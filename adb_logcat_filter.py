@@ -67,6 +67,11 @@ class LogcatFilterApp:
         self.search_results = []
         self.current_result_index = 0
         
+        # 设备选择相关变量
+        self.selected_device = tk.StringVar()
+        self.available_devices = []
+        self.device_combo = None
+        
         # 设置默认值
         self.use_regex.set(True)
         self.case_sensitive.set(False)
@@ -78,6 +83,9 @@ class LogcatFilterApp:
         
         # 启动日志队列处理
         self.process_log_queue()
+        
+        # 初始化设备列表
+        self.refresh_devices()
     
     def setup_ui(self):
         """设置用户界面"""
@@ -95,15 +103,23 @@ class LogcatFilterApp:
         control_frame = ttk.LabelFrame(self.main_frame, text="过滤控制", padding="5")
         control_frame.grid(row=0, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=(0, 10))
         
+        # 设备选择
+        ttk.Label(control_frame, text="设备:").grid(row=0, column=0, sticky=tk.W, padx=(0, 5))
+        self.device_combo = ttk.Combobox(control_frame, textvariable=self.selected_device, width=20, state="readonly")
+        self.device_combo.grid(row=0, column=1, sticky=(tk.W, tk.E), padx=(0, 10))
+        
+        # 刷新设备按钮
+        ttk.Button(control_frame, text="刷新设备", command=self.refresh_devices).grid(row=0, column=2, padx=(0, 10))
+        
         # 关键字输入
-        ttk.Label(control_frame, text="关键字:").grid(row=0, column=0, sticky=tk.W, padx=(0, 5))
+        ttk.Label(control_frame, text="关键字:").grid(row=1, column=0, sticky=tk.W, padx=(0, 5))
         keyword_entry = ttk.Entry(control_frame, textvariable=self.filter_keyword, width=30)
-        keyword_entry.grid(row=0, column=1, sticky=(tk.W, tk.E), padx=(0, 10))
+        keyword_entry.grid(row=1, column=1, sticky=(tk.W, tk.E), padx=(0, 10))
         keyword_entry.bind('<Return>', lambda e: self.start_filtering())
         
         # 选项复选框
         options_frame = ttk.Frame(control_frame)
-        options_frame.grid(row=0, column=2, sticky=tk.W)
+        options_frame.grid(row=1, column=2, sticky=tk.W)
         
         ttk.Checkbutton(options_frame, text="正则表达式", variable=self.use_regex).pack(side=tk.LEFT, padx=(0, 10))
         ttk.Checkbutton(options_frame, text="区分大小写", variable=self.case_sensitive).pack(side=tk.LEFT, padx=(0, 10))
@@ -111,7 +127,7 @@ class LogcatFilterApp:
         
         # 按钮
         button_frame = ttk.Frame(control_frame)
-        button_frame.grid(row=0, column=3, sticky=tk.E)
+        button_frame.grid(row=1, column=3, sticky=tk.E)
         
         self.start_button = ttk.Button(button_frame, text="开始过滤", command=self.start_filtering)
         self.start_button.pack(side=tk.LEFT, padx=(0, 5))
@@ -268,6 +284,7 @@ class LogcatFilterApp:
         menubar.add_cascade(label="工具", menu=tools_menu)
         tools_menu.add_command(label="显示窗口", command=self.bring_to_front)
         tools_menu.add_separator()
+        tools_menu.add_command(label="刷新设备列表", command=self.refresh_devices)
         tools_menu.add_command(label="清除设备缓存", command=self.clear_device_logs)
         tools_menu.add_command(label="保存日志", command=self.save_logs)
         
@@ -314,6 +331,17 @@ class LogcatFilterApp:
             messagebox.showinfo("提示", "过滤已在运行中")
             return
         
+        # 检查设备选择
+        device = self.selected_device.get().strip()
+        if not device or device in ["无设备", "检测失败", "检测超时", "adb未安装", "检测错误"]:
+            messagebox.showwarning("警告", "请先选择有效的设备")
+            return
+        
+        # 如果有多个设备但未选择，提示用户选择
+        if len(self.available_devices) > 1 and not device:
+            messagebox.showwarning("警告", f"检测到多个设备，请选择要抓取日志的设备:\n{', '.join(self.available_devices)}")
+            return
+        
         try:
             # 验证正则表达式
             if self.use_regex.get():
@@ -340,8 +368,14 @@ class LogcatFilterApp:
     def run_logcat(self):
         """运行adb logcat命令"""
         try:
-            # 构建adb logcat命令
-            cmd = ["adb", "logcat", "-v", "time"]
+            # 检查设备选择
+            device = self.selected_device.get().strip()
+            if not device or device in ["无设备", "检测失败", "检测超时", "adb未安装", "检测错误"]:
+                self.log_queue.put("ERROR: 请先选择有效的设备")
+                return
+            
+            # 构建adb logcat命令，添加-b all参数确保完全输出
+            cmd = ["adb", "-s", device, "logcat", "-b", "all", "-v", "time"]
             
             # 启动进程
             self.log_process = subprocess.Popen(
@@ -717,6 +751,69 @@ class LogcatFilterApp:
         else:
             # 使用缓存值
             return self.performance_cache['last_line_count'], self.performance_cache['last_memory_mb']
+    
+    def refresh_devices(self):
+        """刷新可用设备列表"""
+        try:
+            # 执行adb devices命令
+            result = subprocess.run(
+                ["adb", "devices"],
+                capture_output=True,
+                text=True,
+                encoding='utf-8',
+                errors='replace',
+                timeout=10,
+                creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0
+            )
+            
+            if result.returncode == 0:
+                # 解析设备列表
+                lines = result.stdout.strip().split('\n')[1:]  # 跳过第一行标题
+                self.available_devices = []
+                
+                for line in lines:
+                    if line.strip() and '\tdevice' in line:
+                        device_id = line.split('\t')[0].strip()
+                        self.available_devices.append(device_id)
+                
+                # 更新下拉框
+                if self.device_combo:
+                    self.device_combo['values'] = self.available_devices
+                    
+                    # 如果只有一个设备，自动选择
+                    if len(self.available_devices) == 1:
+                        self.selected_device.set(self.available_devices[0])
+                    elif len(self.available_devices) > 1:
+                        # 多个设备时，清空选择
+                        self.selected_device.set("")
+                    else:
+                        # 没有设备
+                        self.selected_device.set("无设备")
+                        
+                self.status_var.set(f"检测到 {len(self.available_devices)} 个设备")
+                
+            else:
+                error_msg = result.stderr.strip() if result.stderr else "未知错误"
+                self.status_var.set(f"设备检测失败: {error_msg}")
+                if self.device_combo:
+                    self.device_combo['values'] = ["检测失败"]
+                    self.selected_device.set("检测失败")
+                
+        except subprocess.TimeoutExpired:
+            self.status_var.set("设备检测超时")
+            if self.device_combo:
+                self.device_combo['values'] = ["检测超时"]
+                self.selected_device.set("检测超时")
+        except FileNotFoundError:
+            self.status_var.set("未找到adb命令")
+            if self.device_combo:
+                self.device_combo['values'] = ["adb未安装"]
+                self.selected_device.set("adb未安装")
+        except Exception as e:
+            self.status_var.set(f"设备检测错误: {e}")
+            if self.device_combo:
+                self.device_combo['values'] = ["检测错误"]
+                self.selected_device.set("检测错误")
     
     def stop_filtering(self):
         """停止过滤"""
