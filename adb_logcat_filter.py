@@ -30,6 +30,35 @@ class LogcatFilterApp:
         self.log_process = None
         self.log_queue = queue.Queue()
         
+        # 性能监控变量
+        self.performance_stats = {
+            'processed_lines': 0,
+            'start_time': None,
+            'last_update_time': None,
+            'processing_rate': 0.0
+        }
+        self.queue_size_threshold = 100  # 队列大小阈值
+        
+        # 自适应处理参数
+        self.adaptive_params = {
+            'base_batch_size': 50,      # 基础批次大小
+            'max_batch_size': 200,      # 最大批次大小
+            'base_interval': 50,         # 基础处理间隔(ms)
+            'min_interval': 10,          # 最小处理间隔(ms)
+            'high_load_threshold': 100,  # 高负荷阈值
+            'medium_load_threshold': 50, # 中等负荷阈值
+            'max_display_lines': 1000,   # 最大显示行数
+            'trim_threshold': 1200       # 裁剪触发阈值
+        }
+        
+        # 性能缓存
+        self.performance_cache = {
+            'last_line_count': 0,
+            'last_memory_mb': 0.0,
+            'last_memory_check': 0,
+            'cache_update_interval': 20   # 每20次更新才重新计算
+        }
+        
         # 搜索相关变量
         self.search_keyword = tk.StringVar()
         self.search_case_sensitive = tk.BooleanVar()
@@ -94,11 +123,22 @@ class LogcatFilterApp:
         ttk.Button(button_frame, text="清除缓存", command=self.clear_device_logs).pack(side=tk.LEFT, padx=(0, 5))
         ttk.Button(button_frame, text="保存日志", command=self.save_logs).pack(side=tk.LEFT)
         
-        # 状态栏
+        # 状态栏框架
+        status_frame = ttk.Frame(self.main_frame)
+        status_frame.grid(row=1, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=(0, 10))
+        status_frame.columnconfigure(0, weight=1)
+        
+        # 主状态
         self.status_var = tk.StringVar()
         self.status_var.set("就绪")
-        status_bar = ttk.Label(self.main_frame, textvariable=self.status_var, relief=tk.SUNKEN)
-        status_bar.grid(row=1, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=(0, 10))
+        status_bar = ttk.Label(status_frame, textvariable=self.status_var, relief=tk.SUNKEN)
+        status_bar.grid(row=0, column=0, sticky=(tk.W, tk.E), padx=(0, 5))
+        
+        # 性能指标
+        self.performance_var = tk.StringVar()
+        self.performance_var.set("")
+        performance_bar = ttk.Label(status_frame, textvariable=self.performance_var, relief=tk.SUNKEN, foreground="blue")
+        performance_bar.grid(row=0, column=1, sticky=tk.E)
     
     def setup_log_display(self):
         """设置日志显示区域"""
@@ -287,6 +327,13 @@ class LogcatFilterApp:
         self.stop_button.config(state=tk.NORMAL)
         self.status_var.set("正在过滤...")
         
+        # 初始化性能统计
+        self.performance_stats['start_time'] = datetime.now()
+        self.performance_stats['last_update_time'] = datetime.now()
+        self.performance_stats['processed_lines'] = 0
+        self.performance_stats['processing_rate'] = 0.0
+        self.update_performance_display()
+        
         # 在新线程中启动logcat
         threading.Thread(target=self.run_logcat, daemon=True).start()
     
@@ -343,13 +390,42 @@ class LogcatFilterApp:
                 return keyword.lower() in line.lower()
     
     def process_log_queue(self):
-        """处理日志队列"""
+        """处理日志队列 - 自适应批次大小"""
         batch_lines = []
+        queue_size = self.log_queue.qsize()
+        
+        # 根据队列大小动态调整批次大小和处理策略
+        if queue_size > self.adaptive_params['high_load_threshold']:
+            # 高负荷：大批次，快速处理，启用采样
+            batch_size = self.adaptive_params['max_batch_size']
+            interval = self.adaptive_params['min_interval']
+            use_sampling = True
+        elif queue_size > self.adaptive_params['medium_load_threshold']:
+            # 中等负荷：中等批次
+            batch_size = int(self.adaptive_params['base_batch_size'] * 1.5)
+            interval = int(self.adaptive_params['base_interval'] * 0.7)
+            use_sampling = False
+        else:
+            # 低负荷：基础批次
+            batch_size = self.adaptive_params['base_batch_size']
+            interval = self.adaptive_params['base_interval']
+            use_sampling = False
+        
         try:
             # 批量处理，减少UI更新次数
-            while len(batch_lines) < 50:  # 最多一次处理50行
-                line = self.log_queue.get_nowait()
-                batch_lines.append(line)
+            if use_sampling:
+                # 高负荷时使用采样：每3行取1行
+                sampled_count = 0
+                while len(batch_lines) < batch_size:
+                    line = self.log_queue.get_nowait()
+                    sampled_count += 1
+                    if sampled_count % 3 == 1:  # 每3行取第1行
+                        batch_lines.append(line)
+            else:
+                # 正常处理
+                while len(batch_lines) < batch_size:
+                    line = self.log_queue.get_nowait()
+                    batch_lines.append(line)
         except queue.Empty:
             pass
         
@@ -357,8 +433,8 @@ class LogcatFilterApp:
         if batch_lines:
             self.add_log_lines_batch(batch_lines)
         
-        # 每50ms检查一次队列，提高响应性
-        self.root.after(50, self.process_log_queue)
+        # 动态调整处理间隔
+        self.root.after(interval, self.process_log_queue)
     
     def add_log_lines_batch(self, lines):
         """批量添加日志行，提高性能"""
@@ -372,34 +448,31 @@ class LogcatFilterApp:
             timestamp = datetime.now().strftime("%H:%M:%S.%f")[:-3]
             full_line = f"[{timestamp}] {line.rstrip()}\n"
             
-            # 高亮关键字（如果启用）
+            # 高亮关键字（如果启用）- 支持自适应高亮策略
             if self.color_highlight.get() and self.filter_keyword.get():
                 self.add_highlighted_line_batch(full_line)
             else:
                 self.log_text.insert(tk.END, full_line)
         
-        # 限制日志行数（保留最近1000行）
-        # 只在添加了一定数量的行后才检查，减少频繁操作
-        if hasattr(self, '_line_count'):
-            self._line_count += len(lines)
-        else:
-            self._line_count = len(lines)
+        # 更新性能统计
+        self.performance_stats['processed_lines'] += len(lines)
+        self.update_performance_display()
         
-        if self._line_count > 1000:
-            lines_count = len(self.log_text.get("1.0", tk.END).split('\n'))
-            if lines_count > 1000:
-                self.log_text.delete("1.0", f"{lines_count - 1000}.0")
-            self._line_count = 0
+        # 高效的行数裁剪机制
+        self.trim_log_lines_if_needed(len(lines))
         
         self.log_text.config(state=tk.DISABLED)
         self.log_text.see(tk.END)
     
     def add_highlighted_line_batch(self, line):
-        """批量添加高亮显示的日志行，优化性能"""
+        """批量添加高亮显示的日志行，支持自适应高亮策略"""
         keyword = self.filter_keyword.get()
         if not keyword:
             self.log_text.insert(tk.END, line)
             return
+        
+        # 检查队列负荷，决定高亮策略
+        queue_size = self.log_queue.qsize()
         
         # 准备搜索模式
         if self.use_regex.get():
@@ -420,20 +493,70 @@ class LogcatFilterApp:
             self.log_text.insert(tk.END, line)
             return
         
-        # 插入高亮文本
-        last_end = 0
-        for match in matches:
-            # 插入普通文本
-            if match.start() > last_end:
-                self.log_text.insert(tk.END, line[last_end:match.start()])
-            
+        # 自适应高亮策略：高负荷时只高亮第一个匹配
+        if queue_size > self.adaptive_params['high_load_threshold']:
+            # 高负荷：只高亮第一个匹配，提升性能
+            match = matches[0]
+            # 插入匹配前的文本
+            if match.start() > 0:
+                self.log_text.insert(tk.END, line[:match.start()])
             # 插入高亮文本
             self.log_text.insert(tk.END, match.group(), "highlight")
-            last_end = match.end()
+            # 插入匹配后的文本
+            if match.end() < len(line):
+                self.log_text.insert(tk.END, line[match.end():])
+        else:
+            # 正常负荷：高亮所有匹配
+            last_end = 0
+            for match in matches:
+                # 插入普通文本
+                if match.start() > last_end:
+                    self.log_text.insert(tk.END, line[last_end:match.start()])
+                
+                # 插入高亮文本
+                self.log_text.insert(tk.END, match.group(), "highlight")
+                last_end = match.end()
+            
+            # 插入剩余文本
+            if last_end < len(line):
+                self.log_text.insert(tk.END, line[last_end:])
+    
+    def trim_log_lines_if_needed(self, added_lines):
+        """高效的行数裁剪机制 - 第三阶段优化"""
+        # 维护行计数器
+        if not hasattr(self, '_line_count'):
+            self._line_count = 0
         
-        # 插入剩余文本
-        if last_end < len(line):
-            self.log_text.insert(tk.END, line[last_end:])
+        self._line_count += added_lines
+        
+        # 使用更高的阈值触发裁剪，减少频繁操作
+        if self._line_count > self.adaptive_params['trim_threshold']:
+            # 使用高效的文本索引删除，避免get().split()统计
+            try:
+                # 获取当前总行数（使用index方法更高效）
+                current_lines = int(self.log_text.index('end-1c').split('.')[0])
+                
+                if current_lines > self.adaptive_params['max_display_lines']:
+                    # 计算需要删除的行数
+                    lines_to_delete = current_lines - self.adaptive_params['max_display_lines']
+                    
+                    # 使用文本索引一次性删除超出的行
+                    # 删除从第1行到第(lines_to_delete)行
+                    self.log_text.delete("1.0", f"{lines_to_delete + 1}.0")
+                    
+                    # 更新缓存
+                    self.performance_cache['last_line_count'] = self.adaptive_params['max_display_lines']
+                    
+                    # 重置计数器
+                    self._line_count = 0
+                    
+            except Exception as e:
+                # 如果出现异常，回退到原来的方法
+                lines_count = len(self.log_text.get("1.0", tk.END).split('\n'))
+                if lines_count > self.adaptive_params['max_display_lines']:
+                    self.log_text.delete("1.0", f"{lines_count - self.adaptive_params['max_display_lines']}.0")
+                self._line_count = 0
+                self.performance_cache['last_line_count'] = self.adaptive_params['max_display_lines']
     
     def add_log_line(self, line):
         """添加日志行到显示区域"""
@@ -452,10 +575,8 @@ class LogcatFilterApp:
         else:
             self.log_text.insert(tk.END, full_line + "\n")
         
-        # 限制日志行数（保留最近1000行）
-        lines = self.log_text.get("1.0", tk.END).split('\n')
-        if len(lines) > 1000:
-            self.log_text.delete("1.0", f"{len(lines) - 1000}.0")
+        # 高效的行数裁剪机制
+        self.trim_log_lines_if_needed(1)
         
         self.log_text.config(state=tk.DISABLED)
         self.log_text.see(tk.END)
@@ -503,6 +624,100 @@ class LogcatFilterApp:
         
         self.log_text.insert(tk.END, "\n")
     
+    def update_performance_display(self):
+        """更新性能显示"""
+        if not self.is_running:
+            return
+        
+        current_time = datetime.now()
+        queue_size = self.log_queue.qsize()
+        
+        # 计算处理速率（每秒处理的行数）
+        if self.performance_stats['start_time']:
+            elapsed_time = (current_time - self.performance_stats['start_time']).total_seconds()
+            if elapsed_time > 0:
+                self.performance_stats['processing_rate'] = self.performance_stats['processed_lines'] / elapsed_time
+        
+        # 获取当前自适应参数
+        current_batch_size = self.get_current_batch_size(queue_size)
+        current_interval = self.get_current_interval(queue_size)
+        
+        # 更新性能显示
+        rate_text = f"{self.performance_stats['processing_rate']:.1f}" if self.performance_stats['processing_rate'] > 0 else "0.0"
+        
+        # 使用缓存机制计算当前显示的行数和内存使用
+        current_display_lines, memory_mb = self.get_cached_performance_metrics()
+        
+        performance_text = f"队列: {queue_size} | 速率: {rate_text} 行/秒 | 批次: {current_batch_size} | 间隔: {current_interval}ms | 显示: {current_display_lines}行 | 内存: {memory_mb:.1f}MB"
+        
+        # 根据队列大小改变颜色和状态
+        if queue_size > self.adaptive_params['high_load_threshold']:
+            performance_text += " (高负荷-采样模式)"
+            color = "red"
+        elif queue_size > self.adaptive_params['medium_load_threshold']:
+            performance_text += " (中负荷-优化)"
+            color = "orange"
+        else:
+            performance_text += " (正常)"
+            color = "blue"
+        
+        self.performance_var.set(performance_text)
+        
+        # 更新性能栏颜色
+        for child in self.main_frame.winfo_children():
+            if isinstance(child, ttk.Frame):
+                for grandchild in child.winfo_children():
+                    if isinstance(grandchild, ttk.Label) and grandchild.cget('textvariable') == str(self.performance_var):
+                        grandchild.configure(foreground=color)
+                        break
+    
+    def get_current_batch_size(self, queue_size):
+        """获取当前批次大小"""
+        if queue_size > self.adaptive_params['high_load_threshold']:
+            return self.adaptive_params['max_batch_size']
+        elif queue_size > self.adaptive_params['medium_load_threshold']:
+            return int(self.adaptive_params['base_batch_size'] * 1.5)
+        else:
+            return self.adaptive_params['base_batch_size']
+    
+    def get_current_interval(self, queue_size):
+        """获取当前处理间隔"""
+        if queue_size > self.adaptive_params['high_load_threshold']:
+            return self.adaptive_params['min_interval']
+        elif queue_size > self.adaptive_params['medium_load_threshold']:
+            return int(self.adaptive_params['base_interval'] * 0.7)
+        else:
+            return self.adaptive_params['base_interval']
+    
+    def get_cached_performance_metrics(self):
+        """使用缓存机制获取性能指标，减少计算开销"""
+        # 更新缓存计数器
+        self.performance_cache['last_memory_check'] += 1
+        
+        # 只在达到缓存更新间隔时才重新计算
+        if self.performance_cache['last_memory_check'] >= self.performance_cache['cache_update_interval']:
+            try:
+                # 计算当前显示的行数
+                current_display_lines = int(self.log_text.index('end-1c').split('.')[0])
+                
+                # 计算内存使用情况（估算）
+                text_content_length = len(self.log_text.get("1.0", tk.END))
+                memory_mb = text_content_length / (1024 * 1024)  # 转换为MB
+                
+                # 更新缓存
+                self.performance_cache['last_line_count'] = current_display_lines
+                self.performance_cache['last_memory_mb'] = memory_mb
+                self.performance_cache['last_memory_check'] = 0
+                
+                return current_display_lines, memory_mb
+                
+            except Exception:
+                # 如果出现异常，返回缓存值
+                return self.performance_cache['last_line_count'], self.performance_cache['last_memory_mb']
+        else:
+            # 使用缓存值
+            return self.performance_cache['last_line_count'], self.performance_cache['last_memory_mb']
+    
     def stop_filtering(self):
         """停止过滤"""
         self.is_running = False
@@ -515,6 +730,9 @@ class LogcatFilterApp:
         self.start_button.config(state=tk.NORMAL)
         self.stop_button.config(state=tk.DISABLED)
         self.status_var.set("已停止")
+        
+        # 重置性能统计
+        self.performance_var.set("")
     
     def clear_logs(self):
         """清空日志"""
@@ -522,6 +740,14 @@ class LogcatFilterApp:
         self.log_text.delete("1.0", tk.END)
         self.log_text.config(state=tk.DISABLED)
         self._line_count = 0  # 重置行计数器
+        
+        # 重置性能统计
+        if self.is_running:
+            self.performance_stats['processed_lines'] = 0
+            self.performance_stats['start_time'] = datetime.now()
+            self.performance_stats['processing_rate'] = 0.0
+            self.update_performance_display()
+        
         self.status_var.set("日志已清空")
     
     def save_logs(self):
