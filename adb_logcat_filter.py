@@ -103,42 +103,75 @@ class LogcatFilterApp:
         control_frame = ttk.LabelFrame(self.main_frame, text="过滤控制", padding="5")
         control_frame.grid(row=0, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=(0, 10))
         
+        # 第一行 - 设备控制 + MTKLOG + ADB log操作
+        first_row_frame = ttk.Frame(control_frame)
+        first_row_frame.grid(row=0, column=0, columnspan=4, sticky=(tk.W, tk.E), pady=(0, 5))
+        
         # 设备选择
-        ttk.Label(control_frame, text="设备:").grid(row=0, column=0, sticky=tk.W, padx=(0, 5))
-        self.device_combo = ttk.Combobox(control_frame, textvariable=self.selected_device, width=20, state="readonly")
-        self.device_combo.grid(row=0, column=1, sticky=(tk.W, tk.E), padx=(0, 10))
+        ttk.Label(first_row_frame, text="设备:").pack(side=tk.LEFT, padx=(0, 5))
+        self.device_combo = ttk.Combobox(first_row_frame, textvariable=self.selected_device, width=18, state="readonly")
+        self.device_combo.pack(side=tk.LEFT, padx=(0, 5))
         
         # 刷新设备按钮
-        ttk.Button(control_frame, text="刷新设备", command=self.refresh_devices).grid(row=0, column=2, padx=(0, 10))
+        ttk.Button(first_row_frame, text="刷新设备", command=self.refresh_devices).pack(side=tk.LEFT, padx=(0, 5))
+        
+        # MTKLOG按钮组
+        mtklog_label = ttk.Label(first_row_frame, text="MTKLOG:")
+        mtklog_label.pack(side=tk.LEFT, padx=(0, 5))
+        
+        self.start_mtklog_button = ttk.Button(first_row_frame, text="开启", command=self.start_mtklog)
+        self.start_mtklog_button.pack(side=tk.LEFT, padx=(0, 2))
+        
+        self.stop_export_mtklog_button = ttk.Button(first_row_frame, text="停止&导出", command=self.stop_and_export_mtklog)
+        self.stop_export_mtklog_button.pack(side=tk.LEFT, padx=(0, 2))
+        
+        self.delete_mtklog_button = ttk.Button(first_row_frame, text="删除", command=self.delete_mtklog)
+        self.delete_mtklog_button.pack(side=tk.LEFT, padx=(0, 2))
+        
+        self.sd_mode_button = ttk.Button(first_row_frame, text="SD模式", command=self.set_sd_mode)
+        self.sd_mode_button.pack(side=tk.LEFT, padx=(0, 2))
+        
+        self.usb_mode_button = ttk.Button(first_row_frame, text="USB模式", command=self.set_usb_mode)
+        self.usb_mode_button.pack(side=tk.LEFT, padx=(0, 10))
+        
+        # ADB log按钮组
+        adblog_label = ttk.Label(first_row_frame, text="ADB Log:")
+        adblog_label.pack(side=tk.LEFT, padx=(0, 5))
+        
+        self.start_adblog_button = ttk.Button(first_row_frame, text="开启", command=self.start_adblog)
+        self.start_adblog_button.pack(side=tk.LEFT, padx=(0, 2))
+        
+        self.export_adblog_button = ttk.Button(first_row_frame, text="导出", command=self.export_adblog)
+        self.export_adblog_button.pack(side=tk.LEFT)
+        
+        # 第二行 - 过滤控制 + 常用操作
+        second_row_frame = ttk.Frame(control_frame)
+        second_row_frame.grid(row=1, column=0, columnspan=4, sticky=(tk.W, tk.E), pady=(0, 5))
         
         # 关键字输入
-        ttk.Label(control_frame, text="关键字:").grid(row=1, column=0, sticky=tk.W, padx=(0, 5))
-        keyword_entry = ttk.Entry(control_frame, textvariable=self.filter_keyword, width=30)
-        keyword_entry.grid(row=1, column=1, sticky=(tk.W, tk.E), padx=(0, 10))
+        ttk.Label(second_row_frame, text="关键字:").pack(side=tk.LEFT, padx=(0, 5))
+        keyword_entry = ttk.Entry(second_row_frame, textvariable=self.filter_keyword, width=20)
+        keyword_entry.pack(side=tk.LEFT, padx=(0, 10))
         keyword_entry.bind('<Return>', lambda e: self.start_filtering())
         
         # 选项复选框
-        options_frame = ttk.Frame(control_frame)
-        options_frame.grid(row=1, column=2, sticky=tk.W)
+        ttk.Checkbutton(second_row_frame, text="正则表达式", variable=self.use_regex).pack(side=tk.LEFT, padx=(0, 8))
+        ttk.Checkbutton(second_row_frame, text="区分大小写", variable=self.case_sensitive).pack(side=tk.LEFT, padx=(0, 8))
+        ttk.Checkbutton(second_row_frame, text="彩色高亮", variable=self.color_highlight).pack(side=tk.LEFT, padx=(0, 10))
         
-        ttk.Checkbutton(options_frame, text="正则表达式", variable=self.use_regex).pack(side=tk.LEFT, padx=(0, 10))
-        ttk.Checkbutton(options_frame, text="区分大小写", variable=self.case_sensitive).pack(side=tk.LEFT, padx=(0, 10))
-        ttk.Checkbutton(options_frame, text="彩色高亮", variable=self.color_highlight).pack(side=tk.LEFT)
+        # 主要操作按钮
+        self.start_button = ttk.Button(second_row_frame, text="开始过滤", command=self.start_filtering)
+        self.start_button.pack(side=tk.LEFT, padx=(0, 3))
         
-        # 按钮
-        button_frame = ttk.Frame(control_frame)
-        button_frame.grid(row=1, column=3, sticky=tk.E)
-        
-        self.start_button = ttk.Button(button_frame, text="开始过滤", command=self.start_filtering)
-        self.start_button.pack(side=tk.LEFT, padx=(0, 5))
-        
-        self.stop_button = ttk.Button(button_frame, text="停止", command=self.stop_filtering, state=tk.DISABLED)
+        self.stop_button = ttk.Button(second_row_frame, text="停止", command=self.stop_filtering, state=tk.DISABLED)
         self.stop_button.pack(side=tk.LEFT, padx=(0, 5))
         
-        ttk.Button(button_frame, text="清空日志", command=self.clear_logs).pack(side=tk.LEFT, padx=(0, 5))
-        ttk.Button(button_frame, text="清除缓存", command=self.clear_device_logs).pack(side=tk.LEFT, padx=(0, 5))
-        ttk.Button(button_frame, text="设置行数", command=self.show_display_lines_dialog).pack(side=tk.LEFT, padx=(0, 5))
-        ttk.Button(button_frame, text="保存日志", command=self.save_logs).pack(side=tk.LEFT)
+        # 常用按钮
+        ttk.Button(second_row_frame, text="清空日志", command=self.clear_logs).pack(side=tk.LEFT, padx=(0, 3))
+        ttk.Button(second_row_frame, text="清除缓存", command=self.clear_device_logs).pack(side=tk.LEFT, padx=(0, 3))
+        ttk.Button(second_row_frame, text="设置行数", command=self.show_display_lines_dialog).pack(side=tk.LEFT, padx=(0, 3))
+        ttk.Button(second_row_frame, text="保存日志", command=self.save_logs).pack(side=tk.LEFT)
+        
         
         # 状态栏框架
         status_frame = ttk.Frame(self.main_frame)
@@ -536,7 +569,7 @@ class LogcatFilterApp:
             # 插入匹配前的文本
             if match.start() > 0:
                 self.log_text.insert(tk.END, line[:match.start()])
-            # 插入高亮文本
+        # 插入高亮文本
             self.log_text.insert(tk.END, match.group(), "highlight")
             # 插入匹配后的文本
             if match.end() < len(line):
@@ -544,18 +577,18 @@ class LogcatFilterApp:
         else:
             # 正常负荷：高亮所有匹配
             last_end = 0
-            for match in matches:
-                # 插入普通文本
-                if match.start() > last_end:
-                    self.log_text.insert(tk.END, line[last_end:match.start()])
-                
-                # 插入高亮文本
-                self.log_text.insert(tk.END, match.group(), "highlight")
-                last_end = match.end()
+        for match in matches:
+            # 插入普通文本
+            if match.start() > last_end:
+                self.log_text.insert(tk.END, line[last_end:match.start()])
             
-            # 插入剩余文本
-            if last_end < len(line):
-                self.log_text.insert(tk.END, line[last_end:])
+            # 插入高亮文本
+            self.log_text.insert(tk.END, match.group(), "highlight")
+            last_end = match.end()
+        
+        # 插入剩余文本
+        if last_end < len(line):
+            self.log_text.insert(tk.END, line[last_end:])
     
     def trim_log_lines_if_needed(self, added_lines):
         """高效的行数裁剪机制 - 使用trim_threshold避免频繁操作"""
@@ -1458,6 +1491,976 @@ class LogcatFilterApp:
         except Exception as e:
             messagebox.showerror("错误", f"清除设备日志缓存时发生错误: {e}")
             self.status_var.set("清除设备日志缓存失败")
+    
+    def start_mtklog(self):
+        """开启MTKLOG"""
+        device = self.selected_device.get()
+        if not device:
+            messagebox.showerror("错误", "请先选择设备")
+            return
+        
+        # 创建进度条弹框
+        progress_dialog = tk.Toplevel(self.root)
+        progress_dialog.title("开启MTKLOG")
+        progress_dialog.geometry("400x150")
+        progress_dialog.resizable(False, False)
+        progress_dialog.transient(self.root)
+        progress_dialog.grab_set()
+        
+        # 居中显示
+        progress_dialog.geometry("+%d+%d" % (self.root.winfo_rootx() + 50, self.root.winfo_rooty() + 50))
+        
+        # 进度条框架
+        progress_frame = ttk.Frame(progress_dialog, padding="20")
+        progress_frame.pack(fill=tk.BOTH, expand=True)
+        
+        # 标题
+        title_label = ttk.Label(progress_frame, text="正在开启MTKLOG...", font=('Arial', 12, 'bold'))
+        title_label.pack(pady=(0, 10))
+        
+        # 进度条
+        progress_var = tk.DoubleVar()
+        progress_bar = ttk.Progressbar(progress_frame, variable=progress_var, maximum=100, length=300)
+        progress_bar.pack(pady=(0, 10))
+        
+        # 状态标签
+        status_label = ttk.Label(progress_frame, text="准备中...", font=('Arial', 10))
+        status_label.pack(pady=(0, 10))
+        
+        # 设备信息
+        device_label = ttk.Label(progress_frame, text=f"设备: {device}", font=('Arial', 9), foreground="gray")
+        device_label.pack()
+        
+        # 更新进度条
+        progress_dialog.update()
+        
+        try:
+            # 命令序列：停止logger -> 清除旧日志 -> 设置缓存大小 -> 开启logger
+            commands = [
+                # 1. 停止logger,加5s时间保护
+                ["adb", "-s", device, "shell", "am", "broadcast", "-a", "com.debug.loggerui.ADB_CMD", 
+                 "-e", "cmd_name", "stop", "--ei", "cmd_target", "-1", "-n", "com.debug.loggerui/.framework.LogReceiver"],
+                
+                # 2. 清除旧日志,加2s时间保护
+                ["adb", "-s", device, "shell", "am", "broadcast", "-a", "com.debug.loggerui.ADB_CMD", 
+                 "-e", "cmd_name", "clear_logs_all", "--ei", "cmd_target", "0", "-n", "com.debug.loggerui/.framework.LogReceiver"],
+                
+                # 3. 设置MD log缓存大小20GB,加1s时间保护
+                ["adb", "-s", device, "shell", "am", "broadcast", "-a", "com.debug.loggerui.ADB_CMD", 
+                 "-e", "cmd_name", "set_log_size_20000", "--ei", "cmd_target", "2", "-n", "com.debug.loggerui/.framework.LogReceiver"],
+                
+                # 4. 开启MTK LOGGER
+                ["adb", "-s", device, "shell", "am", "broadcast", "-a", "com.debug.loggerui.ADB_CMD", 
+                 "-e", "cmd_name", "start", "--ei", "cmd_target", "-1", "-n", "com.debug.loggerui/.framework.LogReceiver"]
+            ]
+            
+            step_names = ["停止logger", "清除旧日志", "设置缓存大小", "开启logger"]
+            
+            # 执行命令序列
+            for i, cmd in enumerate(commands, 1):
+                # 更新状态
+                status_label.config(text=f"步骤 {i}/4: {step_names[i-1]}")
+                progress_var.set((i-1) * 25)
+                progress_dialog.update()
+                
+                result = subprocess.run(cmd, capture_output=True, text=True, timeout=15)
+                if result.returncode != 0:
+                    error_msg = result.stderr.strip() if result.stderr else "未知错误"
+                    progress_dialog.destroy()
+                    messagebox.showerror("错误", f"开启MTKLOG失败 (步骤{i}):\n{error_msg}")
+                    self.status_var.set(f"开启MTKLOG失败 - 步骤{i}")
+                    return
+                
+                # 更新进度
+                progress_var.set(i * 25)
+                progress_dialog.update()
+                
+                # 添加时间保护
+                if i == 1:  # 停止logger后等待5秒
+                    status_label.config(text="等待5秒...")
+                    progress_dialog.update()
+                    import time
+                    time.sleep(5)
+                elif i == 2:  # 清除日志后等待2秒
+                    status_label.config(text="等待2秒...")
+                    progress_dialog.update()
+                    import time
+                    time.sleep(2)
+                elif i == 3:  # 设置缓存大小后等待1秒
+                    status_label.config(text="等待1秒...")
+                    progress_dialog.update()
+                    import time
+                    time.sleep(1)
+            
+            # 完成
+            status_label.config(text="完成!")
+            progress_var.set(100)
+            progress_dialog.update()
+            
+            # 关闭进度条
+            progress_dialog.destroy()
+            
+            messagebox.showinfo("成功", f"MTKLOG已开启 \n(设备: {device})")
+            self.status_var.set(f"MTKLOG已开启 - {device}")
+                
+        except subprocess.TimeoutExpired:
+            progress_dialog.destroy()
+            messagebox.showerror("错误", "开启MTKLOG超时，请检查设备连接")
+            self.status_var.set("开启MTKLOG超时")
+        except FileNotFoundError:
+            progress_dialog.destroy()
+            messagebox.showerror("错误", "未找到adb命令，请确保Android SDK已安装并配置PATH")
+            self.status_var.set("未找到adb命令")
+        except Exception as e:
+            progress_dialog.destroy()
+            messagebox.showerror("错误", f"开启MTKLOG时发生错误: {e}")
+            self.status_var.set("开启MTKLOG失败")
+    
+    def stop_mtklog(self):
+        """停止MTKLOG"""
+        device = self.selected_device.get()
+        if not device:
+            messagebox.showerror("错误", "请先选择设备")
+            return
+        
+        # 创建简单的进度提示
+        progress_dialog = tk.Toplevel(self.root)
+        progress_dialog.title("停止MTKLOG")
+        progress_dialog.geometry("350x120")
+        progress_dialog.resizable(False, False)
+        progress_dialog.transient(self.root)
+        progress_dialog.grab_set()
+        
+        # 居中显示
+        progress_dialog.geometry("+%d+%d" % (self.root.winfo_rootx() + 75, self.root.winfo_rooty() + 75))
+        
+        # 进度框架
+        progress_frame = ttk.Frame(progress_dialog, padding="20")
+        progress_frame.pack(fill=tk.BOTH, expand=True)
+        
+        # 标题
+        title_label = ttk.Label(progress_frame, text="正在停止MTKLOG...", font=('Arial', 12, 'bold'))
+        title_label.pack(pady=(0, 10))
+        
+        # 状态标签
+        status_label = ttk.Label(progress_frame, text="执行停止命令...", font=('Arial', 10))
+        status_label.pack(pady=(0, 5))
+        
+        # 设备信息
+        device_label = ttk.Label(progress_frame, text=f"设备: {device}", font=('Arial', 9), foreground="gray")
+        device_label.pack()
+        
+        progress_dialog.update()
+        
+        try:
+            # 停止logger命令,加5s时间保护
+            cmd = ["adb", "-s", device, "shell", "am", "broadcast", "-a", "com.debug.loggerui.ADB_CMD", 
+                   "-e", "cmd_name", "stop", "--ei", "cmd_target", "-1", "-n", "com.debug.loggerui/.framework.LogReceiver"]
+            
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=15)
+            
+            if result.returncode == 0:
+                # 更新状态
+                status_label.config(text="等待5秒保护时间...")
+                progress_dialog.update()
+                
+                # 添加5秒时间保护
+                import time
+                time.sleep(5)
+                
+                # 关闭进度条
+                progress_dialog.destroy()
+                
+                messagebox.showinfo("成功", f"MTKLOG已停止 \n(设备: {device})")
+                self.status_var.set(f"MTKLOG已停止 - {device}")
+            else:
+                error_msg = result.stderr.strip() if result.stderr else "未知错误"
+                progress_dialog.destroy()
+                messagebox.showerror("错误", f"停止MTKLOG失败:\n{error_msg}")
+                self.status_var.set("停止MTKLOG失败")
+                
+        except subprocess.TimeoutExpired:
+            progress_dialog.destroy()
+            messagebox.showerror("错误", "停止MTKLOG超时，请检查设备连接")
+            self.status_var.set("停止MTKLOG超时")
+        except FileNotFoundError:
+            progress_dialog.destroy()
+            messagebox.showerror("错误", "未找到adb命令，请确保Android SDK已安装并配置PATH")
+            self.status_var.set("未找到adb命令")
+        except Exception as e:
+            progress_dialog.destroy()
+            messagebox.showerror("错误", f"停止MTKLOG时发生错误: {e}")
+            self.status_var.set("停止MTKLOG失败")
+    
+    def stop_and_export_mtklog(self):
+        """停止并导出MTKLOG"""
+        device = self.selected_device.get()
+        if not device:
+            messagebox.showerror("错误", "请先选择设备")
+            return
+        
+        # 获取日志名称
+        log_name = tk.simpledialog.askstring("输入日志名称", "请输入日志名称:", parent=self.root)
+        if not log_name:
+            return
+        
+        # 创建进度条弹框
+        progress_dialog = tk.Toplevel(self.root)
+        progress_dialog.title("停止并导出MTKLOG")
+        progress_dialog.geometry("450x200")
+        progress_dialog.resizable(False, False)
+        progress_dialog.transient(self.root)
+        progress_dialog.grab_set()
+        
+        # 居中显示
+        progress_dialog.geometry("+%d+%d" % (self.root.winfo_rootx() + 25, self.root.winfo_rooty() + 25))
+        
+        # 进度条框架
+        progress_frame = ttk.Frame(progress_dialog, padding="20")
+        progress_frame.pack(fill=tk.BOTH, expand=True)
+        
+        # 标题
+        title_label = ttk.Label(progress_frame, text="正在停止并导出MTKLOG...", font=('Arial', 12, 'bold'))
+        title_label.pack(pady=(0, 10))
+        
+        # 进度条
+        progress_var = tk.DoubleVar()
+        progress_bar = ttk.Progressbar(progress_frame, variable=progress_var, maximum=100, length=400)
+        progress_bar.pack(pady=(0, 10))
+        
+        # 状态标签
+        status_label = ttk.Label(progress_frame, text="准备中...", font=('Arial', 10))
+        status_label.pack(pady=(0, 5))
+        
+        # 设备信息
+        device_label = ttk.Label(progress_frame, text=f"设备: {device} | 日志名称: {log_name}", font=('Arial', 9), foreground="gray")
+        device_label.pack()
+        
+        # 日志输出区域
+        log_text = tk.Text(progress_frame, height=4, width=50, font=('Consolas', 8))
+        log_text.pack(pady=(10, 0))
+        
+        progress_dialog.update()
+        
+        try:
+            import os
+            import datetime
+            
+            # 1. 停止logger命令,加5s时间保护
+            status_label.config(text="停止logger...")
+            progress_var.set(20)
+            progress_dialog.update()
+            
+            stop_cmd = ["adb", "-s", device, "shell", "am", "broadcast", "-a", "com.debug.loggerui.ADB_CMD", 
+                       "-e", "cmd_name", "stop", "--ei", "cmd_target", "-1", "-n", "com.debug.loggerui/.framework.LogReceiver"]
+            
+            result = subprocess.run(stop_cmd, capture_output=True, text=True, timeout=15)
+            if result.returncode != 0:
+                raise Exception(f"停止logger失败: {result.stderr.strip()}")
+            
+            log_text.insert(tk.END, f"✓ logger已停止\n")
+            log_text.see(tk.END)
+            progress_dialog.update()
+            
+            # 添加5秒时间保护
+            status_label.config(text="等待5秒保护时间...")
+            progress_dialog.update()
+            import time
+            time.sleep(5)
+            
+            # 2. 创建日志目录
+            status_label.config(text="创建日志目录...")
+            progress_var.set(40)
+            progress_dialog.update()
+            
+            curredate = datetime.datetime.now().strftime("%Y%m%d")
+            log_dir = f"c:\\log\\{curredate}"
+            log_folder = f"{log_dir}\\log_{log_name}"
+            
+            if not os.path.exists(log_dir):
+                os.makedirs(log_dir)
+            
+            log_text.insert(tk.END, f"✓ 日志目录已创建: {log_folder}\n")
+            log_text.see(tk.END)
+            progress_dialog.update()
+            
+            # 3. 执行adb pull命令序列
+            pull_commands = [
+                ("/sdcard/TCTReport", "TCTReport"),
+                ("/sdcard/mtklog", "mtklog"),
+                ("/sdcard/debuglogger", "debuglogger"),
+                ("/sdcard/logmanager", "logmanager"),
+                ("/data/debuglogger", "data_debuglogger"),
+                ("/sdcard/BugReport", "BugReport"),
+                ("/data/media/logmanager", "data_logmanager")
+            ]
+            
+            total_commands = len(pull_commands)
+            
+            for i, (source_path, folder_name) in enumerate(pull_commands):
+                status_label.config(text=f"导出 {folder_name} ({i+1}/{total_commands})...")
+                progress_var.set(50 + (i * 5))
+                progress_dialog.update()
+                
+                # 执行adb pull
+                cmd = ["adb", "-s", device, "pull", source_path, log_folder]
+                result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+                
+                if result.returncode == 0:
+                    log_text.insert(tk.END, f"✓ {folder_name} 导出成功\n")
+                else:
+                    log_text.insert(tk.END, f"✗ {folder_name} 导出失败: {result.stderr.strip()}\n")
+                
+                log_text.see(tk.END)
+                progress_dialog.update()
+            
+            # 4. 执行设备端重命名操作
+            status_label.config(text="执行设备端重命名...")
+            progress_var.set(90)
+            progress_dialog.update()
+            
+            # 执行脚本 - 逐行执行命令
+            rename_commands = [
+                "cd /sdcard",
+                f"mv /sdcard/mtklog /sdcard/log_{log_name}",
+                f"mv /sdcard/debuglogger /sdcard/log_{log_name}",
+                f"mv /sdcard/logmanager /sdcard/log_{log_name}",
+                f"mv /sdcard/TCTReport /sdcard/log_{log_name}"
+            ]
+            
+            for cmd in rename_commands:
+                shell_cmd = ["adb", "-s", device, "shell", cmd]
+                result = subprocess.run(shell_cmd, capture_output=True, text=True, timeout=30)
+                if result.returncode != 0:
+                    log_text.insert(tk.END, f"重命名命令失败: {cmd}\n")
+                else:
+                    log_text.insert(tk.END, f"✓ 重命名成功: {cmd}\n")
+                log_text.see(tk.END)
+                progress_dialog.update()
+            
+            # 5. 完成
+            status_label.config(text="完成!")
+            progress_var.set(100)
+            progress_dialog.update()
+            
+            # 等待一下让用户看到完成状态
+            time.sleep(1)
+            
+            # 关闭进度条
+            progress_dialog.destroy()
+            
+            # 打开日志文件夹
+            os.startfile(log_folder)
+            
+            messagebox.showinfo("成功", f"MTKLOG已停止并导出到: {log_folder}\n(设备: {device})")
+            self.status_var.set(f"MTKLOG已停止并导出 - {device}")
+                
+        except subprocess.TimeoutExpired:
+            progress_dialog.destroy()
+            messagebox.showerror("错误", "停止并导出MTKLOG超时，请检查设备连接")
+            self.status_var.set("停止并导出MTKLOG超时")
+        except FileNotFoundError:
+            progress_dialog.destroy()
+            messagebox.showerror("错误", "未找到adb命令，请确保Android SDK已安装并配置PATH")
+            self.status_var.set("未找到adb命令")
+        except Exception as e:
+            progress_dialog.destroy()
+            messagebox.showerror("错误", f"停止并导出MTKLOG时发生错误: {e}")
+            self.status_var.set("停止并导出MTKLOG失败")
+    
+    def delete_mtklog(self):
+        """删除MTKLOG"""
+        device = self.selected_device.get()
+        if not device:
+            messagebox.showerror("错误", "请先选择设备")
+            return
+        
+        # 创建进度条弹框
+        progress_dialog = tk.Toplevel(self.root)
+        progress_dialog.title("删除MTKLOG")
+        progress_dialog.geometry("350x120")
+        progress_dialog.resizable(False, False)
+        progress_dialog.transient(self.root)
+        progress_dialog.grab_set()
+        
+        # 居中显示
+        progress_dialog.geometry("+%d+%d" % (self.root.winfo_rootx() + 75, self.root.winfo_rooty() + 75))
+        
+        # 进度框架
+        progress_frame = ttk.Frame(progress_dialog, padding="20")
+        progress_frame.pack(fill=tk.BOTH, expand=True)
+        
+        # 标题
+        title_label = ttk.Label(progress_frame, text="正在删除MTKLOG...", font=('Arial', 12, 'bold'))
+        title_label.pack(pady=(0, 10))
+        
+        # 状态标签
+        status_label = ttk.Label(progress_frame, text="执行删除命令...", font=('Arial', 10))
+        status_label.pack(pady=(0, 5))
+        
+        # 设备信息
+        device_label = ttk.Label(progress_frame, text=f"设备: {device}", font=('Arial', 9), foreground="gray")
+        device_label.pack()
+        
+        progress_dialog.update()
+        
+        try:
+            # 删除logger命令
+            cmd = ["adb", "-s", device, "shell", "am", "broadcast", "-a", "com.debug.loggerui.ADB_CMD", 
+                   "-e", "cmd_name", "clear_logs_all", "--ei", "cmd_target", "0", "-n", "com.debug.loggerui/.framework.LogReceiver"]
+            
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=15)
+            
+            if result.returncode == 0:
+                # 更新状态
+                status_label.config(text="删除完成!")
+                progress_dialog.update()
+                
+                # 等待一下让用户看到完成状态
+                import time
+                time.sleep(1)
+                
+                # 关闭进度条
+                progress_dialog.destroy()
+                
+                messagebox.showinfo("成功", f"MTKLOG已删除 \n(设备: {device})")
+                self.status_var.set(f"MTKLOG已删除 - {device}")
+            else:
+                error_msg = result.stderr.strip() if result.stderr else "未知错误"
+                progress_dialog.destroy()
+                messagebox.showerror("错误", f"删除MTKLOG失败:\n{error_msg}")
+                self.status_var.set("删除MTKLOG失败")
+                
+        except subprocess.TimeoutExpired:
+            progress_dialog.destroy()
+            messagebox.showerror("错误", "删除MTKLOG超时，请检查设备连接")
+            self.status_var.set("删除MTKLOG超时")
+        except FileNotFoundError:
+            progress_dialog.destroy()
+            messagebox.showerror("错误", "未找到adb命令，请确保Android SDK已安装并配置PATH")
+            self.status_var.set("未找到adb命令")
+        except Exception as e:
+            progress_dialog.destroy()
+            messagebox.showerror("错误", f"删除MTKLOG时发生错误: {e}")
+            self.status_var.set("删除MTKLOG失败")
+    
+    def set_sd_mode(self):
+        """设置SD模式"""
+        device = self.selected_device.get()
+        if not device:
+            messagebox.showerror("错误", "请先选择设备")
+            return
+        
+        try:
+            cmd = ["adb", "-s", device, "shell", "am", "broadcast", "-a", "com.debug.loggerui.ADB_CMD", 
+                   "-e", "cmd_name", "switch_modem_log_mode_2", "--ei", "cmd_target", "1", "-n", "com.debug.loggerui/.framework.LogReceiver"]
+            
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=15)
+            
+            if result.returncode == 0:
+                messagebox.showinfo("成功", f"已设置为SD模式 \n(设备: {device})")
+                self.status_var.set(f"已设置为SD模式 - {device}")
+            else:
+                error_msg = result.stderr.strip() if result.stderr else "未知错误"
+                messagebox.showerror("错误", f"设置SD模式失败:\n{error_msg}")
+                self.status_var.set("设置SD模式失败")
+                
+        except subprocess.TimeoutExpired:
+            messagebox.showerror("错误", "设置SD模式超时，请检查设备连接")
+            self.status_var.set("设置SD模式超时")
+        except FileNotFoundError:
+            messagebox.showerror("错误", "未找到adb命令，请确保Android SDK已安装并配置PATH")
+            self.status_var.set("未找到adb命令")
+        except Exception as e:
+            messagebox.showerror("错误", f"设置SD模式时发生错误: {e}")
+            self.status_var.set("设置SD模式失败")
+    
+    def set_usb_mode(self):
+        """设置USB模式"""
+        device = self.selected_device.get()
+        if not device:
+            messagebox.showerror("错误", "请先选择设备")
+            return
+        
+        try:
+            cmd = ["adb", "-s", device, "shell", "am", "broadcast", "-a", "com.debug.loggerui.ADB_CMD", 
+                   "-e", "cmd_name", "switch_modem_log_mode_1", "--ei", "cmd_target", "1", "-n", "com.debug.loggerui/.framework.LogReceiver"]
+            
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=15)
+            
+            if result.returncode == 0:
+                messagebox.showinfo("成功", f"已设置为USB模式 \n(设备: {device})")
+                self.status_var.set(f"已设置为USB模式 - {device}")
+            else:
+                error_msg = result.stderr.strip() if result.stderr else "未知错误"
+                messagebox.showerror("错误", f"设置USB模式失败:\n{error_msg}")
+                self.status_var.set("设置USB模式失败")
+                
+        except subprocess.TimeoutExpired:
+            messagebox.showerror("错误", "设置USB模式超时，请检查设备连接")
+            self.status_var.set("设置USB模式超时")
+        except FileNotFoundError:
+            messagebox.showerror("错误", "未找到adb命令，请确保Android SDK已安装并配置PATH")
+            self.status_var.set("未找到adb命令")
+        except Exception as e:
+            messagebox.showerror("错误", f"设置USB模式时发生错误: {e}")
+            self.status_var.set("设置USB模式失败")
+    
+    def export_mtklog(self):
+        """导出MTKLOG - 按照CMD脚本逻辑"""
+        device = self.selected_device.get()
+        if not device:
+            messagebox.showerror("错误", "请先选择设备")
+            return
+        
+        # 获取日志名称
+        log_name = tk.simpledialog.askstring("输入日志名称", "请输入日志名称:", parent=self.root)
+        if not log_name:
+            return
+        
+        # 创建进度条弹框
+        progress_dialog = tk.Toplevel(self.root)
+        progress_dialog.title("导出MTKLOG")
+        progress_dialog.geometry("450x200")
+        progress_dialog.resizable(False, False)
+        progress_dialog.transient(self.root)
+        progress_dialog.grab_set()
+        
+        # 居中显示
+        progress_dialog.geometry("+%d+%d" % (self.root.winfo_rootx() + 25, self.root.winfo_rooty() + 25))
+        
+        # 进度条框架
+        progress_frame = ttk.Frame(progress_dialog, padding="20")
+        progress_frame.pack(fill=tk.BOTH, expand=True)
+        
+        # 标题
+        title_label = ttk.Label(progress_frame, text="正在导出MTKLOG...", font=('Arial', 12, 'bold'))
+        title_label.pack(pady=(0, 10))
+        
+        # 进度条
+        progress_var = tk.DoubleVar()
+        progress_bar = ttk.Progressbar(progress_frame, variable=progress_var, maximum=100, length=400)
+        progress_bar.pack(pady=(0, 10))
+        
+        # 状态标签
+        status_label = ttk.Label(progress_frame, text="准备中...", font=('Arial', 10))
+        status_label.pack(pady=(0, 5))
+        
+        # 设备信息
+        device_label = ttk.Label(progress_frame, text=f"设备: {device} | 日志名称: {log_name}", font=('Arial', 9), foreground="gray")
+        device_label.pack()
+        
+        # 日志输出区域
+        log_text = tk.Text(progress_frame, height=4, width=50, font=('Consolas', 8))
+        log_text.pack(pady=(10, 0))
+        
+        progress_dialog.update()
+        
+        try:
+            import os
+            import datetime
+            
+            # 1. 等待设备连接
+            status_label.config(text="等待设备连接...")
+            progress_var.set(5)
+            progress_dialog.update()
+            
+            wait_cmd = ["adb", "-s", device, "wait-for-device"]
+            result = subprocess.run(wait_cmd, capture_output=True, text=True, timeout=30)
+            if result.returncode != 0:
+                raise Exception("设备连接失败")
+            
+            # 2. 创建日志目录
+            status_label.config(text="创建日志目录...")
+            progress_var.set(10)
+            progress_dialog.update()
+            
+            curredate = datetime.datetime.now().strftime("%Y%m%d")
+            log_dir = f"c:\\log\\{curredate}"
+            log_folder = f"{log_dir}\\log_{log_name}"
+            
+            if not os.path.exists(log_dir):
+                os.makedirs(log_dir)
+            
+            # 3. 执行adb pull命令序列
+            pull_commands = [
+                ("/sdcard/TCTReport", "TCTReport"),
+                ("/sdcard/mtklog", "mtklog"),
+                ("/sdcard/debuglogger", "debuglogger"),
+                ("/sdcard/logmanager", "logmanager"),
+                ("/data/debuglogger", "data_debuglogger"),
+                ("/sdcard/BugReport", "BugReport"),
+                ("/data/media/logmanager", "data_logmanager")
+            ]
+            
+            total_commands = len(pull_commands)
+            
+            for i, (source_path, folder_name) in enumerate(pull_commands):
+                status_label.config(text=f"导出 {folder_name} ({i+1}/{total_commands})...")
+                progress_var.set(15 + (i * 10))
+                progress_dialog.update()
+                
+                # 执行adb pull
+                cmd = ["adb", "-s", device, "pull", source_path, log_folder]
+                result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+                
+                if result.returncode == 0:
+                    log_text.insert(tk.END, f"✓ {folder_name} 导出成功\n")
+                else:
+                    log_text.insert(tk.END, f"✗ {folder_name} 导出失败: {result.stderr.strip()}\n")
+                
+                log_text.see(tk.END)
+                progress_dialog.update()
+            
+            # 4. 执行设备端重命名操作
+            status_label.config(text="执行设备端重命名...")
+            progress_var.set(85)
+            progress_dialog.update()
+            
+            # 创建临时脚本文件
+            temp_script = os.path.expanduser("~\\temp.txt")
+            with open(temp_script, 'w') as f:
+                f.write("cd /sdcard\n")
+                f.write(f"mv /sdcard/mtklog /sdcard/log_{log_name}\n")
+                f.write(f"mv /sdcard/debuglogger /sdcard/log_{log_name}\n")
+                f.write(f"mv /sdcard/logmanager /sdcard/log_{log_name}\n")
+                f.write(f"mv /sdcard/TCTReport /sdcard/log_{log_name}\n")
+                f.write("exit\n")
+            
+            # 执行脚本 - 逐行执行命令
+            rename_commands = [
+                "cd /sdcard",
+                f"mv /sdcard/mtklog /sdcard/log_{log_name}",
+                f"mv /sdcard/debuglogger /sdcard/log_{log_name}",
+                f"mv /sdcard/logmanager /sdcard/log_{log_name}",
+                f"mv /sdcard/TCTReport /sdcard/log_{log_name}"
+            ]
+            
+            for cmd in rename_commands:
+                shell_cmd = ["adb", "-s", device, "shell", cmd]
+                result = subprocess.run(shell_cmd, capture_output=True, text=True, timeout=30)
+                if result.returncode != 0:
+                    log_text.insert(tk.END, f"重命名命令失败: {cmd}\n")
+                else:
+                    log_text.insert(tk.END, f"✓ 重命名成功: {cmd}\n")
+                log_text.see(tk.END)
+                progress_dialog.update()
+            
+            # 5. 检查data/media/logmanager
+            status_label.config(text="检查data/media/logmanager...")
+            progress_var.set(90)
+            progress_dialog.update()
+            
+            check_cmd = ["adb", "-s", device, "shell", "ls", "-l", "/data/media/logmanager/*"]
+            result = subprocess.run(check_cmd, capture_output=True, text=True, timeout=30)
+            if result.returncode == 0:
+                log_text.insert(tk.END, f"data/media/logmanager 内容:\n{result.stdout}\n")
+            
+            # 6. 完成
+            status_label.config(text="完成!")
+            progress_var.set(100)
+            progress_dialog.update()
+            
+            # 等待一下让用户看到完成状态
+            import time
+            time.sleep(1)
+            
+            # 关闭进度条
+            progress_dialog.destroy()
+            
+            # 打开日志文件夹
+            os.startfile(log_folder)
+            
+            # 清理临时文件
+            if os.path.exists(temp_script):
+                os.remove(temp_script)
+            
+            messagebox.showinfo("成功", f"MTKLOG已导出到: {log_folder}\n(设备: {device})")
+            self.status_var.set(f"MTKLOG已导出 - {device}")
+                
+        except subprocess.TimeoutExpired:
+            progress_dialog.destroy()
+            messagebox.showerror("错误", "导出MTKLOG超时，请检查设备连接")
+            self.status_var.set("导出MTKLOG超时")
+        except FileNotFoundError:
+            progress_dialog.destroy()
+            messagebox.showerror("错误", "未找到adb命令，请确保Android SDK已安装并配置PATH")
+            self.status_var.set("未找到adb命令")
+        except Exception as e:
+            progress_dialog.destroy()
+            messagebox.showerror("错误", f"导出MTKLOG时发生错误: {e}")
+            self.status_var.set("导出MTKLOG失败")
+    
+    def start_adblog(self):
+        """开启adb log"""
+        device = self.selected_device.get()
+        if not device:
+            messagebox.showerror("错误", "请先选择设备")
+            return
+        
+        # 创建进度条弹框
+        progress_dialog = tk.Toplevel(self.root)
+        progress_dialog.title("开启ADB Log")
+        progress_dialog.geometry("400x150")
+        progress_dialog.resizable(False, False)
+        progress_dialog.transient(self.root)
+        progress_dialog.grab_set()
+        
+        # 居中显示
+        progress_dialog.geometry("+%d+%d" % (self.root.winfo_rootx() + 50, self.root.winfo_rooty() + 50))
+        
+        # 进度条框架
+        progress_frame = ttk.Frame(progress_dialog, padding="20")
+        progress_frame.pack(fill=tk.BOTH, expand=True)
+        
+        # 标题
+        title_label = ttk.Label(progress_frame, text="正在开启ADB Log...", font=('Arial', 12, 'bold'))
+        title_label.pack(pady=(0, 10))
+        
+        # 进度条
+        progress_var = tk.DoubleVar()
+        progress_bar = ttk.Progressbar(progress_frame, variable=progress_var, maximum=100, length=300)
+        progress_bar.pack(pady=(0, 10))
+        
+        # 状态标签
+        status_label = ttk.Label(progress_frame, text="准备中...", font=('Arial', 10))
+        status_label.pack(pady=(0, 10))
+        
+        # 设备信息
+        device_label = ttk.Label(progress_frame, text=f"设备: {device}", font=('Arial', 9), foreground="gray")
+        device_label.pack()
+        
+        progress_dialog.update()
+        
+        try:
+            # 1. 清理临时目录
+            status_label.config(text="清理临时目录...")
+            progress_var.set(25)
+            progress_dialog.update()
+            
+            cmd1 = ["adb", "-s", device, "shell", "rm", "-rf", "/data/local/tmp/*"]
+            result = subprocess.run(cmd1, capture_output=True, text=True, timeout=30)
+            if result.returncode != 0:
+                raise Exception(f"清理临时目录失败: {result.stderr.strip()}")
+            
+            # 2. 启动logcat进程
+            status_label.config(text="启动logcat进程...")
+            progress_var.set(50)
+            progress_dialog.update()
+            
+            cmd2 = ["adb", "-s", device, "shell", "nohup", "logcat", "-v", "time", "-b", "all", "-f", "/data/local/tmp/logcat_$(date +%Y%m%d_%H%M%S).txt", ">", "/dev/null", "2>&1", "&"]
+            result = subprocess.run(cmd2, capture_output=True, text=True, timeout=30)
+            if result.returncode != 0:
+                raise Exception(f"启动logcat失败: {result.stderr.strip()}")
+            
+            # 3. 检查logcat进程是否存在
+            status_label.config(text="检查logcat进程...")
+            progress_var.set(75)
+            progress_dialog.update()
+            
+            cmd3 = ["adb", "-s", device, "shell", "ps", "-A"]
+            result = subprocess.run(cmd3, capture_output=True, text=True, timeout=30)
+            if result.returncode != 0:
+                raise Exception(f"检查进程失败: {result.stderr.strip()}")
+            
+            # 检查输出中是否包含logcat
+            if "logcat" not in result.stdout:
+                raise Exception("logcat进程不存在，启动失败")
+            
+            # 完成
+            status_label.config(text="完成!")
+            progress_var.set(100)
+            progress_dialog.update()
+            
+            # 等待一下让用户看到完成状态
+            import time
+            time.sleep(1)
+            
+            # 关闭进度条
+            progress_dialog.destroy()
+            
+            messagebox.showinfo("成功", f"ADB log已开启 (设备: {device})\nlogcat进程正在后台运行")
+            self.status_var.set(f"ADB log已开启 - {device}")
+                
+        except subprocess.TimeoutExpired:
+            progress_dialog.destroy()
+            messagebox.showerror("错误", "开启ADB log超时，请检查设备连接")
+            self.status_var.set("开启ADB log超时")
+        except FileNotFoundError:
+            progress_dialog.destroy()
+            messagebox.showerror("错误", "未找到adb命令，请确保Android SDK已安装并配置PATH")
+            self.status_var.set("未找到adb命令")
+        except Exception as e:
+            progress_dialog.destroy()
+            messagebox.showerror("错误", f"开启ADB log时发生错误: {e}")
+            self.status_var.set("开启ADB log失败")
+    
+    def export_adblog(self):
+        """停止adb log并导出"""
+        device = self.selected_device.get()
+        if not device:
+            messagebox.showerror("错误", "请先选择设备")
+            return
+        
+        # 创建进度条弹框
+        progress_dialog = tk.Toplevel(self.root)
+        progress_dialog.title("停止并导出ADB Log")
+        progress_dialog.geometry("450x200")
+        progress_dialog.resizable(False, False)
+        progress_dialog.transient(self.root)
+        progress_dialog.grab_set()
+        
+        # 居中显示
+        progress_dialog.geometry("+%d+%d" % (self.root.winfo_rootx() + 25, self.root.winfo_rooty() + 25))
+        
+        # 进度条框架
+        progress_frame = ttk.Frame(progress_dialog, padding="20")
+        progress_frame.pack(fill=tk.BOTH, expand=True)
+        
+        # 标题
+        title_label = ttk.Label(progress_frame, text="正在停止并导出ADB Log...", font=('Arial', 12, 'bold'))
+        title_label.pack(pady=(0, 10))
+        
+        # 进度条
+        progress_var = tk.DoubleVar()
+        progress_bar = ttk.Progressbar(progress_frame, variable=progress_var, maximum=100, length=400)
+        progress_bar.pack(pady=(0, 10))
+        
+        # 状态标签
+        status_label = ttk.Label(progress_frame, text="准备中...", font=('Arial', 10))
+        status_label.pack(pady=(0, 5))
+        
+        # 设备信息
+        device_label = ttk.Label(progress_frame, text=f"设备: {device}", font=('Arial', 9), foreground="gray")
+        device_label.pack()
+        
+        # 日志输出区域
+        log_text = tk.Text(progress_frame, height=4, width=50, font=('Consolas', 8))
+        log_text.pack(pady=(10, 0))
+        
+        progress_dialog.update()
+        
+        try:
+            import os
+            import datetime
+            
+            # 1. 检查设备连接状态
+            status_label.config(text="检查设备连接状态...")
+            progress_var.set(10)
+            progress_dialog.update()
+            
+            devices_cmd = ["adb", "devices"]
+            result = subprocess.run(devices_cmd, capture_output=True, text=True, timeout=30)
+            if result.returncode != 0:
+                raise Exception("检查设备连接失败")
+            
+            # 检查设备是否在列表中
+            if device not in result.stdout:
+                raise Exception(f"设备 {device} 未连接")
+            
+            log_text.insert(tk.END, f"✓ 设备 {device} 连接正常\n")
+            log_text.see(tk.END)
+            progress_dialog.update()
+            
+            # 2. 检查logcat进程是否存在
+            status_label.config(text="检查logcat进程...")
+            progress_var.set(25)
+            progress_dialog.update()
+            
+            ps_cmd = ["adb", "-s", device, "shell", "ps", "-A"]
+            result = subprocess.run(ps_cmd, capture_output=True, text=True, timeout=30)
+            if result.returncode != 0:
+                raise Exception(f"检查进程失败: {result.stderr.strip()}")
+            
+            # 检查输出中是否包含logcat
+            if "logcat" not in result.stdout:
+                progress_dialog.destroy()
+                messagebox.showerror("错误", "logcat进程不存在，log抓取异常")
+                self.status_var.set("logcat进程不存在")
+                return
+            
+            log_text.insert(tk.END, f"✓ logcat进程存在\n")
+            log_text.see(tk.END)
+            progress_dialog.update()
+            
+            # 3. 杀掉logcat进程
+            status_label.config(text="停止logcat进程...")
+            progress_var.set(40)
+            progress_dialog.update()
+            
+            pkill_cmd = ["adb", "-s", device, "shell", "pkill", "logcat"]
+            result = subprocess.run(pkill_cmd, capture_output=True, text=True, timeout=30)
+            if result.returncode != 0:
+                log_text.insert(tk.END, f"⚠ 停止logcat进程警告: {result.stderr.strip()}\n")
+            else:
+                log_text.insert(tk.END, f"✓ logcat进程已停止\n")
+            
+            log_text.see(tk.END)
+            progress_dialog.update()
+            
+            # 4. 创建日志目录
+            status_label.config(text="创建日志目录...")
+            progress_var.set(50)
+            progress_dialog.update()
+            
+            curredate = datetime.datetime.now().strftime("%Y%m%d")
+            log_dir = f"c:\\log\\{curredate}"
+            
+            if not os.path.exists(log_dir):
+                os.makedirs(log_dir)
+            
+            log_text.insert(tk.END, f"✓ 日志目录已创建: {log_dir}\n")
+            log_text.see(tk.END)
+            progress_dialog.update()
+            
+            # 5. 导出log文件
+            status_label.config(text="导出log文件...")
+            progress_var.set(70)
+            progress_dialog.update()
+            
+            # 创建logcat子目录
+            logcat_dir = os.path.join(log_dir, "logcat")
+            pull_cmd = ["adb", "-s", device, "pull", "/data/local/tmp/", logcat_dir]
+            result = subprocess.run(pull_cmd, capture_output=True, text=True, timeout=120)
+            
+            if result.returncode == 0:
+                log_text.insert(tk.END, f"✓ log文件导出成功\n")
+            else:
+                log_text.insert(tk.END, f"✗ log文件导出失败: {result.stderr.strip()}\n")
+            
+            log_text.see(tk.END)
+            progress_dialog.update()
+            
+            # 6. 完成
+            status_label.config(text="完成!")
+            progress_var.set(100)
+            progress_dialog.update()
+            
+            # 等待一下让用户看到完成状态
+            import time
+            time.sleep(1)
+            
+            # 关闭进度条
+            progress_dialog.destroy()
+            
+            # 打开logcat文件夹
+            os.startfile(logcat_dir)
+            
+            messagebox.showinfo("成功", f"ADB log已停止并导出到: {logcat_dir}\n(设备: {device})")
+            self.status_var.set(f"ADB log已导出 - {device}")
+                
+        except subprocess.TimeoutExpired:
+            progress_dialog.destroy()
+            messagebox.showerror("错误", "停止并导出ADB log超时，请检查设备连接")
+            self.status_var.set("停止并导出ADB log超时")
+        except FileNotFoundError:
+            progress_dialog.destroy()
+            messagebox.showerror("错误", "未找到adb命令，请确保Android SDK已安装并配置PATH")
+            self.status_var.set("未找到adb命令")
+        except Exception as e:
+            progress_dialog.destroy()
+            messagebox.showerror("错误", f"停止并导出ADB log时发生错误: {e}")
+            self.status_var.set("停止并导出ADB log失败")
 
 def main():
     """主函数"""
