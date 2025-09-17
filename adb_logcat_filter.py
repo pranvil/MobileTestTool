@@ -1506,6 +1506,52 @@ class LogcatFilterApp:
             messagebox.showerror("错误", "请先选择设备")
             return
         
+        # 先检查设备连接状态
+        try:
+            devices_cmd = ["adb", "devices"]
+            result = subprocess.run(devices_cmd, capture_output=True, text=True, timeout=30, creationflags=subprocess.CREATE_NO_WINDOW)
+            
+            if result.returncode != 0:
+                messagebox.showerror("错误", "检查设备连接失败")
+                self.status_var.set("检查设备连接失败")
+                return
+            
+            # 检查设备是否在列表中
+            if device not in result.stdout:
+                messagebox.showerror("错误", f"设备 {device} 未连接")
+                self.status_var.set(f"设备 {device} 未连接")
+                return
+            
+            # 设备连接正常，继续检查MTKlogger
+            self.status_var.set(f"设备 {device} 连接正常，检查MTKlogger...")
+                
+        except Exception as e:
+            messagebox.showerror("错误", f"检查设备连接时发生错误: {e}")
+            self.status_var.set("检查设备连接失败")
+            return
+        
+        # 检查MTKlogger是否存在
+        try:
+            check_cmd = ["adb", "-s", device, "shell", "am", "start", "-n", "com.debug.loggerui/.MainActivity"]
+            result = subprocess.run(check_cmd, capture_output=True, text=True, timeout=30, creationflags=subprocess.CREATE_NO_WINDOW)
+            
+            if result.returncode != 0 or "Error type 3" in result.stderr or "does not exist" in result.stderr:
+                messagebox.showerror("错误", 
+                    f"MTKlogger不存在，需要安装\n\n"
+                    f"设备: {device}\n"
+                    f"错误信息: {result.stderr.strip() if result.stderr else 'MTKlogger未安装'}\n\n"
+                    f"请先安装MTKlogger工具后再使用此功能")
+                self.status_var.set("MTKlogger不存在，需要安装")
+                return
+            
+            # MTKlogger存在，继续执行
+            self.status_var.set("MTKlogger检查通过，开始开启MTKLOG")
+                
+        except Exception as e:
+            messagebox.showerror("错误", f"检查MTKlogger时发生错误: {e}")
+            self.status_var.set("检查MTKlogger失败")
+            return
+        
         # 创建进度条弹框
         progress_dialog = tk.Toplevel(self.root)
         progress_dialog.title("开启MTKLOG")
@@ -1639,6 +1685,52 @@ class LogcatFilterApp:
             messagebox.showerror("错误", "请先选择设备")
             return
         
+        # 先检查设备连接状态
+        try:
+            devices_cmd = ["adb", "devices"]
+            result = subprocess.run(devices_cmd, capture_output=True, text=True, timeout=30, creationflags=subprocess.CREATE_NO_WINDOW)
+            
+            if result.returncode != 0:
+                messagebox.showerror("错误", "检查设备连接失败")
+                self.status_var.set("检查设备连接失败")
+                return
+            
+            # 检查设备是否在列表中
+            if device not in result.stdout:
+                messagebox.showerror("错误", f"设备 {device} 未连接")
+                self.status_var.set(f"设备 {device} 未连接")
+                return
+            
+            # 设备连接正常，继续检查MTKlogger
+            self.status_var.set(f"设备 {device} 连接正常，检查MTKlogger...")
+                
+        except Exception as e:
+            messagebox.showerror("错误", f"检查设备连接时发生错误: {e}")
+            self.status_var.set("检查设备连接失败")
+            return
+        
+        # 检查MTKlogger是否存在
+        try:
+            check_cmd = ["adb", "-s", device, "shell", "am", "start", "-n", "com.debug.loggerui/.MainActivity"]
+            result = subprocess.run(check_cmd, capture_output=True, text=True, timeout=30, creationflags=subprocess.CREATE_NO_WINDOW)
+            
+            if result.returncode != 0 or "Error type 3" in result.stderr or "does not exist" in result.stderr:
+                messagebox.showerror("错误", 
+                    f"MTKlogger不存在，需要安装\n\n"
+                    f"设备: {device}\n"
+                    f"错误信息: {result.stderr.strip() if result.stderr else 'MTKlogger未安装'}\n\n"
+                    f"请先安装MTKlogger工具后再使用此功能")
+                self.status_var.set("MTKlogger不存在，需要安装")
+                return
+            
+            # MTKlogger存在，继续执行
+            self.status_var.set("MTKlogger检查通过，开始停止MTKLOG")
+                
+        except Exception as e:
+            messagebox.showerror("错误", f"检查MTKlogger时发生错误: {e}")
+            self.status_var.set("检查MTKlogger失败")
+            return
+        
         # 创建简单的进度提示
         progress_dialog = tk.Toplevel(self.root)
         progress_dialog.title("停止MTKLOG")
@@ -1722,6 +1814,52 @@ class LogcatFilterApp:
         device = self.selected_device.get()
         if not device:
             messagebox.showerror("错误", "请先选择设备")
+            return
+        
+        # 先检查设备连接状态
+        try:
+            devices_cmd = ["adb", "devices"]
+            result = subprocess.run(devices_cmd, capture_output=True, text=True, timeout=30, creationflags=subprocess.CREATE_NO_WINDOW)
+            
+            if result.returncode != 0:
+                messagebox.showerror("错误", "检查设备连接失败")
+                self.status_var.set("检查设备连接失败")
+                return
+            
+            # 检查设备是否在列表中
+            if device not in result.stdout:
+                messagebox.showerror("错误", f"设备 {device} 未连接")
+                self.status_var.set(f"设备 {device} 未连接")
+                return
+            
+            # 设备连接正常，继续检查MTKlogger
+            self.status_var.set(f"设备 {device} 连接正常，检查MTKlogger...")
+                
+        except Exception as e:
+            messagebox.showerror("错误", f"检查设备连接时发生错误: {e}")
+            self.status_var.set("检查设备连接失败")
+            return
+        
+        # 检查MTKlogger是否存在
+        try:
+            check_cmd = ["adb", "-s", device, "shell", "am", "start", "-n", "com.debug.loggerui/.MainActivity"]
+            result = subprocess.run(check_cmd, capture_output=True, text=True, timeout=30, creationflags=subprocess.CREATE_NO_WINDOW)
+            
+            if result.returncode != 0 or "Error type 3" in result.stderr or "does not exist" in result.stderr:
+                messagebox.showerror("错误", 
+                    f"MTKlogger不存在，需要安装\n\n"
+                    f"设备: {device}\n"
+                    f"错误信息: {result.stderr.strip() if result.stderr else 'MTKlogger未安装'}\n\n"
+                    f"请先安装MTKlogger工具后再使用此功能")
+                self.status_var.set("MTKlogger不存在，需要安装")
+                return
+            
+            # MTKlogger存在，继续执行
+            self.status_var.set("MTKlogger检查通过，开始停止并导出MTKLOG")
+                
+        except Exception as e:
+            messagebox.showerror("错误", f"检查MTKlogger时发生错误: {e}")
+            self.status_var.set("检查MTKlogger失败")
             return
         
         # 获取日志名称
@@ -1906,6 +2044,52 @@ class LogcatFilterApp:
             messagebox.showerror("错误", "请先选择设备")
             return
         
+        # 先检查设备连接状态
+        try:
+            devices_cmd = ["adb", "devices"]
+            result = subprocess.run(devices_cmd, capture_output=True, text=True, timeout=30, creationflags=subprocess.CREATE_NO_WINDOW)
+            
+            if result.returncode != 0:
+                messagebox.showerror("错误", "检查设备连接失败")
+                self.status_var.set("检查设备连接失败")
+                return
+            
+            # 检查设备是否在列表中
+            if device not in result.stdout:
+                messagebox.showerror("错误", f"设备 {device} 未连接")
+                self.status_var.set(f"设备 {device} 未连接")
+                return
+            
+            # 设备连接正常，继续检查MTKlogger
+            self.status_var.set(f"设备 {device} 连接正常，检查MTKlogger...")
+                
+        except Exception as e:
+            messagebox.showerror("错误", f"检查设备连接时发生错误: {e}")
+            self.status_var.set("检查设备连接失败")
+            return
+        
+        # 检查MTKlogger是否存在
+        try:
+            check_cmd = ["adb", "-s", device, "shell", "am", "start", "-n", "com.debug.loggerui/.MainActivity"]
+            result = subprocess.run(check_cmd, capture_output=True, text=True, timeout=30, creationflags=subprocess.CREATE_NO_WINDOW)
+            
+            if result.returncode != 0 or "Error type 3" in result.stderr or "does not exist" in result.stderr:
+                messagebox.showerror("错误", 
+                    f"MTKlogger不存在，需要安装\n\n"
+                    f"设备: {device}\n"
+                    f"错误信息: {result.stderr.strip() if result.stderr else 'MTKlogger未安装'}\n\n"
+                    f"请先安装MTKlogger工具后再使用此功能")
+                self.status_var.set("MTKlogger不存在，需要安装")
+                return
+            
+            # MTKlogger存在，继续执行
+            self.status_var.set("MTKlogger检查通过，开始删除MTKLOG")
+                
+        except Exception as e:
+            messagebox.showerror("错误", f"检查MTKlogger时发生错误: {e}")
+            self.status_var.set("检查MTKlogger失败")
+            return
+        
         # 创建进度条弹框
         progress_dialog = tk.Toplevel(self.root)
         progress_dialog.title("删除MTKLOG")
@@ -1991,6 +2175,52 @@ class LogcatFilterApp:
             messagebox.showerror("错误", "请先选择设备")
             return
         
+        # 先检查设备连接状态
+        try:
+            devices_cmd = ["adb", "devices"]
+            result = subprocess.run(devices_cmd, capture_output=True, text=True, timeout=30, creationflags=subprocess.CREATE_NO_WINDOW)
+            
+            if result.returncode != 0:
+                messagebox.showerror("错误", "检查设备连接失败")
+                self.status_var.set("检查设备连接失败")
+                return
+            
+            # 检查设备是否在列表中
+            if device not in result.stdout:
+                messagebox.showerror("错误", f"设备 {device} 未连接")
+                self.status_var.set(f"设备 {device} 未连接")
+                return
+            
+            # 设备连接正常，继续检查MTKlogger
+            self.status_var.set(f"设备 {device} 连接正常，检查MTKlogger...")
+                
+        except Exception as e:
+            messagebox.showerror("错误", f"检查设备连接时发生错误: {e}")
+            self.status_var.set("检查设备连接失败")
+            return
+        
+        # 检查MTKlogger是否存在
+        try:
+            check_cmd = ["adb", "-s", device, "shell", "am", "start", "-n", "com.debug.loggerui/.MainActivity"]
+            result = subprocess.run(check_cmd, capture_output=True, text=True, timeout=30, creationflags=subprocess.CREATE_NO_WINDOW)
+            
+            if result.returncode != 0 or "Error type 3" in result.stderr or "does not exist" in result.stderr:
+                messagebox.showerror("错误", 
+                    f"MTKlogger不存在，需要安装\n\n"
+                    f"设备: {device}\n"
+                    f"错误信息: {result.stderr.strip() if result.stderr else 'MTKlogger未安装'}\n\n"
+                    f"请先安装MTKlogger工具后再使用此功能")
+                self.status_var.set("MTKlogger不存在，需要安装")
+                return
+            
+            # MTKlogger存在，继续执行
+            self.status_var.set("MTKlogger检查通过，开始设置SD模式")
+                
+        except Exception as e:
+            messagebox.showerror("错误", f"检查MTKlogger时发生错误: {e}")
+            self.status_var.set("检查MTKlogger失败")
+            return
+        
         try:
             cmd = ["adb", "-s", device, "shell", "am", "broadcast", "-a", "com.debug.loggerui.ADB_CMD", 
                    "-e", "cmd_name", "switch_modem_log_mode_2", "--ei", "cmd_target", "1", "-n", "com.debug.loggerui/.framework.LogReceiver"]
@@ -2020,6 +2250,52 @@ class LogcatFilterApp:
         device = self.selected_device.get()
         if not device:
             messagebox.showerror("错误", "请先选择设备")
+            return
+        
+        # 先检查设备连接状态
+        try:
+            devices_cmd = ["adb", "devices"]
+            result = subprocess.run(devices_cmd, capture_output=True, text=True, timeout=30, creationflags=subprocess.CREATE_NO_WINDOW)
+            
+            if result.returncode != 0:
+                messagebox.showerror("错误", "检查设备连接失败")
+                self.status_var.set("检查设备连接失败")
+                return
+            
+            # 检查设备是否在列表中
+            if device not in result.stdout:
+                messagebox.showerror("错误", f"设备 {device} 未连接")
+                self.status_var.set(f"设备 {device} 未连接")
+                return
+            
+            # 设备连接正常，继续检查MTKlogger
+            self.status_var.set(f"设备 {device} 连接正常，检查MTKlogger...")
+                
+        except Exception as e:
+            messagebox.showerror("错误", f"检查设备连接时发生错误: {e}")
+            self.status_var.set("检查设备连接失败")
+            return
+        
+        # 检查MTKlogger是否存在
+        try:
+            check_cmd = ["adb", "-s", device, "shell", "am", "start", "-n", "com.debug.loggerui/.MainActivity"]
+            result = subprocess.run(check_cmd, capture_output=True, text=True, timeout=30, creationflags=subprocess.CREATE_NO_WINDOW)
+            
+            if result.returncode != 0 or "Error type 3" in result.stderr or "does not exist" in result.stderr:
+                messagebox.showerror("错误", 
+                    f"MTKlogger不存在，需要安装\n\n"
+                    f"设备: {device}\n"
+                    f"错误信息: {result.stderr.strip() if result.stderr else 'MTKlogger未安装'}\n\n"
+                    f"请先安装MTKlogger工具后再使用此功能")
+                self.status_var.set("MTKlogger不存在，需要安装")
+                return
+            
+            # MTKlogger存在，继续执行
+            self.status_var.set("MTKlogger检查通过，开始设置USB模式")
+                
+        except Exception as e:
+            messagebox.showerror("错误", f"检查MTKlogger时发生错误: {e}")
+            self.status_var.set("检查MTKlogger失败")
             return
         
         try:
@@ -2245,7 +2521,31 @@ class LogcatFilterApp:
             messagebox.showerror("错误", "请先选择设备")
             return
         
-        # 先检查logcat进程是否存在
+        # 先检查设备连接状态
+        try:
+            devices_cmd = ["adb", "devices"]
+            result = subprocess.run(devices_cmd, capture_output=True, text=True, timeout=30, creationflags=subprocess.CREATE_NO_WINDOW)
+            
+            if result.returncode != 0:
+                messagebox.showerror("错误", "检查设备连接失败")
+                self.status_var.set("检查设备连接失败")
+                return
+            
+            # 检查设备是否在列表中
+            if device not in result.stdout:
+                messagebox.showerror("错误", f"设备 {device} 未连接")
+                self.status_var.set(f"设备 {device} 未连接")
+                return
+            
+            # 设备连接正常，继续检查logcat进程
+            self.status_var.set(f"设备 {device} 连接正常，检查logcat进程...")
+                
+        except Exception as e:
+            messagebox.showerror("错误", f"检查设备连接时发生错误: {e}")
+            self.status_var.set("检查设备连接失败")
+            return
+        
+        # 检查logcat进程是否存在
         try:
             ps_cmd = ["adb", "-s", device, "shell", "ps", "-A"]
             result = subprocess.run(ps_cmd, capture_output=True, text=True, timeout=30, creationflags=subprocess.CREATE_NO_WINDOW)
@@ -2386,6 +2686,30 @@ class LogcatFilterApp:
         device = self.selected_device.get()
         if not device:
             messagebox.showerror("错误", "请先选择设备")
+            return
+        
+        # 先检查设备连接状态
+        try:
+            devices_cmd = ["adb", "devices"]
+            result = subprocess.run(devices_cmd, capture_output=True, text=True, timeout=30, creationflags=subprocess.CREATE_NO_WINDOW)
+            
+            if result.returncode != 0:
+                messagebox.showerror("错误", "检查设备连接失败")
+                self.status_var.set("检查设备连接失败")
+                return
+            
+            # 检查设备是否在列表中
+            if device not in result.stdout:
+                messagebox.showerror("错误", f"设备 {device} 未连接")
+                self.status_var.set(f"设备 {device} 未连接")
+                return
+            
+            # 设备连接正常，继续执行导出流程
+            self.status_var.set(f"设备 {device} 连接正常，开始导出ADB log...")
+                
+        except Exception as e:
+            messagebox.showerror("错误", f"检查设备连接时发生错误: {e}")
+            self.status_var.set("检查设备连接失败")
             return
         
         # 创建进度条弹框
