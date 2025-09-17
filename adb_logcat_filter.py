@@ -18,7 +18,7 @@ import queue
 class LogcatFilterApp:
     def __init__(self, root):
         self.root = root
-        self.root.title("ADB Logcat 关键字过滤工具 v1.0")
+        self.root.title("手机log辅助工具v2.0")
         self.root.geometry("1000x700")
         
         # 变量
@@ -1502,7 +1502,7 @@ class LogcatFilterApp:
         # 创建进度条弹框
         progress_dialog = tk.Toplevel(self.root)
         progress_dialog.title("开启MTKLOG")
-        progress_dialog.geometry("400x150")
+        progress_dialog.geometry("400x200")
         progress_dialog.resizable(False, False)
         progress_dialog.transient(self.root)
         progress_dialog.grab_set()
@@ -1530,6 +1530,14 @@ class LogcatFilterApp:
         # 设备信息
         device_label = ttk.Label(progress_frame, text=f"设备: {device}", font=('Arial', 9), foreground="gray")
         device_label.pack()
+        
+        # 按钮框架
+        button_frame = ttk.Frame(progress_frame)
+        button_frame.pack(pady=(10, 0))
+        
+        # 确认按钮（初始状态为禁用）
+        confirm_button = ttk.Button(button_frame, text="确认", state=tk.DISABLED, command=lambda: self.close_progress_dialog(progress_dialog, None, device))
+        confirm_button.pack()
         
         # 更新进度条
         progress_dialog.update()
@@ -1563,7 +1571,7 @@ class LogcatFilterApp:
                 progress_var.set((i-1) * 25)
                 progress_dialog.update()
                 
-                result = subprocess.run(cmd, capture_output=True, text=True, timeout=15)
+                result = subprocess.run(cmd, capture_output=True, text=True, timeout=15, creationflags=subprocess.CREATE_NO_WINDOW)
                 if result.returncode != 0:
                     error_msg = result.stderr.strip() if result.stderr else "未知错误"
                     progress_dialog.destroy()
@@ -1597,11 +1605,12 @@ class LogcatFilterApp:
             progress_var.set(100)
             progress_dialog.update()
             
-            # 关闭进度条
-            progress_dialog.destroy()
+            # 启用确认按钮
+            confirm_button.config(state=tk.NORMAL)
+            progress_dialog.update()
             
-            messagebox.showinfo("成功", f"MTKLOG已开启 \n(设备: {device})")
-            self.status_var.set(f"MTKLOG已开启 - {device}")
+            # 保存结果信息供确认按钮使用
+            progress_dialog.device = device
                 
         except subprocess.TimeoutExpired:
             progress_dialog.destroy()
@@ -1626,7 +1635,7 @@ class LogcatFilterApp:
         # 创建简单的进度提示
         progress_dialog = tk.Toplevel(self.root)
         progress_dialog.title("停止MTKLOG")
-        progress_dialog.geometry("350x120")
+        progress_dialog.geometry("350x170")
         progress_dialog.resizable(False, False)
         progress_dialog.transient(self.root)
         progress_dialog.grab_set()
@@ -1650,6 +1659,14 @@ class LogcatFilterApp:
         device_label = ttk.Label(progress_frame, text=f"设备: {device}", font=('Arial', 9), foreground="gray")
         device_label.pack()
         
+        # 按钮框架
+        button_frame = ttk.Frame(progress_frame)
+        button_frame.pack(pady=(10, 0))
+        
+        # 确认按钮（初始状态为禁用）
+        confirm_button = ttk.Button(button_frame, text="确认", state=tk.DISABLED, command=lambda: self.close_progress_dialog(progress_dialog, None, device))
+        confirm_button.pack()
+        
         progress_dialog.update()
         
         try:
@@ -1657,7 +1674,7 @@ class LogcatFilterApp:
             cmd = ["adb", "-s", device, "shell", "am", "broadcast", "-a", "com.debug.loggerui.ADB_CMD", 
                    "-e", "cmd_name", "stop", "--ei", "cmd_target", "-1", "-n", "com.debug.loggerui/.framework.LogReceiver"]
             
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=15)
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=15, creationflags=subprocess.CREATE_NO_WINDOW)
             
             if result.returncode == 0:
                 # 更新状态
@@ -1668,11 +1685,12 @@ class LogcatFilterApp:
                 import time
                 time.sleep(5)
                 
-                # 关闭进度条
-                progress_dialog.destroy()
+                # 启用确认按钮
+                confirm_button.config(state=tk.NORMAL)
+                progress_dialog.update()
                 
-                messagebox.showinfo("成功", f"MTKLOG已停止 \n(设备: {device})")
-                self.status_var.set(f"MTKLOG已停止 - {device}")
+                # 保存结果信息供确认按钮使用
+                progress_dialog.device = device
             else:
                 error_msg = result.stderr.strip() if result.stderr else "未知错误"
                 progress_dialog.destroy()
@@ -1707,7 +1725,7 @@ class LogcatFilterApp:
         # 创建进度条弹框
         progress_dialog = tk.Toplevel(self.root)
         progress_dialog.title("停止并导出MTKLOG")
-        progress_dialog.geometry("450x200")
+        progress_dialog.geometry("450x280")
         progress_dialog.resizable(False, False)
         progress_dialog.transient(self.root)
         progress_dialog.grab_set()
@@ -1740,6 +1758,14 @@ class LogcatFilterApp:
         log_text = tk.Text(progress_frame, height=4, width=50, font=('Consolas', 8))
         log_text.pack(pady=(10, 0))
         
+        # 按钮框架
+        button_frame = ttk.Frame(progress_frame)
+        button_frame.pack(pady=(10, 0))
+        
+        # 确认按钮（初始状态为禁用）
+        confirm_button = ttk.Button(button_frame, text="确认", state=tk.DISABLED, command=lambda: self.close_progress_dialog(progress_dialog, None, device))
+        confirm_button.pack()
+        
         progress_dialog.update()
         
         try:
@@ -1754,7 +1780,7 @@ class LogcatFilterApp:
             stop_cmd = ["adb", "-s", device, "shell", "am", "broadcast", "-a", "com.debug.loggerui.ADB_CMD", 
                        "-e", "cmd_name", "stop", "--ei", "cmd_target", "-1", "-n", "com.debug.loggerui/.framework.LogReceiver"]
             
-            result = subprocess.run(stop_cmd, capture_output=True, text=True, timeout=15)
+            result = subprocess.run(stop_cmd, capture_output=True, text=True, timeout=15, creationflags=subprocess.CREATE_NO_WINDOW)
             if result.returncode != 0:
                 raise Exception(f"停止logger失败: {result.stderr.strip()}")
             
@@ -1804,7 +1830,7 @@ class LogcatFilterApp:
                 
                 # 执行adb pull
                 cmd = ["adb", "-s", device, "pull", source_path, log_folder]
-                result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+                result = subprocess.run(cmd, capture_output=True, text=True, timeout=120, creationflags=subprocess.CREATE_NO_WINDOW)
                 
                 if result.returncode == 0:
                     log_text.insert(tk.END, f"✓ {folder_name} 导出成功\n")
@@ -1830,7 +1856,7 @@ class LogcatFilterApp:
             
             for cmd in rename_commands:
                 shell_cmd = ["adb", "-s", device, "shell", cmd]
-                result = subprocess.run(shell_cmd, capture_output=True, text=True, timeout=30)
+                result = subprocess.run(shell_cmd, capture_output=True, text=True, timeout=30, creationflags=subprocess.CREATE_NO_WINDOW)
                 if result.returncode != 0:
                     log_text.insert(tk.END, f"重命名命令失败: {cmd}\n")
                 else:
@@ -1846,14 +1872,13 @@ class LogcatFilterApp:
             # 等待一下让用户看到完成状态
             time.sleep(1)
             
-            # 关闭进度条
-            progress_dialog.destroy()
+            # 启用确认按钮
+            confirm_button.config(state=tk.NORMAL)
+            progress_dialog.update()
             
-            # 打开日志文件夹
-            os.startfile(log_folder)
-            
-            messagebox.showinfo("成功", f"MTKLOG已停止并导出到: {log_folder}\n(设备: {device})")
-            self.status_var.set(f"MTKLOG已停止并导出 - {device}")
+            # 保存结果信息供确认按钮使用
+            progress_dialog.log_folder = log_folder
+            progress_dialog.device = device
                 
         except subprocess.TimeoutExpired:
             progress_dialog.destroy()
@@ -1868,6 +1893,29 @@ class LogcatFilterApp:
             messagebox.showerror("错误", f"停止并导出MTKLOG时发生错误: {e}")
             self.status_var.set("停止并导出MTKLOG失败")
     
+    def close_progress_dialog(self, dialog, log_folder, device):
+        """关闭进度弹框并执行后续操作"""
+        import os
+        # 从dialog对象中获取log_folder（如果参数为None）
+        if log_folder is None and hasattr(dialog, 'log_folder'):
+            log_folder = dialog.log_folder
+        if device is None and hasattr(dialog, 'device'):
+            device = dialog.device
+            
+        # 打开日志文件夹
+        if log_folder:
+            os.startfile(log_folder)
+        # 关闭弹框
+        dialog.destroy()
+        # 更新状态
+        if device:
+            self.status_var.set(f"MTKLOG已停止并导出 - {device}")
+    
+    def cancel_progress_dialog(self, dialog):
+        """取消进度弹框"""
+        dialog.destroy()
+        self.status_var.set("操作已取消")
+    
     def delete_mtklog(self):
         """删除MTKLOG"""
         device = self.selected_device.get()
@@ -1878,7 +1926,7 @@ class LogcatFilterApp:
         # 创建进度条弹框
         progress_dialog = tk.Toplevel(self.root)
         progress_dialog.title("删除MTKLOG")
-        progress_dialog.geometry("350x120")
+        progress_dialog.geometry("350x170")
         progress_dialog.resizable(False, False)
         progress_dialog.transient(self.root)
         progress_dialog.grab_set()
@@ -1902,6 +1950,14 @@ class LogcatFilterApp:
         device_label = ttk.Label(progress_frame, text=f"设备: {device}", font=('Arial', 9), foreground="gray")
         device_label.pack()
         
+        # 按钮框架
+        button_frame = ttk.Frame(progress_frame)
+        button_frame.pack(pady=(10, 0))
+        
+        # 确认按钮（初始状态为禁用）
+        confirm_button = ttk.Button(button_frame, text="确认", state=tk.DISABLED, command=lambda: self.close_progress_dialog(progress_dialog, None, device))
+        confirm_button.pack()
+        
         progress_dialog.update()
         
         try:
@@ -1909,7 +1965,7 @@ class LogcatFilterApp:
             cmd = ["adb", "-s", device, "shell", "am", "broadcast", "-a", "com.debug.loggerui.ADB_CMD", 
                    "-e", "cmd_name", "clear_logs_all", "--ei", "cmd_target", "0", "-n", "com.debug.loggerui/.framework.LogReceiver"]
             
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=15)
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=15, creationflags=subprocess.CREATE_NO_WINDOW)
             
             if result.returncode == 0:
                 # 更新状态
@@ -1920,11 +1976,12 @@ class LogcatFilterApp:
                 import time
                 time.sleep(1)
                 
-                # 关闭进度条
-                progress_dialog.destroy()
+                # 启用确认按钮
+                confirm_button.config(state=tk.NORMAL)
+                progress_dialog.update()
                 
-                messagebox.showinfo("成功", f"MTKLOG已删除 \n(设备: {device})")
-                self.status_var.set(f"MTKLOG已删除 - {device}")
+                # 保存结果信息供确认按钮使用
+                progress_dialog.device = device
             else:
                 error_msg = result.stderr.strip() if result.stderr else "未知错误"
                 progress_dialog.destroy()
@@ -1955,7 +2012,7 @@ class LogcatFilterApp:
             cmd = ["adb", "-s", device, "shell", "am", "broadcast", "-a", "com.debug.loggerui.ADB_CMD", 
                    "-e", "cmd_name", "switch_modem_log_mode_2", "--ei", "cmd_target", "1", "-n", "com.debug.loggerui/.framework.LogReceiver"]
             
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=15)
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=15, creationflags=subprocess.CREATE_NO_WINDOW)
             
             if result.returncode == 0:
                 messagebox.showinfo("成功", f"已设置为SD模式 \n(设备: {device})")
@@ -1986,7 +2043,7 @@ class LogcatFilterApp:
             cmd = ["adb", "-s", device, "shell", "am", "broadcast", "-a", "com.debug.loggerui.ADB_CMD", 
                    "-e", "cmd_name", "switch_modem_log_mode_1", "--ei", "cmd_target", "1", "-n", "com.debug.loggerui/.framework.LogReceiver"]
             
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=15)
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=15, creationflags=subprocess.CREATE_NO_WINDOW)
             
             if result.returncode == 0:
                 messagebox.showinfo("成功", f"已设置为USB模式 \n(设备: {device})")
@@ -2021,7 +2078,7 @@ class LogcatFilterApp:
         # 创建进度条弹框
         progress_dialog = tk.Toplevel(self.root)
         progress_dialog.title("导出MTKLOG")
-        progress_dialog.geometry("450x200")
+        progress_dialog.geometry("450x280")
         progress_dialog.resizable(False, False)
         progress_dialog.transient(self.root)
         progress_dialog.grab_set()
@@ -2054,6 +2111,14 @@ class LogcatFilterApp:
         log_text = tk.Text(progress_frame, height=4, width=50, font=('Consolas', 8))
         log_text.pack(pady=(10, 0))
         
+        # 按钮框架
+        button_frame = ttk.Frame(progress_frame)
+        button_frame.pack(pady=(10, 0))
+        
+        # 确认按钮（初始状态为禁用）
+        confirm_button = ttk.Button(button_frame, text="确认", state=tk.DISABLED, command=lambda: self.close_progress_dialog(progress_dialog, None, device))
+        confirm_button.pack()
+        
         progress_dialog.update()
         
         try:
@@ -2066,7 +2131,7 @@ class LogcatFilterApp:
             progress_dialog.update()
             
             wait_cmd = ["adb", "-s", device, "wait-for-device"]
-            result = subprocess.run(wait_cmd, capture_output=True, text=True, timeout=30)
+            result = subprocess.run(wait_cmd, capture_output=True, text=True, timeout=30, creationflags=subprocess.CREATE_NO_WINDOW)
             if result.returncode != 0:
                 raise Exception("设备连接失败")
             
@@ -2102,7 +2167,7 @@ class LogcatFilterApp:
                 
                 # 执行adb pull
                 cmd = ["adb", "-s", device, "pull", source_path, log_folder]
-                result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+                result = subprocess.run(cmd, capture_output=True, text=True, timeout=120, creationflags=subprocess.CREATE_NO_WINDOW)
                 
                 if result.returncode == 0:
                     log_text.insert(tk.END, f"✓ {folder_name} 导出成功\n")
@@ -2138,7 +2203,7 @@ class LogcatFilterApp:
             
             for cmd in rename_commands:
                 shell_cmd = ["adb", "-s", device, "shell", cmd]
-                result = subprocess.run(shell_cmd, capture_output=True, text=True, timeout=30)
+                result = subprocess.run(shell_cmd, capture_output=True, text=True, timeout=30, creationflags=subprocess.CREATE_NO_WINDOW)
                 if result.returncode != 0:
                     log_text.insert(tk.END, f"重命名命令失败: {cmd}\n")
                 else:
@@ -2152,7 +2217,7 @@ class LogcatFilterApp:
             progress_dialog.update()
             
             check_cmd = ["adb", "-s", device, "shell", "ls", "-l", "/data/media/logmanager/*"]
-            result = subprocess.run(check_cmd, capture_output=True, text=True, timeout=30)
+            result = subprocess.run(check_cmd, capture_output=True, text=True, timeout=30, creationflags=subprocess.CREATE_NO_WINDOW)
             if result.returncode == 0:
                 log_text.insert(tk.END, f"data/media/logmanager 内容:\n{result.stdout}\n")
             
@@ -2165,18 +2230,17 @@ class LogcatFilterApp:
             import time
             time.sleep(1)
             
-            # 关闭进度条
-            progress_dialog.destroy()
+            # 启用确认按钮
+            confirm_button.config(state=tk.NORMAL)
+            progress_dialog.update()
             
-            # 打开日志文件夹
-            os.startfile(log_folder)
+            # 保存结果信息供确认按钮使用
+            progress_dialog.log_folder = log_folder
+            progress_dialog.device = device
             
             # 清理临时文件
             if os.path.exists(temp_script):
                 os.remove(temp_script)
-            
-            messagebox.showinfo("成功", f"MTKLOG已导出到: {log_folder}\n(设备: {device})")
-            self.status_var.set(f"MTKLOG已导出 - {device}")
                 
         except subprocess.TimeoutExpired:
             progress_dialog.destroy()
@@ -2201,7 +2265,7 @@ class LogcatFilterApp:
         # 创建进度条弹框
         progress_dialog = tk.Toplevel(self.root)
         progress_dialog.title("开启ADB Log")
-        progress_dialog.geometry("400x150")
+        progress_dialog.geometry("400x200")
         progress_dialog.resizable(False, False)
         progress_dialog.transient(self.root)
         progress_dialog.grab_set()
@@ -2230,6 +2294,14 @@ class LogcatFilterApp:
         device_label = ttk.Label(progress_frame, text=f"设备: {device}", font=('Arial', 9), foreground="gray")
         device_label.pack()
         
+        # 按钮框架
+        button_frame = ttk.Frame(progress_frame)
+        button_frame.pack(pady=(10, 0))
+        
+        # 确认按钮（初始状态为禁用）
+        confirm_button = ttk.Button(button_frame, text="确认", state=tk.DISABLED, command=lambda: self.close_progress_dialog(progress_dialog, None, device))
+        confirm_button.pack()
+        
         progress_dialog.update()
         
         try:
@@ -2239,7 +2311,7 @@ class LogcatFilterApp:
             progress_dialog.update()
             
             cmd1 = ["adb", "-s", device, "shell", "rm", "-rf", "/data/local/tmp/*"]
-            result = subprocess.run(cmd1, capture_output=True, text=True, timeout=30)
+            result = subprocess.run(cmd1, capture_output=True, text=True, timeout=30, creationflags=subprocess.CREATE_NO_WINDOW)
             if result.returncode != 0:
                 raise Exception(f"清理临时目录失败: {result.stderr.strip()}")
             
@@ -2249,7 +2321,7 @@ class LogcatFilterApp:
             progress_dialog.update()
             
             cmd2 = ["adb", "-s", device, "shell", "nohup", "logcat", "-v", "time", "-b", "all", "-f", "/data/local/tmp/logcat_$(date +%Y%m%d_%H%M%S).txt", ">", "/dev/null", "2>&1", "&"]
-            result = subprocess.run(cmd2, capture_output=True, text=True, timeout=30)
+            result = subprocess.run(cmd2, capture_output=True, text=True, timeout=30, creationflags=subprocess.CREATE_NO_WINDOW)
             if result.returncode != 0:
                 raise Exception(f"启动logcat失败: {result.stderr.strip()}")
             
@@ -2259,7 +2331,7 @@ class LogcatFilterApp:
             progress_dialog.update()
             
             cmd3 = ["adb", "-s", device, "shell", "ps", "-A"]
-            result = subprocess.run(cmd3, capture_output=True, text=True, timeout=30)
+            result = subprocess.run(cmd3, capture_output=True, text=True, timeout=30, creationflags=subprocess.CREATE_NO_WINDOW)
             if result.returncode != 0:
                 raise Exception(f"检查进程失败: {result.stderr.strip()}")
             
@@ -2276,11 +2348,12 @@ class LogcatFilterApp:
             import time
             time.sleep(1)
             
-            # 关闭进度条
-            progress_dialog.destroy()
+            # 启用确认按钮
+            confirm_button.config(state=tk.NORMAL)
+            progress_dialog.update()
             
-            messagebox.showinfo("成功", f"ADB log已开启 (设备: {device})\nlogcat进程正在后台运行")
-            self.status_var.set(f"ADB log已开启 - {device}")
+            # 保存结果信息供确认按钮使用
+            progress_dialog.device = device
                 
         except subprocess.TimeoutExpired:
             progress_dialog.destroy()
@@ -2305,7 +2378,7 @@ class LogcatFilterApp:
         # 创建进度条弹框
         progress_dialog = tk.Toplevel(self.root)
         progress_dialog.title("停止并导出ADB Log")
-        progress_dialog.geometry("450x200")
+        progress_dialog.geometry("450x280")
         progress_dialog.resizable(False, False)
         progress_dialog.transient(self.root)
         progress_dialog.grab_set()
@@ -2338,6 +2411,14 @@ class LogcatFilterApp:
         log_text = tk.Text(progress_frame, height=4, width=50, font=('Consolas', 8))
         log_text.pack(pady=(10, 0))
         
+        # 按钮框架
+        button_frame = ttk.Frame(progress_frame)
+        button_frame.pack(pady=(10, 0))
+        
+        # 确认按钮（初始状态为禁用）
+        confirm_button = ttk.Button(button_frame, text="确认", state=tk.DISABLED, command=lambda: self.close_progress_dialog(progress_dialog, None, device))
+        confirm_button.pack()
+        
         progress_dialog.update()
         
         try:
@@ -2350,7 +2431,7 @@ class LogcatFilterApp:
             progress_dialog.update()
             
             devices_cmd = ["adb", "devices"]
-            result = subprocess.run(devices_cmd, capture_output=True, text=True, timeout=30)
+            result = subprocess.run(devices_cmd, capture_output=True, text=True, timeout=30, creationflags=subprocess.CREATE_NO_WINDOW)
             if result.returncode != 0:
                 raise Exception("检查设备连接失败")
             
@@ -2368,7 +2449,7 @@ class LogcatFilterApp:
             progress_dialog.update()
             
             ps_cmd = ["adb", "-s", device, "shell", "ps", "-A"]
-            result = subprocess.run(ps_cmd, capture_output=True, text=True, timeout=30)
+            result = subprocess.run(ps_cmd, capture_output=True, text=True, timeout=30, creationflags=subprocess.CREATE_NO_WINDOW)
             if result.returncode != 0:
                 raise Exception(f"检查进程失败: {result.stderr.strip()}")
             
@@ -2389,7 +2470,7 @@ class LogcatFilterApp:
             progress_dialog.update()
             
             pkill_cmd = ["adb", "-s", device, "shell", "pkill", "logcat"]
-            result = subprocess.run(pkill_cmd, capture_output=True, text=True, timeout=30)
+            result = subprocess.run(pkill_cmd, capture_output=True, text=True, timeout=30, creationflags=subprocess.CREATE_NO_WINDOW)
             if result.returncode != 0:
                 log_text.insert(tk.END, f"⚠ 停止logcat进程警告: {result.stderr.strip()}\n")
             else:
@@ -2421,7 +2502,7 @@ class LogcatFilterApp:
             # 创建logcat子目录
             logcat_dir = os.path.join(log_dir, "logcat")
             pull_cmd = ["adb", "-s", device, "pull", "/data/local/tmp/", logcat_dir]
-            result = subprocess.run(pull_cmd, capture_output=True, text=True, timeout=120)
+            result = subprocess.run(pull_cmd, capture_output=True, text=True, timeout=120, creationflags=subprocess.CREATE_NO_WINDOW)
             
             if result.returncode == 0:
                 log_text.insert(tk.END, f"✓ log文件导出成功\n")
@@ -2440,14 +2521,13 @@ class LogcatFilterApp:
             import time
             time.sleep(1)
             
-            # 关闭进度条
-            progress_dialog.destroy()
+            # 启用确认按钮
+            confirm_button.config(state=tk.NORMAL)
+            progress_dialog.update()
             
-            # 打开logcat文件夹
-            os.startfile(logcat_dir)
-            
-            messagebox.showinfo("成功", f"ADB log已停止并导出到: {logcat_dir}\n(设备: {device})")
-            self.status_var.set(f"ADB log已导出 - {device}")
+            # 保存结果信息供确认按钮使用
+            progress_dialog.log_folder = logcat_dir
+            progress_dialog.device = device
                 
         except subprocess.TimeoutExpired:
             progress_dialog.destroy()
