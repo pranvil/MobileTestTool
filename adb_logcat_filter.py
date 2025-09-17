@@ -18,7 +18,7 @@ import queue
 class LogcatFilterApp:
     def __init__(self, root):
         self.root = root
-        self.root.title("ADB Logcat 关键字过滤工具")
+        self.root.title("ADB Logcat 关键字过滤工具 v1.0")
         self.root.geometry("1000x700")
         
         # 变量
@@ -47,8 +47,8 @@ class LogcatFilterApp:
             'min_interval': 10,          # 最小处理间隔(ms)
             'high_load_threshold': 100,  # 高负荷阈值
             'medium_load_threshold': 50, # 中等负荷阈值
-            'max_display_lines': 1000,   # 最大显示行数
-            'trim_threshold': 1200       # 裁剪触发阈值
+            'max_display_lines': 5000,   # 最大显示行数（默认5000）
+            'trim_threshold': 6000       # 裁剪触发阈值（自动计算）
         }
         
         # 性能缓存
@@ -137,6 +137,7 @@ class LogcatFilterApp:
         
         ttk.Button(button_frame, text="清空日志", command=self.clear_logs).pack(side=tk.LEFT, padx=(0, 5))
         ttk.Button(button_frame, text="清除缓存", command=self.clear_device_logs).pack(side=tk.LEFT, padx=(0, 5))
+        ttk.Button(button_frame, text="设置行数", command=self.show_display_lines_dialog).pack(side=tk.LEFT, padx=(0, 5))
         ttk.Button(button_frame, text="保存日志", command=self.save_logs).pack(side=tk.LEFT)
         
         # 状态栏框架
@@ -285,6 +286,7 @@ class LogcatFilterApp:
         tools_menu.add_command(label="显示窗口", command=self.bring_to_front)
         tools_menu.add_separator()
         tools_menu.add_command(label="刷新设备列表", command=self.refresh_devices)
+        tools_menu.add_command(label="设置显示行数", command=self.show_display_lines_dialog)
         tools_menu.add_command(label="清除设备缓存", command=self.clear_device_logs)
         tools_menu.add_command(label="保存日志", command=self.save_logs)
         
@@ -479,8 +481,8 @@ class LogcatFilterApp:
         
         # 批量处理所有行
         for line in lines:
-            timestamp = datetime.now().strftime("%H:%M:%S.%f")[:-3]
-            full_line = f"[{timestamp}] {line.rstrip()}\n"
+            # 直接使用设备log输出的时间，不添加额外时间戳
+            full_line = line.rstrip() + "\n"
             
             # 高亮关键字（如果启用）- 支持自适应高亮策略
             if self.color_highlight.get() and self.filter_keyword.get():
@@ -556,18 +558,20 @@ class LogcatFilterApp:
                 self.log_text.insert(tk.END, line[last_end:])
     
     def trim_log_lines_if_needed(self, added_lines):
-        """高效的行数裁剪机制 - 第三阶段优化"""
+        """高效的行数裁剪机制 - 使用trim_threshold避免频繁操作"""
         # 维护行计数器
         if not hasattr(self, '_line_count'):
             self._line_count = 0
         
         self._line_count += added_lines
         
-        # 使用更高的阈值触发裁剪，减少频繁操作
-        if self._line_count > self.adaptive_params['trim_threshold']:
-            # 使用高效的文本索引删除，避免get().split()统计
+        # 计算trim_threshold = 5%的缓冲行数
+        trim_threshold = int(self.adaptive_params['max_display_lines'] * 0.05)
+        
+        # 只有当累计新增行数超过trim_threshold时才检查并裁剪
+        if self._line_count > trim_threshold:
             try:
-                # 获取当前总行数（使用index方法更高效）
+                # 获取当前总行数
                 current_lines = int(self.log_text.index('end-1c').split('.')[0])
                 
                 if current_lines > self.adaptive_params['max_display_lines']:
@@ -575,7 +579,6 @@ class LogcatFilterApp:
                     lines_to_delete = current_lines - self.adaptive_params['max_display_lines']
                     
                     # 使用文本索引一次性删除超出的行
-                    # 删除从第1行到第(lines_to_delete)行
                     self.log_text.delete("1.0", f"{lines_to_delete + 1}.0")
                     
                     # 更新缓存
@@ -584,13 +587,23 @@ class LogcatFilterApp:
                     # 重置计数器
                     self._line_count = 0
                     
+                    # 输出调试信息
+                    print(f"裁剪日志: 删除了 {lines_to_delete} 行，当前行数: {self.adaptive_params['max_display_lines']} (trim_threshold: {trim_threshold})")
+                    
             except Exception as e:
                 # 如果出现异常，回退到原来的方法
-                lines_count = len(self.log_text.get("1.0", tk.END).split('\n'))
-                if lines_count > self.adaptive_params['max_display_lines']:
-                    self.log_text.delete("1.0", f"{lines_count - self.adaptive_params['max_display_lines']}.0")
+                try:
+                    lines_count = len(self.log_text.get("1.0", tk.END).split('\n'))
+                    if lines_count > self.adaptive_params['max_display_lines']:
+                        lines_to_delete = lines_count - self.adaptive_params['max_display_lines']
+                        self.log_text.delete("1.0", f"{lines_to_delete + 1}.0")
+                        self.performance_cache['last_line_count'] = self.adaptive_params['max_display_lines']
+                        print(f"裁剪日志(备用方法): 删除了 {lines_to_delete} 行")
+                except Exception as e2:
+                    print(f"裁剪日志失败: {e2}")
+                
+                # 重置计数器
                 self._line_count = 0
-                self.performance_cache['last_line_count'] = self.adaptive_params['max_display_lines']
     
     def add_log_line(self, line):
         """添加日志行到显示区域"""
@@ -599,9 +612,8 @@ class LogcatFilterApp:
         # 移动到末尾
         self.log_text.see(tk.END)
         
-        # 添加时间戳
-        timestamp = datetime.now().strftime("%H:%M:%S.%f")[:-3]
-        full_line = f"[{timestamp}] {line.rstrip()}"
+        # 直接使用设备log输出的时间，不添加额外时间戳
+        full_line = line.rstrip()
         
         # 高亮关键字
         if self.color_highlight.get() and self.filter_keyword.get():
@@ -725,31 +737,42 @@ class LogcatFilterApp:
     
     def get_cached_performance_metrics(self):
         """使用缓存机制获取性能指标，减少计算开销"""
-        # 更新缓存计数器
-        self.performance_cache['last_memory_check'] += 1
-        
-        # 只在达到缓存更新间隔时才重新计算
-        if self.performance_cache['last_memory_check'] >= self.performance_cache['cache_update_interval']:
-            try:
-                # 计算当前显示的行数
-                current_display_lines = int(self.log_text.index('end-1c').split('.')[0])
+        # 行数总是实时计算
+        try:
+            # 计算当前显示的行数（实时计算）
+            current_display_lines = int(self.log_text.index('end-1c').split('.')[0])
+            
+            # 检查是否需要更新内存缓存（基于时间间隔）
+            current_time = datetime.now()
+            if not hasattr(self, '_last_memory_update') or \
+               (current_time - self._last_memory_update).total_seconds() > 2.0:  # 每2秒更新一次
                 
-                # 计算内存使用情况（估算）
-                text_content_length = len(self.log_text.get("1.0", tk.END))
-                memory_mb = text_content_length / (1024 * 1024)  # 转换为MB
+                # 计算内存使用情况（更准确的估算）
+                try:
+                    # 获取文本内容长度
+                    text_content = self.log_text.get("1.0", tk.END)
+                    text_length = len(text_content)
+                    
+                    # 估算内存使用（包括Tkinter内部开销）
+                    # 每个字符大约2-4字节（UTF-8编码 + Tkinter内部结构）
+                    estimated_memory_bytes = text_length * 3  # 使用3字节作为平均值
+                    memory_mb = estimated_memory_bytes / (1024 * 1024)
+                    
+                    # 更新缓存
+                    self.performance_cache['last_memory_mb'] = memory_mb
+                    self._last_memory_update = current_time
+                    
+                except Exception:
+                    # 如果计算失败，使用缓存值
+                    memory_mb = self.performance_cache['last_memory_mb']
+            else:
+                # 使用缓存的内存值
+                memory_mb = self.performance_cache['last_memory_mb']
+            
+            return current_display_lines, memory_mb
                 
-                # 更新缓存
-                self.performance_cache['last_line_count'] = current_display_lines
-                self.performance_cache['last_memory_mb'] = memory_mb
-                self.performance_cache['last_memory_check'] = 0
-                
-                return current_display_lines, memory_mb
-                
-            except Exception:
-                # 如果出现异常，返回缓存值
-                return self.performance_cache['last_line_count'], self.performance_cache['last_memory_mb']
-        else:
-            # 使用缓存值
+        except Exception:
+            # 如果出现异常，返回缓存值
             return self.performance_cache['last_line_count'], self.performance_cache['last_memory_mb']
     
     def refresh_devices(self):
@@ -814,6 +837,107 @@ class LogcatFilterApp:
             if self.device_combo:
                 self.device_combo['values'] = ["检测错误"]
                 self.selected_device.set("检测错误")
+    
+    def show_display_lines_dialog(self):
+        """显示设置最大显示行数的对话框"""
+        # 创建设置对话框
+        dialog = tk.Toplevel(self.root)
+        dialog.title("设置最大显示行数")
+        dialog.geometry("450x450")
+        dialog.resizable(False, False)
+        dialog.transient(self.root)
+        dialog.grab_set()
+        
+        # 居中显示
+        dialog.geometry("+%d+%d" % (
+            self.root.winfo_rootx() + 50,
+            self.root.winfo_rooty() + 50
+        ))
+        
+        # 主框架
+        main_frame = ttk.Frame(dialog, padding="20")
+        main_frame.pack(fill=tk.BOTH, expand=True)
+        
+        # 标题
+        title_label = ttk.Label(main_frame, text="设置最大显示行数", font=('Arial', 12, 'bold'))
+        title_label.pack(pady=(0, 20))
+        
+        # 当前设置显示
+        current_label = ttk.Label(main_frame, text=f"当前设置: {self.adaptive_params['max_display_lines']} 行")
+        current_label.pack(pady=(0, 10))
+        
+        # 输入框
+        input_frame = ttk.Frame(main_frame)
+        input_frame.pack(pady=(0, 20))
+        
+        ttk.Label(input_frame, text="最大显示行数:").pack(side=tk.LEFT, padx=(0, 10))
+        lines_var = tk.StringVar(value=str(self.adaptive_params['max_display_lines']))
+        lines_entry = ttk.Entry(input_frame, textvariable=lines_var, width=15)
+        lines_entry.pack(side=tk.LEFT)
+        lines_entry.focus()
+        
+        # 预设选项
+        presets_frame = ttk.LabelFrame(main_frame, text="快速选择", padding="10")
+        presets_frame.pack(fill=tk.X, pady=(0, 15))
+        
+        presets = [
+            ("1000行 (轻量)", 1000),
+            ("2000行 (标准)", 2000),
+            ("5000行 (推荐)", 5000),
+            ("10000行 (大量)", 10000),
+            ("20000行 (超大)", 20000)
+        ]
+        
+        # 使用垂直布局，避免重叠
+        for text, value in presets:
+            btn = ttk.Button(presets_frame, text=text, 
+                           command=lambda v=value: lines_var.set(str(v)))
+            btn.pack(fill=tk.X, padx=5, pady=2)
+        
+        # 说明文本
+        info_text = "设置说明: 行数越多显示更多历史日志，建议范围: 1000-20000 行"
+        
+        info_label = ttk.Label(main_frame, text=info_text, justify=tk.LEFT, foreground="gray")
+        info_label.pack(pady=(0, 10))
+        
+        def apply_settings():
+            try:
+                new_lines = int(lines_var.get())
+                if new_lines < 100:
+                    messagebox.showerror("错误", "行数不能少于100行")
+                    return
+                if new_lines > 100000:
+                    messagebox.showerror("错误", "行数不能超过100000行")
+                    return
+                
+                # 更新设置
+                self.adaptive_params['max_display_lines'] = new_lines
+                self.adaptive_params['trim_threshold'] = int(new_lines * 0.05)
+                
+                # 更新状态显示
+                self.status_var.set(f"最大显示行数已设置为: {new_lines} 行")
+                
+                messagebox.showinfo("成功", f"设置已应用!\n最大显示行数: {new_lines}\ntrim_threshold: {self.adaptive_params['trim_threshold']}")
+                dialog.destroy()
+                
+            except ValueError:
+                messagebox.showerror("错误", "请输入有效的数字")
+        
+        # 按钮 - 使用更简单的布局
+        button_frame = ttk.Frame(main_frame)
+        button_frame.pack(fill=tk.X, pady=(20, 20))
+        
+        # 应用按钮
+        apply_btn = ttk.Button(button_frame, text="确定", command=apply_settings)
+        apply_btn.pack(side=tk.LEFT, padx=(0, 10))
+        
+        # 取消按钮
+        cancel_btn = ttk.Button(button_frame, text="取消", command=dialog.destroy)
+        cancel_btn.pack(side=tk.LEFT)
+        
+        # 绑定回车键
+        lines_entry.bind('<Return>', lambda e: apply_settings())
+        dialog.bind('<Escape>', lambda e: dialog.destroy())
     
     def stop_filtering(self):
         """停止过滤"""
