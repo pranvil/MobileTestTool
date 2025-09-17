@@ -18,7 +18,7 @@ import queue
 class LogcatFilterApp:
     def __init__(self, root):
         self.root = root
-        self.root.title("手机log辅助工具v2.0")
+        self.root.title("手机日志辅助工具 v2.0")
         self.root.geometry("1000x700")
         
         # 变量
@@ -331,9 +331,16 @@ class LogcatFilterApp:
     def show_about(self):
         """显示关于对话框"""
         messagebox.showinfo("关于", 
-            "ADB Logcat 关键字过滤工具\n\n"
-            "版本: 1.0\n"
-            "功能: 实时过滤Android设备日志\n\n"
+            "手机log辅助工具\n\n"
+            "版本: 2.0\n"
+            "功能: Android设备日志管理和MTKLOG操作\n\n"
+            "主要功能:\n"
+            "• 实时过滤Android设备日志\n"
+            "• MTKLOG开启/停止/导出/删除\n"
+            "• ADB Log开启/导出\n"
+            "• 设备模式切换(SD/USB)\n"
+            "• 多设备支持\n"
+            "• 性能监控和优化\n\n"
             "快捷键:\n"
             "Ctrl+F - 搜索\n"
             "F3 - 查找下一个\n"
@@ -1840,31 +1847,7 @@ class LogcatFilterApp:
                 log_text.see(tk.END)
                 progress_dialog.update()
             
-            # 4. 执行设备端重命名操作
-            status_label.config(text="执行设备端重命名...")
-            progress_var.set(90)
-            progress_dialog.update()
-            
-            # 执行脚本 - 逐行执行命令
-            rename_commands = [
-                "cd /sdcard",
-                f"mv /sdcard/mtklog /sdcard/log_{log_name}",
-                f"mv /sdcard/debuglogger /sdcard/log_{log_name}",
-                f"mv /sdcard/logmanager /sdcard/log_{log_name}",
-                f"mv /sdcard/TCTReport /sdcard/log_{log_name}"
-            ]
-            
-            for cmd in rename_commands:
-                shell_cmd = ["adb", "-s", device, "shell", cmd]
-                result = subprocess.run(shell_cmd, capture_output=True, text=True, timeout=30, creationflags=subprocess.CREATE_NO_WINDOW)
-                if result.returncode != 0:
-                    log_text.insert(tk.END, f"重命名命令失败: {cmd}\n")
-                else:
-                    log_text.insert(tk.END, f"✓ 重命名成功: {cmd}\n")
-                log_text.see(tk.END)
-                progress_dialog.update()
-            
-            # 5. 完成
+            # 4. 完成
             status_label.config(text="完成!")
             progress_var.set(100)
             progress_dialog.update()
@@ -2262,6 +2245,36 @@ class LogcatFilterApp:
             messagebox.showerror("错误", "请先选择设备")
             return
         
+        # 先检查logcat进程是否存在
+        try:
+            ps_cmd = ["adb", "-s", device, "shell", "ps", "-A"]
+            result = subprocess.run(ps_cmd, capture_output=True, text=True, timeout=30, creationflags=subprocess.CREATE_NO_WINDOW)
+            
+            if result.returncode == 0 and "logcat" in result.stdout:
+                # logcat进程存在，询问用户是否停止并重新开始
+                response = messagebox.askyesno("确认", 
+                    f"检测到logcat进程正在运行 (设备: {device})\n\n"
+                    "是否停止现有进程并重新开始抓取ADB log？\n\n"
+                    "选择'是'：停止现有进程，清空临时文件，重新开始抓取\n"
+                    "选择'否'：返回主界面，保持现有进程运行")
+                
+                if not response:
+                    # 用户选择否，返回主界面
+                    self.status_var.set("用户取消操作")
+                    return
+                
+                # 用户选择是，停止现有进程
+                pkill_cmd = ["adb", "-s", device, "shell", "pkill", "logcat"]
+                subprocess.run(pkill_cmd, capture_output=True, text=True, timeout=30, creationflags=subprocess.CREATE_NO_WINDOW)
+                
+                # 清空临时目录
+                rm_cmd = ["adb", "-s", device, "shell", "rm", "-rf", "/data/local/tmp/*"]
+                subprocess.run(rm_cmd, capture_output=True, text=True, timeout=30, creationflags=subprocess.CREATE_NO_WINDOW)
+                
+        except Exception as e:
+            messagebox.showerror("错误", f"检查logcat进程时发生错误: {e}")
+            return
+        
         # 创建进度条弹框
         progress_dialog = tk.Toplevel(self.root)
         progress_dialog.title("开启ADB Log")
@@ -2305,7 +2318,7 @@ class LogcatFilterApp:
         progress_dialog.update()
         
         try:
-            # 1. 清理临时目录
+            # 1. 清理临时目录（如果之前没有清理过）
             status_label.config(text="清理临时目录...")
             progress_var.set(25)
             progress_dialog.update()
@@ -2499,15 +2512,37 @@ class LogcatFilterApp:
             progress_var.set(70)
             progress_dialog.update()
             
-            # 创建logcat子目录
+            # 创建logcat目录
             logcat_dir = os.path.join(log_dir, "logcat")
-            pull_cmd = ["adb", "-s", device, "pull", "/data/local/tmp/", logcat_dir]
-            result = subprocess.run(pull_cmd, capture_output=True, text=True, timeout=120, creationflags=subprocess.CREATE_NO_WINDOW)
+            if not os.path.exists(logcat_dir):
+                os.makedirs(logcat_dir)
             
-            if result.returncode == 0:
-                log_text.insert(tk.END, f"✓ log文件导出成功\n")
+            # 先获取设备上的logcat文件列表
+            ls_cmd = ["adb", "-s", device, "shell", "ls", "/data/local/tmp/logcat_*.txt"]
+            result = subprocess.run(ls_cmd, capture_output=True, text=True, timeout=30, creationflags=subprocess.CREATE_NO_WINDOW)
+            
+            if result.returncode == 0 and result.stdout.strip():
+                # 有logcat文件，逐个导出
+                logcat_files = result.stdout.strip().split('\n')
+                for logcat_file in logcat_files:
+                    if logcat_file.strip():
+                        filename = os.path.basename(logcat_file.strip())
+                        pull_cmd = ["adb", "-s", device, "pull", logcat_file.strip(), os.path.join(logcat_dir, filename)]
+                        result = subprocess.run(pull_cmd, capture_output=True, text=True, timeout=120, creationflags=subprocess.CREATE_NO_WINDOW)
+                        
+                        if result.returncode == 0:
+                            log_text.insert(tk.END, f"✓ {filename} 导出成功\n")
+                        else:
+                            log_text.insert(tk.END, f"✗ {filename} 导出失败: {result.stderr.strip()}\n")
             else:
-                log_text.insert(tk.END, f"✗ log文件导出失败: {result.stderr.strip()}\n")
+                # 没有找到logcat文件，尝试导出整个tmp目录
+                pull_cmd = ["adb", "-s", device, "pull", "/data/local/tmp/", logcat_dir]
+                result = subprocess.run(pull_cmd, capture_output=True, text=True, timeout=120, creationflags=subprocess.CREATE_NO_WINDOW)
+                
+                if result.returncode == 0:
+                    log_text.insert(tk.END, f"✓ log文件导出成功\n")
+                else:
+                    log_text.insert(tk.END, f"✗ log文件导出失败: {result.stderr.strip()}\n")
             
             log_text.see(tk.END)
             progress_dialog.update()

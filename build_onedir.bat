@@ -1,6 +1,7 @@
 @echo off
+chcp 65001 >nul
 echo ========================================
-echo    ADB Logcat 过滤工具 - onedir 打包
+echo    手机log辅助工具 v2.0 - onedir 打包
 echo ========================================
 echo.
 
