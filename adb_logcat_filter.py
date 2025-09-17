@@ -46,7 +46,7 @@ class LogcatFilterApp:
             'high_load_threshold': 100,  # 高负荷阈值
             'medium_load_threshold': 50, # 中等负荷阈值
             'max_display_lines': 5000,   # 最大显示行数（默认5000）
-            'trim_threshold': 6000       # 裁剪触发阈值（自动计算）
+            'trim_threshold': 250        # 裁剪触发阈值（max_display_lines的5%）
         }
         
         # 性能缓存
@@ -373,13 +373,15 @@ class LogcatFilterApp:
         
         # 检查设备选择
         device = self.selected_device.get().strip()
-        if not device or device in ["无设备", "检测失败", "检测超时", "adb未安装", "检测错误"]:
-            messagebox.showwarning("警告", "请先选择有效的设备")
-            return
         
         # 如果有多个设备但未选择，提示用户选择
-        if len(self.available_devices) > 1 and not device:
+        if len(self.available_devices) > 1 and device == "":
             messagebox.showwarning("警告", f"检测到多个设备，请选择要抓取日志的设备:\n{', '.join(self.available_devices)}")
+            return
+        
+        bad_devices = {"无设备", "检测失败", "检测超时", "adb未安装", "检测错误"}
+        if device == "" or device in bad_devices:
+            messagebox.showwarning("警告", "请先选择有效的设备")
             return
         
         try:
@@ -574,7 +576,7 @@ class LogcatFilterApp:
             # 插入匹配前的文本
             if match.start() > 0:
                 self.log_text.insert(tk.END, line[:match.start()])
-        # 插入高亮文本
+            # 插入高亮文本
             self.log_text.insert(tk.END, match.group(), "highlight")
             # 插入匹配后的文本
             if match.end() < len(line):
@@ -582,18 +584,18 @@ class LogcatFilterApp:
         else:
             # 正常负荷：高亮所有匹配
             last_end = 0
-        for match in matches:
-            # 插入普通文本
-            if match.start() > last_end:
-                self.log_text.insert(tk.END, line[last_end:match.start()])
+            for match in matches:
+                # 插入普通文本
+                if match.start() > last_end:
+                    self.log_text.insert(tk.END, line[last_end:match.start()])
+                
+                # 插入高亮文本
+                self.log_text.insert(tk.END, match.group(), "highlight")
+                last_end = match.end()
             
-            # 插入高亮文本
-            self.log_text.insert(tk.END, match.group(), "highlight")
-            last_end = match.end()
-        
-        # 插入剩余文本
-        if last_end < len(line):
-            self.log_text.insert(tk.END, line[last_end:])
+            # 插入剩余文本
+            if last_end < len(line):
+                self.log_text.insert(tk.END, line[last_end:])
     
     def trim_log_lines_if_needed(self, added_lines):
         """高效的行数裁剪机制 - 使用trim_threshold避免频繁操作"""
@@ -603,8 +605,8 @@ class LogcatFilterApp:
         
         self._line_count += added_lines
         
-        # 计算trim_threshold = 5%的缓冲行数
-        trim_threshold = int(self.adaptive_params['max_display_lines'] * 0.05)
+        # 使用统一的trim_threshold值
+        trim_threshold = self.adaptive_params['trim_threshold']
         
         # 只有当累计新增行数超过trim_threshold时才检查并裁剪
         if self._line_count > trim_threshold:
@@ -950,7 +952,7 @@ class LogcatFilterApp:
                 
                 # 更新设置
                 self.adaptive_params['max_display_lines'] = new_lines
-                self.adaptive_params['trim_threshold'] = int(new_lines * 0.05)
+                self.adaptive_params['trim_threshold'] = int(new_lines * 0.05)  # 5%的缓冲行数
                 
                 # 更新状态显示
                 self.status_var.set(f"最大显示行数已设置为: {new_lines} 行")
@@ -982,6 +984,7 @@ class LogcatFilterApp:
         self.is_running = False
         if self.log_process:
             self.log_process.terminate()
+            self.log_process.wait()  # 等待进程结束，避免僵尸进程
             self.log_process = None
     
     def filtering_stopped(self):
@@ -1734,55 +1737,11 @@ class LogcatFilterApp:
         if not log_name:
             return
         
-        # 创建进度条弹框
-        progress_dialog = tk.Toplevel(self.root)
-        progress_dialog.title("停止并导出MTKLOG")
-        progress_dialog.geometry("450x280")
-        progress_dialog.resizable(False, False)
-        progress_dialog.transient(self.root)
-        progress_dialog.grab_set()
-        
-        # 居中显示
-        progress_dialog.geometry("+%d+%d" % (self.root.winfo_rootx() + 25, self.root.winfo_rooty() + 25))
-        
-        # 进度条框架
-        progress_frame = ttk.Frame(progress_dialog, padding="20")
-        progress_frame.pack(fill=tk.BOTH, expand=True)
-        
-        # 标题
-        title_label = ttk.Label(progress_frame, text="正在停止并导出MTKLOG...", font=('Arial', 12, 'bold'))
-        title_label.pack(pady=(0, 10))
-        
-        # 进度条
-        progress_var = tk.DoubleVar()
-        progress_bar = ttk.Progressbar(progress_frame, variable=progress_var, maximum=100, length=400)
-        progress_bar.pack(pady=(0, 10))
-        
-        # 状态标签
-        status_label = ttk.Label(progress_frame, text="准备中...", font=('Arial', 10))
-        status_label.pack(pady=(0, 5))
-        
-        # 设备信息
-        device_label = ttk.Label(progress_frame, text=f"设备: {device} | 日志名称: {log_name}", font=('Arial', 9), foreground="gray")
-        device_label.pack()
-        
-        # 日志输出区域
-        log_text = tk.Text(progress_frame, height=4, width=50, font=('Consolas', 8))
-        log_text.pack(pady=(10, 0))
-        
-        # 按钮框架
-        button_frame = ttk.Frame(progress_frame)
-        button_frame.pack(pady=(10, 0))
-        
-        # 确认按钮（初始状态为禁用）
-        confirm_button = ttk.Button(button_frame, text="确认", state=tk.DISABLED, command=lambda: self.close_progress_dialog(progress_dialog, None, device))
-        confirm_button.pack()
-        
-        progress_dialog.update()
-        
-        try:
+        # 定义后台工作函数
+        def mtklog_worker(progress_var, status_label, progress_dialog):
             import os
             import datetime
+            import time
             
             # 1. 停止logger命令,加5s时间保护
             status_label.config(text="停止logger...")
@@ -1796,15 +1755,10 @@ class LogcatFilterApp:
             if result.returncode != 0:
                 raise Exception(f"停止logger失败: {result.stderr.strip()}")
             
-            log_text.insert(tk.END, f"✓ logger已停止\n")
-            log_text.see(tk.END)
-            progress_dialog.update()
-            
             # 添加5秒时间保护
             status_label.config(text="等待5秒保护时间...")
             progress_dialog.update()
-            import time
-            time.sleep(5)
+            time.sleep(5)  # 在后台线程中sleep，不会阻塞UI
             
             # 2. 创建日志目录
             status_label.config(text="创建日志目录...")
@@ -1817,10 +1771,6 @@ class LogcatFilterApp:
             
             if not os.path.exists(log_dir):
                 os.makedirs(log_dir)
-            
-            log_text.insert(tk.END, f"✓ 日志目录已创建: {log_folder}\n")
-            log_text.see(tk.END)
-            progress_dialog.update()
             
             # 3. 执行adb pull命令序列
             pull_commands = [
@@ -1844,42 +1794,166 @@ class LogcatFilterApp:
                 cmd = ["adb", "-s", device, "pull", source_path, log_folder]
                 result = subprocess.run(cmd, capture_output=True, text=True, timeout=120, creationflags=subprocess.CREATE_NO_WINDOW)
                 
-                if result.returncode == 0:
-                    log_text.insert(tk.END, f"✓ {folder_name} 导出成功\n")
-                else:
-                    log_text.insert(tk.END, f"✗ {folder_name} 导出失败: {result.stderr.strip()}\n")
-                
-                log_text.see(tk.END)
-                progress_dialog.update()
+                if result.returncode != 0:
+                    print(f"警告: {folder_name} 导出失败: {result.stderr.strip()}")
             
             # 4. 完成
             status_label.config(text="完成!")
             progress_var.set(100)
             progress_dialog.update()
             
-            # 等待一下让用户看到完成状态
-            time.sleep(1)
-            
-            # 启用确认按钮
-            confirm_button.config(state=tk.NORMAL)
-            progress_dialog.update()
-            
-            # 保存结果信息供确认按钮使用
-            progress_dialog.log_folder = log_folder
-            progress_dialog.device = device
-                
-        except subprocess.TimeoutExpired:
-            progress_dialog.destroy()
-            messagebox.showerror("错误", "停止并导出MTKLOG超时，请检查设备连接")
-            self.status_var.set("停止并导出MTKLOG超时")
-        except FileNotFoundError:
-            progress_dialog.destroy()
-            messagebox.showerror("错误", "未找到adb命令，请确保Android SDK已安装并配置PATH")
-            self.status_var.set("未找到adb命令")
-        except Exception as e:
-            progress_dialog.destroy()
-            messagebox.showerror("错误", f"停止并导出MTKLOG时发生错误: {e}")
+            return {"log_folder": log_folder, "device": device}
+        
+        # 定义完成回调
+        def on_mtklog_done(result):
+            import os
+            # 打开日志文件夹
+            if result["log_folder"]:
+                os.startfile(result["log_folder"])
+            # 更新状态
+            self.status_var.set(f"MTKLOG已停止并导出 - {result['device']}")
+        
+        # 定义错误回调
+        def on_mtklog_error(error):
+            messagebox.showerror("错误", f"停止并导出MTKLOG时发生错误: {error}")
             self.status_var.set("停止并导出MTKLOG失败")
+        
+        # 使用模态执行器
+        self.run_with_modal("停止并导出MTKLOG", mtklog_worker, on_mtklog_done, on_mtklog_error)
+    
+    def run_with_modal(self, title, worker_fn, on_done=None, on_error=None):
+        """通用的模态执行器：后台线程执行 + 局部遮罩拦截点击"""
+        import threading
+        
+        # 禁用主窗口所有控件
+        self._disable_all_widgets(self.root)
+        
+        # 创建局部遮罩层（仅在主窗口内部）
+        mask_frame = ttk.Frame(self.root)
+        mask_frame.place(x=0, y=0, relwidth=1, relheight=1)  # 覆盖整个主窗口
+        mask_frame.configure(style="Mask.TFrame")  # 使用自定义样式
+        
+        # 创建进度对话框
+        progress_dialog = tk.Toplevel(self.root)
+        progress_dialog.title(title)
+        progress_dialog.geometry("400x200")
+        progress_dialog.resizable(False, False)
+        progress_dialog.transient(self.root)
+        
+        # 居中显示
+        progress_dialog.geometry("+%d+%d" % (
+            self.root.winfo_rootx() + (self.root.winfo_width() - 400) // 2,
+            self.root.winfo_rooty() + (self.root.winfo_height() - 200) // 2
+        ))
+        
+        # 进度条框架
+        progress_frame = ttk.Frame(progress_dialog, padding="20")
+        progress_frame.pack(fill=tk.BOTH, expand=True)
+        
+        # 标题
+        title_label = ttk.Label(progress_frame, text=f"正在{title}...", font=('Arial', 12, 'bold'))
+        title_label.pack(pady=(0, 10))
+        
+        # 进度条
+        progress_var = tk.DoubleVar()
+        progress_bar = ttk.Progressbar(progress_frame, variable=progress_var, maximum=100, length=300)
+        progress_bar.pack(pady=(0, 10))
+        
+        # 状态标签
+        status_label = ttk.Label(progress_frame, text="准备中...", font=('Arial', 10))
+        status_label.pack(pady=(0, 10))
+        
+        # 按钮框架
+        button_frame = ttk.Frame(progress_frame)
+        button_frame.pack(pady=(10, 0))
+        
+        # 确认按钮（初始状态为禁用）
+        confirm_button = ttk.Button(button_frame, text="确认", state=tk.DISABLED)
+        confirm_button.pack()
+        
+        # 遮罩点击处理
+        def on_mask_click(event):
+            messagebox.showinfo("正在处理", "后台正在执行操作，请稍候...\n\n请不要关闭窗口，操作完成后会自动提示。")
+        
+        mask_frame.bind("<Button-1>", on_mask_click)
+        
+        # 更新进度条
+        progress_dialog.update()
+        
+        # 后台线程执行
+        def background_worker():
+            try:
+                result = worker_fn(progress_var, status_label, progress_dialog)
+                # 执行成功，回到主线程
+                self.root.after(0, lambda: self._finish_modal_execution(
+                    mask_frame, progress_dialog, confirm_button, result, on_done, True
+                ))
+            except Exception as e:
+                # 执行失败，回到主线程
+                self.root.after(0, lambda: self._finish_modal_execution(
+                    mask_frame, progress_dialog, confirm_button, e, on_error, False
+                ))
+        
+        # 启动后台线程
+        thread = threading.Thread(target=background_worker, daemon=True)
+        thread.start()
+        
+        return mask_frame, progress_dialog, confirm_button
+    
+    def _disable_all_widgets(self, parent):
+        """禁用所有控件"""
+        for child in parent.winfo_children():
+            try:
+                if isinstance(child, (ttk.Button, ttk.Entry, ttk.Combobox)):
+                    child.config(state=tk.DISABLED)
+                elif isinstance(child, tk.Text):
+                    child.config(state=tk.DISABLED)
+                # 递归处理子控件
+                self._disable_all_widgets(child)
+            except:
+                pass
+    
+    def _enable_all_widgets(self, parent):
+        """启用所有控件"""
+        for child in parent.winfo_children():
+            try:
+                if isinstance(child, (ttk.Button, ttk.Entry, ttk.Combobox)):
+                    child.config(state=tk.NORMAL)
+                elif isinstance(child, tk.Text):
+                    child.config(state=tk.NORMAL)
+                # 递归处理子控件
+                self._enable_all_widgets(child)
+            except:
+                pass
+    
+    def _finish_modal_execution(self, mask_frame, progress_dialog, confirm_button, result, callback, success):
+        """完成模态执行"""
+        # 更新进度条到100%
+        progress_var = progress_dialog.children['!frame'].children['!progressbar'].cget('variable')
+        if hasattr(progress_var, 'set'):
+            progress_var.set(100)
+        
+        # 更新状态
+        status_label = progress_dialog.children['!frame'].children['!label']
+        if hasattr(status_label, 'config'):
+            status_label.config(text="完成!" if success else "失败!")
+        
+        # 启用确认按钮
+        confirm_button.config(state=tk.NORMAL)
+        
+        # 设置确认按钮的回调
+        def on_confirm():
+            # 移除遮罩
+            mask_frame.destroy()
+            # 重新启用所有控件
+            self._enable_all_widgets(self.root)
+            # 关闭进度对话框
+            progress_dialog.destroy()
+            # 执行回调
+            if callback:
+                callback(result)
+        
+        confirm_button.config(command=on_confirm)
     
     def close_progress_dialog(self, dialog, log_folder, device):
         """关闭进度弹框并执行后续操作"""
@@ -1897,7 +1971,16 @@ class LogcatFilterApp:
         dialog.destroy()
         # 更新状态
         if device:
-            self.status_var.set(f"MTKLOG已停止并导出 - {device}")
+            # 根据操作类型设置不同的状态信息
+            if hasattr(dialog, 'operation_type') and dialog.operation_type == "adb_export":
+                # ADB log导出操作
+                self.status_var.set(f"ADB log已导出 - {device}")
+            elif hasattr(dialog, 'log_folder'):
+                # MTKLOG操作
+                self.status_var.set(f"MTKLOG已停止并导出 - {device}")
+            else:
+                # ADB log开启操作
+                self.status_var.set(f"ADB log已开启 - {device}")
     
     def delete_mtklog(self):
         """删除MTKLOG"""
@@ -2245,49 +2328,10 @@ class LogcatFilterApp:
             messagebox.showerror("错误", f"检查logcat进程时发生错误: {e}")
             return
         
-        # 创建进度条弹框
-        progress_dialog = tk.Toplevel(self.root)
-        progress_dialog.title("开启ADB Log")
-        progress_dialog.geometry("400x200")
-        progress_dialog.resizable(False, False)
-        progress_dialog.transient(self.root)
-        progress_dialog.grab_set()
-        
-        # 居中显示
-        progress_dialog.geometry("+%d+%d" % (self.root.winfo_rootx() + 50, self.root.winfo_rooty() + 50))
-        
-        # 进度条框架
-        progress_frame = ttk.Frame(progress_dialog, padding="20")
-        progress_frame.pack(fill=tk.BOTH, expand=True)
-        
-        # 标题
-        title_label = ttk.Label(progress_frame, text="正在开启ADB Log...", font=('Arial', 12, 'bold'))
-        title_label.pack(pady=(0, 10))
-        
-        # 进度条
-        progress_var = tk.DoubleVar()
-        progress_bar = ttk.Progressbar(progress_frame, variable=progress_var, maximum=100, length=300)
-        progress_bar.pack(pady=(0, 10))
-        
-        # 状态标签
-        status_label = ttk.Label(progress_frame, text="准备中...", font=('Arial', 10))
-        status_label.pack(pady=(0, 10))
-        
-        # 设备信息
-        device_label = ttk.Label(progress_frame, text=f"设备: {device}", font=('Arial', 9), foreground="gray")
-        device_label.pack()
-        
-        # 按钮框架
-        button_frame = ttk.Frame(progress_frame)
-        button_frame.pack(pady=(10, 0))
-        
-        # 确认按钮（初始状态为禁用）
-        confirm_button = ttk.Button(button_frame, text="确认", state=tk.DISABLED, command=lambda: self.close_progress_dialog(progress_dialog, None, device))
-        confirm_button.pack()
-        
-        progress_dialog.update()
-        
-        try:
+        # 定义后台工作函数
+        def adblog_start_worker(progress_var, status_label, progress_dialog):
+            import time
+            
             # 1. 清理临时目录（如果之前没有清理过）
             status_label.config(text="清理临时目录...")
             progress_var.set(25)
@@ -2327,29 +2371,20 @@ class LogcatFilterApp:
             progress_var.set(100)
             progress_dialog.update()
             
-            # 等待一下让用户看到完成状态
-            import time
-            time.sleep(1)
-            
-            # 启用确认按钮
-            confirm_button.config(state=tk.NORMAL)
-            progress_dialog.update()
-            
-            # 保存结果信息供确认按钮使用
-            progress_dialog.device = device
-                
-        except subprocess.TimeoutExpired:
-            progress_dialog.destroy()
-            messagebox.showerror("错误", "开启ADB log超时，请检查设备连接")
-            self.status_var.set("开启ADB log超时")
-        except FileNotFoundError:
-            progress_dialog.destroy()
-            messagebox.showerror("错误", "未找到adb命令，请确保Android SDK已安装并配置PATH")
-            self.status_var.set("未找到adb命令")
-        except Exception as e:
-            progress_dialog.destroy()
-            messagebox.showerror("错误", f"开启ADB log时发生错误: {e}")
+            return {"device": device}
+        
+        # 定义完成回调
+        def on_adblog_start_done(result):
+            # 更新状态
+            self.status_var.set(f"ADB log已开启 - {result['device']}")
+        
+        # 定义错误回调
+        def on_adblog_start_error(error):
+            messagebox.showerror("错误", f"开启ADB log时发生错误: {error}")
             self.status_var.set("开启ADB log失败")
+        
+        # 使用模态执行器
+        self.run_with_modal("开启ADB Log", adblog_start_worker, on_adblog_start_done, on_adblog_start_error)
     
     def export_adblog(self):
         """停止adb log并导出"""
@@ -2382,55 +2417,11 @@ class LogcatFilterApp:
             self.status_var.set("检查设备连接失败")
             return
         
-        # 创建进度条弹框
-        progress_dialog = tk.Toplevel(self.root)
-        progress_dialog.title("停止并导出ADB Log")
-        progress_dialog.geometry("450x280")
-        progress_dialog.resizable(False, False)
-        progress_dialog.transient(self.root)
-        progress_dialog.grab_set()
-        
-        # 居中显示
-        progress_dialog.geometry("+%d+%d" % (self.root.winfo_rootx() + 25, self.root.winfo_rooty() + 25))
-        
-        # 进度条框架
-        progress_frame = ttk.Frame(progress_dialog, padding="20")
-        progress_frame.pack(fill=tk.BOTH, expand=True)
-        
-        # 标题
-        title_label = ttk.Label(progress_frame, text="正在停止并导出ADB Log...", font=('Arial', 12, 'bold'))
-        title_label.pack(pady=(0, 10))
-        
-        # 进度条
-        progress_var = tk.DoubleVar()
-        progress_bar = ttk.Progressbar(progress_frame, variable=progress_var, maximum=100, length=400)
-        progress_bar.pack(pady=(0, 10))
-        
-        # 状态标签
-        status_label = ttk.Label(progress_frame, text="准备中...", font=('Arial', 10))
-        status_label.pack(pady=(0, 5))
-        
-        # 设备信息
-        device_label = ttk.Label(progress_frame, text=f"设备: {device}", font=('Arial', 9), foreground="gray")
-        device_label.pack()
-        
-        # 日志输出区域
-        log_text = tk.Text(progress_frame, height=4, width=50, font=('Consolas', 8))
-        log_text.pack(pady=(10, 0))
-        
-        # 按钮框架
-        button_frame = ttk.Frame(progress_frame)
-        button_frame.pack(pady=(10, 0))
-        
-        # 确认按钮（初始状态为禁用）
-        confirm_button = ttk.Button(button_frame, text="确认", state=tk.DISABLED, command=lambda: self.close_progress_dialog(progress_dialog, None, device))
-        confirm_button.pack()
-        
-        progress_dialog.update()
-        
-        try:
+        # 定义后台工作函数
+        def adblog_worker(progress_var, status_label, progress_dialog):
             import os
             import datetime
+            import time
             
             # 1. 检查设备连接状态
             status_label.config(text="检查设备连接状态...")
@@ -2446,10 +2437,6 @@ class LogcatFilterApp:
             if device not in result.stdout:
                 raise Exception(f"设备 {device} 未连接")
             
-            log_text.insert(tk.END, f"✓ 设备 {device} 连接正常\n")
-            log_text.see(tk.END)
-            progress_dialog.update()
-            
             # 2. 检查logcat进程是否存在
             status_label.config(text="检查logcat进程...")
             progress_var.set(25)
@@ -2462,14 +2449,7 @@ class LogcatFilterApp:
             
             # 检查输出中是否包含logcat
             if "logcat" not in result.stdout:
-                progress_dialog.destroy()
-                messagebox.showerror("错误", "logcat进程不存在，log抓取异常")
-                self.status_var.set("logcat进程不存在")
-                return
-            
-            log_text.insert(tk.END, f"✓ logcat进程存在\n")
-            log_text.see(tk.END)
-            progress_dialog.update()
+                raise Exception("logcat进程不存在，log抓取异常")
             
             # 3. 杀掉logcat进程
             status_label.config(text="停止logcat进程...")
@@ -2479,12 +2459,7 @@ class LogcatFilterApp:
             pkill_cmd = ["adb", "-s", device, "shell", "pkill", "logcat"]
             result = subprocess.run(pkill_cmd, capture_output=True, text=True, timeout=30, creationflags=subprocess.CREATE_NO_WINDOW)
             if result.returncode != 0:
-                log_text.insert(tk.END, f"⚠ 停止logcat进程警告: {result.stderr.strip()}\n")
-            else:
-                log_text.insert(tk.END, f"✓ logcat进程已停止\n")
-            
-            log_text.see(tk.END)
-            progress_dialog.update()
+                print(f"警告: 停止logcat进程警告: {result.stderr.strip()}")
             
             # 4. 创建日志目录
             status_label.config(text="创建日志目录...")
@@ -2496,10 +2471,6 @@ class LogcatFilterApp:
             
             if not os.path.exists(log_dir):
                 os.makedirs(log_dir)
-            
-            log_text.insert(tk.END, f"✓ 日志目录已创建: {log_dir}\n")
-            log_text.see(tk.END)
-            progress_dialog.update()
             
             # 5. 导出log文件
             status_label.config(text="导出log文件...")
@@ -2524,52 +2495,43 @@ class LogcatFilterApp:
                         pull_cmd = ["adb", "-s", device, "pull", logcat_file.strip(), os.path.join(logcat_dir, filename)]
                         result = subprocess.run(pull_cmd, capture_output=True, text=True, timeout=120, creationflags=subprocess.CREATE_NO_WINDOW)
                         
-                        if result.returncode == 0:
-                            log_text.insert(tk.END, f"✓ {filename} 导出成功\n")
-                        else:
-                            log_text.insert(tk.END, f"✗ {filename} 导出失败: {result.stderr.strip()}\n")
+                        if result.returncode != 0:
+                            print(f"警告: {filename} 导出失败: {result.stderr.strip()}")
             else:
                 # 没有找到logcat文件，尝试导出整个tmp目录
                 pull_cmd = ["adb", "-s", device, "pull", "/data/local/tmp/", logcat_dir]
                 result = subprocess.run(pull_cmd, capture_output=True, text=True, timeout=120, creationflags=subprocess.CREATE_NO_WINDOW)
                 
-                if result.returncode == 0:
-                    log_text.insert(tk.END, f"✓ log文件导出成功\n")
-                else:
-                    log_text.insert(tk.END, f"✗ log文件导出失败: {result.stderr.strip()}\n")
-            
-            log_text.see(tk.END)
-            progress_dialog.update()
+                if result.returncode != 0:
+                    print(f"警告: log文件导出失败: {result.stderr.strip()}")
             
             # 6. 完成
             status_label.config(text="完成!")
             progress_var.set(100)
             progress_dialog.update()
             
-            # 等待一下让用户看到完成状态
-            import time
-            time.sleep(1)
-            
-            # 启用确认按钮
-            confirm_button.config(state=tk.NORMAL)
-            progress_dialog.update()
-            
-            # 保存结果信息供确认按钮使用
-            progress_dialog.log_folder = logcat_dir
-            progress_dialog.device = device
-                
-        except subprocess.TimeoutExpired:
-            progress_dialog.destroy()
-            messagebox.showerror("错误", "停止并导出ADB log超时，请检查设备连接")
-            self.status_var.set("停止并导出ADB log超时")
-        except FileNotFoundError:
-            progress_dialog.destroy()
-            messagebox.showerror("错误", "未找到adb命令，请确保Android SDK已安装并配置PATH")
-            self.status_var.set("未找到adb命令")
-        except Exception as e:
-            progress_dialog.destroy()
-            messagebox.showerror("错误", f"停止并导出ADB log时发生错误: {e}")
-            self.status_var.set("停止并导出ADB log失败")
+            return {"log_folder": logcat_dir, "device": device, "operation_type": "adb_export"}
+        
+        # 定义完成回调
+        def on_adblog_done(result):
+            import os
+            # 打开日志文件夹
+            if result["log_folder"]:
+                os.startfile(result["log_folder"])
+            # 更新状态
+            self.status_var.set(f"ADB log已导出 - {result['device']}")
+        
+        # 定义错误回调
+        def on_adblog_error(error):
+            if "logcat进程不存在" in str(error):
+                messagebox.showerror("错误", "logcat进程不存在，log抓取异常")
+                self.status_var.set("logcat进程不存在")
+            else:
+                messagebox.showerror("错误", f"停止并导出ADB log时发生错误: {error}")
+                self.status_var.set("停止并导出ADB log失败")
+        
+        # 使用模态执行器
+        self.run_with_modal("停止并导出ADB Log", adblog_worker, on_adblog_done, on_adblog_error)
 
 def main():
     """主函数"""
