@@ -320,6 +320,8 @@ class LogcatFilterApp:
         tools_menu.add_command(label="设置显示行数", command=self.show_display_lines_dialog)
         tools_menu.add_command(label="清除设备缓存", command=self.clear_device_logs)
         tools_menu.add_command(label="保存日志", command=self.save_logs)
+        tools_menu.add_separator()
+        tools_menu.add_command(label="安装MTKLOGGER", command=self.install_mtklogger)
         
         # 帮助菜单
         help_menu = tk.Menu(menubar, tearoff=0)
@@ -576,7 +578,7 @@ class LogcatFilterApp:
             # 插入匹配前的文本
             if match.start() > 0:
                 self.log_text.insert(tk.END, line[:match.start()])
-            # 插入高亮文本
+        # 插入高亮文本
             self.log_text.insert(tk.END, match.group(), "highlight")
             # 插入匹配后的文本
             if match.end() < len(line):
@@ -592,10 +594,10 @@ class LogcatFilterApp:
                 # 插入高亮文本
                 self.log_text.insert(tk.END, match.group(), "highlight")
                 last_end = match.end()
-            
-            # 插入剩余文本
-            if last_end < len(line):
-                self.log_text.insert(tk.END, line[last_end:])
+        
+        # 插入剩余文本
+        if last_end < len(line):
+            self.log_text.insert(tk.END, line[last_end:])
     
     def trim_log_lines_if_needed(self, added_lines):
         """高效的行数裁剪机制 - 使用trim_threshold避免频繁操作"""
@@ -1888,10 +1890,10 @@ class LogcatFilterApp:
                 self.root.after(0, lambda: self._finish_modal_execution(
                     mask_frame, progress_dialog, confirm_button, result, on_done, True
                 ))
-            except Exception as e:
+            except Exception as error:
                 # 执行失败，回到主线程
-                self.root.after(0, lambda: self._finish_modal_execution(
-                    mask_frame, progress_dialog, confirm_button, e, on_error, False
+                self.root.after(0, lambda err=error: self._finish_modal_execution(
+                    mask_frame, progress_dialog, confirm_button, err, on_error, False
                 ))
         
         # 启动后台线程
@@ -1901,12 +1903,19 @@ class LogcatFilterApp:
         return mask_frame, progress_dialog, confirm_button
     
     def _disable_all_widgets(self, parent):
-        """禁用所有控件"""
+        """禁用所有控件，并保存原始状态"""
+        if not hasattr(self, '_original_widget_states'):
+            self._original_widget_states = {}
+        
         for child in parent.winfo_children():
             try:
                 if isinstance(child, (ttk.Button, ttk.Entry, ttk.Combobox)):
+                    # 保存原始状态
+                    self._original_widget_states[child] = child.cget('state')
                     child.config(state=tk.DISABLED)
                 elif isinstance(child, tk.Text):
+                    # 保存原始状态
+                    self._original_widget_states[child] = child.cget('state')
                     child.config(state=tk.DISABLED)
                 # 递归处理子控件
                 self._disable_all_widgets(child)
@@ -1914,13 +1923,18 @@ class LogcatFilterApp:
                 pass
     
     def _enable_all_widgets(self, parent):
-        """启用所有控件"""
+        """恢复所有控件的原始状态"""
+        if not hasattr(self, '_original_widget_states'):
+            return
+            
         for child in parent.winfo_children():
             try:
-                if isinstance(child, (ttk.Button, ttk.Entry, ttk.Combobox)):
-                    child.config(state=tk.NORMAL)
-                elif isinstance(child, tk.Text):
-                    child.config(state=tk.NORMAL)
+                if isinstance(child, (ttk.Button, ttk.Entry, ttk.Combobox, tk.Text)):
+                    # 恢复原始状态
+                    if child in self._original_widget_states:
+                        original_state = self._original_widget_states[child]
+                        child.config(state=original_state)
+                        del self._original_widget_states[child]
                 # 递归处理子控件
                 self._enable_all_widgets(child)
             except:
@@ -2290,71 +2304,94 @@ class LogcatFilterApp:
                 self.status_var.set(f"设备 {device} 未连接")
                 return
             
-            # 设备连接正常，继续检查logcat进程
-            self.status_var.set(f"设备 {device} 连接正常，检查logcat进程...")
+            # 设备连接正常
+            self.status_var.set(f"设备 {device} 连接正常，准备开启ADB log")
                 
         except Exception as e:
             messagebox.showerror("错误", f"检查设备连接时发生错误: {e}")
             self.status_var.set("检查设备连接失败")
             return
         
-        # 检查logcat进程是否存在
+        # 检查/data/local/tmp是否有txt文件
         try:
-            ps_cmd = ["adb", "-s", device, "shell", "ps", "-A"]
-            result = subprocess.run(ps_cmd, capture_output=True, text=True, timeout=30, creationflags=subprocess.CREATE_NO_WINDOW)
+            ls_cmd = ["adb", "-s", device, "shell", "ls", "/data/local/tmp/*.txt"]
+            result = subprocess.run(ls_cmd, capture_output=True, text=True, timeout=30, creationflags=subprocess.CREATE_NO_WINDOW)
             
-            if result.returncode == 0 and "logcat" in result.stdout:
-                # logcat进程存在，询问用户是否停止并重新开始
-                response = messagebox.askyesno("确认", 
-                    f"检测到logcat进程正在运行 (设备: {device})\n\n"
-                    "是否停止现有进程并重新开始抓取ADB log？\n\n"
-                    "选择'是'：停止现有进程，清空临时文件，重新开始抓取\n"
-                    "选择'否'：返回主界面，保持现有进程运行")
+            if result.returncode == 0 and result.stdout.strip():
+                # 有txt文件，询问用户是否清除
+                txt_files = result.stdout.strip().split('\n')
+                file_count = len([f for f in txt_files if f.strip()])
                 
-                if not response:
-                    # 用户选择否，返回主界面
-                    self.status_var.set("用户取消操作")
-                    return
+                # 显示文件名列表（最多显示5个）
+                file_list = [os.path.basename(f.strip()) for f in txt_files if f.strip()][:5]
+                file_display = '\n'.join(file_list)
+                if file_count > 5:
+                    file_display += '\n...'
                 
-                # 用户选择是，停止现有进程
-                pkill_cmd = ["adb", "-s", device, "shell", "pkill", "logcat"]
-                subprocess.run(pkill_cmd, capture_output=True, text=True, timeout=30, creationflags=subprocess.CREATE_NO_WINDOW)
+                response = messagebox.askyesno("发现旧log文件", 
+                    f"在设备 {device} 的 /data/local/tmp 目录中发现 {file_count} 个txt文件:\n\n"
+                    f"{file_display}\n\n"
+                    "是否清除这些旧log文件？\n\n"
+                    "选择'是'：清除所有旧文件，然后输入新文件名\n"
+                    "选择'否'：保留旧文件，然后输入新文件名")
                 
-                # 清空临时目录
-                rm_cmd = ["adb", "-s", device, "shell", "rm", "-rf", "/data/local/tmp/*"]
-                subprocess.run(rm_cmd, capture_output=True, text=True, timeout=30, creationflags=subprocess.CREATE_NO_WINDOW)
-                
+                if response:
+                    # 用户选择清除，只删除txt文件
+                    self.status_var.set(f"正在清除设备 {device} 的旧log文件...")
+                    
+                    # 只删除txt文件，不影响其他文件
+                    rm_cmd = ["adb", "-s", device, "shell", "rm", "-f", "/data/local/tmp/*.txt"]
+                    result = subprocess.run(rm_cmd, capture_output=True, text=True, timeout=30, creationflags=subprocess.CREATE_NO_WINDOW)
+                    
+                    if result.returncode == 0:
+                        self.status_var.set(f"已清除设备 {device} 的旧log文件")
+                    else:
+                        print(f"警告: 清除旧文件失败: {result.stderr.strip()}")
+                else:
+                    # 用户选择保留
+                    self.status_var.set(f"保留设备 {device} 的旧log文件")
+                    
         except Exception as e:
-            messagebox.showerror("错误", f"检查logcat进程时发生错误: {e}")
+            print(f"检查旧log文件时发生错误: {e}")
+            # 继续执行，不中断流程
+        
+        # 获取log名称
+        log_name = tk.simpledialog.askstring("输入log名称", 
+            "请输入log名称:\n\n注意: 名称中不能包含空格，空格将被替换为下划线", 
+            parent=self.root)
+        if not log_name:
             return
+        
+        # 处理log名称：替换空格为下划线
+        log_name = log_name.replace(" ", "_")
         
         # 定义后台工作函数
         def adblog_start_worker(progress_var, status_label, progress_dialog):
             import time
+            import datetime
             
-            # 1. 清理临时目录（如果之前没有清理过）
-            status_label.config(text="清理临时目录...")
-            progress_var.set(25)
+            # 1. 生成带时间的log文件名
+            status_label.config(text="生成log文件名...")
+            progress_var.set(20)
             progress_dialog.update()
             
-            cmd1 = ["adb", "-s", device, "shell", "rm", "-rf", "/data/local/tmp/*"]
-            result = subprocess.run(cmd1, capture_output=True, text=True, timeout=30, creationflags=subprocess.CREATE_NO_WINDOW)
-            if result.returncode != 0:
-                raise Exception(f"清理临时目录失败: {result.stderr.strip()}")
+            current_time = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+            log_filename = f"{log_name}_{current_time}.txt"
+            log_path = f"/data/local/tmp/{log_filename}"
             
             # 2. 启动logcat进程
             status_label.config(text="启动logcat进程...")
             progress_var.set(50)
             progress_dialog.update()
             
-            cmd2 = ["adb", "-s", device, "shell", "nohup", "logcat", "-v", "time", "-b", "all", "-f", "/data/local/tmp/logcat_$(date +%Y%m%d_%H%M%S).txt", ">", "/dev/null", "2>&1", "&"]
-            result = subprocess.run(cmd2, capture_output=True, text=True, timeout=30, creationflags=subprocess.CREATE_NO_WINDOW)
+            cmd = ["adb", "-s", device, "shell", "nohup", "logcat", "-v", "time", "-b", "all", "-f", log_path, ">", "/dev/null", "2>&1", "&"]
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=30, creationflags=subprocess.CREATE_NO_WINDOW)
             if result.returncode != 0:
                 raise Exception(f"启动logcat失败: {result.stderr.strip()}")
             
             # 3. 检查logcat进程是否存在
             status_label.config(text="检查logcat进程...")
-            progress_var.set(75)
+            progress_var.set(80)
             progress_dialog.update()
             
             cmd3 = ["adb", "-s", device, "shell", "ps", "-A"]
@@ -2371,12 +2408,12 @@ class LogcatFilterApp:
             progress_var.set(100)
             progress_dialog.update()
             
-            return {"device": device}
+            return {"device": device, "log_filename": log_filename, "log_path": log_path}
         
         # 定义完成回调
         def on_adblog_start_done(result):
             # 更新状态
-            self.status_var.set(f"ADB log已开启 - {result['device']}")
+            self.status_var.set(f"ADB log已开启 - {result['device']} - {result['log_filename']}")
         
         # 定义错误回调
         def on_adblog_start_error(error):
@@ -2451,15 +2488,45 @@ class LogcatFilterApp:
             if "logcat" not in result.stdout:
                 raise Exception("logcat进程不存在，log抓取异常")
             
-            # 3. 杀掉logcat进程
-            status_label.config(text="停止logcat进程...")
+            # 3. 精确杀掉nohup启动的logcat进程
+            status_label.config(text="停止nohup logcat进程...")
             progress_var.set(40)
             progress_dialog.update()
             
-            pkill_cmd = ["adb", "-s", device, "shell", "pkill", "logcat"]
-            result = subprocess.run(pkill_cmd, capture_output=True, text=True, timeout=30, creationflags=subprocess.CREATE_NO_WINDOW)
-            if result.returncode != 0:
-                print(f"警告: 停止logcat进程警告: {result.stderr.strip()}")
+            # 查找nohup启动的logcat进程
+            ps_cmd = ["adb", "-s", device, "shell", "ps", "-ef"]
+            result = subprocess.run(ps_cmd, capture_output=True, text=True, timeout=30, creationflags=subprocess.CREATE_NO_WINDOW)
+            
+            if result.returncode == 0:
+                # 解析进程列表，找到包含/data/local/tmp/的logcat进程
+                lines = result.stdout.strip().split('\n')
+                nohup_pids = []
+                
+                for line in lines:
+                    if 'logcat' in line and '/data/local/tmp/' in line:
+                        # 提取PID（第二列）
+                        parts = line.split()
+                        if len(parts) >= 2:
+                            try:
+                                pid = int(parts[1])
+                                nohup_pids.append(pid)
+                                print(f"找到nohup logcat进程 PID: {pid}")
+                            except ValueError:
+                                continue
+                
+                # 杀掉找到的nohup logcat进程
+                if nohup_pids:
+                    for pid in nohup_pids:
+                        kill_cmd = ["adb", "-s", device, "shell", "kill", str(pid)]
+                        kill_result = subprocess.run(kill_cmd, capture_output=True, text=True, timeout=30, creationflags=subprocess.CREATE_NO_WINDOW)
+                        if kill_result.returncode == 0:
+                            print(f"成功停止nohup logcat进程 PID: {pid}")
+                        else:
+                            print(f"停止进程 PID {pid} 失败: {kill_result.stderr.strip()}")
+                else:
+                    print("未找到nohup启动的logcat进程")
+            else:
+                print(f"获取进程列表失败: {result.stderr.strip()}")
             
             # 4. 创建日志目录
             status_label.config(text="创建日志目录...")
@@ -2482,28 +2549,38 @@ class LogcatFilterApp:
             if not os.path.exists(logcat_dir):
                 os.makedirs(logcat_dir)
             
-            # 先获取设备上的logcat文件列表
-            ls_cmd = ["adb", "-s", device, "shell", "ls", "/data/local/tmp/logcat_*.txt"]
+            # 先获取设备上的所有txt文件列表
+            ls_cmd = ["adb", "-s", device, "shell", "ls", "/data/local/tmp/*.txt"]
             result = subprocess.run(ls_cmd, capture_output=True, text=True, timeout=30, creationflags=subprocess.CREATE_NO_WINDOW)
             
             if result.returncode == 0 and result.stdout.strip():
-                # 有logcat文件，逐个导出
-                logcat_files = result.stdout.strip().split('\n')
-                for logcat_file in logcat_files:
-                    if logcat_file.strip():
-                        filename = os.path.basename(logcat_file.strip())
-                        pull_cmd = ["adb", "-s", device, "pull", logcat_file.strip(), os.path.join(logcat_dir, filename)]
+                # 有txt文件，逐个导出
+                txt_files = result.stdout.strip().split('\n')
+                exported_count = 0
+                for txt_file in txt_files:
+                    if txt_file.strip():
+                        filename = os.path.basename(txt_file.strip())
+                        pull_cmd = ["adb", "-s", device, "pull", txt_file.strip(), os.path.join(logcat_dir, filename)]
                         result = subprocess.run(pull_cmd, capture_output=True, text=True, timeout=120, creationflags=subprocess.CREATE_NO_WINDOW)
                         
-                        if result.returncode != 0:
+                        if result.returncode == 0:
+                            exported_count += 1
+                            print(f"成功导出: {filename}")
+                        else:
                             print(f"警告: {filename} 导出失败: {result.stderr.strip()}")
+                
+                if exported_count == 0:
+                    raise Exception("没有成功导出任何log文件")
             else:
-                # 没有找到logcat文件，尝试导出整个tmp目录
+                # 没有找到txt文件，尝试导出整个tmp目录
+                status_label.config(text="未找到txt文件，导出整个tmp目录...")
+                progress_dialog.update()
+                
                 pull_cmd = ["adb", "-s", device, "pull", "/data/local/tmp/", logcat_dir]
                 result = subprocess.run(pull_cmd, capture_output=True, text=True, timeout=120, creationflags=subprocess.CREATE_NO_WINDOW)
                 
                 if result.returncode != 0:
-                    print(f"警告: log文件导出失败: {result.stderr.strip()}")
+                    raise Exception(f"导出tmp目录失败: {result.stderr.strip()}")
             
             # 6. 完成
             status_label.config(text="完成!")
@@ -2532,6 +2609,108 @@ class LogcatFilterApp:
         
         # 使用模态执行器
         self.run_with_modal("停止并导出ADB Log", adblog_worker, on_adblog_done, on_adblog_error)
+    
+    def install_mtklogger(self):
+        """安装MTKLOGGER"""
+        # 检查是否有设备连接
+        device = self.selected_device.get()
+        if not device or device in ["无设备", "检测失败", "检测超时", "adb未安装", "检测错误"]:
+            messagebox.showerror("错误", "请先连接设备并选择有效设备")
+            return
+        
+        # 检查设备连接状态
+        try:
+            devices_cmd = ["adb", "devices"]
+            result = subprocess.run(devices_cmd, capture_output=True, text=True, timeout=30, creationflags=subprocess.CREATE_NO_WINDOW)
+            
+            if result.returncode != 0:
+                messagebox.showerror("错误", "检查设备连接失败")
+                return
+            
+            # 检查设备是否在列表中
+            if device not in result.stdout:
+                messagebox.showerror("错误", f"设备 {device} 未连接")
+                return
+            
+            # 设备连接正常
+            self.status_var.set(f"设备 {device} 连接正常，准备安装MTKLOGGER")
+                
+        except Exception as e:
+            messagebox.showerror("错误", f"检查设备连接时发生错误: {e}")
+            return
+        
+        # 选择APK文件
+        apk_file = filedialog.askopenfilename(
+            title="选择MTKLOGGER APK文件",
+            filetypes=[("APK文件", "*.apk"), ("所有文件", "*.*")],
+            parent=self.root
+        )
+        
+        if not apk_file:
+            return
+        
+        # 定义后台工作函数
+        def install_worker(progress_var, status_label, progress_dialog):
+            import time
+            
+            # 1. 卸载旧版本（如果存在）
+            status_label.config(text="检查并卸载旧版本...")
+            progress_var.set(20)
+            progress_dialog.update()
+            
+            uninstall_cmd = ["adb", "-s", device, "uninstall", "com.debug.loggerui"]
+            subprocess.run(uninstall_cmd, capture_output=True, text=True, timeout=30, creationflags=subprocess.CREATE_NO_WINDOW)
+            
+            # 2. 安装新版本
+            status_label.config(text="安装MTKLOGGER...")
+            progress_var.set(50)
+            progress_dialog.update()
+            
+            install_cmd = ["adb", "-s", device, "install", apk_file]
+            result = subprocess.run(install_cmd, capture_output=True, text=True, timeout=120, creationflags=subprocess.CREATE_NO_WINDOW)
+            
+            if result.returncode != 0:
+                error_msg = result.stderr.strip() if result.stderr else "未知错误"
+                raise Exception(f"安装失败: {error_msg}")
+            
+            # 检查安装结果
+            if "Success" not in result.stdout and "success" not in result.stdout.lower():
+                raise Exception(f"安装可能失败: {result.stdout.strip()}")
+            
+            # 3. 启动MTKLOGGER
+            status_label.config(text="启动MTKLOGGER...")
+            progress_var.set(80)
+            progress_dialog.update()
+            
+            start_cmd = ["adb", "-s", device, "shell", "am", "start", "-n", "com.debug.loggerui/.MainActivity"]
+            result = subprocess.run(start_cmd, capture_output=True, text=True, timeout=30, creationflags=subprocess.CREATE_NO_WINDOW)
+            
+            if result.returncode != 0:
+                print(f"警告: 启动MTKLOGGER失败: {result.stderr.strip()}")
+            
+            # 4. 完成
+            status_label.config(text="安装完成!")
+            progress_var.set(100)
+            progress_dialog.update()
+            
+            return {"device": device, "apk_file": apk_file}
+        
+        # 定义完成回调
+        def on_install_done(result):
+            messagebox.showinfo("成功", 
+                f"MTKLOGGER安装成功!\n\n"
+                f"设备: {result['device']}\n"
+                f"APK文件: {result['apk_file']}\n\n"
+                f"MTKLOGGER已启动，现在可以使用MTKLOG相关功能。")
+            self.status_var.set(f"MTKLOGGER安装成功 - {result['device']}")
+        
+        # 定义错误回调
+        def on_install_error(error):
+            messagebox.showerror("错误", f"安装MTKLOGGER时发生错误: {error}")
+            self.status_var.set("安装MTKLOGGER失败")
+        
+        # 使用模态执行器
+        self.run_with_modal("安装MTKLOGGER", install_worker, on_install_done, on_install_error)
 
 def main():
     """主函数"""
