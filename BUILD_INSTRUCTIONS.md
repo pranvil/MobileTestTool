@@ -26,7 +26,7 @@ build_onedir_simple.bat
 pip install pyinstaller
 
 # 2. 执行打包命令
-pyinstaller --onefile --windowed --name "ADB_Logcat_Filter" adb_logcat_filter.py
+pyinstaller --onefile --windowed --name "ADB_Logcat_Filter" main.py
 ```
 
 ## 打包选项说明
@@ -85,12 +85,12 @@ dist/ADB_Logcat_Filter/
 
 1. **使用UPX压缩**（如果已安装UPX）：
 ```bash
-pyinstaller --onefile --windowed --upx-dir="C:\upx" adb_logcat_filter.py
+pyinstaller --onefile --windowed --upx-dir="C:\upx" main.py
 ```
 
 2. **排除不需要的模块**：
 ```bash
-pyinstaller --onefile --windowed --exclude-module matplotlib --exclude-module numpy adb_logcat_filter.py
+pyinstaller --onefile --windowed --exclude-module matplotlib --exclude-module numpy main.py
 ```
 
 ## 常见问题

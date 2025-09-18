@@ -40,7 +40,7 @@ REM 执行打包命令
 pyinstaller ^
     --onedir ^
     --windowed ^
-    --name "ADB_Logcat_Filter" ^
+    --name "手机测试辅助工具 " ^
     --add-data "README.md;." ^
     --hidden-import "tkinter" ^
     --hidden-import "tkinter.ttk" ^
@@ -55,7 +55,7 @@ pyinstaller ^
     --hidden-import "sys" ^
     --hidden-import "datetime" ^
     --clean ^
-    adb_logcat_filter.py
+    main.py
 
 if errorlevel 1 (
     echo.

@@ -53,7 +53,7 @@
 ### 2. 运行程序
 ```bash
 # 直接运行Python脚本
-python adb_logcat_filter.py
+python main.py
 
 # 或使用打包好的可执行文件
 .\dist\ADB_Logcat_Filter\ADB_Logcat_Filter.exe
@@ -107,7 +107,7 @@ python adb_logcat_filter.py
 
 ### 第二行（过滤控制）
 ```
-[关键字:] [输入框] [正则表达式] [区分大小写] [彩色高亮] [开始过滤] [停止] [清空日志] [清除缓存] [设置行数] [保存日志]
+[关键字:] [输入框] [正则表达式] [区分大小写] [彩色高亮] [开始过滤/停止过滤] [清空日志] [清除缓存] [设置行数] [保存日志]
 ```
 
 ## ⚠️ 注意事项
@@ -143,6 +143,17 @@ python adb_logcat_filter.py
 
 ## 🏗️ 技术实现
 
+### 架构设计
+- **模块化设计**: 将功能拆分为独立模块，便于维护和扩展
+- **主入口**: `main.py` - 应用程序主入口和协调器
+- **UI管理**: `ui_manager.py` - 用户界面和交互管理
+- **设备管理**: `device_manager.py` - 设备连接和验证
+- **MTKLOG管理**: `mtklog_manager.py` - MTKLOG相关操作
+- **ADBLOG管理**: `adblog_manager.py` - ADB Log相关操作
+- **日志处理**: `log_processor.py` - 日志过滤和性能优化
+- **搜索管理**: `search_manager.py` - 搜索和高亮功能
+
+### 技术栈
 - **GUI框架**: tkinter
 - **进程管理**: subprocess
 - **多线程**: threading
@@ -161,6 +172,9 @@ python adb_logcat_filter.py
 - 🔧 优化用户界面布局
 - 🔧 改进错误处理机制
 - 🔧 统一确认弹框逻辑
+- 🏗️ 重构为模块化架构
+- 🔄 合并开始/停止过滤按钮
+- 🎯 优化UI响应性和用户体验
 
 ### v1.0
 - 🎯 基础日志过滤功能

@@ -15,7 +15,7 @@ if errorlevel 1 (
 )
 
 echo 开始打包...
-pyinstaller --onefile --windowed --name "ADB_Logcat_Filter" adb_logcat_filter.py
+pyinstaller --onefile --windowed --name "ADB_Logcat_Filter" main.py
 
 if errorlevel 1 (
     echo 打包失败！
