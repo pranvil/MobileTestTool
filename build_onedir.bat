@@ -1,7 +1,7 @@
 @echo off
 chcp 65001 >nul
 echo ========================================
-echo    手机log辅助工具 v2.0 - onedir 打包
+echo    手机测试辅助工具 v2.0 - onedir 打包
 echo ========================================
 echo.
 
@@ -40,7 +40,8 @@ REM 执行打包命令
 pyinstaller ^
     --onedir ^
     --windowed ^
-    --name "手机测试辅助工具 " ^
+    --icon "icon.ico" ^
+    --name "手机测试辅助工具" ^
     --add-data "README.md;." ^
     --hidden-import "tkinter" ^
     --hidden-import "tkinter.ttk" ^
@@ -69,14 +70,14 @@ echo ========================================
 echo           打包完成！
 echo ========================================
 echo.
-echo 可执行文件位置: dist\ADB_Logcat_Filter\ADB_Logcat_Filter.exe
+echo 可执行文件位置: dist\手机测试辅助工具\手机测试辅助工具.exe
 echo 目录大小: 
-dir "dist\ADB_Logcat_Filter" | find "个文件"
+dir "dist\手机测试辅助工具" | find "个文件"
 echo.
 echo 使用说明：
 echo 1. 确保已安装 Android SDK 并配置 adb 命令
 echo 2. 连接 Android 设备并启用 USB 调试
-echo 3. 运行 dist\ADB_Logcat_Filter\ADB_Logcat_Filter.exe
+echo 3. 运行 dist\手机测试辅助工具\手机测试辅助工具.exe
 echo.
 echo onedir 模式优势：
 echo - 启动速度更快

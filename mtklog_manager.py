@@ -164,7 +164,7 @@ class MTKLogManager:
                 
                 # 执行adb pull
                 cmd = ["adb", "-s", device, "pull", source_path, log_folder]
-                result = subprocess.run(cmd, capture_output=True, text=True, timeout=120, 
+                result = subprocess.run(cmd, capture_output=True, text=True, timeout=3600, 
                                       creationflags=subprocess.CREATE_NO_WINDOW)
                 
                 if result.returncode != 0:
@@ -324,21 +324,12 @@ class MTKLogManager:
         
         # 定义后台工作函数
         def install_worker(progress_var, status_label, progress_dialog):
-            # 1. 卸载旧版本（如果存在）
-            status_label.config(text="检查并卸载旧版本...")
-            progress_var.set(20)
-            progress_dialog.update()
-            
-            uninstall_cmd = ["adb", "-s", device, "uninstall", "com.debug.loggerui"]
-            subprocess.run(uninstall_cmd, capture_output=True, text=True, timeout=30, 
-                         creationflags=subprocess.CREATE_NO_WINDOW)
-            
-            # 2. 安装新版本
+            # 1. 安装MTKLOGGER
             status_label.config(text="安装MTKLOGGER...")
-            progress_var.set(50)
+            progress_var.set(30)
             progress_dialog.update()
             
-            install_cmd = ["adb", "-s", device, "install", apk_file]
+            install_cmd = ["adb", "-s", device, "install", "--bypass-low-target-sdk-block", apk_file]
             result = subprocess.run(install_cmd, capture_output=True, text=True, timeout=120, 
                                   creationflags=subprocess.CREATE_NO_WINDOW)
             
@@ -350,9 +341,9 @@ class MTKLogManager:
             if "Success" not in result.stdout and "success" not in result.stdout.lower():
                 raise Exception(f"安装可能失败: {result.stdout.strip()}")
             
-            # 3. 启动MTKLOGGER
+            # 2. 启动MTKLOGGER
             status_label.config(text="启动MTKLOGGER...")
-            progress_var.set(80)
+            progress_var.set(70)
             progress_dialog.update()
             
             start_cmd = ["adb", "-s", device, "shell", "am", "start", "-n", "com.debug.loggerui/.MainActivity"]

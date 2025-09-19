@@ -16,12 +16,22 @@ from mtklog_manager import MTKLogManager
 from adblog_manager import ADBLogManager
 from log_processor import LogProcessor
 from search_manager import SearchManager
+from screenshot_manager import ScreenshotManager
+from video_manager import VideoManager
 
 class LogcatFilterApp:
     def __init__(self, root):
         self.root = root
         self.root.title("手机测试辅助工具 v2.1")
-        self.root.geometry("1000x700")
+        self.root.geometry("1200x800")
+        self.root.minsize(800, 600)
+        
+        # 默认最大化窗口，确保用户能看到所有按钮
+        try:
+            self.root.state('zoomed')  # Windows上最大化窗口
+        except:
+            # 如果zoomed不支持，使用其他方法
+            self.root.attributes('-zoomed', True)
         
         # 变量
         self.filter_keyword = tk.StringVar()
@@ -46,9 +56,14 @@ class LogcatFilterApp:
         self.adblog_manager = ADBLogManager(self)
         self.log_processor = LogProcessor(self)
         self.search_manager = SearchManager(self)
+        self.screenshot_manager = ScreenshotManager(self)
+        self.video_manager = VideoManager(self)
         
         # 初始化设备列表
         self.device_manager.refresh_devices()
+        
+        # 设置录制按钮引用
+        self.video_manager.set_recording_button(self.ui.record_button)
     
     # 设备管理相关方法
     def refresh_devices(self):
@@ -126,6 +141,14 @@ class LogcatFilterApp:
     def find_previous(self, event=None):
         """查找上一个匹配项"""
         self.search_manager.find_previous(event)
+    
+    def take_screenshot(self):
+        """截图"""
+        self.screenshot_manager.take_screenshot()
+    
+    def toggle_recording(self):
+        """切换录制状态"""
+        self.video_manager.toggle_recording()
 
 def main():
     """主函数"""

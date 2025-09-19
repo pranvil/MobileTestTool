@@ -2,11 +2,11 @@
 # -*- coding: utf-8 -*-
 """
 UI管理模块
-负责界面布局、控件管理和用户交互
+负责用户界面的创建和管理
 """
 
 import tkinter as tk
-from tkinter import ttk, messagebox, filedialog, simpledialog
+from tkinter import ttk, messagebox
 import threading
 
 class UIManager:
@@ -27,103 +27,245 @@ class UIManager:
         # 配置网格权重
         self.root.columnconfigure(0, weight=1)
         self.root.rowconfigure(0, weight=1)
-        self.main_frame.columnconfigure(1, weight=1)
-        self.main_frame.rowconfigure(2, weight=1)
+        self.main_frame.columnconfigure(0, weight=1)
+        self.main_frame.rowconfigure(1, weight=1)
         
-        # 控制面板
-        control_frame = ttk.LabelFrame(self.main_frame, text="过滤控制", padding="5")
-        control_frame.grid(row=0, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=(0, 10))
+        # 创建Tab控件
+        self.notebook = ttk.Notebook(self.main_frame)
+        self.notebook.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S), pady=(0, 5))
         
-        # 第一行 - 设备控制 + MTKLOG + ADB log操作
-        first_row_frame = ttk.Frame(control_frame)
-        first_row_frame.grid(row=0, column=0, columnspan=4, sticky=(tk.W, tk.E), pady=(0, 5))
+        # 绑定Tab切换事件
+        self.notebook.bind("<<NotebookTabChanged>>", self.on_tab_changed)
+        
+        # 绑定窗口大小变化事件
+        self.root.bind("<Configure>", self.on_window_configure)
+        
+        # 创建各个Tab页面
+        self.setup_device_control_tab()
+        self.setup_log_filter_tab()
+        self.setup_tmo_cc_tab()
+        
+        # 初始化时检查第一个Tab的滚动条
+        self.root.after(200, self.check_current_tab_scrollbar)
+    
+    def setup_device_control_tab(self):
+        """设置设备控制Tab页面"""
+        # 创建设备控制Tab
+        device_tab = ttk.Frame(self.notebook)
+        self.notebook.add(device_tab, text="设备控制")
+        
+        # 创建滚动容器
+        device_container = ttk.Frame(device_tab)
+        device_container.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
+        device_container.columnconfigure(0, weight=1)
+        
+        # 创建水平滚动的Canvas
+        canvas = tk.Canvas(device_container, height=30, highlightthickness=0)
+        scrollbar = ttk.Scrollbar(device_container, orient="horizontal", command=canvas.xview)
+        scrollable_frame = ttk.Frame(canvas)
+        
+        # 配置滚动
+        def update_scroll_region(event):
+            canvas.configure(scrollregion=canvas.bbox("all"))
+            # 检查是否需要滚动条
+            self.update_scrollbar_visibility(canvas, scrollbar, scrollable_frame)
+        
+        scrollable_frame.bind("<Configure>", update_scroll_region)
+        
+        canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
+        canvas.configure(xscrollcommand=scrollbar.set)
+        
+        # 布局Canvas和Scrollbar
+        canvas.grid(row=0, column=0, sticky=(tk.W, tk.E), padx=(0, 0), pady=(2, 0))
+        scrollbar.grid(row=1, column=0, sticky=(tk.W, tk.E), padx=(0, 0), pady=(1, 2))
+        
+        # 绑定鼠标滚轮事件
+        canvas.bind("<MouseWheel>", lambda e: canvas.xview_scroll(int(-1 * (e.delta / 120)), "units"))
+        
+        # 设备控制行
+        device_row = scrollable_frame
         
         # 设备选择
-        ttk.Label(first_row_frame, text="设备:").pack(side=tk.LEFT, padx=(0, 5))
-        self.device_combo = ttk.Combobox(first_row_frame, textvariable=self.app.selected_device, width=18, state="readonly")
-        self.device_combo.pack(side=tk.LEFT, padx=(0, 5))
+        ttk.Label(device_row, text="设备:").pack(side=tk.LEFT, padx=(0, 5))
+        self.device_combo = ttk.Combobox(device_row, textvariable=self.app.selected_device, width=18, state="readonly")
+        self.device_combo.pack(side=tk.LEFT, padx=(0, 10))
         
-        # 刷新设备按钮
-        ttk.Button(first_row_frame, text="刷新设备", command=self.app.refresh_devices).pack(side=tk.LEFT, padx=(0, 5))
+        ttk.Button(device_row, text="刷新设备", command=self.app.refresh_devices).pack(side=tk.LEFT, padx=(0, 5))
         
-        # MTKLOG按钮组
-        mtklog_label = ttk.Label(first_row_frame, text="MTKLOG:")
-        mtklog_label.pack(side=tk.LEFT, padx=(0, 5))
+        ttk.Button(device_row, text="截图", command=self.app.take_screenshot).pack(side=tk.LEFT, padx=(0, 5))
         
-        self.start_mtklog_button = ttk.Button(first_row_frame, text="开启", command=self.app.start_mtklog)
-        self.start_mtklog_button.pack(side=tk.LEFT, padx=(0, 2))
+        # 录制按钮
+        self.record_button = ttk.Button(device_row, text="开始录制", command=self.app.toggle_recording)
+        self.record_button.pack(side=tk.LEFT, padx=(0, 10))
         
-        self.stop_export_mtklog_button = ttk.Button(first_row_frame, text="停止&导出", command=self.app.stop_and_export_mtklog)
-        self.stop_export_mtklog_button.pack(side=tk.LEFT, padx=(0, 2))
+        # MTKLOG控制
+        ttk.Label(device_row, text="MTKLOG:").pack(side=tk.LEFT, padx=(0, 5))
         
-        self.delete_mtklog_button = ttk.Button(first_row_frame, text="删除", command=self.app.delete_mtklog)
-        self.delete_mtklog_button.pack(side=tk.LEFT, padx=(0, 2))
+        self.start_mtklog_button = ttk.Button(device_row, text="开启", command=self.app.start_mtklog)
+        self.start_mtklog_button.pack(side=tk.LEFT, padx=(0, 3))
         
-        self.sd_mode_button = ttk.Button(first_row_frame, text="SD模式", command=self.app.set_sd_mode)
-        self.sd_mode_button.pack(side=tk.LEFT, padx=(0, 2))
+        self.stop_export_mtklog_button = ttk.Button(device_row, text="停止&导出", command=self.app.stop_and_export_mtklog)
+        self.stop_export_mtklog_button.pack(side=tk.LEFT, padx=(0, 3))
         
-        self.usb_mode_button = ttk.Button(first_row_frame, text="USB模式", command=self.app.set_usb_mode)
+        self.delete_mtklog_button = ttk.Button(device_row, text="删除", command=self.app.delete_mtklog)
+        self.delete_mtklog_button.pack(side=tk.LEFT, padx=(0, 3))
+        
+        self.sd_mode_button = ttk.Button(device_row, text="SD模式", command=self.app.set_sd_mode)
+        self.sd_mode_button.pack(side=tk.LEFT, padx=(0, 3))
+        
+        self.usb_mode_button = ttk.Button(device_row, text="USB模式", command=self.app.set_usb_mode)
         self.usb_mode_button.pack(side=tk.LEFT, padx=(0, 10))
         
-        # ADB log按钮组
-        adblog_label = ttk.Label(first_row_frame, text="ADB Log:")
-        adblog_label.pack(side=tk.LEFT, padx=(0, 5))
+        # ADB Log控制
+        ttk.Label(device_row, text="ADB Log:").pack(side=tk.LEFT, padx=(0, 5))
         
-        self.start_adblog_button = ttk.Button(first_row_frame, text="开启", command=self.app.start_adblog)
-        self.start_adblog_button.pack(side=tk.LEFT, padx=(0, 2))
+        self.start_adblog_button = ttk.Button(device_row, text="开启", command=self.app.start_adblog)
+        self.start_adblog_button.pack(side=tk.LEFT, padx=(0, 3))
         
-        self.export_adblog_button = ttk.Button(first_row_frame, text="导出", command=self.app.export_adblog)
+        self.export_adblog_button = ttk.Button(device_row, text="导出", command=self.app.export_adblog)
         self.export_adblog_button.pack(side=tk.LEFT)
         
-        # 第二行 - 过滤控制 + 常用操作
-        second_row_frame = ttk.Frame(control_frame)
-        second_row_frame.grid(row=1, column=0, columnspan=4, sticky=(tk.W, tk.E), pady=(0, 5))
+        # 存储Canvas和滚动条引用，用于后续检查
+        self.device_canvas = canvas
+        self.device_scrollbar = scrollbar
+        self.device_scrollable_frame = scrollable_frame
+    
+    def setup_log_filter_tab(self):
+        """设置日志过滤Tab页面"""
+        # 创建日志过滤Tab
+        filter_tab = ttk.Frame(self.notebook)
+        self.notebook.add(filter_tab, text="Log过滤")
+        
+        # 创建滚动容器
+        filter_container = ttk.Frame(filter_tab)
+        filter_container.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
+        filter_container.columnconfigure(0, weight=1)
+        
+        # 创建水平滚动的Canvas
+        canvas = tk.Canvas(filter_container, height=30, highlightthickness=0)
+        scrollbar = ttk.Scrollbar(filter_container, orient="horizontal", command=canvas.xview)
+        scrollable_frame = ttk.Frame(canvas)
+        
+        # 配置滚动
+        def update_scroll_region(event):
+            canvas.configure(scrollregion=canvas.bbox("all"))
+            # 检查是否需要滚动条
+            self.update_scrollbar_visibility(canvas, scrollbar, scrollable_frame)
+        
+        scrollable_frame.bind("<Configure>", update_scroll_region)
+        
+        canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
+        canvas.configure(xscrollcommand=scrollbar.set)
+        
+        # 布局Canvas和Scrollbar
+        canvas.grid(row=0, column=0, sticky=(tk.W, tk.E), padx=(0, 0), pady=(2, 0))
+        scrollbar.grid(row=1, column=0, sticky=(tk.W, tk.E), padx=(0, 0), pady=(1, 2))
+        
+        # 绑定鼠标滚轮事件
+        canvas.bind("<MouseWheel>", lambda e: canvas.xview_scroll(int(-1 * (e.delta / 120)), "units"))
+        
+        # 日志过滤行
+        filter_row = scrollable_frame
         
         # 关键字输入
-        ttk.Label(second_row_frame, text="关键字:").pack(side=tk.LEFT, padx=(0, 5))
-        keyword_entry = ttk.Entry(second_row_frame, textvariable=self.app.filter_keyword, width=20)
+        ttk.Label(filter_row, text="关键字:").pack(side=tk.LEFT, padx=(0, 5))
+        keyword_entry = ttk.Entry(filter_row, textvariable=self.app.filter_keyword, width=20)
         keyword_entry.pack(side=tk.LEFT, padx=(0, 10))
         keyword_entry.bind('<Return>', lambda e: self.app.start_filtering())
         
         # 选项复选框
-        ttk.Checkbutton(second_row_frame, text="正则表达式", variable=self.app.use_regex).pack(side=tk.LEFT, padx=(0, 8))
-        ttk.Checkbutton(second_row_frame, text="区分大小写", variable=self.app.case_sensitive).pack(side=tk.LEFT, padx=(0, 8))
-        ttk.Checkbutton(second_row_frame, text="彩色高亮", variable=self.app.color_highlight).pack(side=tk.LEFT, padx=(0, 10))
+        ttk.Checkbutton(filter_row, text="正则表达式", variable=self.app.use_regex).pack(side=tk.LEFT, padx=(0, 8))
+        ttk.Checkbutton(filter_row, text="区分大小写", variable=self.app.case_sensitive).pack(side=tk.LEFT, padx=(0, 8))
+        ttk.Checkbutton(filter_row, text="彩色高亮", variable=self.app.color_highlight).pack(side=tk.LEFT, padx=(0, 10))
         
         # 主要操作按钮（动态按钮）
-        self.filter_button = ttk.Button(second_row_frame, text="开始过滤", command=self.toggle_filtering)
-        self.filter_button.pack(side=tk.LEFT, padx=(0, 5))
+        self.filter_button = ttk.Button(filter_row, text="开始过滤", command=self.toggle_filtering)
+        self.filter_button.pack(side=tk.LEFT, padx=(0, 10))
         
-        # 常用按钮
-        ttk.Button(second_row_frame, text="清空日志", command=self.app.clear_logs).pack(side=tk.LEFT, padx=(0, 3))
-        ttk.Button(second_row_frame, text="清除缓存", command=self.app.clear_device_logs).pack(side=tk.LEFT, padx=(0, 3))
-        ttk.Button(second_row_frame, text="设置行数", command=self.app.show_display_lines_dialog).pack(side=tk.LEFT, padx=(0, 3))
-        ttk.Button(second_row_frame, text="保存日志", command=self.app.save_logs).pack(side=tk.LEFT)
+        # 常用操作按钮
+        ttk.Button(filter_row, text="清空日志", command=self.app.clear_logs).pack(side=tk.LEFT, padx=(0, 5))
+        ttk.Button(filter_row, text="清除缓存", command=self.app.clear_device_logs).pack(side=tk.LEFT, padx=(0, 5))
+        ttk.Button(filter_row, text="设置行数", command=self.app.show_display_lines_dialog).pack(side=tk.LEFT, padx=(0, 5))
+        ttk.Button(filter_row, text="保存日志", command=self.app.save_logs).pack(side=tk.LEFT)
         
-        # 状态栏框架
-        status_frame = ttk.Frame(self.main_frame)
-        status_frame.grid(row=1, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=(0, 10))
-        status_frame.columnconfigure(0, weight=1)
+        # 存储Canvas和滚动条引用，用于后续检查
+        self.filter_canvas = canvas
+        self.filter_scrollbar = scrollbar
+        self.filter_scrollable_frame = scrollable_frame
+    
+    def setup_tmo_cc_tab(self):
+        """设置TMO CC Tab页面"""
+        # 创建TMO CC Tab
+        tmo_cc_tab = ttk.Frame(self.notebook)
+        self.notebook.add(tmo_cc_tab, text="TMO CC")
         
-        # 主状态
-        self.status_var = tk.StringVar()
-        self.status_var.set("就绪")
-        status_bar = ttk.Label(status_frame, textvariable=self.status_var, relief=tk.SUNKEN)
-        status_bar.grid(row=0, column=0, sticky=(tk.W, tk.E), padx=(0, 5))
+        # 创建滚动容器
+        tmo_container = ttk.Frame(tmo_cc_tab)
+        tmo_container.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
+        tmo_container.columnconfigure(0, weight=1)
         
-        # 性能指标
-        self.performance_var = tk.StringVar()
-        self.performance_var.set("")
-        performance_bar = ttk.Label(status_frame, textvariable=self.performance_var, relief=tk.SUNKEN, foreground="blue")
-        performance_bar.grid(row=0, column=1, sticky=tk.E)
+        # 创建水平滚动的Canvas
+        canvas = tk.Canvas(tmo_container, height=30, highlightthickness=0)
+        scrollbar = ttk.Scrollbar(tmo_container, orient="horizontal", command=canvas.xview)
+        scrollable_frame = ttk.Frame(canvas)
+        
+        # 配置滚动
+        def update_scroll_region(event):
+            canvas.configure(scrollregion=canvas.bbox("all"))
+            # 检查是否需要滚动条
+            self.update_scrollbar_visibility(canvas, scrollbar, scrollable_frame)
+        
+        scrollable_frame.bind("<Configure>", update_scroll_region)
+        
+        canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
+        canvas.configure(xscrollcommand=scrollbar.set)
+        
+        # 布局Canvas和Scrollbar
+        canvas.grid(row=0, column=0, sticky=(tk.W, tk.E), padx=(0, 0), pady=(2, 0))
+        scrollbar.grid(row=1, column=0, sticky=(tk.W, tk.E), padx=(0, 0), pady=(1, 2))
+        
+        # 绑定鼠标滚轮事件
+        canvas.bind("<MouseWheel>", lambda e: canvas.xview_scroll(int(-1 * (e.delta / 120)), "units"))
+        
+        # TMO CC控制行
+        tmo_row = scrollable_frame
+        
+        # TMO CC按钮
+        ttk.Button(tmo_row, text="推CC文件", command=self.push_cc_file).pack(side=tk.LEFT, padx=(0, 10))
+        ttk.Button(tmo_row, text="拉CC文件", command=self.pull_cc_file).pack(side=tk.LEFT, padx=(0, 10))
+        ttk.Button(tmo_row, text="简单过滤", command=self.simple_filter).pack(side=tk.LEFT, padx=(0, 10))
+        ttk.Button(tmo_row, text="完全过滤", command=self.complete_filter).pack(side=tk.LEFT, padx=(0, 10))
+        ttk.Button(tmo_row, text="PROD服务器", command=self.prod_server).pack(side=tk.LEFT, padx=(0, 10))
+        ttk.Button(tmo_row, text="STG服务器", command=self.stg_server).pack(side=tk.LEFT)
+        
+        # 存储Canvas和滚动条引用，用于后续检查
+        self.tmo_canvas = canvas
+        self.tmo_scrollbar = scrollbar
+        self.tmo_scrollable_frame = scrollable_frame
     
     def setup_log_display(self):
         """设置日志显示区域"""
         # 日志显示框架
         log_frame = ttk.LabelFrame(self.main_frame, text="日志内容", padding="5")
-        log_frame.grid(row=2, column=0, columnspan=2, sticky=(tk.W, tk.E, tk.N, tk.S))
+        log_frame.grid(row=1, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
         log_frame.columnconfigure(0, weight=1)
         log_frame.rowconfigure(0, weight=1)
+        
+        # 状态栏
+        status_frame = ttk.Frame(self.main_frame)
+        status_frame.grid(row=2, column=0, sticky=(tk.W, tk.E), pady=(5, 0))
+        status_frame.columnconfigure(0, weight=1)
+        
+        self.status_var = tk.StringVar()
+        self.status_var.set("就绪")
+        status_bar = ttk.Label(status_frame, textvariable=self.status_var, relief=tk.SUNKEN)
+        status_bar.grid(row=0, column=0, sticky=(tk.W, tk.E), padx=(0, 5))
+        
+        # 性能显示标签
+        self.performance_var = tk.StringVar()
+        self.performance_var.set("性能: 等待中...")
+        self.performance_label = ttk.Label(status_frame, textvariable=self.performance_var, relief=tk.SUNKEN)
+        self.performance_label.grid(row=0, column=1, sticky=tk.W)
         
         # 创建文本框和滚动条
         text_frame = ttk.Frame(log_frame)
@@ -151,11 +293,11 @@ class UIManager:
         self.log_text.bind("<Button-5>", self.on_mousewheel)
         
         # 绑定搜索快捷键
-        self.root.bind_all("<Control-f>", self.app.show_search_dialog)
-        self.root.bind_all("<Control-F>", self.app.show_search_dialog)
-        self.root.bind_all("<F3>", self.app.find_next)
-        self.root.bind_all("<Shift-F3>", self.app.find_previous)
-        self.root.bind_all("<Control-g>", self.app.find_next)
+        self.root.bind_all("<Control-f>", self.show_search_dialog)
+        self.root.bind_all("<Control-F>", self.show_search_dialog)
+        self.root.bind_all("<F3>", self.find_next)
+        self.root.bind_all("<Shift-F3>", self.find_previous)
+        self.root.bind_all("<Control-g>", self.find_next)
         
         # 确保主窗口能接收键盘事件
         self.root.focus_set()
@@ -168,9 +310,9 @@ class UIManager:
         # 编辑菜单
         edit_menu = tk.Menu(menubar, tearoff=0)
         menubar.add_cascade(label="编辑", menu=edit_menu)
-        edit_menu.add_command(label="搜索 (Ctrl+F)", command=self.app.show_search_dialog)
-        edit_menu.add_command(label="查找下一个 (F3)", command=self.app.find_next)
-        edit_menu.add_command(label="查找上一个 (Shift+F3)", command=self.app.find_previous)
+        edit_menu.add_command(label="搜索 (Ctrl+F)", command=self.show_search_dialog)
+        edit_menu.add_command(label="查找下一个 (F3)", command=self.find_next)
+        edit_menu.add_command(label="查找上一个 (Shift+F3)", command=self.find_previous)
         edit_menu.add_separator()
         edit_menu.add_command(label="清空日志", command=self.app.clear_logs)
         
@@ -264,13 +406,59 @@ class UIManager:
             self.app.stop_filtering()
         else:
             self.app.start_filtering()
+        self.update_filter_button()
     
     def update_filter_button(self):
-        """更新过滤按钮状态"""
+        """更新过滤按钮的文本"""
         if self.app.is_running:
             self.filter_button.config(text="停止过滤")
         else:
             self.filter_button.config(text="开始过滤")
+    
+    def on_tab_changed(self, event):
+        """Tab切换时的处理"""
+        # 延迟检查当前Tab的滚动条
+        self.root.after(100, self.check_current_tab_scrollbar)
+    
+    def on_window_configure(self, event):
+        """窗口大小变化时的处理"""
+        # 只处理主窗口的大小变化，忽略子控件的Configure事件
+        if event.widget == self.root:
+            # 延迟检查当前Tab的滚动条，避免频繁检查
+            if hasattr(self, '_configure_timer'):
+                self.root.after_cancel(self._configure_timer)
+            self._configure_timer = self.root.after(200, self.check_current_tab_scrollbar)
+    
+    def check_current_tab_scrollbar(self):
+        """检查当前Tab的滚动条"""
+        try:
+            current_tab = self.notebook.select()
+            tab_text = self.notebook.tab(current_tab, "text")
+            
+            if tab_text == "设备控制" and hasattr(self, 'device_canvas'):
+                self.update_scrollbar_visibility(self.device_canvas, self.device_scrollbar, self.device_scrollable_frame)
+            elif tab_text == "Log过滤" and hasattr(self, 'filter_canvas'):
+                self.update_scrollbar_visibility(self.filter_canvas, self.filter_scrollbar, self.filter_scrollable_frame)
+            elif tab_text == "TMO CC" and hasattr(self, 'tmo_canvas'):
+                self.update_scrollbar_visibility(self.tmo_canvas, self.tmo_scrollbar, self.tmo_scrollable_frame)
+        except Exception as e:
+            pass  # 静默处理错误
+    
+    def update_scrollbar_visibility(self, canvas, scrollbar, scrollable_frame):
+        """动态控制滚动条的显示/隐藏"""
+        try:
+            # 获取Canvas和内容的大小
+            canvas_width = canvas.winfo_width()
+            content_width = scrollable_frame.winfo_reqwidth()
+            
+            # 如果内容宽度小于等于Canvas宽度，隐藏滚动条
+            if content_width <= canvas_width:
+                scrollbar.grid_remove()
+            else:
+                scrollbar.grid()
+        except Exception as e:
+            # 如果获取尺寸失败，默认显示滚动条
+            scrollbar.grid()
     
     def on_closing(self):
         """窗口关闭时的处理"""
@@ -281,14 +469,16 @@ class UIManager:
     def show_about(self):
         """显示关于对话框"""
         messagebox.showinfo("关于", 
-            "手机log辅助工具\n\n"
-            "版本: 2.0\n"
+            "手机测试辅助工具\n\n"
+            "版本: 2.1\n"
             "功能: Android设备日志管理和MTKLOG操作\n\n"
             "主要功能:\n"
             "• 实时过滤Android设备日志\n"
             "• MTKLOG开启/停止/导出/删除\n"
             "• ADB Log开启/导出\n"
             "• 设备模式切换(SD/USB)\n"
+            "• 截图和视频录制\n"
+            "• TMO CC文件操作\n"
             "• 多设备支持\n"
             "• 性能监控和优化\n\n"
             "快捷键:\n"
@@ -297,28 +487,60 @@ class UIManager:
             "Shift+F3 - 查找上一个\n"
             "Ctrl+Shift+L - 显示窗口\n"
             "Escape - 关闭搜索对话框\n\n"
-            "窗口管理:\n"
-            "使用 Alt+Tab 切换窗口\n"
-            "使用任务栏图标访问程序\n"
-            "菜单: 工具 → 显示窗口")
+            "Tab页面:\n"
+            "• 设备控制 - 设备管理、MTKLOG、ADB Log\n"
+            "• Log过滤 - 关键字过滤、日志管理\n"
+            "• TMO CC - CC文件操作、服务器选择")
     
+    # TMO CC相关方法（占位符，待实现）
+    def push_cc_file(self):
+        """推CC文件"""
+        messagebox.showinfo("提示", "推CC文件功能待实现")
+    
+    def pull_cc_file(self):
+        """拉CC文件"""
+        messagebox.showinfo("提示", "拉CC文件功能待实现")
+    
+    def simple_filter(self):
+        """简单过滤"""
+        messagebox.showinfo("提示", "简单过滤功能待实现")
+    
+    def complete_filter(self):
+        """完全过滤"""
+        messagebox.showinfo("提示", "完全过滤功能待实现")
+    
+    def prod_server(self):
+        """PROD服务器"""
+        messagebox.showinfo("提示", "PROD服务器功能待实现")
+    
+    def stg_server(self):
+        """STG服务器"""
+        messagebox.showinfo("提示", "STG服务器功能待实现")
+    
+    # 搜索相关方法（委托给search_manager）
+    def show_search_dialog(self, event=None):
+        """显示搜索对话框"""
+        self.app.search_manager.show_search_dialog(event)
+    
+    def find_next(self, event=None):
+        """查找下一个匹配项"""
+        self.app.search_manager.find_next(event)
+    
+    def find_previous(self, event=None):
+        """查找上一个匹配项"""
+        self.app.search_manager.find_previous(event)
+    
+    # 模态执行器相关方法
     def run_with_modal(self, title, worker_fn, on_done=None, on_error=None):
         """通用的模态执行器：后台线程执行 + 局部遮罩拦截点击"""
+        
         # 禁用主窗口所有控件
         self._disable_all_widgets(self.root)
         
         # 创建局部遮罩层（仅在主窗口内部）
         mask_frame = ttk.Frame(self.root)
-        mask_frame.place(x=0, y=0, relwidth=1, relheight=1)
-        
-        # 设置遮罩样式（半透明效果）
-        try:
-            style = ttk.Style()
-            style.configure("Mask.TFrame", background="gray")
-            mask_frame.configure(style="Mask.TFrame")
-        except:
-            # 如果样式设置失败，使用默认样式
-            pass
+        mask_frame.place(x=0, y=0, relwidth=1, relheight=1)  # 覆盖整个主窗口
+        mask_frame.configure(style="Mask.TFrame")  # 使用自定义样式
         
         # 创建进度对话框
         progress_dialog = tk.Toplevel(self.root)
