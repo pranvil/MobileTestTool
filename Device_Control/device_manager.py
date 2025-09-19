@@ -104,6 +104,10 @@ class DeviceManager:
     def check_mtklogger_exists(self, device):
         """检查MTKlogger是否存在"""
         try:
+            # 确保屏幕亮屏且解锁
+            if not self.ensure_screen_unlocked(device):
+                return False
+            
             check_cmd = ["adb", "-s", device, "shell", "am", "start", "-n", "com.debug.loggerui/.MainActivity"]
             result = subprocess.run(check_cmd, capture_output=True, text=True, timeout=30, 
                                   creationflags=subprocess.CREATE_NO_WINDOW)
@@ -142,3 +146,76 @@ class DeviceManager:
             return None
         
         return device
+    
+    def ensure_screen_unlocked(self, device):
+        """确保屏幕亮屏且解锁状态"""
+        try:
+            # 1. 检查屏幕是否亮屏
+            screen_on = self._check_screen_on(device)
+            if not screen_on:
+                self._wake_screen(device)
+            
+            # 2. 检查屏幕是否解锁
+            screen_unlocked = self._check_screen_unlocked(device)
+            if not screen_unlocked:
+                self._unlock_screen(device)
+            
+            return True
+            
+        except Exception as e:
+            messagebox.showerror("错误", f"检查屏幕状态时发生错误: {e}")
+            return False
+    
+    def _check_screen_on(self, device):
+        """检查屏幕是否亮屏"""
+        try:
+            cmd = ["adb", "-s", device, "shell", "dumpsys", "deviceidle"]
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=10, 
+                                  creationflags=subprocess.CREATE_NO_WINDOW)
+            
+            if result.returncode == 0:
+                # 查找 mScreenOn 状态
+                for line in result.stdout.split('\n'):
+                    if 'mScreenOn' in line:
+                        return 'true' in line.lower()
+            
+            return False
+            
+        except Exception:
+            return False
+    
+    def _check_screen_unlocked(self, device):
+        """检查屏幕是否解锁"""
+        try:
+            cmd = ["adb", "-s", device, "shell", "dumpsys", "deviceidle"]
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=10, 
+                                  creationflags=subprocess.CREATE_NO_WINDOW)
+            
+            if result.returncode == 0:
+                # 查找 mScreenLocked 状态
+                for line in result.stdout.split('\n'):
+                    if 'mScreenLocked' in line:
+                        return 'false' in line.lower()  # false表示解锁状态
+            
+            return False
+            
+        except Exception:
+            return False
+    
+    def _wake_screen(self, device):
+        """点亮屏幕"""
+        try:
+            cmd = ["adb", "-s", device, "shell", "input", "keyevent", "224"]
+            subprocess.run(cmd, capture_output=True, text=True, timeout=10, 
+                          creationflags=subprocess.CREATE_NO_WINDOW)
+        except Exception:
+            pass
+    
+    def _unlock_screen(self, device):
+        """解锁屏幕"""
+        try:
+            cmd = ["adb", "-s", device, "shell", "input", "keyevent", "82"]
+            subprocess.run(cmd, capture_output=True, text=True, timeout=10, 
+                          creationflags=subprocess.CREATE_NO_WINDOW)
+        except Exception:
+            pass

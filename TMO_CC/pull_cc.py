@@ -162,9 +162,9 @@ class PullCCManager:
                 
                 # 检查是否出现Permission denied错误
                 if result.returncode != 0 and "Permission denied" in result.stderr:
-                    print(f"[DEBUG] 检测到Permission denied，需要执行remount")
-                    # 执行 adb root && adb remount
-                    status_label.config(text="检测到权限问题，执行 adb root && adb remount...")
+                    print(f"[DEBUG] 检测到Permission denied，需要检查root权限")
+                    # 只执行 adb root 检查
+                    status_label.config(text="检测到权限问题，检查 root 权限...")
                     progress_var.set(40)
                     progress_dialog.update()
                     
@@ -179,43 +179,23 @@ class PullCCManager:
                     if "adbd cannot run as root in production builds" in output:
                         raise Exception("设备没有root权限，操作无法执行")
                     
-                    # 执行 adb remount
-                    status_label.config(text="执行 adb remount...")
-                    progress_var.set(50)
+                    # root权限检查通过，重新执行pull
+                    status_label.config(text="Root权限检查通过，重新拉取文件...")
+                    progress_var.set(60)
                     progress_dialog.update()
                     
-                    cmd2 = ["adb", "-s", device, "remount"]
-                    print(f"[DEBUG] 执行命令: {' '.join(cmd2)}")
-                    result2 = subprocess.run(cmd2, capture_output=True, text=True, timeout=30, 
-                                            creationflags=subprocess.CREATE_NO_WINDOW)
+                    # 重新执行 adb pull
+                    pull_cmd = ["adb", "-s", device, "pull", "/data/deviceInfo", target_dir]
+                    print(f"[DEBUG] 重新执行pull命令: {' '.join(pull_cmd)}")
+                    result = subprocess.run(pull_cmd, capture_output=True, text=True, timeout=60, 
+                                          creationflags=subprocess.CREATE_NO_WINDOW)
                     
-                    output2 = result2.stdout + result2.stderr
-                    print(f"[DEBUG] adb remount命令输出: {output2}")
+                    print(f"[DEBUG] 重新pull命令返回码: {result.returncode}")
+                    print(f"[DEBUG] 重新pull命令输出: {result.stdout}")
+                    print(f"[DEBUG] 重新pull命令错误: {result.stderr}")
                     
-                    if "Now reboot your device for settings to take effect" in output2:
-                        # 需要重启设备，返回特殊结果
-                        return {"success": False, "need_reboot": True, "output": output2}
-                    
-                    elif "Remount succeeded" in output2 or "remounted" in output2.lower():
-                        # remount成功，重新执行pull
-                        status_label.config(text="Remount成功，重新拉取文件...")
-                        progress_var.set(60)
-                        progress_dialog.update()
-                        
-                        # 重新执行 adb pull
-                        pull_cmd = ["adb", "-s", device, "pull", "/data/deviceInfo", target_dir]
-                        print(f"[DEBUG] 重新执行pull命令: {' '.join(pull_cmd)}")
-                        result = subprocess.run(pull_cmd, capture_output=True, text=True, timeout=60, 
-                                              creationflags=subprocess.CREATE_NO_WINDOW)
-                        
-                        print(f"[DEBUG] 重新pull命令返回码: {result.returncode}")
-                        print(f"[DEBUG] 重新pull命令输出: {result.stdout}")
-                        print(f"[DEBUG] 重新pull命令错误: {result.stderr}")
-                        
-                        if result.returncode != 0:
-                            raise Exception(f"拉取文件失败: {result.stderr}")
-                    else:
-                        raise Exception(f"Remount失败: {output2}")
+                    if result.returncode != 0:
+                        raise Exception(f"拉取文件失败: {result.stderr}")
                 
                 elif result.returncode != 0:
                     # 其他错误
@@ -244,28 +224,14 @@ class PullCCManager:
         
         # 定义成功回调
         def on_pull_cc_done(result):
-            if result.get("need_reboot"):
-                # 处理需要重启的情况
-                if messagebox.askyesno("需要重启", 
-                                    "检测到需要重启设备才能使设置生效。\n\n是否现在重启设备？"):
-                    # 执行重启
-                    reboot_cmd = ["adb", "-s", device, "reboot"]
-                    try:
-                        subprocess.run(reboot_cmd, timeout=10, 
-                                     creationflags=subprocess.CREATE_NO_WINDOW)
-                        self.app.ui.status_var.set(f"设备 {device} 正在重启...")
-                        messagebox.showinfo("提示", "设备正在重启，请等待设备重启完成后再试")
-                    except Exception as e:
-                        messagebox.showerror("错误", f"重启设备失败: {str(e)}")
-            else:
-                # 正常完成的情况
-                self.app.ui.status_var.set(f"CC文件已拉取完成 - {result['device']} - {result['deviceinfo_path']}")
-                
-                # 直接打开文件夹
-                try:
-                    os.startfile(result['target_dir'])
-                except Exception as e:
-                    messagebox.showerror("错误", f"无法打开文件夹: {str(e)}")
+            # 正常完成的情况
+            self.app.ui.status_var.set(f"CC文件已拉取完成 - {result['device']} - {result['deviceinfo_path']}")
+            
+            # 直接打开文件夹
+            try:
+                os.startfile(result['target_dir'])
+            except Exception as e:
+                messagebox.showerror("错误", f"无法打开文件夹: {str(e)}")
         
         # 定义错误回调
         def on_pull_cc_error(error):

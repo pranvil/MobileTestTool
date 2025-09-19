@@ -346,6 +346,10 @@ class MTKLogManager:
             progress_var.set(70)
             progress_dialog.update()
             
+            # 确保屏幕亮屏且解锁
+            if not self.app.device_manager.ensure_screen_unlocked(device):
+                raise Exception("无法确保屏幕状态")
+            
             start_cmd = ["adb", "-s", device, "shell", "am", "start", "-n", "com.debug.loggerui/.MainActivity"]
             result = subprocess.run(start_cmd, capture_output=True, text=True, timeout=30, 
                                   creationflags=subprocess.CREATE_NO_WINDOW)

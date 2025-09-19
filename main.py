@@ -13,7 +13,7 @@ from tkinter import ttk
 from ui_manager import UIManager
 from Device_Control import DeviceManager, MTKLogManager, ADBLogManager, ScreenshotManager, VideoManager
 from Log_Filter import LogProcessor, SearchManager
-from TMO_CC import PullCCManager, PushCCManager
+from TMO_CC import PullCCManager, PushCCManager, ServerManager
 
 class LogcatFilterApp:
     def __init__(self, root):
@@ -56,6 +56,7 @@ class LogcatFilterApp:
         self.video_manager = VideoManager(self)
         self.tmo_cc_manager = PullCCManager(self)
         self.push_cc_manager = PushCCManager(self)
+        self.server_manager = ServerManager(self)
         
         # 初始化设备列表
         self.device_manager.refresh_devices()

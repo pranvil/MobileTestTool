@@ -532,11 +532,11 @@ class UIManager:
     
     def prod_server(self):
         """PROD服务器"""
-        messagebox.showinfo("提示", "PROD服务器功能待实现")
+        self.app.server_manager.prod_server()
     
     def stg_server(self):
         """STG服务器"""
-        messagebox.showinfo("提示", "STG服务器功能待实现")
+        self.app.server_manager.stg_server()
     
     def load_log_keywords(self):
         """加载log关键字文件"""
