@@ -234,8 +234,17 @@ class UIManager:
         # TMO CC按钮
         ttk.Button(tmo_row, text="推CC文件", command=self.push_cc_file).pack(side=tk.LEFT, padx=(0, 10))
         ttk.Button(tmo_row, text="拉CC文件", command=self.pull_cc_file).pack(side=tk.LEFT, padx=(0, 10))
-        ttk.Button(tmo_row, text="简单过滤", command=self.simple_filter).pack(side=tk.LEFT, padx=(0, 10))
-        ttk.Button(tmo_row, text="完全过滤", command=self.complete_filter).pack(side=tk.LEFT, padx=(0, 10))
+        
+        # 过滤按钮（动态按钮）
+        self.simple_filter_button = ttk.Button(tmo_row, text="简单过滤", command=self.simple_filter)
+        self.simple_filter_button.pack(side=tk.LEFT, padx=(0, 10))
+        
+        self.complete_filter_button = ttk.Button(tmo_row, text="完全过滤", command=self.complete_filter)
+        self.complete_filter_button.pack(side=tk.LEFT, padx=(0, 10))
+        
+        # 清空日志按钮
+        ttk.Button(tmo_row, text="清空日志", command=self.app.clear_logs).pack(side=tk.LEFT, padx=(0, 10))
+        
         ttk.Button(tmo_row, text="PROD服务器", command=self.prod_server).pack(side=tk.LEFT, padx=(0, 10))
         ttk.Button(tmo_row, text="STG服务器", command=self.stg_server).pack(side=tk.LEFT)
         
@@ -415,6 +424,39 @@ class UIManager:
             self.filter_button.config(text="停止过滤")
         else:
             self.filter_button.config(text="开始过滤")
+        
+        # 同时更新TMO CC tab的按钮状态
+        self.update_tmo_filter_buttons()
+    
+    def update_tmo_filter_buttons(self):
+        """更新TMO CC tab的过滤按钮状态"""
+        if not hasattr(self, 'simple_filter_button') or not hasattr(self, 'complete_filter_button'):
+            return
+        
+        if self.app.is_running:
+            # 正在过滤中，根据当前过滤类型显示停止按钮
+            current_keywords = self.app.filter_keyword.get()
+            
+            # 判断当前是简单过滤还是完全过滤
+            simple_keywords = "new cc version|old cc version|doDeviceActivation:Successful|mDeviceGroup|getUserAgent"
+            complete_keywords = "EntitlementServerApi|new cc version|old cc version|doDeviceActivation:Successful|mDeviceGroup|Entitlement-EapAka|EntitlementHandling|UpdateProvider|EntitlementService"
+            
+            if current_keywords == simple_keywords:
+                # 当前是简单过滤
+                self.simple_filter_button.config(text="停止log过滤")
+                self.complete_filter_button.config(text="完全过滤")
+            elif current_keywords == complete_keywords:
+                # 当前是完全过滤
+                self.simple_filter_button.config(text="简单过滤")
+                self.complete_filter_button.config(text="停止log过滤")
+            else:
+                # 其他过滤类型，默认简单过滤按钮显示停止
+                self.simple_filter_button.config(text="停止log过滤")
+                self.complete_filter_button.config(text="完全过滤")
+        else:
+            # 没有过滤，恢复原始状态
+            self.simple_filter_button.config(text="简单过滤")
+            self.complete_filter_button.config(text="完全过滤")
     
     def on_tab_changed(self, event):
         """Tab切换时的处理"""
@@ -504,6 +546,12 @@ class UIManager:
     
     def simple_filter(self):
         """简单过滤"""
+        # 如果正在过滤中，则停止过滤
+        if self.app.is_running:
+            self.app.stop_filtering()
+            self.update_tmo_filter_buttons()
+            return
+        
         # 设置预定义的关键字（使用正则表达式）
         keywords = "new cc version|old cc version|doDeviceActivation:Successful|mDeviceGroup|getUserAgent"
         
@@ -515,9 +563,18 @@ class UIManager:
         
         # 直接开始过滤
         self.app.start_filtering()
+        
+        # 更新按钮状态
+        self.update_tmo_filter_buttons()
     
     def complete_filter(self):
         """完全过滤"""
+        # 如果正在过滤中，则停止过滤
+        if self.app.is_running:
+            self.app.stop_filtering()
+            self.update_tmo_filter_buttons()
+            return
+        
         # 设置预定义的关键字（使用正则表达式）
         keywords = "EntitlementServerApi|new cc version|old cc version|doDeviceActivation:Successful|mDeviceGroup|Entitlement-EapAka|EntitlementHandling|UpdateProvider|EntitlementService"
         
@@ -529,6 +586,9 @@ class UIManager:
         
         # 直接开始过滤
         self.app.start_filtering()
+        
+        # 更新按钮状态
+        self.update_tmo_filter_buttons()
     
     def prod_server(self):
         """PROD服务器"""
