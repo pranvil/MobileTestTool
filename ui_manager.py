@@ -183,6 +183,7 @@ class UIManager:
         self.filter_button.pack(side=tk.LEFT, padx=(0, 10))
         
         # 常用操作按钮
+        ttk.Button(filter_row, text="加载log关键字", command=self.load_log_keywords).pack(side=tk.LEFT, padx=(0, 5))
         ttk.Button(filter_row, text="清空日志", command=self.app.clear_logs).pack(side=tk.LEFT, padx=(0, 5))
         ttk.Button(filter_row, text="清除缓存", command=self.app.clear_device_logs).pack(side=tk.LEFT, padx=(0, 5))
         ttk.Button(filter_row, text="设置行数", command=self.app.show_display_lines_dialog).pack(side=tk.LEFT, padx=(0, 5))
@@ -495,19 +496,39 @@ class UIManager:
     # TMO CC相关方法（占位符，待实现）
     def push_cc_file(self):
         """推CC文件"""
-        messagebox.showinfo("提示", "推CC文件功能待实现")
+        self.app.push_cc_manager.push_cc_file()
     
     def pull_cc_file(self):
         """拉CC文件"""
-        messagebox.showinfo("提示", "拉CC文件功能待实现")
+        self.app.tmo_cc_manager.pull_cc_file()
     
     def simple_filter(self):
         """简单过滤"""
-        messagebox.showinfo("提示", "简单过滤功能待实现")
+        # 设置预定义的关键字（使用正则表达式）
+        keywords = "new cc version|old cc version|doDeviceActivation:Successful|mDeviceGroup|getUserAgent"
+        
+        # 设置关键字到输入框
+        self.app.filter_keyword.set(keywords)
+        
+        # 启用正则表达式模式
+        self.app.use_regex.set(True)
+        
+        # 直接开始过滤
+        self.app.start_filtering()
     
     def complete_filter(self):
         """完全过滤"""
-        messagebox.showinfo("提示", "完全过滤功能待实现")
+        # 设置预定义的关键字（使用正则表达式）
+        keywords = "EntitlementServerApi|new cc version|old cc version|doDeviceActivation:Successful|mDeviceGroup|Entitlement-EapAka|EntitlementHandling|UpdateProvider|EntitlementService"
+        
+        # 设置关键字到输入框
+        self.app.filter_keyword.set(keywords)
+        
+        # 启用正则表达式模式
+        self.app.use_regex.set(True)
+        
+        # 直接开始过滤
+        self.app.start_filtering()
     
     def prod_server(self):
         """PROD服务器"""
@@ -516,6 +537,52 @@ class UIManager:
     def stg_server(self):
         """STG服务器"""
         messagebox.showinfo("提示", "STG服务器功能待实现")
+    
+    def load_log_keywords(self):
+        """加载log关键字文件"""
+        from tkinter import filedialog, messagebox
+        
+        # 显示文件选择对话框
+        file_path = filedialog.askopenfilename(
+            title="选择log关键字文件",
+            filetypes=[
+                ("文本文件", "*.txt"),
+                ("所有文件", "*.*")
+            ],
+            parent=self.root
+        )
+        
+        if not file_path:
+            print(f"[DEBUG] 用户取消文件选择")
+            return
+        
+        try:
+            print(f"[DEBUG] 加载log关键字文件: {file_path}")
+            
+            # 读取文件内容
+            with open(file_path, 'r', encoding='utf-8') as f:
+                content = f.read().strip()
+            
+            if not content:
+                messagebox.showwarning("警告", "文件内容为空")
+                return
+            
+            print(f"[DEBUG] 文件内容: {content}")
+            
+            # 设置关键字到输入框
+            self.app.filter_keyword.set(content)
+            
+            # 自动启用正则表达式模式（因为文件内容是按正则表达式方式书写的）
+            self.app.use_regex.set(True)
+            
+            # 自动开始过滤
+            self.app.start_filtering()
+            
+        except UnicodeDecodeError:
+            messagebox.showerror("错误", "文件编码错误，请确保文件是UTF-8编码")
+        except Exception as e:
+            print(f"[DEBUG] 加载文件失败: {str(e)}")
+            messagebox.showerror("错误", f"加载文件失败:\n{str(e)}")
     
     # 搜索相关方法（委托给search_manager）
     def show_search_dialog(self, event=None):
@@ -649,29 +716,50 @@ class UIManager:
     
     def _finish_modal_execution(self, mask_frame, progress_dialog, confirm_button, result, callback, success):
         """完成模态执行"""
-        # 更新进度条到100%
-        progress_var = progress_dialog.children['!frame'].children['!progressbar'].cget('variable')
-        if hasattr(progress_var, 'set'):
-            progress_var.set(100)
-        
-        # 更新状态
-        status_label = progress_dialog.children['!frame'].children['!label']
-        if hasattr(status_label, 'config'):
-            status_label.config(text="完成!" if success else "失败!")
-        
-        # 启用确认按钮
-        confirm_button.config(state=tk.NORMAL)
-        
-        # 设置确认按钮的回调
-        def on_confirm():
-            # 移除遮罩
-            mask_frame.destroy()
-            # 重新启用所有控件
-            self._enable_all_widgets(self.root)
-            # 关闭进度对话框
-            progress_dialog.destroy()
-            # 执行回调
-            if callback:
-                callback(result)
-        
-        confirm_button.config(command=on_confirm)
+        try:
+            # 检查对话框是否仍然存在
+            if not progress_dialog.winfo_exists():
+                return
+            
+            # 更新进度条到100%
+            if '!frame' in progress_dialog.children:
+                frame = progress_dialog.children['!frame']
+                if '!progressbar' in frame.children:
+                    progress_var = frame.children['!progressbar'].cget('variable')
+                    if hasattr(progress_var, 'set'):
+                        progress_var.set(100)
+            
+            # 更新状态
+            if '!frame' in progress_dialog.children:
+                frame = progress_dialog.children['!frame']
+                if '!label' in frame.children:
+                    status_label = frame.children['!label']
+                    if hasattr(status_label, 'config'):
+                        status_label.config(text="完成!" if success else "失败!")
+            
+            # 启用确认按钮
+            confirm_button.config(state=tk.NORMAL)
+            
+            # 设置确认按钮的回调
+            def on_confirm():
+                # 移除遮罩
+                mask_frame.destroy()
+                # 重新启用所有控件
+                self._enable_all_widgets(self.root)
+                # 关闭进度对话框
+                progress_dialog.destroy()
+                # 执行回调
+                if callback:
+                    callback(result)
+            
+            confirm_button.config(command=on_confirm)
+        except Exception as e:
+            # 如果出现任何错误，直接清理资源
+            try:
+                mask_frame.destroy()
+                self._enable_all_widgets(self.root)
+                progress_dialog.destroy()
+                if callback:
+                    callback(result)
+            except:
+                pass
