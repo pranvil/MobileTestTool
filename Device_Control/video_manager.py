@@ -342,3 +342,113 @@ class VideoManager:
         
         # 使用模态执行器
         self.app.ui.run_with_modal("保存视频", save_video_worker, on_save_done, on_save_error)
+    
+    def start_google_recording(self, device, target_folder):
+        """为Google日志开始录制"""
+        if self.is_recording:
+            print("警告: 录制已在进行中")
+            return False
+        
+        # 生成带时间的视频文件名
+        current_time = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        video_filename = f"Google_recording_{current_time}.mp4"
+        video_path = f"/sdcard/{video_filename}"
+        
+        # 检查屏幕状态
+        screen_check_cmd = ["adb", "-s", device, "shell", "dumpsys", "display"]
+        result = subprocess.run(screen_check_cmd, capture_output=True, text=True, timeout=30, 
+                              creationflags=subprocess.CREATE_NO_WINDOW)
+        
+        if result.returncode == 0:
+            if "mDisplayState=ON" not in result.stdout:
+                # 屏幕关闭，尝试唤醒屏幕
+                wake_cmd = ["adb", "-s", device, "shell", "input", "keyevent", "KEYCODE_WAKEUP"]
+                subprocess.run(wake_cmd, capture_output=True, text=True, timeout=10, 
+                              creationflags=subprocess.CREATE_NO_WINDOW)
+                time.sleep(2)
+        
+        # 开始录制
+        cmd = ["adb", "-s", device, "shell", "screenrecord", "--time-limit", "3600", "--bit-rate", "8000000", video_path]
+        
+        try:
+            self.recording_process = subprocess.Popen(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                creationflags=subprocess.CREATE_NO_WINDOW
+            )
+            
+            self.is_recording = True
+            print(f"Google录制已启动: {video_filename}")
+            
+            # 保存录制信息
+            self.google_recording_info = {
+                'device': device,
+                'video_filename': video_filename,
+                'video_path': video_path,
+                'target_folder': target_folder
+            }
+            
+            return True
+            
+        except Exception as e:
+            print(f"启动Google录制失败: {e}")
+            return False
+    
+    def stop_and_export_to_folder(self, device, target_folder):
+        """停止录制并导出到指定文件夹"""
+        if not self.is_recording:
+            print("没有录制在进行中")
+            return False
+        
+        try:
+            # 停止录制进程
+            if self.recording_process:
+                self.recording_process.terminate()
+                self.recording_process.wait(timeout=10)
+                self.recording_process = None
+            
+            self.is_recording = False
+            
+            # 等待视频文件生成完成
+            time.sleep(3)
+            
+            # 导出视频文件
+            if hasattr(self, 'google_recording_info'):
+                video_filename = self.google_recording_info['video_filename']
+                video_path = self.google_recording_info['video_path']
+                
+                # 检查文件是否存在
+                check_cmd = ["adb", "-s", device, "shell", "ls", video_path]
+                result = subprocess.run(check_cmd, capture_output=True, text=True, timeout=30, 
+                                      creationflags=subprocess.CREATE_NO_WINDOW)
+                
+                if result.returncode == 0 and video_filename in result.stdout:
+                    # 导出视频文件
+                    pull_cmd = ["adb", "-s", device, "pull", video_path, os.path.join(target_folder, video_filename)]
+                    result = subprocess.run(pull_cmd, capture_output=True, text=True, timeout=120, 
+                                          creationflags=subprocess.CREATE_NO_WINDOW)
+                    
+                    if result.returncode == 0:
+                        print(f"成功导出Google录制视频: {video_filename}")
+                        
+                        # 删除设备上的视频文件
+                        rm_cmd = ["adb", "-s", device, "shell", "rm", video_path]
+                        subprocess.run(rm_cmd, capture_output=True, text=True, timeout=30, 
+                                      creationflags=subprocess.CREATE_NO_WINDOW)
+                        
+                        return True
+                    else:
+                        print(f"导出Google录制视频失败: {result.stderr.strip()}")
+                        return False
+                else:
+                    print(f"Google录制视频文件不存在: {video_filename}")
+                    return False
+            else:
+                print("Google录制信息不存在")
+                return False
+                
+        except Exception as e:
+            print(f"停止Google录制失败: {e}")
+            self.is_recording = False
+            return False

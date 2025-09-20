@@ -11,8 +11,11 @@ from tkinter import ttk
 
 # 导入自定义模块
 from ui_manager import UIManager
-from Device_Control import DeviceManager, MTKLogManager, ADBLogManager, ScreenshotManager, VideoManager
-from Log_Filter import LogProcessor, SearchManager
+from Device_Control import DeviceManager, MTKLogManager, ScreenshotManager, VideoManager
+from Device_Control.network_info_manager import NetworkInfoManager
+from Device_Control.enable_telephony import TelephonyManager
+from Log_Filter import LogProcessor, SearchManager, ADBLogManager
+from Log_Filter.google_log import GoogleLogManager
 from TMO_CC import PullCCManager, PushCCManager, ServerManager
 
 class LogcatFilterApp:
@@ -50,6 +53,8 @@ class LogcatFilterApp:
         self.device_manager = DeviceManager(self)
         self.mtklog_manager = MTKLogManager(self)
         self.adblog_manager = ADBLogManager(self)
+        self.google_log_manager = GoogleLogManager(self)
+        self.network_info_manager = NetworkInfoManager(self)
         self.log_processor = LogProcessor(self)
         self.search_manager = SearchManager(self)
         self.screenshot_manager = ScreenshotManager(self)
@@ -57,6 +62,7 @@ class LogcatFilterApp:
         self.tmo_cc_manager = PullCCManager(self)
         self.push_cc_manager = PushCCManager(self)
         self.server_manager = ServerManager(self)
+        self.telephony_manager = TelephonyManager(self)
         
         # 初始化设备列表
         self.device_manager.refresh_devices()
@@ -148,6 +154,10 @@ class LogcatFilterApp:
     def toggle_recording(self):
         """切换录制状态"""
         self.video_manager.toggle_recording()
+    
+    def enable_telephony(self):
+        """启用Telephony日志"""
+        self.telephony_manager.enable_telephony_logs()
 
 def main():
     """主函数"""

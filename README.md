@@ -149,8 +149,8 @@ python main.py
 - **UI管理**: `ui_manager.py` - 用户界面和交互管理
 - **设备管理**: `device_manager.py` - 设备连接和验证
 - **MTKLOG管理**: `mtklog_manager.py` - MTKLOG相关操作
-- **ADBLOG管理**: `adblog_manager.py` - ADB Log相关操作
 - **日志处理**: `log_processor.py` - 日志过滤和性能优化
+- **ADBLOG管理**: `adblog_manager.py` - ADB Log相关操作
 - **搜索管理**: `search_manager.py` - 搜索和高亮功能
 
 ### 技术栈

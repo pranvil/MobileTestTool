@@ -8,15 +8,78 @@ UI管理模块
 import tkinter as tk
 from tkinter import ttk, messagebox
 import threading
+import subprocess
+import os
+import json
 
 class UIManager:
     def __init__(self, root, app_instance):
         self.root = root
         self.app = app_instance
+        
+        
         self.setup_ui()
         self.setup_log_display()
         self.setup_menu()
         self.setup_window_management()
+    
+    def _ui_state_path(self):
+        """获取UI状态文件路径"""
+        base = os.path.expanduser("~/.netui")
+        os.makedirs(base, exist_ok=True)
+        return os.path.join(base, "ui_state.json")
+    
+    def load_ui_state(self):
+        """加载UI状态"""
+        p = self._ui_state_path()
+        try:
+            with open(p, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            return {}
+    
+    def save_ui_state(self, state):
+        """保存UI状态"""
+        p = self._ui_state_path()
+        try:
+            with open(p, "w", encoding="utf-8") as f:
+                json.dump(state, f, ensure_ascii=False, indent=2)
+        except Exception:
+            pass
+    
+    def restore_sash_position(self):
+        """恢复分割条位置"""
+        try:
+            state = self.load_ui_state()
+            if "sashpos_main" in state:
+                self.main_paned.sash_place(0, 0, state["sashpos_main"])
+            else:
+                # 默认位置
+                self.main_paned.sash_place(0, 0, 140)
+        except Exception as e:
+            print(f"恢复分割条位置失败: {e}")
+            # 使用默认位置
+            try:
+                self.main_paned.sash_place(0, 0, 140)
+            except:
+                pass
+    
+    def save_sash_position(self):
+        """保存分割条位置"""
+        try:
+            state = self.load_ui_state()
+            x, y = self.main_paned.sash_coord(0)
+            state["sashpos_main"] = y
+            self.save_ui_state(state)
+        except Exception as e:
+            print(f"保存分割条位置失败: {e}")
+    
+    def reset_sash_position(self, event=None):
+        """重置分割条位置到默认值"""
+        try:
+            self.main_paned.sash_place(0, 0, 140)
+        except Exception as e:
+            print(f"重置分割条位置失败: {e}")
     
     def setup_ui(self):
         """设置用户界面"""
@@ -28,11 +91,19 @@ class UIManager:
         self.root.columnconfigure(0, weight=1)
         self.root.rowconfigure(0, weight=1)
         self.main_frame.columnconfigure(0, weight=1)
-        self.main_frame.rowconfigure(1, weight=1)
+        self.main_frame.rowconfigure(0, weight=1)
+        
+        # 创建可分割的主面板 - 使用tk.PanedWindow支持minsize
+        self.main_paned = tk.PanedWindow(self.main_frame, orient=tk.VERTICAL)
+        self.main_paned.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+        
+        # 创建Tab控件容器
+        self.tab_container = ttk.Frame(self.main_paned)
+        self.main_paned.add(self.tab_container, minsize=72)
         
         # 创建Tab控件
-        self.notebook = ttk.Notebook(self.main_frame)
-        self.notebook.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S), pady=(0, 5))
+        self.notebook = ttk.Notebook(self.tab_container)
+        self.notebook.pack(fill=tk.BOTH, expand=True)
         
         # 绑定Tab切换事件
         self.notebook.bind("<<NotebookTabChanged>>", self.on_tab_changed)
@@ -43,10 +114,26 @@ class UIManager:
         # 创建各个Tab页面
         self.setup_device_control_tab()
         self.setup_log_filter_tab()
+        self.setup_network_info_tab()
         self.setup_tmo_cc_tab()
+        self.setup_tmo_echolocate_tab()
+        
+        # 创建日志显示容器作为第二个面板
+        self.log_container = ttk.Frame(self.main_paned)
+        self.main_paned.add(self.log_container, minsize=120)
+        
+        # 配置日志容器
+        self.log_container.grid_rowconfigure(0, weight=1)
+        self.log_container.grid_columnconfigure(0, weight=1)
         
         # 初始化时检查第一个Tab的滚动条
         self.root.after(200, self.check_current_tab_scrollbar)
+        
+        # 恢复分割条位置
+        self.root.after_idle(self.restore_sash_position)
+        
+        # 绑定双击重置分割条位置
+        self.main_paned.bind("<Double-Button-1>", self.reset_sash_position)
     
     def setup_device_control_tab(self):
         """设置设备控制Tab页面"""
@@ -116,14 +203,9 @@ class UIManager:
         self.usb_mode_button = ttk.Button(device_row, text="USB模式", command=self.app.set_usb_mode)
         self.usb_mode_button.pack(side=tk.LEFT, padx=(0, 10))
         
-        # ADB Log控制
-        ttk.Label(device_row, text="ADB Log:").pack(side=tk.LEFT, padx=(0, 5))
         
-        self.start_adblog_button = ttk.Button(device_row, text="开启", command=self.app.start_adblog)
-        self.start_adblog_button.pack(side=tk.LEFT, padx=(0, 3))
-        
-        self.export_adblog_button = ttk.Button(device_row, text="导出", command=self.app.export_adblog)
-        self.export_adblog_button.pack(side=tk.LEFT)
+        # Telephony控制
+        ttk.Button(device_row, text="Telephony", command=self.app.enable_telephony).pack(side=tk.LEFT)
         
         # 存储Canvas和滚动条引用，用于后续检查
         self.device_canvas = canvas
@@ -181,6 +263,7 @@ class UIManager:
         # 主要操作按钮（动态按钮）
         self.filter_button = ttk.Button(filter_row, text="开始过滤", command=self.toggle_filtering)
         self.filter_button.pack(side=tk.LEFT, padx=(0, 10))
+
         
         # 常用操作按钮
         ttk.Button(filter_row, text="加载log关键字", command=self.load_log_keywords).pack(side=tk.LEFT, padx=(0, 5))
@@ -189,10 +272,65 @@ class UIManager:
         ttk.Button(filter_row, text="设置行数", command=self.app.show_display_lines_dialog).pack(side=tk.LEFT, padx=(0, 5))
         ttk.Button(filter_row, text="保存日志", command=self.app.save_logs).pack(side=tk.LEFT)
         
+        # ADB Log控制
+        ttk.Label(filter_row, text="ADB Log:").pack(side=tk.LEFT, padx=(10, 5))
+        
+        self.start_adblog_button = ttk.Button(filter_row, text="开启", command=self.app.start_adblog)
+        self.start_adblog_button.pack(side=tk.LEFT, padx=(0, 3))
+        
+        self.export_adblog_button = ttk.Button(filter_row, text="导出", command=self.app.export_adblog)
+        self.export_adblog_button.pack(side=tk.LEFT, padx=(0, 10))
+        
+        # Google日志控制
+        ttk.Label(filter_row, text="Google日志:").pack(side=tk.LEFT, padx=(10, 5))
+        
+        self.google_log_button = ttk.Button(filter_row, text="Google日志", command=self.toggle_google_log)
+        self.google_log_button.pack(side=tk.LEFT, padx=(0, 10))
+                
         # 存储Canvas和滚动条引用，用于后续检查
         self.filter_canvas = canvas
         self.filter_scrollbar = scrollbar
         self.filter_scrollable_frame = scrollable_frame
+    
+    def setup_network_info_tab(self):
+        """设置网络信息Tab页面"""
+        # 创建网络信息Tab
+        network_tab = ttk.Frame(self.notebook)
+        self.notebook.add(network_tab, text="网络信息")
+        
+        # 创建主容器
+        network_container = ttk.Frame(network_tab)
+        network_container.pack(fill=tk.X, expand=False, padx=5, pady=3)
+        network_container.columnconfigure(1, weight=1)
+        network_container.rowconfigure(0, weight=0)
+        
+        # 左侧控制面板 - 更紧凑
+        control_frame = ttk.LabelFrame(network_container, text="控制", padding="5")
+        control_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S), padx=(0, 5))
+        control_frame.columnconfigure(0, weight=1)
+        
+        # 开始按钮
+        self.network_start_button = ttk.Button(control_frame, text="开始", command=self.toggle_network_info)
+        self.network_start_button.pack(fill=tk.X, pady=(0, 5))
+        
+        # 状态标签
+        self.network_status_label = ttk.Label(control_frame, text="未启动", foreground="gray", font=('Arial', 9))
+        self.network_status_label.pack()
+        
+        # 右侧信息显示区域 - 更紧凑
+        info_frame = ttk.LabelFrame(network_container, text="网络信息", padding="1")
+        info_frame.grid(row=0, column=1, sticky=(tk.W, tk.E), padx=(5, 0))
+        info_frame.columnconfigure(0, weight=1)
+        
+        # 网络信息显示框架
+        self.network_info_frame = ttk.Frame(info_frame)
+        self.network_info_frame.grid(row=0, column=0, sticky=(tk.W, tk.E))
+        self.network_info_frame.columnconfigure(0, weight=1)
+        
+        # 初始显示提示信息
+        initial_label = ttk.Label(self.network_info_frame, text="点击'开始'按钮获取网络信息", 
+                                 font=('Arial', 10), foreground="gray")
+        initial_label.pack(expand=True)
     
     def setup_tmo_cc_tab(self):
         """设置TMO CC Tab页面"""
@@ -253,17 +391,72 @@ class UIManager:
         self.tmo_scrollbar = scrollbar
         self.tmo_scrollable_frame = scrollable_frame
     
+    def setup_tmo_echolocate_tab(self):
+        """设置TMO Echolocate Tab页面"""
+        # 创建TMO Echolocate Tab
+        tmo_echolocate_tab = ttk.Frame(self.notebook)
+        self.notebook.add(tmo_echolocate_tab, text="TMO Echolocate")
+        
+        # 创建滚动容器
+        echolocate_container = ttk.Frame(tmo_echolocate_tab)
+        echolocate_container.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
+        echolocate_container.columnconfigure(0, weight=1)
+        
+        # 创建水平滚动的Canvas
+        canvas = tk.Canvas(echolocate_container, height=30, highlightthickness=0)
+        scrollbar = ttk.Scrollbar(echolocate_container, orient="horizontal", command=canvas.xview)
+        scrollable_frame = ttk.Frame(canvas)
+        
+        # 配置滚动
+        def update_scroll_region(event):
+            canvas.configure(scrollregion=canvas.bbox("all"))
+            # 检查是否需要滚动条
+            self.update_scrollbar_visibility(canvas, scrollbar, scrollable_frame)
+        
+        scrollable_frame.bind("<Configure>", update_scroll_region)
+        
+        canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
+        canvas.configure(xscrollcommand=scrollbar.set)
+        
+        # 布局Canvas和Scrollbar
+        canvas.grid(row=0, column=0, sticky=(tk.W, tk.E), padx=(0, 0), pady=(2, 0))
+        scrollbar.grid(row=1, column=0, sticky=(tk.W, tk.E), padx=(0, 0), pady=(1, 2))
+        
+        # 绑定鼠标滚轮事件
+        canvas.bind("<MouseWheel>", lambda e: canvas.xview_scroll(int(-1 * (e.delta / 120)), "units"))
+        
+        # TMO Echolocate控制行
+        echolocate_row = scrollable_frame
+        
+        # TMO Echolocate按钮
+        ttk.Button(echolocate_row, text="安装", command=self.install_echolocate).pack(side=tk.LEFT, padx=(0, 10))
+        ttk.Button(echolocate_row, text="Trigger", command=self.trigger_echolocate).pack(side=tk.LEFT, padx=(0, 10))
+        ttk.Button(echolocate_row, text="Pull file", command=self.pull_echolocate_file).pack(side=tk.LEFT, padx=(0, 10))
+        
+        # 过滤标签和按钮
+        ttk.Label(echolocate_row, text="filter:").pack(side=tk.LEFT, padx=(0, 5))
+        ttk.Button(echolocate_row, text="CallState", command=self.filter_callstate).pack(side=tk.LEFT, padx=(0, 5))
+        ttk.Button(echolocate_row, text="UICallState", command=self.filter_uicallstate).pack(side=tk.LEFT, padx=(0, 5))
+        ttk.Button(echolocate_row, text="AllCallState", command=self.filter_allcallstate).pack(side=tk.LEFT, padx=(0, 5))
+        ttk.Button(echolocate_row, text="IMSSignallingMessageLine1", command=self.filter_ims_signalling).pack(side=tk.LEFT, padx=(0, 5))
+        ttk.Button(echolocate_row, text="AllCallFlow", command=self.filter_allcallflow).pack(side=tk.LEFT)
+        
+        # 存储Canvas和滚动条引用，用于后续检查
+        self.echolocate_canvas = canvas
+        self.echolocate_scrollbar = scrollbar
+        self.echolocate_scrollable_frame = scrollable_frame
+    
     def setup_log_display(self):
         """设置日志显示区域"""
         # 日志显示框架
-        log_frame = ttk.LabelFrame(self.main_frame, text="日志内容", padding="5")
-        log_frame.grid(row=1, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
+        log_frame = ttk.LabelFrame(self.log_container, text="日志内容", padding="5")
+        log_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
         log_frame.columnconfigure(0, weight=1)
         log_frame.rowconfigure(0, weight=1)
         
         # 状态栏
-        status_frame = ttk.Frame(self.main_frame)
-        status_frame.grid(row=2, column=0, sticky=(tk.W, tk.E), pady=(5, 0))
+        status_frame = ttk.Frame(self.log_container)
+        status_frame.grid(row=1, column=0, sticky=(tk.W, tk.E), pady=(5, 0))
         status_frame.columnconfigure(0, weight=1)
         
         self.status_var = tk.StringVar()
@@ -283,14 +476,19 @@ class UIManager:
         text_frame.columnconfigure(0, weight=1)
         text_frame.rowconfigure(0, weight=1)
         
-        self.log_text = tk.Text(text_frame, wrap=tk.WORD, font=('Cascadia Mono', 12), 
+        self.log_text = tk.Text(text_frame, wrap=tk.NONE, font=('Cascadia Mono', 12), 
                                bg='#0C0C0C', fg='#FFFFFF', insertbackground='white')
         self.log_text.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
         
-        # 滚动条
-        scrollbar = ttk.Scrollbar(text_frame, orient=tk.VERTICAL, command=self.log_text.yview)
-        scrollbar.grid(row=0, column=1, sticky=(tk.N, tk.S))
-        self.log_text.configure(yscrollcommand=scrollbar.set)
+        # 垂直滚动条
+        v_scrollbar = ttk.Scrollbar(text_frame, orient=tk.VERTICAL, command=self.log_text.yview)
+        v_scrollbar.grid(row=0, column=1, sticky=(tk.N, tk.S))
+        self.log_text.configure(yscrollcommand=v_scrollbar.set)
+        
+        # 水平滚动条
+        h_scrollbar = ttk.Scrollbar(log_frame, orient=tk.HORIZONTAL, command=self.log_text.xview)
+        h_scrollbar.grid(row=1, column=0, sticky=(tk.W, tk.E))
+        self.log_text.configure(xscrollcommand=h_scrollbar.set)
         
         # 配置文本标签用于高亮
         self.log_text.tag_configure("highlight", foreground="#FF4444", background="")
@@ -482,8 +680,13 @@ class UIManager:
                 self.update_scrollbar_visibility(self.device_canvas, self.device_scrollbar, self.device_scrollable_frame)
             elif tab_text == "Log过滤" and hasattr(self, 'filter_canvas'):
                 self.update_scrollbar_visibility(self.filter_canvas, self.filter_scrollbar, self.filter_scrollable_frame)
+            elif tab_text == "网络信息":
+                # 网络信息tab不需要滚动条检查
+                pass
             elif tab_text == "TMO CC" and hasattr(self, 'tmo_canvas'):
                 self.update_scrollbar_visibility(self.tmo_canvas, self.tmo_scrollbar, self.tmo_scrollable_frame)
+            elif tab_text == "TMO Echolocate" and hasattr(self, 'echolocate_canvas'):
+                self.update_scrollbar_visibility(self.echolocate_canvas, self.echolocate_scrollbar, self.echolocate_scrollable_frame)
         except Exception as e:
             pass  # 静默处理错误
     
@@ -507,6 +710,8 @@ class UIManager:
         """窗口关闭时的处理"""
         if self.app.is_running:
             self.app.stop_filtering()
+        # 保存分割条位置
+        self.save_sash_position()
         self.root.destroy()
     
     def show_about(self):
@@ -531,8 +736,8 @@ class UIManager:
             "Ctrl+Shift+L - 显示窗口\n"
             "Escape - 关闭搜索对话框\n\n"
             "Tab页面:\n"
-            "• 设备控制 - 设备管理、MTKLOG、ADB Log\n"
-            "• Log过滤 - 关键字过滤、日志管理\n"
+            "• 设备控制 - 设备管理、MTKLOG\n"
+            "• Log过滤 - 关键字过滤、ADB Log、日志管理\n"
             "• TMO CC - CC文件操作、服务器选择")
     
     # TMO CC相关方法（占位符，待实现）
@@ -597,6 +802,74 @@ class UIManager:
     def stg_server(self):
         """STG服务器"""
         self.app.server_manager.stg_server()
+    
+    # TMO Echolocate相关方法
+    def install_echolocate(self):
+        """安装Echolocate"""
+        messagebox.showinfo("TMO Echolocate", "安装Echolocate功能待实现")
+    
+    def trigger_echolocate(self):
+        """触发Echolocate"""
+        messagebox.showinfo("TMO Echolocate", "触发Echolocate功能待实现")
+    
+    def pull_echolocate_file(self):
+        """拉取Echolocate文件"""
+        messagebox.showinfo("TMO Echolocate", "拉取Echolocate文件功能待实现")
+    
+    def filter_callstate(self):
+        """过滤CallState"""
+        if self.app.is_running:
+            self.app.stop_filtering()
+        
+        # 设置CallState关键字
+        keywords = "CallState"
+        self.app.filter_keyword.set(keywords)
+        self.app.use_regex.set(True)
+        self.app.start_filtering()
+    
+    def filter_uicallstate(self):
+        """过滤UICallState"""
+        if self.app.is_running:
+            self.app.stop_filtering()
+        
+        # 设置UICallState关键字
+        keywords = "UICallState"
+        self.app.filter_keyword.set(keywords)
+        self.app.use_regex.set(True)
+        self.app.start_filtering()
+    
+    def filter_allcallstate(self):
+        """过滤AllCallState"""
+        if self.app.is_running:
+            self.app.stop_filtering()
+        
+        # 设置AllCallState关键字
+        keywords = "AllCallState"
+        self.app.filter_keyword.set(keywords)
+        self.app.use_regex.set(True)
+        self.app.start_filtering()
+    
+    def filter_ims_signalling(self):
+        """过滤IMSSignallingMessageLine1"""
+        if self.app.is_running:
+            self.app.stop_filtering()
+        
+        # 设置IMSSignallingMessageLine1关键字
+        keywords = "IMSSignallingMessageLine1"
+        self.app.filter_keyword.set(keywords)
+        self.app.use_regex.set(True)
+        self.app.start_filtering()
+    
+    def filter_allcallflow(self):
+        """过滤AllCallFlow"""
+        if self.app.is_running:
+            self.app.stop_filtering()
+        
+        # 设置AllCallFlow关键字
+        keywords = "AllCallFlow"
+        self.app.filter_keyword.set(keywords)
+        self.app.use_regex.set(True)
+        self.app.start_filtering()
     
     def load_log_keywords(self):
         """加载log关键字文件"""
@@ -823,3 +1096,93 @@ class UIManager:
                     callback(result)
             except:
                 pass
+    
+    def toggle_google_log(self):
+        """切换Google日志状态"""
+        if self.app.google_log_manager.is_running():
+            self.stop_google_log()
+        else:
+            self.show_google_log_options()
+    
+    def start_google_log(self):
+        """开始Google日志收集"""
+        device = self.app.device_manager.validate_device_selection()
+        if not device:
+            return
+        
+        # 调用GoogleLogManager启动完整的Google日志收集
+        self.app.google_log_manager.start_google_log(device, self)
+    
+    def show_google_log_options(self):
+        """显示Google日志选项对话框"""
+        # 创建设备选择对话框
+        dialog = tk.Toplevel(self.root)
+        dialog.title("Google日志收集选项")
+        dialog.geometry("400x200")
+        dialog.resizable(False, False)
+        dialog.transient(self.root)
+        dialog.grab_set()  # 模态对话框
+        
+        # 居中显示
+        dialog.geometry("+%d+%d" % (
+            self.root.winfo_rootx() + (self.root.winfo_width() - 400) // 2,
+            self.root.winfo_rooty() + (self.root.winfo_height() - 200) // 2
+        ))
+        
+        # 主框架
+        main_frame = ttk.Frame(dialog, padding="20")
+        main_frame.pack(fill=tk.BOTH, expand=True)
+        
+        # 标题
+        title_label = ttk.Label(main_frame, text="选择Google日志收集模式", font=('Arial', 12, 'bold'))
+        title_label.pack(pady=(0, 20))
+        
+        # 选项框架
+        options_frame = ttk.Frame(main_frame)
+        options_frame.pack(pady=(0, 20))
+
+        # 同一行里放两个按钮
+        btn1 = ttk.Button(options_frame, text="仅bugreport",
+                        command=lambda: self.start_bugreport_only(dialog))
+        btn1.pack(side=tk.LEFT, padx=5)
+
+        btn2 = ttk.Button(options_frame, text="全部log+video",
+                        command=lambda: self.start_full_google_log(dialog))
+        btn2.pack(side=tk.LEFT, padx=5)
+        
+        # 取消按钮
+        ttk.Button(main_frame, text="取消", command=dialog.destroy).pack()
+    
+    def start_bugreport_only(self, dialog):
+        """仅执行bugreport"""
+        dialog.destroy()  # 关闭选择对话框
+        
+        device = self.app.device_manager.validate_device_selection()
+        if not device:
+            return
+        
+        # 调用GoogleLogManager执行仅bugreport
+        self.app.google_log_manager.start_bugreport_only(device, self)
+    
+    def start_full_google_log(self, dialog):
+        """启动完整的Google日志收集"""
+        dialog.destroy()  # 关闭选择对话框
+        self.start_google_log()
+    
+    def stop_google_log(self):
+        """停止Google日志收集"""
+        device = self.app.device_manager.validate_device_selection()
+        if not device:
+            return
+        
+        # 调用GoogleLogManager停止Google日志收集
+        self.app.google_log_manager.stop_google_log(device, self)
+    
+    def toggle_network_info(self):
+        """切换网络信息获取状态"""
+        if self.app.network_info_manager.is_running:
+            self.app.network_info_manager.stop_network_info()
+            self.network_status_label.config(text="已停止", foreground="red")
+        else:
+            self.app.network_info_manager.start_network_info()
+            self.network_status_label.config(text="运行中", foreground="green")

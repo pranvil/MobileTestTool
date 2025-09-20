@@ -11,13 +11,13 @@ adb_filter_key_words/
 │   ├── __init__.py
 │   ├── device_manager.py     # 设备管理
 │   ├── mtklog_manager.py     # MTKLOG管理
-│   ├── adblog_manager.py     # ADB Log管理
 │   ├── screenshot_manager.py  # 截图管理
 │   └── video_manager.py      # 录制管理
 ├── Log_Filter/               # 日志过滤模块
 │   ├── __init__.py
 │   ├── log_processor.py      # 日志处理
-│   └── search_manager.py     # 搜索管理
+│   ├── search_manager.py     # 搜索管理
+│   └── adblog_manager.py     # ADB Log管理
 ├── TMO_CC/                   # TMO CC模块
 │   ├── __init__.py
 │   └── pull_cc.py           # 拉CC文件功能
@@ -31,12 +31,12 @@ adb_filter_key_words/
 ### Tab 1: 设备控制 (Device_Control)
 - **设备管理**: 设备选择、刷新、连接检查
 - **MTKLOG**: 开启、停止&导出、删除、SD模式、USB模式
-- **ADB Log**: 开启、导出
 - **截图**: 设备截图功能
 - **录制**: 屏幕录制功能
 
 ### Tab 2: 日志过滤 (Log_Filter)
 - **关键字过滤**: 正则表达式、区分大小写、彩色高亮
+- **ADB Log**: 开启、导出
 - **日志处理**: 开始过滤/停止过滤、清空日志、清除缓存、设置行数、保存日志
 - **搜索功能**: 搜索对话框、查找下一个/上一个、显示所有结果
 
@@ -59,8 +59,8 @@ adb_filter_key_words/
 
 ```python
 # main.py
-from Device_Control import DeviceManager, MTKLogManager, ADBLogManager, ScreenshotManager, VideoManager
-from Log_Filter import LogProcessor, SearchManager
+from Device_Control import DeviceManager, MTKLogManager, ScreenshotManager, VideoManager
+from Log_Filter import LogProcessor, SearchManager, ADBLogManager
 from TMO_CC import PullCCManager
 from ui_manager import UIManager
 ```

@@ -296,3 +296,99 @@ class ADBLogManager:
         
         # 使用模态执行器
         self.app.ui.run_with_modal("停止并导出ADB Log", adblog_worker, on_adblog_done, on_adblog_error)
+    
+    def start_google_adblog(self, device, log_name, target_folder):
+        """为Google日志启动ADB log"""
+        # 清空/data/local/tmp/目录下的所有文件
+        clear_cmd = ["adb", "-s", device, "shell", "rm", "-f", "/data/local/tmp/*"]
+        result = subprocess.run(clear_cmd, capture_output=True, text=True, timeout=30, 
+                              creationflags=subprocess.CREATE_NO_WINDOW)
+        if result.returncode != 0:
+            print(f"警告: 清空/data/local/tmp/目录失败: {result.stderr.strip()}")
+        
+        # 生成带时间的log文件名
+        current_time = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        log_filename = f"{log_name}_{current_time}.txt"
+        log_path = f"/data/local/tmp/{log_filename}"
+        
+        # 启动logcat进程
+        cmd = ["adb", "-s", device, "shell", "nohup", "logcat", "-v", "time", "-b", "all", "-f", log_path, ">", "/dev/null", "2>&1", "&"]
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=30, 
+                              creationflags=subprocess.CREATE_NO_WINDOW)
+        if result.returncode != 0:
+            print(f"警告: 启动Google logcat失败: {result.stderr.strip()}")
+            return False
+        
+        # 检查logcat进程是否存在
+        cmd3 = ["adb", "-s", device, "shell", "ps", "-A"]
+        result = subprocess.run(cmd3, capture_output=True, text=True, timeout=30, 
+                              creationflags=subprocess.CREATE_NO_WINDOW)
+        if result.returncode == 0 and "logcat" in result.stdout:
+            print(f"Google ADB log已启动: {log_filename}")
+            return True
+        else:
+            print("Google logcat进程不存在，启动失败")
+            return False
+    
+    def stop_and_export_to_folder(self, device, target_folder):
+        """停止ADB log并导出到指定文件夹"""
+        # 检查设备连接状态
+        devices_cmd = ["adb", "devices"]
+        result = subprocess.run(devices_cmd, capture_output=True, text=True, timeout=30, 
+                              creationflags=subprocess.CREATE_NO_WINDOW)
+        if result.returncode != 0 or device not in result.stdout:
+            print(f"设备 {device} 未连接")
+            return False
+        
+        # 检查logcat进程是否存在
+        ps_cmd = ["adb", "-s", device, "shell", "ps", "-A"]
+        result = subprocess.run(ps_cmd, capture_output=True, text=True, timeout=30, 
+                              creationflags=subprocess.CREATE_NO_WINDOW)
+        if result.returncode != 0 or "logcat" not in result.stdout:
+            print("logcat进程不存在")
+            return False
+        
+        # 停止nohup启动的logcat进程
+        ps_cmd = ["adb", "-s", device, "shell", "ps", "-ef"]
+        result = subprocess.run(ps_cmd, capture_output=True, text=True, timeout=30, 
+                              creationflags=subprocess.CREATE_NO_WINDOW)
+        
+        if result.returncode == 0:
+            lines = result.stdout.strip().split('\n')
+            nohup_pids = []
+            
+            for line in lines:
+                if 'logcat' in line and '/data/local/tmp/' in line:
+                    parts = line.split()
+                    if len(parts) >= 2:
+                        try:
+                            pid = int(parts[1])
+                            nohup_pids.append(pid)
+                        except ValueError:
+                            continue
+            
+            # 杀掉找到的nohup logcat进程
+            for pid in nohup_pids:
+                kill_cmd = ["adb", "-s", device, "shell", "kill", str(pid)]
+                subprocess.run(kill_cmd, capture_output=True, text=True, timeout=30, 
+                              creationflags=subprocess.CREATE_NO_WINDOW)
+        
+        # 导出log文件到指定目录
+        ls_cmd = ["adb", "-s", device, "shell", "ls", "/data/local/tmp/*.txt"]
+        result = subprocess.run(ls_cmd, capture_output=True, text=True, timeout=30, 
+                              creationflags=subprocess.CREATE_NO_WINDOW)
+        
+        if result.returncode == 0 and result.stdout.strip():
+            txt_files = result.stdout.strip().split('\n')
+            exported_count = 0
+            for txt_file in txt_files:
+                if txt_file.strip():
+                    filename = os.path.basename(txt_file.strip())
+                    pull_cmd = ["adb", "-s", device, "pull", txt_file.strip(), os.path.join(target_folder, filename)]
+                    result = subprocess.run(pull_cmd, capture_output=True, text=True, timeout=120, 
+                                          creationflags=subprocess.CREATE_NO_WINDOW)
+                    if result.returncode == 0:
+                        exported_count += 1
+                        print(f"成功导出Google log: {filename}")
+        
+        return exported_count > 0
