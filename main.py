@@ -17,6 +17,7 @@ from Device_Control.enable_telephony import TelephonyManager
 from Log_Filter import LogProcessor, SearchManager, ADBLogManager
 from Log_Filter.google_log import GoogleLogManager
 from TMO_CC import PullCCManager, PushCCManager, ServerManager
+from Echolocate.echolocate_manager import EcholocateManager
 
 class LogcatFilterApp:
     def __init__(self, root):
@@ -63,6 +64,7 @@ class LogcatFilterApp:
         self.push_cc_manager = PushCCManager(self)
         self.server_manager = ServerManager(self)
         self.telephony_manager = TelephonyManager(self)
+        self.echolocate_manager = EcholocateManager(self)
         
         # 初始化设备列表
         self.device_manager.refresh_devices()

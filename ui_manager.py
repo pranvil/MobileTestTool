@@ -806,70 +806,35 @@ class UIManager:
     # TMO Echolocate相关方法
     def install_echolocate(self):
         """安装Echolocate"""
-        messagebox.showinfo("TMO Echolocate", "安装Echolocate功能待实现")
+        self.app.echolocate_manager.install_echolocate()
     
     def trigger_echolocate(self):
         """触发Echolocate"""
-        messagebox.showinfo("TMO Echolocate", "触发Echolocate功能待实现")
+        self.app.echolocate_manager.trigger_echolocate()
     
     def pull_echolocate_file(self):
         """拉取Echolocate文件"""
-        messagebox.showinfo("TMO Echolocate", "拉取Echolocate文件功能待实现")
+        self.app.echolocate_manager.pull_echolocate_file()
     
     def filter_callstate(self):
         """过滤CallState"""
-        if self.app.is_running:
-            self.app.stop_filtering()
-        
-        # 设置CallState关键字
-        keywords = "CallState"
-        self.app.filter_keyword.set(keywords)
-        self.app.use_regex.set(True)
-        self.app.start_filtering()
+        self.app.echolocate_manager.filter_callstate()
     
     def filter_uicallstate(self):
         """过滤UICallState"""
-        if self.app.is_running:
-            self.app.stop_filtering()
-        
-        # 设置UICallState关键字
-        keywords = "UICallState"
-        self.app.filter_keyword.set(keywords)
-        self.app.use_regex.set(True)
-        self.app.start_filtering()
+        self.app.echolocate_manager.filter_uicallstate()
     
     def filter_allcallstate(self):
         """过滤AllCallState"""
-        if self.app.is_running:
-            self.app.stop_filtering()
-        
-        # 设置AllCallState关键字
-        keywords = "AllCallState"
-        self.app.filter_keyword.set(keywords)
-        self.app.use_regex.set(True)
-        self.app.start_filtering()
+        self.app.echolocate_manager.filter_allcallstate()
     
     def filter_ims_signalling(self):
         """过滤IMSSignallingMessageLine1"""
-        if self.app.is_running:
-            self.app.stop_filtering()
-        
-        # 设置IMSSignallingMessageLine1关键字
-        keywords = "IMSSignallingMessageLine1"
-        self.app.filter_keyword.set(keywords)
-        self.app.use_regex.set(True)
-        self.app.start_filtering()
+        self.app.echolocate_manager.filter_ims_signalling()
     
     def filter_allcallflow(self):
         """过滤AllCallFlow"""
-        if self.app.is_running:
-            self.app.stop_filtering()
-        
-        # 设置AllCallFlow关键字
-        keywords = "AllCallFlow"
-        self.app.filter_keyword.set(keywords)
-        self.app.use_regex.set(True)
-        self.app.start_filtering()
+        self.app.echolocate_manager.filter_allcallflow()
     
     def load_log_keywords(self):
         """加载log关键字文件"""
