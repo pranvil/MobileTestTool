@@ -309,13 +309,27 @@ class UIManager:
         control_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S), padx=(0, 5))
         control_frame.columnconfigure(0, weight=1)
         
-        # 开始按钮
-        self.network_start_button = ttk.Button(control_frame, text="开始", command=self.toggle_network_info)
-        self.network_start_button.pack(fill=tk.X, pady=(0, 5))
+        # 按钮框架 - 水平布局
+        button_frame = ttk.Frame(control_frame)
+        button_frame.pack(fill=tk.X, pady=(0, 5))
+        button_frame.columnconfigure(0, weight=1)
+        button_frame.columnconfigure(1, weight=1)
         
-        # 状态标签
+        # 开始按钮
+        self.network_start_button = ttk.Button(button_frame, text="开始", command=self.toggle_network_info)
+        self.network_start_button.grid(row=0, column=0, sticky=(tk.W, tk.E), padx=(0, 2))
+        
+        # Ping按钮
+        self.network_ping_button = ttk.Button(button_frame, text="Ping", command=self.toggle_network_ping)
+        self.network_ping_button.grid(row=0, column=1, sticky=(tk.W, tk.E), padx=(2, 0))
+        
+        # 网络状态标签
         self.network_status_label = ttk.Label(control_frame, text="未启动", foreground="gray", font=('Arial', 9))
         self.network_status_label.pack()
+        
+        # Ping状态标签
+        self.network_ping_status_label = ttk.Label(control_frame, text="", foreground="gray", font=('Arial', 9))
+        self.network_ping_status_label.pack()
         
         # 右侧信息显示区域 - 更紧凑
         info_frame = ttk.LabelFrame(network_container, text="网络信息", padding="1")
@@ -1151,3 +1165,10 @@ class UIManager:
         else:
             self.app.network_info_manager.start_network_info()
             self.network_status_label.config(text="运行中", foreground="green")
+    
+    def toggle_network_ping(self):
+        """切换网络Ping状态"""
+        if self.app.network_info_manager.is_ping_running:
+            self.app.network_info_manager.stop_network_ping()
+        else:
+            self.app.network_info_manager.start_network_ping()

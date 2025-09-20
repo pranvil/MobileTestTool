@@ -20,6 +20,9 @@ class NetworkInfoManager:
         self.app = app_instance
         self.is_running = False
         self.network_info_thread = None
+        self.is_ping_running = False
+        self.ping_thread = None
+        self.ping_process = None
         self.network_info_data = {
             'SIM1': {
                 'LTE': {
@@ -708,3 +711,175 @@ class NetworkInfoManager:
                 note_parts.append(f"Freq={freq}MHz")
         
         return '; '.join(note_parts) if note_parts else ''
+    
+    def start_network_ping(self):
+        """开始网络Ping测试"""
+        try:
+            device = self.app.device_manager.validate_device_selection()
+            if not device:
+                return
+            
+            if self.is_ping_running:
+                messagebox.showwarning("警告", "Ping测试已在运行中")
+                return
+            
+            self.is_ping_running = True
+            self.app.ui.network_ping_button.config(text="停止")
+            
+            # 启动Ping线程
+            self.ping_thread = threading.Thread(target=self._ping_worker, args=(device,), daemon=True)
+            self.ping_thread.start()
+            
+        except Exception as e:
+            messagebox.showerror("错误", f"启动Ping测试失败: {str(e)}")
+            self.is_ping_running = False
+            self.app.ui.network_ping_button.config(text="Ping")
+    
+    def stop_network_ping(self):
+        """停止网络Ping测试"""
+        try:
+            # 设置停止标志
+            self.is_ping_running = False
+            
+            # 终止ping进程
+            if self.ping_process:
+                try:
+                    # 先尝试优雅终止
+                    self.ping_process.terminate()
+                    
+                    # 等待进程结束，最多等待2秒
+                    try:
+                        self.ping_process.wait(timeout=2)
+                    except subprocess.TimeoutExpired:
+                        # 如果进程没有在2秒内结束，强制杀死
+                        self.ping_process.kill()
+                        self.ping_process.wait()
+                    
+                    self.ping_process = None
+                except Exception as e:
+                    print(f"[DEBUG] 终止ping进程失败: {str(e)}")
+                    # 即使终止失败，也要清理引用
+                    self.ping_process = None
+            
+            # 更新UI
+            self.app.ui.network_ping_button.config(text="Ping")
+            
+            # 更新状态显示
+            if hasattr(self.app.ui, 'network_ping_status_label'):
+                self.app.ui.network_ping_status_label.config(text="Ping已停止", foreground="gray")
+            
+        except Exception as e:
+            print(f"[DEBUG] 停止Ping测试失败: {str(e)}")
+    
+    def _ping_worker(self, device):
+        """Ping工作线程 - 按照network_ping_monitor_spec.json规范实现"""
+        try:
+            # 执行ping命令 - 使用无限ping，但通过停止标志控制
+            cmd = f"adb -s {device} shell ping www.google.com"
+            
+            # 启动ping进程
+            self.ping_process = subprocess.Popen(
+                cmd,
+                shell=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0
+            )
+            
+            # 启动两个独立的线程来监控stdout和stderr
+            stdout_thread = threading.Thread(target=self._read_stdout, daemon=True)
+            stderr_thread = threading.Thread(target=self._read_stderr, daemon=True)
+            
+            stdout_thread.start()
+            stderr_thread.start()
+            
+            # 主线程等待进程结束或停止标志
+            while self.is_ping_running and self.ping_process:
+                try:
+                    # 检查进程是否还在运行
+                    if self.ping_process.poll() is not None:
+                        # 进程已结束
+                        break
+                    
+                    # 短暂休眠，避免CPU占用过高
+                    time.sleep(0.1)
+                    
+                except Exception as e:
+                    print(f"[DEBUG] Ping监控异常: {str(e)}")
+                    break
+            
+            # 等待子线程结束
+            stdout_thread.join(timeout=1)
+            stderr_thread.join(timeout=1)
+                
+        except Exception as e:
+            print(f"[DEBUG] Ping测试异常: {str(e)}")
+            self._update_ping_status("Ping测试失败", "red")
+        finally:
+            # 清理状态
+            self.is_ping_running = False
+            self.ping_process = None
+            
+            # 更新UI
+            if hasattr(self.app.ui, 'network_ping_button'):
+                self.app.ui.network_ping_button.config(text="Ping")
+    
+    def _read_stdout(self):
+        """读取stdout输出 - 检测成功响应"""
+        try:
+            while self.is_ping_running and self.ping_process:
+                line = self.ping_process.stdout.readline()
+                if not line:
+                    break
+                
+                line_lower = line.lower().strip()
+                
+                # 检查成功响应 - 按照spec.json规范
+                if "bytes from" in line_lower:
+                    # 每次成功响应都更新状态为正常（支持状态切换）
+                    self._update_ping_status("网络正常", "green")
+                        
+        except Exception as e:
+            print(f"[DEBUG] 读取stdout异常: {str(e)}")
+    
+    def _read_stderr(self):
+        """读取stderr输出 - 检测网络错误"""
+        try:
+            while self.is_ping_running and self.ping_process:
+                line = self.ping_process.stderr.readline()
+                if not line:
+                    break
+                
+                line_lower = line.lower().strip()
+                
+                # 按照spec.json规范检测各种错误
+                if "network is unreachable" in line_lower:
+                    self._update_ping_status("网络不可达", "red")
+                elif "destination host unreachable" in line_lower:
+                    self._update_ping_status("网络不可达", "red")
+                elif "unknown host" in line_lower or "name or service not known" in line_lower:
+                    self._update_ping_status("DNS解析失败", "red")
+                elif "bad address" in line_lower:
+                    self._update_ping_status("DNS解析失败", "red")
+                elif "time to live exceeded" in line_lower:
+                    self._update_ping_status("TTL超限", "orange")
+                elif "request timeout" in line_lower or "timeout" in line_lower:
+                    self._update_ping_status("请求超时", "orange")
+                elif "sendmsg:" in line_lower or "sendto:" in line_lower:
+                    # 检测到sendmsg/sendto错误，通常是网络中断
+                    if "network is unreachable" in line_lower:
+                        self._update_ping_status("网络不可达", "red")
+                    else:
+                        self._update_ping_status("网络异常", "red")
+                        
+        except Exception as e:
+            print(f"[DEBUG] 读取stderr异常: {str(e)}")
+    
+    def _update_ping_status(self, status_text, color):
+        """更新Ping状态显示"""
+        try:
+            if hasattr(self.app.ui, 'network_ping_status_label'):
+                self.app.ui.network_ping_status_label.config(text=status_text, foreground=color)
+        except Exception as e:
+            print(f"[DEBUG] 更新Ping状态失败: {str(e)}")

@@ -1,0 +1,320 @@
+{
+  "name": "network_ping_monitor",
+  "version": "1.0.0",
+  "last_updated": "2025-09-20 22:50:40",
+  "description": "通过 ADB 调用设备 ping，并同时监控 stdout 与 stderr，以便在 ping 过程中实时检测网络中断（如 'Network is unreachable'）。",
+  "context": {
+    "ui_env": "Tkinter-based desktop app",
+    "os": "Windows 10+",
+    "python": "3.9+",
+    "adb_required": true
+  },
+  "parameters": {
+    "device_serial": {
+      "type": "string",
+      "required": true,
+      "example": "R58M123ABC",
+      "desc": "adb -s 的设备序列号"
+    },
+    "host": {
+      "type": "string",
+      "required": false,
+      "default": "www.google.com",
+      "desc": "要 ping 的目标主机名或 IP"
+    },
+    "interval_seconds": {
+      "type": "number",
+      "required": false,
+      "default": 1.0,
+      "desc": "UI 轮询/节流更新的最小时间间隔（避免高 CPU）"
+    }
+  },
+  "command": {
+    "template": "adb -s {device_serial} shell ping {host}",
+    "shell": true,
+    "creationflags": "subprocess.CREATE_NO_WINDOW (Windows)",
+    "graceful_stop": {
+      "terminate_timeout_seconds": 2,
+      "kill_on_timeout": true
+    }
+  },
+  "process_io": {
+    "stdout": {
+      "read": "line_by_line",
+      "success_signatures": [
+        {
+          "pattern": "bytes from",
+          "flags": [
+            "CASE_INSENSITIVE"
+          ]
+        },
+        {
+          "pattern": "icmp_seq=",
+          "flags": [
+            "CASE_INSENSITIVE"
+          ],
+          "optional": true
+        }
+      ]
+    },
+    "stderr": {
+      "read": "line_by_line",
+      "error_signatures": [
+        {
+          "pattern": "Network is unreachable",
+          "alias": "UNREACHABLE",
+          "severity": "error"
+        },
+        {
+          "pattern": "Destination Host Unreachable",
+          "alias": "UNREACHABLE",
+          "severity": "error"
+        },
+        {
+          "pattern": "unknown host",
+          "alias": "DNS_ERROR",
+          "severity": "error"
+        },
+        {
+          "pattern": "Name or service not known",
+          "alias": "DNS_ERROR",
+          "severity": "error"
+        },
+        {
+          "pattern": "bad address",
+          "alias": "DNS_ERROR",
+          "severity": "error"
+        },
+        {
+          "pattern": "time to live exceeded",
+          "alias": "TTL_EXCEEDED",
+          "severity": "warn"
+        },
+        {
+          "pattern": "Request timeout",
+          "alias": "TIMEOUT",
+          "severity": "warn"
+        }
+      ]
+    },
+    "concurrency": "use two daemon threads: read_stdout() & read_stderr()"
+  },
+  "state_machine": {
+    "initial_state": "IDLE",
+    "states": {
+      "IDLE": {
+        "on": {
+          "start": "RUNNING"
+        }
+      },
+      "RUNNING": {
+        "on": {
+          "stdout_success": {
+            "target": "HEALTHY",
+            "action": "set_status(GREEN, '网络正常')"
+          },
+          "stderr_UNREACHABLE": {
+            "target": "DEGRADED",
+            "action": "set_status(RED, '网络不可达')"
+          },
+          "stderr_DNS_ERROR": {
+            "target": "DEGRADED",
+            "action": "set_status(RED, 'DNS解析失败')"
+          },
+          "stderr_TIMEOUT": {
+            "target": "DEGRADED",
+            "action": "set_status(ORANGE, '请求超时')"
+          },
+          "stderr_TTL_EXCEEDED": {
+            "target": "DEGRADED",
+            "action": "set_status(ORANGE, 'TTL超限')"
+          },
+          "process_exit": {
+            "target": "STOPPED",
+            "action": "set_status(GRAY, 'Ping结束')"
+          },
+          "user_stop": {
+            "target": "STOPPED",
+            "action": "set_status(GRAY, 'Ping已停止')"
+          }
+        }
+      },
+      "HEALTHY": {
+        "on": {
+          "stderr_*": {
+            "target": "DEGRADED"
+          },
+          "user_stop": {
+            "target": "STOPPED"
+          }
+        }
+      },
+      "DEGRADED": {
+        "on": {
+          "stdout_success": {
+            "target": "HEALTHY"
+          },
+          "user_stop": {
+            "target": "STOPPED"
+          }
+        }
+      },
+      "STOPPED": {
+        "terminal": true
+      }
+    }
+  },
+  "ui_bindings": {
+    "buttons": {
+      "network_ping_button": {
+        "labels": {
+          "start": "Ping",
+          "running": "停止",
+          "stopped": "Ping"
+        },
+        "behavior": "toggle"
+      }
+    },
+    "labels": {
+      "network_ping_status_label": {
+        "text_map": {
+          "HEALTHY": "网络正常",
+          "DEGRADED": "网络异常",
+          "STOPPED": "Ping已停止"
+        },
+        "color_map": {
+          "GREEN": "green",
+          "ORANGE": "orange",
+          "RED": "red",
+          "GRAY": "gray"
+        }
+      }
+    }
+  },
+  "threading_model": {
+    "worker_thread": "ping_worker (daemon=True)",
+    "stdout_thread": "read_stdout (daemon=True)",
+    "stderr_thread": "read_stderr (daemon=True)",
+    "stop_flag": "is_ping_running: bool"
+  },
+  "lifecycle": {
+    "start": [
+      "validate device selection",
+      "set is_ping_running=True",
+      "update button to '停止'",
+      "spawn ping_worker"
+    ],
+    "stop": [
+      "set is_ping_running=False",
+      "terminate process -> wait 2s -> kill if needed",
+      "clear process handle",
+      "update button to 'Ping'",
+      "status_label: 'Ping已停止' (gray)"
+    ],
+    "cleanup": [
+      "unset _ping_status_updated if present",
+      "ensure threads exit when stop_flag is False"
+    ]
+  },
+  "event_patterns": {
+    "stdout_success": [
+      {
+        "match": "bytes from",
+        "lowercase": true
+      }
+    ],
+    "stderr_errors": [
+      {
+        "match": "Network is unreachable",
+        "alias": "UNREACHABLE"
+      },
+      {
+        "match": "Destination Host Unreachable",
+        "alias": "UNREACHABLE"
+      },
+      {
+        "match": "unknown host",
+        "alias": "DNS_ERROR"
+      },
+      {
+        "match": "Name or service not known",
+        "alias": "DNS_ERROR"
+      },
+      {
+        "match": "bad address",
+        "alias": "DNS_ERROR"
+      },
+      {
+        "match": "Request timeout",
+        "alias": "TIMEOUT"
+      },
+      {
+        "match": "time to live exceeded",
+        "alias": "TTL_EXCEEDED"
+      }
+    ]
+  },
+  "edge_cases": [
+    "ping 进程启动失败：立即显示 'Ping测试失败' (red)，并复位按钮",
+    "stdout/stderr 任一管道阻塞：使用 for line in stream 保证逐行消费",
+    "用户快速点击开始/停止：检查 is_ping_running 标志并防抖",
+    "设备断开/ADB 掉线：process_exit 触发，显示灰色并记录错误"
+  ],
+  "telemetry_logging": {
+    "enabled": true,
+    "log_file": "logs/ping_monitor.log",
+    "append_mode": true,
+    "fields": [
+      "timestamp",
+      "device_serial",
+      "host",
+      "stream",
+      "line",
+      "detected_event",
+      "state_after"
+    ]
+  },
+  "test_plan": {
+    "cases": [
+      {
+        "id": "T01",
+        "title": "正常网络下持续 ping",
+        "steps": [
+          "启动",
+          "观察 stdout 出现 'bytes from'"
+        ],
+        "expected": "状态为 绿色 '网络正常'"
+      },
+      {
+        "id": "T02",
+        "title": "中途关闭蜂窝/断开 Wi‑Fi",
+        "steps": [
+          "启动",
+          "手动断网",
+          "观察 stderr 出现 'Network is unreachable'"
+        ],
+        "expected": "状态切换为 红色 '网络不可达'"
+      },
+      {
+        "id": "T03",
+        "title": "错误域名（DNS 失败）",
+        "params_override": {
+          "host": "no.such.domain.example"
+        },
+        "expected": "状态 红色 'DNS解析失败'"
+      },
+      {
+        "id": "T04",
+        "title": "用户点击停止",
+        "steps": [
+          "启动",
+          "点击停止"
+        ],
+        "expected": "状态 灰色 'Ping已停止'，进程结束"
+      }
+    ]
+  },
+  "reference_impl_hint": {
+    "pseudocode": "spawn Popen(cmd, stdout=PIPE, stderr=PIPE)\nstart thread read_stdout():\n    for line in stdout:\n        if \"bytes from\" in lower(line):\n            set_status(GREEN, \"网络正常\")\nstart thread read_stderr():\n    for line in stderr:\n        if \"unreachable\" in lower(line): set_status(RED, \"网络不可达\")\n        elif \"unknown host\" in lower(line): set_status(RED, \"DNS解析失败\")\n        elif \"timeout\" in lower(line): set_status(ORANGE, \"请求超时\")\nwait for process exit or user stop\n"
+  }
+}
