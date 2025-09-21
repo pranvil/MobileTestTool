@@ -36,7 +36,7 @@ if exist "dist" rmdir /s /q "dist"
 
 REM 创建简化的构建命令
 echo 开始构建...
-pyinstaller --onedir --windowed --icon "icon.ico" --name "MobileTestTool" --hidden-import uiautomator2 --collect-all uiautomator2 --clean --noupx --strip main.py
+pyinstaller --clean --distpath "c:\MyBuilds" MobileTestTool.spec
 
 if errorlevel 1 (
     echo 构建失败
@@ -45,7 +45,8 @@ if errorlevel 1 (
 )
 
 echo.
-echo 构建完成: dist\MobileTestTool\MobileTestTool.exe
+echo 构建完成: c:\MyBuilds\MobileTestTool\MobileTestTool.exe
+echo APK文件已包含在打包中
 echo.
 echo 注意: 如果杀毒软件误报，请将项目目录添加到白名单
 echo 详细说明请查看: 杀毒软件白名单说明.md

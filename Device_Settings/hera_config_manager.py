@@ -151,7 +151,7 @@ class HeraConfigManager:
             self._start_logger()
             time.sleep(0.5)
             
-            # 6. 设置移动日志
+            # 6. 设置手机日志
             self._setup_mobile_log()
             time.sleep(0.5)
             
@@ -403,7 +403,7 @@ class HeraConfigManager:
         """带重试机制的设备连接"""
         for attempt in range(max_retries):
             try:
-                self._log_message(f"尝试连接设备 (第{attempt + 1}次)...")
+                # self._log_message(f"尝试连接设备 (第{attempt + 1}次)...")
                 device = u2.connect(device_id)
                 
                 # 简单测试连接
@@ -447,11 +447,7 @@ class HeraConfigManager:
             
             self._log_message("正在安装uiautomator APK...")
             
-            # 下载APK文件
-            if not self._download_uiautomator_apks():
-                return False
-            
-            # 安装APK
+            # 检查APK文件是否存在
             current_dir = os.path.dirname(os.path.abspath(__file__))
             app_path = os.path.join(current_dir, 'app-uiautomator.apk')
             test_path = os.path.join(current_dir, 'app-uiautomator-test.apk')
@@ -469,36 +465,6 @@ class HeraConfigManager:
             self._log_message(f"❌ uiautomator APK安装失败: {str(e)}")
             return False
     
-    def _download_uiautomator_apks(self):
-        """下载uiautomator APK文件"""
-        try:
-            files = {
-                'app-uiautomator.apk': 'https://github.com/openatx/android-uiautomator-server/releases/download/2.3.3/app-uiautomator.apk',
-                'app-uiautomator-test.apk': 'https://github.com/openatx/android-uiautomator-server/releases/download/2.3.3/app-uiautomator-test.apk'
-            }
-            
-            current_dir = os.path.dirname(os.path.abspath(__file__))
-            
-            for filename, url in files.items():
-                file_path = os.path.join(current_dir, filename)
-                if not os.path.exists(file_path):
-                    self._log_message(f"正在下载 {filename}...")
-                    
-                    headers = {
-                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-                    }
-                    req = urllib.request.Request(url, headers=headers)
-                    
-                    with urllib.request.urlopen(req) as response, open(file_path, 'wb') as out_file:
-                        out_file.write(response.read())
-                    
-                    self._log_message(f"✅ {filename} 下载完成")
-            
-            return True
-            
-        except Exception as e:
-            self._log_message(f"❌ 下载uiautomator APK失败: {str(e)}")
-            return False
     
     def _ensure_screen_on_and_unlocked(self):
         """确保屏幕开启并解锁"""
@@ -593,12 +559,11 @@ class HeraConfigManager:
             cmd = f"adb -s {selected_device} shell am start -n {self.package_name}/{self.activity_name}"
             run_adb_command(cmd, check=True)
             time.sleep(1)
-            self._log_message("✅ Logger已启动")
         except Exception as e:
             self._log_message(f"❌ 启动Logger失败: {str(e)}")
     
     def _setup_mobile_log(self):
-        """设置移动日志"""
+        """设置MobileLog"""
         try:
             selected_device = self.app.selected_device.get()
             
@@ -607,24 +572,24 @@ class HeraConfigManager:
             run_adb_command(cmd1, check=True)
             time.sleep(1)
             
-            # 启动移动日志
+            # 启动MobileLog
             cmd2 = f'adb -s {selected_device} shell am broadcast -a com.debug.loggerui.ADB_CMD -e cmd_name start --ei cmd_target 1 -n com.debug.loggerui/.framework.LogReceiver'
             run_adb_command(cmd2, check=True)
             time.sleep(5)
             
-            # 点击移动日志开关 (需要UI自动化)
+            # 点击MobileLog开关 (需要UI自动化)
             if self.device:
                 self._check_and_click_mobile_log_toggle()
             else:
-                self._log_message("⚠️ 跳过移动日志开关点击 (需要UI自动化)")
+                self._log_message("⚠️ 跳过MobileLog开关点击 (需要UI自动化)")
             
-            self._log_message("✅ 移动日志设置完成")
+            self._log_message("✅ 日志设置完成")
             
         except Exception as e:
-            self._log_message(f"❌ 设置移动日志失败: {str(e)}")
+            self._log_message(f"❌ 设置MobileLog失败: {str(e)}")
     
     def _check_and_click_mobile_log_toggle(self):
-        """检查并点击移动日志开关"""
+        """检查并点击MobileLog开关"""
         try:
             if not self.device:
                 return
@@ -634,15 +599,15 @@ class HeraConfigManager:
                 info = toggle_button.info
                 if not info.get('checked', False):
                     toggle_button.click()
-                    self._log_message("✅ 移动日志开关已点击")
+                    self._log_message("✅ MobileLog日志开关已点击")
                     time.sleep(1)
                 else:
-                    self._log_message("✅ 移动日志已启用")
+                    self._log_message("✅ MobileLog日志已启用")
             else:
-                self._log_message("❌ 移动日志开关未找到")
+                self._log_message("❌ MobileLog开关未找到")
                 
         except Exception as e:
-            self._log_message(f"❌ 点击移动日志开关失败: {str(e)}")
+            self._log_message(f"❌ 点击MobileLog开关失败: {str(e)}")
     
     def _handle_gdpr_settings(self):
         """处理GDPR设置"""
