@@ -112,6 +112,14 @@ class MTKLogManager:
         if not log_name:
             return
         
+        # 询问是否导出截图和视频
+        export_media = messagebox.askyesno("导出媒体文件", 
+            "是否同时导出截图和录制的视频？\n\n"
+            "包括:\n"
+            "• 屏幕录制视频\n"
+            "• 截图文件\n\n"
+            "选择'是'将额外导出这些媒体文件。")
+        
         # 定义后台工作函数
         def mtklog_worker(progress_var, status_label, progress_dialog):
             # 1. 停止logger命令,加5s时间保护
@@ -155,6 +163,18 @@ class MTKLogManager:
                 ("/data/media/logmanager", "data_logmanager")
             ]
             
+            # 如果用户选择导出媒体文件，添加额外的命令
+            if export_media:
+                media_commands = [
+                    ("/sdcard/DCIM/Screen Recorder/.", "Screen_Recorder_DCIM"),
+                    ("/sdcard/Screen Recorder/.", "Screen_Recorder"),
+                    ("/storage/emulated/0/Screen Recorder/.", "Screen_Recorder_Storage"),
+                    ("/sdcard/DCIM/ViewMe/.", "ViewMe_DCIM"),
+                    ("/storage/emulated/0/Pictures/Screenshots/.", "Screenshots_Storage"),
+                    ("/sdcard/Pictures/Screenshots/.", "Screenshots_DCIM")
+                ]
+                pull_commands.extend(media_commands)
+            
             total_commands = len(pull_commands)
             
             for i, (source_path, folder_name) in enumerate(pull_commands):
@@ -175,15 +195,34 @@ class MTKLogManager:
             progress_var.set(100)
             progress_dialog.update()
             
-            return {"log_folder": log_folder, "device": device}
+            return {"log_folder": log_folder, "device": device, "export_media": export_media}
         
         # 定义完成回调
         def on_mtklog_done(result):
             # 打开日志文件夹
             if result["log_folder"]:
                 os.startfile(result["log_folder"])
-            # 更新状态
-            self.app.ui.status_var.set(f"MTKLOG已停止并导出 - {result['device']}")
+            
+            # 更新状态和显示完成信息
+            if result["export_media"]:
+                self.app.ui.status_var.set(f"MTKLOG已停止并导出(含媒体文件) - {result['device']}")
+                messagebox.showinfo("导出完成", 
+                    f"MTKLOG导出完成！\n\n"
+                    f"导出目录: {result['log_folder']}\n"
+                    f"设备: {result['device']}\n\n"
+                    f"已导出内容:\n"
+                    f"• MTKLOG日志文件\n"
+                    f"• 屏幕录制视频\n"
+                    f"• 截图文件\n\n"
+                    f"文件夹已自动打开。")
+            else:
+                self.app.ui.status_var.set(f"MTKLOG已停止并导出 - {result['device']}")
+                messagebox.showinfo("导出完成", 
+                    f"MTKLOG导出完成！\n\n"
+                    f"导出目录: {result['log_folder']}\n"
+                    f"设备: {result['device']}\n\n"
+                    f"已导出MTKLOG日志文件。\n\n"
+                    f"文件夹已自动打开。")
         
         # 定义错误回调
         def on_mtklog_error(error):
