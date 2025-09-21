@@ -1,88 +1,88 @@
 @echo off
 chcp 65001 >nul
+setlocal EnableExtensions EnableDelayedExpansion
+
 echo ========================================
-echo    手机测试辅助工具 v2.0 - onedir 打包
+echo   MobileTestTool - onedir build
 echo ========================================
 echo.
 
-REM 检查Python环境
-python --version
-if errorlevel 1 (
-    echo 错误：未找到Python环境！
-    pause
-    exit /b 1
+REM 1) Check Python / PyInstaller
+python --version >nul 2>nul || (echo Python not found.& pause & exit /b 1)
+python -c "import PyInstaller" 1>nul 2>nul || (echo Installing PyInstaller... & pip install -q pyinstaller || (echo Install failed.& pause & exit /b 1))
+
+REM 2) Write a tiny Python helper to detect Tcl/Tk paths
+set "DETECT=%TEMP%\detect_tk_paths.py"
+> "%DETECT%" echo import tkinter as tk, pathlib
+>>"%DETECT%" echo r = tk.Tk()
+>>"%DETECT%" echo tcl = pathlib.Path(r.tk.eval('info library')).resolve()
+>>"%DETECT%" echo try:
+>>"%DETECT%" echo^    tkd = pathlib.Path(r.tk.eval('set tk_library')).resolve()
+>>"%DETECT%" echo except Exception:
+>>"%DETECT%" echo^    tkd = tcl.parent / 'tk8.6'
+>>"%DETECT%" echo r.destroy()
+>>"%DETECT%" echo print(str(tcl)+';'+str(tkd))
+
+REM 3) Run helper and parse "tcl;tk" output
+for /f "usebackq tokens=1,2 delims=;" %%i in (`python "%DETECT%"`) do (
+  set "TCL_DIR=%%~i"
+  set "TK_DIR=%%~j"
 )
 
-REM 检查并安装依赖
-echo 检查依赖包...
-python -c "import PyInstaller" 2>nul
-if errorlevel 1 (
-    echo 正在安装 PyInstaller...
-    pip install pyinstaller
-    if errorlevel 1 (
-        echo 安装 PyInstaller 失败！
-        pause
-        exit /b 1
-    )
+if not exist "%TCL_DIR%\init.tcl" (
+  echo init.tcl not found: %TCL_DIR%
+  del "%DETECT%" >nul 2>nul
+  pause
+  exit /b 1
+)
+if not exist "%TK_DIR%\tk.tcl" (
+  echo tk.tcl not found: %TK_DIR%
+  del "%DETECT%" >nul 2>nul
+  pause
+  exit /b 1
 )
 
-REM 清理之前的构建文件
-echo 清理之前的构建文件...
+for %%# in ("%TCL_DIR%") do set "TCL_BASE=%%~nx#"
+for %%# in ("%TK_DIR%") do set "TK_BASE=%%~nx#"
+
+echo Detected:
+echo   TCL_DIR = %TCL_DIR%   (-> lib\%TCL_BASE%)
+echo   TK_DIR  = %TK_DIR%    (-> lib\%TK_BASE%)
+echo.
+
+REM 4) Clean previous build
 if exist "build" rmdir /s /q "build"
-if exist "dist" rmdir /s /q "dist"
+if exist "dist"  rmdir /s /q "dist"
 
-echo.
-echo 开始打包（onedir模式）...
-echo 这可能需要几分钟时间，请耐心等待...
-echo.
+REM 5) Create a runtime hook to set TCL/TK env at app start
+> hook_set_tk_env.py echo import os,sys
+>>hook_set_tk_env.py echo from pathlib import Path
+>>hook_set_tk_env.py echo base = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
+>>hook_set_tk_env.py echo os.environ.setdefault("TCL_LIBRARY", str(base / "lib" / "%TCL_BASE%"))
+>>hook_set_tk_env.py echo os.environ.setdefault("TK_LIBRARY",  str(base / "lib" / "%TK_BASE%"))
 
-REM 执行打包命令
+REM 6) Build (ASCII app name avoids path issues)
 pyinstaller ^
-    --onedir ^
-    --windowed ^
-    --icon "icon.ico" ^
-    --name "手机测试辅助工具" ^
-    --add-data "README.md;." ^
-    --hidden-import "tkinter" ^
-    --hidden-import "tkinter.ttk" ^
-    --hidden-import "tkinter.messagebox" ^
-    --hidden-import "tkinter.filedialog" ^
-    --hidden-import "tkinter.simpledialog" ^
-    --hidden-import "subprocess" ^
-    --hidden-import "threading" ^
-    --hidden-import "queue" ^
-    --hidden-import "re" ^
-    --hidden-import "os" ^
-    --hidden-import "sys" ^
-    --hidden-import "datetime" ^
-    --clean ^
-    main.py
+  --onedir ^
+  --windowed ^
+  --icon "icon.ico" ^
+  --name "手机测试辅助工具 v2.1" ^
+  --add-data "README.md;." ^
+  --add-data "%TCL_DIR%;lib/%TCL_BASE%" ^
+  --add-data "%TK_DIR%;lib/%TK_BASE%" ^
+  --hidden-import tkinter ^
+  --runtime-hook hook_set_tk_env.py ^
+  --clean ^
+  main.py
+
+del "%DETECT%" >nul 2>nul
 
 if errorlevel 1 (
-    echo.
-    echo 打包失败！请检查错误信息。
-    pause
-    exit /b 1
+  echo Build failed.
+  pause
+  exit /b 1
 )
 
 echo.
-echo ========================================
-echo           打包完成！
-echo ========================================
-echo.
-echo 可执行文件位置: dist\手机测试辅助工具\手机测试辅助工具.exe
-echo 目录大小: 
-dir "dist\手机测试辅助工具" | find "个文件"
-echo.
-echo 使用说明：
-echo 1. 确保已安装 Android SDK 并配置 adb 命令
-echo 2. 连接 Android 设备并启用 USB 调试
-echo 3. 运行 dist\手机测试辅助工具\手机测试辅助工具.exe
-echo.
-echo onedir 模式优势：
-echo - 启动速度更快
-echo - 文件结构清晰
-echo - 便于调试和修改
-echo - 可以单独更新某些文件
-echo.
+echo Build done: dist\手机测试辅助工具 v2.1\手机测试辅助工具 v2.1.exe
 pause
