@@ -493,7 +493,7 @@ class NetworkInfoManager:
             ('RSRQ', 64, 'e'),
             ('SINR', 58, 'e'),
             ('RSSI', 58, 'e'),
-            ('TA', 40, 'e'),
+            ('CA', 40, 'e'),
             ('NOTE', 160, 'w')
         ]
         
@@ -665,7 +665,7 @@ class NetworkInfoManager:
                     '',  # RSRQ
                     '',  # SINR
                     wifi.get('RSSI', ''),
-                    '',  # TA
+                    '',  # CA
                     note
                 ])
             

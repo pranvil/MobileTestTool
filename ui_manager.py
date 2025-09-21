@@ -559,7 +559,8 @@ class UIManager:
         ttk.Button(other_row, text="合并PCAP", command=self.app.device_settings_manager.merge_pcap).pack(side=tk.LEFT, padx=(0, 10))
         ttk.Button(other_row, text="高通log提取pcap", command=self.app.device_settings_manager.extract_pcap_from_qualcomm_log).pack(side=tk.LEFT, padx=(0, 10))
         ttk.Button(other_row, text="删除bugreport", command=self.app.device_settings_manager.delete_bugreport).pack(side=tk.LEFT, padx=(0, 10))
-        ttk.Button(other_row, text="赫拉配置", command=self.app.hera_config_manager.configure_hera).pack(side=tk.LEFT)
+        ttk.Button(other_row, text="赫拉配置", command=self.app.hera_config_manager.configure_hera).pack(side=tk.LEFT, padx=(0, 10))
+        ttk.Button(other_row, text="TCPDUMP", command=self.app.tcpdump_manager.show_tcpdump_dialog).pack(side=tk.LEFT)
         
         # 存储Canvas和滚动条引用，用于后续检查
         self.other_canvas = canvas
@@ -654,6 +655,7 @@ class UIManager:
         tools_menu.add_command(label="清除设备缓存", command=self.app.clear_device_logs)
         tools_menu.add_command(label="保存日志", command=self.app.save_logs)
         tools_menu.add_separator()
+        tools_menu.add_command(label="工具配置", command=self.app.device_settings_manager.configure_tools)
         tools_menu.add_command(label="安装MTKLOGGER", command=self.app.install_mtklogger)
         
         # 帮助菜单

@@ -20,6 +20,7 @@ from TMO_CC import PullCCManager, PushCCManager, ServerManager
 from Echolocate.echolocate_manager import EcholocateManager
 from Background_Data import BackgroundConfigManager, LogAnalysisManager
 from Device_Settings import DeviceSettingsManager, HeraConfigManager
+from Device_Settings.tcpdump_capture import TCPDumpManager
 
 class LogcatFilterApp:
     def __init__(self, root):
@@ -70,6 +71,7 @@ class LogcatFilterApp:
         self.log_analysis_manager = LogAnalysisManager(self)
         self.device_settings_manager = DeviceSettingsManager(self)
         self.hera_config_manager = HeraConfigManager(self)
+        self.tcpdump_manager = TCPDumpManager(self)
         
         # 初始化UI管理器（必须在所有管理器初始化之后）
         self.ui = UIManager(self.root, self)

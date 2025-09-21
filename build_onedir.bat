@@ -34,9 +34,40 @@ echo 清理之前的构建...
 if exist "build" rmdir /s /q "build"
 if exist "dist" rmdir /s /q "dist"
 
+REM 强制清理输出目录
+echo 清理输出目录...
+if exist "c:\MyBuilds\MobileTestTool" (
+    echo 正在清理 c:\MyBuilds\MobileTestTool...
+    
+    REM 尝试终止可能运行的进程
+    taskkill /f /im "MobileTestTool.exe" 2>nul
+    
+    REM 等待进程完全终止
+    timeout /t 2 /nobreak >nul
+    
+    REM 尝试删除目录
+    rmdir /s /q "c:\MyBuilds\MobileTestTool" 2>nul
+    
+    REM 如果删除失败，尝试使用robocopy清空
+    if exist "c:\MyBuilds\MobileTestTool" (
+        echo 使用robocopy清空目录...
+        mkdir "c:\temp_empty" 2>nul
+        robocopy "c:\temp_empty" "c:\MyBuilds\MobileTestTool" /mir /nfl /ndl /njh /njs /nc /ns /np >nul 2>&1
+        rmdir /s /q "c:\temp_empty" 2>nul
+        rmdir /s /q "c:\MyBuilds\MobileTestTool" 2>nul
+    )
+    
+    REM 最终检查
+    if exist "c:\MyBuilds\MobileTestTool" (
+        echo 警告: 无法完全清理输出目录，但将继续构建...
+    ) else (
+        echo 输出目录清理完成
+    )
+)
+
 REM 创建简化的构建命令
 echo 开始构建...
-pyinstaller --clean --distpath "c:\MyBuilds" MobileTestTool.spec
+pyinstaller --clean --noconfirm --distpath "c:\MyBuilds" MobileTestTool.spec
 
 if errorlevel 1 (
     echo 构建失败
