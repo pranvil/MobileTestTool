@@ -18,6 +18,8 @@ from Log_Filter import LogProcessor, SearchManager, ADBLogManager
 from Log_Filter.google_log import GoogleLogManager
 from TMO_CC import PullCCManager, PushCCManager, ServerManager
 from Echolocate.echolocate_manager import EcholocateManager
+from Background_Data import BackgroundConfigManager, LogAnalysisManager
+from Device_Settings import DeviceSettingsManager, HeraConfigManager
 
 class LogcatFilterApp:
     def __init__(self, root):
@@ -49,8 +51,7 @@ class LogcatFilterApp:
         self.case_sensitive.set(False)
         self.color_highlight.set(True)
         
-        # 初始化各个管理器
-        self.ui = UIManager(self.root, self)
+        # 初始化各个管理器（必须在UIManager之前初始化）
         self.device_manager = DeviceManager(self)
         self.mtklog_manager = MTKLogManager(self)
         self.adblog_manager = ADBLogManager(self)
@@ -65,6 +66,13 @@ class LogcatFilterApp:
         self.server_manager = ServerManager(self)
         self.telephony_manager = TelephonyManager(self)
         self.echolocate_manager = EcholocateManager(self)
+        self.background_config_manager = BackgroundConfigManager(self)
+        self.log_analysis_manager = LogAnalysisManager(self)
+        self.device_settings_manager = DeviceSettingsManager(self)
+        self.hera_config_manager = HeraConfigManager(self)
+        
+        # 初始化UI管理器（必须在所有管理器初始化之后）
+        self.ui = UIManager(self.root, self)
         
         # 初始化设备列表
         self.device_manager.refresh_devices()

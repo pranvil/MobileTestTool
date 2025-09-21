@@ -122,6 +122,8 @@ class UIManager:
         self.setup_network_info_tab()
         self.setup_tmo_cc_tab()
         self.setup_tmo_echolocate_tab()
+        self.setup_background_data_tab()
+        self.setup_other_tab()
         
         # 创建日志显示容器作为第二个面板
         self.log_container = ttk.Frame(self.main_paned)
@@ -389,8 +391,8 @@ class UIManager:
         tmo_row = scrollable_frame
         
         # TMO CC按钮
-        ttk.Button(tmo_row, text="推CC文件", command=self.push_cc_file).pack(side=tk.LEFT, padx=(0, 10))
-        ttk.Button(tmo_row, text="拉CC文件", command=self.pull_cc_file).pack(side=tk.LEFT, padx=(0, 10))
+        ttk.Button(tmo_row, text="推CC文件", command=self.app.push_cc_manager.push_cc_file).pack(side=tk.LEFT, padx=(0, 10))
+        ttk.Button(tmo_row, text="拉CC文件", command=self.app.tmo_cc_manager.pull_cc_file).pack(side=tk.LEFT, padx=(0, 10))
         
         # 过滤按钮（动态按钮）
         self.simple_filter_button = ttk.Button(tmo_row, text="简单过滤", command=self.simple_filter)
@@ -402,8 +404,8 @@ class UIManager:
         # 清空日志按钮
         ttk.Button(tmo_row, text="清空日志", command=self.app.clear_logs).pack(side=tk.LEFT, padx=(0, 10))
         
-        ttk.Button(tmo_row, text="PROD服务器", command=self.prod_server).pack(side=tk.LEFT, padx=(0, 10))
-        ttk.Button(tmo_row, text="STG服务器", command=self.stg_server).pack(side=tk.LEFT)
+        ttk.Button(tmo_row, text="PROD服务器", command=self.app.server_manager.prod_server).pack(side=tk.LEFT, padx=(0, 10))
+        ttk.Button(tmo_row, text="STG服务器", command=self.app.server_manager.stg_server).pack(side=tk.LEFT)
         
         # 存储Canvas和滚动条引用，用于后续检查
         self.tmo_canvas = canvas
@@ -448,23 +450,121 @@ class UIManager:
         echolocate_row = scrollable_frame
         
         # TMO Echolocate按钮
-        ttk.Button(echolocate_row, text="安装", command=self.install_echolocate).pack(side=tk.LEFT, padx=(0, 10))
-        ttk.Button(echolocate_row, text="Trigger", command=self.trigger_echolocate).pack(side=tk.LEFT, padx=(0, 10))
-        ttk.Button(echolocate_row, text="Pull file", command=self.pull_echolocate_file).pack(side=tk.LEFT, padx=(0, 10))
-        ttk.Button(echolocate_row, text="删除手机文件", command=self.delete_echolocate_file).pack(side=tk.LEFT, padx=(0, 10))
+        ttk.Button(echolocate_row, text="安装", command=self.app.echolocate_manager.install_echolocate).pack(side=tk.LEFT, padx=(0, 10))
+        ttk.Button(echolocate_row, text="Trigger", command=self.app.echolocate_manager.trigger_echolocate).pack(side=tk.LEFT, padx=(0, 10))
+        ttk.Button(echolocate_row, text="Pull file", command=self.app.echolocate_manager.pull_echolocate_file).pack(side=tk.LEFT, padx=(0, 10))
+        ttk.Button(echolocate_row, text="删除手机文件", command=self.app.echolocate_manager.delete_echolocate_file).pack(side=tk.LEFT, padx=(0, 10))
         # 过滤标签和按钮
         ttk.Label(echolocate_row, text="filter:").pack(side=tk.LEFT, padx=(0, 5))
-        ttk.Button(echolocate_row, text="CallID", command=self.filter_callid).pack(side=tk.LEFT, padx=(0, 5))
-        ttk.Button(echolocate_row, text="CallState", command=self.filter_callstate).pack(side=tk.LEFT, padx=(0, 5))
-        ttk.Button(echolocate_row, text="UICallState", command=self.filter_uicallstate).pack(side=tk.LEFT, padx=(0, 5))
-        ttk.Button(echolocate_row, text="AllCallState", command=self.filter_allcallstate).pack(side=tk.LEFT, padx=(0, 5))
-        ttk.Button(echolocate_row, text="IMSSignallingMessageLine1", command=self.filter_ims_signalling).pack(side=tk.LEFT, padx=(0, 5))
-        ttk.Button(echolocate_row, text="AllCallFlow", command=self.filter_allcallflow).pack(side=tk.LEFT)
+        ttk.Button(echolocate_row, text="CallID", command=self.app.echolocate_manager.filter_callid).pack(side=tk.LEFT, padx=(0, 5))
+        ttk.Button(echolocate_row, text="CallState", command=self.app.echolocate_manager.filter_callstate).pack(side=tk.LEFT, padx=(0, 5))
+        ttk.Button(echolocate_row, text="UICallState", command=self.app.echolocate_manager.filter_uicallstate).pack(side=tk.LEFT, padx=(0, 5))
+        ttk.Button(echolocate_row, text="AllCallState", command=self.app.echolocate_manager.filter_allcallstate).pack(side=tk.LEFT, padx=(0, 5))
+        ttk.Button(echolocate_row, text="IMSSignallingMessageLine1", command=self.app.echolocate_manager.filter_ims_signalling).pack(side=tk.LEFT, padx=(0, 5))
+        ttk.Button(echolocate_row, text="AllCallFlow", command=self.app.echolocate_manager.filter_allcallflow).pack(side=tk.LEFT)
         
         # 存储Canvas和滚动条引用，用于后续检查
         self.echolocate_canvas = canvas
         self.echolocate_scrollbar = scrollbar
         self.echolocate_scrollable_frame = scrollable_frame
+    
+    def setup_background_data_tab(self):
+        """设置24小时背景数据Tab页面"""
+        # 创建24小时背景数据Tab
+        background_tab = ttk.Frame(self.notebook)
+        self.notebook.add(background_tab, text="24小时背景数据")
+        
+        # 创建滚动容器
+        background_container = ttk.Frame(background_tab)
+        background_container.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
+        background_container.columnconfigure(0, weight=1)
+        
+        # 创建水平滚动的Canvas
+        canvas = tk.Canvas(background_container, height=30, highlightthickness=0)
+        scrollbar = ttk.Scrollbar(background_container, orient="horizontal", command=canvas.xview)
+        scrollable_frame = ttk.Frame(canvas)
+        
+        # 配置滚动
+        def update_scroll_region(event):
+            canvas.configure(scrollregion=canvas.bbox("all"))
+            # 检查是否需要滚动条
+            self.update_scrollbar_visibility(canvas, scrollbar, scrollable_frame)
+        
+        scrollable_frame.bind("<Configure>", update_scroll_region)
+        
+        canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
+        canvas.configure(xscrollcommand=scrollbar.set)
+        
+        # 布局Canvas和Scrollbar
+        canvas.grid(row=0, column=0, sticky=(tk.W, tk.E), padx=(0, 0), pady=(2, 0))
+        scrollbar.grid(row=1, column=0, sticky=(tk.W, tk.E), padx=(0, 0), pady=(1, 2))
+        
+        # 绑定鼠标滚轮事件
+        canvas.bind("<MouseWheel>", lambda e: canvas.xview_scroll(int(-1 * (e.delta / 120)), "units"))
+        
+        # 24小时背景数据控制行
+        background_row = scrollable_frame
+        
+        # 24小时背景数据按钮
+        ttk.Button(background_row, text="配置手机", command=self.app.background_config_manager.configure_phone).pack(side=tk.LEFT, padx=(0, 10))
+        ttk.Button(background_row, text="导出log", command=self.app.background_config_manager.export_background_logs).pack(side=tk.LEFT, padx=(0, 10))
+        ttk.Button(background_row, text="分析log", command=self.app.log_analysis_manager.analyze_logs).pack(side=tk.LEFT)
+        
+        # 存储Canvas和滚动条引用，用于后续检查
+        self.background_canvas = canvas
+        self.background_scrollbar = scrollbar
+        self.background_scrollable_frame = scrollable_frame
+    
+    def setup_other_tab(self):
+        """设置其他Tab页面"""
+        # 创建其他Tab
+        other_tab = ttk.Frame(self.notebook)
+        self.notebook.add(other_tab, text="其他")
+        
+        # 创建滚动容器
+        other_container = ttk.Frame(other_tab)
+        other_container.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
+        other_container.columnconfigure(0, weight=1)
+        
+        # 创建水平滚动的Canvas
+        canvas = tk.Canvas(other_container, height=30, highlightthickness=0)
+        scrollbar = ttk.Scrollbar(other_container, orient="horizontal", command=canvas.xview)
+        scrollable_frame = ttk.Frame(canvas)
+        
+        # 配置滚动
+        def update_scroll_region(event):
+            canvas.configure(scrollregion=canvas.bbox("all"))
+            # 检查是否需要滚动条
+            self.update_scrollbar_visibility(canvas, scrollbar, scrollable_frame)
+        
+        scrollable_frame.bind("<Configure>", update_scroll_region)
+        
+        canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
+        canvas.configure(xscrollcommand=scrollbar.set)
+        
+        # 布局Canvas和Scrollbar
+        canvas.grid(row=0, column=0, sticky=(tk.W, tk.E), padx=(0, 0), pady=(2, 0))
+        scrollbar.grid(row=1, column=0, sticky=(tk.W, tk.E), padx=(0, 0), pady=(1, 2))
+        
+        # 绑定鼠标滚轮事件
+        canvas.bind("<MouseWheel>", lambda e: canvas.xview_scroll(int(-1 * (e.delta / 120)), "units"))
+        
+        # 其他控制行
+        other_row = scrollable_frame
+        
+        # 其他按钮
+        ttk.Button(other_row, text="设置灭屏时间", command=self.app.device_settings_manager.set_screen_timeout).pack(side=tk.LEFT, padx=(0, 10))
+        ttk.Button(other_row, text="合并MTKlog", command=self.app.device_settings_manager.merge_mtklog).pack(side=tk.LEFT, padx=(0, 10))
+        ttk.Button(other_row, text="MTKlog提取pcap", command=self.app.device_settings_manager.extract_pcap_from_mtklog).pack(side=tk.LEFT, padx=(0, 10))
+        ttk.Button(other_row, text="合并PCAP", command=self.app.device_settings_manager.merge_pcap).pack(side=tk.LEFT, padx=(0, 10))
+        ttk.Button(other_row, text="高通log提取pcap", command=self.app.device_settings_manager.extract_pcap_from_qualcomm_log).pack(side=tk.LEFT, padx=(0, 10))
+        ttk.Button(other_row, text="删除bugreport", command=self.app.device_settings_manager.delete_bugreport).pack(side=tk.LEFT, padx=(0, 10))
+        ttk.Button(other_row, text="赫拉配置", command=self.app.hera_config_manager.configure_hera).pack(side=tk.LEFT)
+        
+        # 存储Canvas和滚动条引用，用于后续检查
+        self.other_canvas = canvas
+        self.other_scrollbar = scrollbar
+        self.other_scrollable_frame = scrollable_frame
     
     def setup_log_display(self):
         """设置日志显示区域"""
@@ -707,6 +807,10 @@ class UIManager:
                 self.update_scrollbar_visibility(self.tmo_canvas, self.tmo_scrollbar, self.tmo_scrollable_frame)
             elif tab_text == "TMO Echolocate" and hasattr(self, 'echolocate_canvas'):
                 self.update_scrollbar_visibility(self.echolocate_canvas, self.echolocate_scrollbar, self.echolocate_scrollable_frame)
+            elif tab_text == "24小时背景数据" and hasattr(self, 'background_canvas'):
+                self.update_scrollbar_visibility(self.background_canvas, self.background_scrollbar, self.background_scrollable_frame)
+            elif tab_text == "其他" and hasattr(self, 'other_canvas'):
+                self.update_scrollbar_visibility(self.other_canvas, self.other_scrollbar, self.other_scrollable_frame)
         except Exception as e:
             pass  # 静默处理错误
     
@@ -760,186 +864,18 @@ class UIManager:
             "• Log过滤 - 关键字过滤、ADB Log、日志管理\n"
             "• TMO CC - CC文件操作、服务器选择")
     
-    # TMO CC相关方法（占位符，待实现）
-    def push_cc_file(self):
-        """推CC文件"""
-        self.app.push_cc_manager.push_cc_file()
-    
-    def pull_cc_file(self):
-        """拉CC文件"""
-        self.app.tmo_cc_manager.pull_cc_file()
-    
+    # 过滤相关方法（委托给log_processor）
     def simple_filter(self):
         """简单过滤"""
-        # 如果正在过滤中，检查当前过滤类型
-        if self.app.is_running:
-            current_keywords = self.app.filter_keyword.get()
-            complete_keywords = "EntitlementServerApi|new cc version|old cc version|doDeviceActivation:Successful|mDeviceGroup|Entitlement-EapAka|EntitlementHandling|UpdateProvider|EntitlementService"
-            
-            # 如果当前是完全过滤，直接切换到简单过滤
-            if current_keywords == complete_keywords:
-                # 设置简单过滤的关键字
-                simple_keywords = "new cc version|old cc version|doDeviceActivation:Successful|mDeviceGroup|getUserAgent"
-                self.app.filter_keyword.set(simple_keywords)
-                self.app.use_regex.set(True)
-                # 重新开始过滤（这会自动停止当前过滤并开始新的过滤）
-                self.app.start_filtering()
-                self.update_tmo_filter_buttons()
-                return
-            else:
-                # 其他情况停止过滤
-                self.app.stop_filtering()
-                self.update_tmo_filter_buttons()
-                return
-        
-        # 设置预定义的关键字（使用正则表达式）
-        keywords = "new cc version|old cc version|doDeviceActivation:Successful|mDeviceGroup|getUserAgent"
-        
-        # 设置关键字到输入框
-        self.app.filter_keyword.set(keywords)
-        
-        # 启用正则表达式模式
-        self.app.use_regex.set(True)
-        
-        # 直接开始过滤
-        self.app.start_filtering()
-        
-        # 更新按钮状态
-        self.update_tmo_filter_buttons()
+        self.app.log_processor.simple_filter()
     
     def complete_filter(self):
         """完全过滤"""
-        # 如果正在过滤中，检查当前过滤类型
-        if self.app.is_running:
-            current_keywords = self.app.filter_keyword.get()
-            simple_keywords = "new cc version|old cc version|doDeviceActivation:Successful|mDeviceGroup|getUserAgent"
-            
-            # 如果当前是简单过滤，直接切换到完全过滤
-            if current_keywords == simple_keywords:
-                # 设置完全过滤的关键字
-                complete_keywords = "EntitlementServerApi|new cc version|old cc version|doDeviceActivation:Successful|mDeviceGroup|Entitlement-EapAka|EntitlementHandling|UpdateProvider|EntitlementService"
-                self.app.filter_keyword.set(complete_keywords)
-                self.app.use_regex.set(True)
-                # 重新开始过滤（这会自动停止当前过滤并开始新的过滤）
-                self.app.start_filtering()
-                self.update_tmo_filter_buttons()
-                return
-            else:
-                # 其他情况停止过滤
-                self.app.stop_filtering()
-                self.update_tmo_filter_buttons()
-                return
-        
-        # 设置预定义的关键字（使用正则表达式）
-        keywords = "EntitlementServerApi|new cc version|old cc version|doDeviceActivation:Successful|mDeviceGroup|Entitlement-EapAka|EntitlementHandling|UpdateProvider|EntitlementService"
-        
-        # 设置关键字到输入框
-        self.app.filter_keyword.set(keywords)
-        
-        # 启用正则表达式模式
-        self.app.use_regex.set(True)
-        
-        # 直接开始过滤
-        self.app.start_filtering()
-        
-        # 更新按钮状态
-        self.update_tmo_filter_buttons()
-    
-    def prod_server(self):
-        """PROD服务器"""
-        self.app.server_manager.prod_server()
-    
-    def stg_server(self):
-        """STG服务器"""
-        self.app.server_manager.stg_server()
-    
-    # TMO Echolocate相关方法
-    def install_echolocate(self):
-        """安装Echolocate"""
-        self.app.echolocate_manager.install_echolocate()
-    
-    def trigger_echolocate(self):
-        """触发Echolocate"""
-        self.app.echolocate_manager.trigger_echolocate()
-    
-    def pull_echolocate_file(self):
-        """拉取Echolocate文件"""
-        self.app.echolocate_manager.pull_echolocate_file()
-    def delete_echolocate_file(self):
-        """删除Echolocate文件"""
-        self.app.echolocate_manager.delete_echolocate_file()
-
-    # Echolocate过滤相关方法
-    def filter_callid(self):
-        """过滤CallID"""
-        self.app.echolocate_manager.filter_callid()
-    
-    # CallState过滤
-    def filter_callstate(self):
-        """过滤CallState"""
-        self.app.echolocate_manager.filter_callstate()
-    
-    def filter_uicallstate(self):
-        """过滤UICallState"""
-        self.app.echolocate_manager.filter_uicallstate()
-    
-    def filter_allcallstate(self):
-        """过滤AllCallState"""
-        self.app.echolocate_manager.filter_allcallstate()
-    
-    def filter_ims_signalling(self):
-        """过滤IMSSignallingMessageLine1"""
-        self.app.echolocate_manager.filter_ims_signalling()
-    
-    def filter_allcallflow(self):
-        """过滤AllCallFlow"""
-        self.app.echolocate_manager.filter_allcallflow()
+        self.app.log_processor.complete_filter()
     
     def load_log_keywords(self):
         """加载log关键字文件"""
-        from tkinter import filedialog, messagebox
-        
-        # 显示文件选择对话框
-        file_path = filedialog.askopenfilename(
-            title="选择log关键字文件",
-            filetypes=[
-                ("文本文件", "*.txt"),
-                ("所有文件", "*.*")
-            ],
-            parent=self.root
-        )
-        
-        if not file_path:
-            print(f"[DEBUG] 用户取消文件选择")
-            return
-        
-        try:
-            print(f"[DEBUG] 加载log关键字文件: {file_path}")
-            
-            # 读取文件内容
-            with open(file_path, 'r', encoding='utf-8') as f:
-                content = f.read().strip()
-            
-            if not content:
-                messagebox.showwarning("警告", "文件内容为空")
-                return
-            
-            print(f"[DEBUG] 文件内容: {content}")
-            
-            # 设置关键字到输入框
-            self.app.filter_keyword.set(content)
-            
-            # 自动启用正则表达式模式（因为文件内容是按正则表达式方式书写的）
-            self.app.use_regex.set(True)
-            
-            # 自动开始过滤
-            self.app.start_filtering()
-            
-        except UnicodeDecodeError:
-            messagebox.showerror("错误", "文件编码错误，请确保文件是UTF-8编码")
-        except Exception as e:
-            print(f"[DEBUG] 加载文件失败: {str(e)}")
-            messagebox.showerror("错误", f"加载文件失败:\n{str(e)}")
+        self.app.log_processor.load_log_keywords()
     
     # 搜索相关方法（委托给search_manager）
     def show_search_dialog(self, event=None):

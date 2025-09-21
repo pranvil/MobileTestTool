@@ -630,3 +630,123 @@ class LogProcessor:
         except Exception:
             # 如果出现异常，返回缓存值
             return self.performance_cache['last_line_count'], self.performance_cache['last_memory_mb']
+    
+    def simple_filter(self):
+        """简单过滤"""
+        # 如果正在过滤中，检查当前过滤类型
+        if self.app.is_running:
+            current_keywords = self.app.filter_keyword.get()
+            complete_keywords = "EntitlementServerApi|new cc version|old cc version|doDeviceActivation:Successful|mDeviceGroup|Entitlement-EapAka|EntitlementHandling|UpdateProvider|EntitlementService"
+            
+            # 如果当前是完全过滤，直接切换到简单过滤
+            if current_keywords == complete_keywords:
+                # 设置简单过滤的关键字
+                simple_keywords = "new cc version|old cc version|doDeviceActivation:Successful|mDeviceGroup|getUserAgent"
+                self.app.filter_keyword.set(simple_keywords)
+                self.app.use_regex.set(True)
+                # 重新开始过滤（这会自动停止当前过滤并开始新的过滤）
+                self.app.start_filtering()
+                self.app.ui.update_tmo_filter_buttons()
+                return
+            else:
+                # 其他情况停止过滤
+                self.app.stop_filtering()
+                self.app.ui.update_tmo_filter_buttons()
+                return
+        
+        # 设置预定义的关键字（使用正则表达式）
+        keywords = "new cc version|old cc version|doDeviceActivation:Successful|mDeviceGroup|getUserAgent"
+        
+        # 设置关键字到输入框
+        self.app.filter_keyword.set(keywords)
+        
+        # 启用正则表达式模式
+        self.app.use_regex.set(True)
+        
+        # 直接开始过滤
+        self.app.start_filtering()
+        
+        # 更新按钮状态
+        self.app.ui.update_tmo_filter_buttons()
+    
+    def complete_filter(self):
+        """完全过滤"""
+        # 如果正在过滤中，检查当前过滤类型
+        if self.app.is_running:
+            current_keywords = self.app.filter_keyword.get()
+            simple_keywords = "new cc version|old cc version|doDeviceActivation:Successful|mDeviceGroup|getUserAgent"
+            
+            # 如果当前是简单过滤，直接切换到完全过滤
+            if current_keywords == simple_keywords:
+                # 设置完全过滤的关键字
+                complete_keywords = "EntitlementServerApi|new cc version|old cc version|doDeviceActivation:Successful|mDeviceGroup|Entitlement-EapAka|EntitlementHandling|UpdateProvider|EntitlementService"
+                self.app.filter_keyword.set(complete_keywords)
+                self.app.use_regex.set(True)
+                # 重新开始过滤（这会自动停止当前过滤并开始新的过滤）
+                self.app.start_filtering()
+                self.app.ui.update_tmo_filter_buttons()
+                return
+            else:
+                # 其他情况停止过滤
+                self.app.stop_filtering()
+                self.app.ui.update_tmo_filter_buttons()
+                return
+        
+        # 设置预定义的关键字（使用正则表达式）
+        keywords = "EntitlementServerApi|new cc version|old cc version|doDeviceActivation:Successful|mDeviceGroup|Entitlement-EapAka|EntitlementHandling|UpdateProvider|EntitlementService"
+        
+        # 设置关键字到输入框
+        self.app.filter_keyword.set(keywords)
+        
+        # 启用正则表达式模式
+        self.app.use_regex.set(True)
+        
+        # 直接开始过滤
+        self.app.start_filtering()
+        
+        # 更新按钮状态
+        self.app.ui.update_tmo_filter_buttons()
+    
+    def load_log_keywords(self):
+        """加载log关键字文件"""
+        # 显示文件选择对话框
+        file_path = filedialog.askopenfilename(
+            title="选择log关键字文件",
+            filetypes=[
+                ("文本文件", "*.txt"),
+                ("所有文件", "*.*")
+            ],
+            parent=self.app.root
+        )
+        
+        if not file_path:
+            print(f"[DEBUG] 用户取消文件选择")
+            return
+        
+        try:
+            print(f"[DEBUG] 加载log关键字文件: {file_path}")
+            
+            # 读取文件内容
+            with open(file_path, 'r', encoding='utf-8') as f:
+                content = f.read().strip()
+            
+            if not content:
+                messagebox.showwarning("警告", "文件内容为空")
+                return
+            
+            print(f"[DEBUG] 文件内容: {content}")
+            
+            # 设置关键字到输入框
+            self.app.filter_keyword.set(content)
+            
+            # 自动启用正则表达式模式（因为文件内容是按正则表达式方式书写的）
+            self.app.use_regex.set(True)
+            
+            # 自动开始过滤
+            self.app.start_filtering()
+            
+        except UnicodeDecodeError:
+            messagebox.showerror("错误", "文件编码错误，请确保文件是UTF-8编码")
+        except Exception as e:
+            print(f"[DEBUG] 加载文件失败: {str(e)}")
+            messagebox.showerror("错误", f"加载文件失败:\n{str(e)}")
