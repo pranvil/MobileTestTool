@@ -94,9 +94,14 @@ class UIManager:
         self.main_frame.rowconfigure(0, weight=1)
         
         # 创建可分割的主面板 - 使用tk.PanedWindow支持minsize
-        self.main_paned = tk.PanedWindow(self.main_frame, orient=tk.VERTICAL)
-        self.main_paned.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
-        
+        self.main_paned = tk.PanedWindow(
+            self.root,
+            orient=tk.VERTICAL,
+            sashwidth=5, # 加宽分割条，便于点击
+            sashrelief="raised", # 立体感，让分割条更显眼
+            
+            )
+        self.main_paned.grid(row=0, column=0, sticky="nsew")
         # 创建Tab控件容器
         self.tab_container = ttk.Frame(self.main_paned)
         self.main_paned.add(self.tab_container, minsize=72)
@@ -766,11 +771,26 @@ class UIManager:
     
     def simple_filter(self):
         """简单过滤"""
-        # 如果正在过滤中，则停止过滤
+        # 如果正在过滤中，检查当前过滤类型
         if self.app.is_running:
-            self.app.stop_filtering()
-            self.update_tmo_filter_buttons()
-            return
+            current_keywords = self.app.filter_keyword.get()
+            complete_keywords = "EntitlementServerApi|new cc version|old cc version|doDeviceActivation:Successful|mDeviceGroup|Entitlement-EapAka|EntitlementHandling|UpdateProvider|EntitlementService"
+            
+            # 如果当前是完全过滤，直接切换到简单过滤
+            if current_keywords == complete_keywords:
+                # 设置简单过滤的关键字
+                simple_keywords = "new cc version|old cc version|doDeviceActivation:Successful|mDeviceGroup|getUserAgent"
+                self.app.filter_keyword.set(simple_keywords)
+                self.app.use_regex.set(True)
+                # 重新开始过滤（这会自动停止当前过滤并开始新的过滤）
+                self.app.start_filtering()
+                self.update_tmo_filter_buttons()
+                return
+            else:
+                # 其他情况停止过滤
+                self.app.stop_filtering()
+                self.update_tmo_filter_buttons()
+                return
         
         # 设置预定义的关键字（使用正则表达式）
         keywords = "new cc version|old cc version|doDeviceActivation:Successful|mDeviceGroup|getUserAgent"
@@ -789,11 +809,26 @@ class UIManager:
     
     def complete_filter(self):
         """完全过滤"""
-        # 如果正在过滤中，则停止过滤
+        # 如果正在过滤中，检查当前过滤类型
         if self.app.is_running:
-            self.app.stop_filtering()
-            self.update_tmo_filter_buttons()
-            return
+            current_keywords = self.app.filter_keyword.get()
+            simple_keywords = "new cc version|old cc version|doDeviceActivation:Successful|mDeviceGroup|getUserAgent"
+            
+            # 如果当前是简单过滤，直接切换到完全过滤
+            if current_keywords == simple_keywords:
+                # 设置完全过滤的关键字
+                complete_keywords = "EntitlementServerApi|new cc version|old cc version|doDeviceActivation:Successful|mDeviceGroup|Entitlement-EapAka|EntitlementHandling|UpdateProvider|EntitlementService"
+                self.app.filter_keyword.set(complete_keywords)
+                self.app.use_regex.set(True)
+                # 重新开始过滤（这会自动停止当前过滤并开始新的过滤）
+                self.app.start_filtering()
+                self.update_tmo_filter_buttons()
+                return
+            else:
+                # 其他情况停止过滤
+                self.app.stop_filtering()
+                self.update_tmo_filter_buttons()
+                return
         
         # 设置预定义的关键字（使用正则表达式）
         keywords = "EntitlementServerApi|new cc version|old cc version|doDeviceActivation:Successful|mDeviceGroup|Entitlement-EapAka|EntitlementHandling|UpdateProvider|EntitlementService"

@@ -369,9 +369,9 @@ class LogcatFilterApp:
             messagebox.showwarning("警告", "请输入过滤关键字")
             return
         
-        if self.is_running:
-            messagebox.showinfo("提示", "过滤已在运行中")
-            return
+        # if self.is_running:
+        #     messagebox.showinfo("提示", "过滤已在运行中")
+        #     return
         
         # 检查设备选择
         device = self.selected_device.get().strip()
