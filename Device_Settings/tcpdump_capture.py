@@ -305,15 +305,16 @@ class TCPDumpManager:
         log_path = self.get_log_path()
         self.log_message(f"正在拉取日志文件: {log_path}")
         
-        # 创建本地日志目录
-        local_log_dir = "C:\\log"
-        if not os.path.exists(local_log_dir):
-            try:
-                os.makedirs(local_log_dir)
-                self.log_message(f"✅ 创建日志目录: {local_log_dir}")
-            except Exception as e:
-                self.log_message(f"⚠️ 无法创建C:\\log目录，将保存到当前目录: {e}")
-                local_log_dir = "."
+        # 创建本地日志目录 - 使用统一的路径格式 c:\log\yyyymmdd\tcpdump
+        date_str = datetime.now().strftime("%Y%m%d")
+        local_log_dir = f"C:\\log\\{date_str}\\tcpdump"
+        
+        try:
+            os.makedirs(local_log_dir, exist_ok=True)
+            self.log_message(f"✅ 创建日志目录: {local_log_dir}")
+        except Exception as e:
+            self.log_message(f"⚠️ 无法创建日志目录，将保存到当前目录: {e}")
+            local_log_dir = "."
         
         # 生成带时间戳的文件名
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")

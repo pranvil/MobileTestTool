@@ -462,6 +462,7 @@ class UIManager:
         ttk.Button(echolocate_row, text="AllCallState", command=self.app.echolocate_manager.filter_allcallstate).pack(side=tk.LEFT, padx=(0, 5))
         ttk.Button(echolocate_row, text="IMSSignallingMessageLine1", command=self.app.echolocate_manager.filter_ims_signalling).pack(side=tk.LEFT, padx=(0, 5))
         ttk.Button(echolocate_row, text="AllCallFlow", command=self.app.echolocate_manager.filter_allcallflow).pack(side=tk.LEFT)
+        ttk.Button(echolocate_row, text="voice_intent分类", command=self.app.echolocate_manager.filter_voice_intent_classification).pack(side=tk.LEFT)
         
         # 存储Canvas和滚动条引用，用于后续检查
         self.echolocate_canvas = canvas
