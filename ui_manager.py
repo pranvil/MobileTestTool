@@ -446,9 +446,10 @@ class UIManager:
         ttk.Button(echolocate_row, text="安装", command=self.install_echolocate).pack(side=tk.LEFT, padx=(0, 10))
         ttk.Button(echolocate_row, text="Trigger", command=self.trigger_echolocate).pack(side=tk.LEFT, padx=(0, 10))
         ttk.Button(echolocate_row, text="Pull file", command=self.pull_echolocate_file).pack(side=tk.LEFT, padx=(0, 10))
-        
+        ttk.Button(echolocate_row, text="删除手机文件", command=self.delete_echolocate_file).pack(side=tk.LEFT, padx=(0, 10))
         # 过滤标签和按钮
         ttk.Label(echolocate_row, text="filter:").pack(side=tk.LEFT, padx=(0, 5))
+        ttk.Button(echolocate_row, text="CallID", command=self.filter_callid).pack(side=tk.LEFT, padx=(0, 5))
         ttk.Button(echolocate_row, text="CallState", command=self.filter_callstate).pack(side=tk.LEFT, padx=(0, 5))
         ttk.Button(echolocate_row, text="UICallState", command=self.filter_uicallstate).pack(side=tk.LEFT, padx=(0, 5))
         ttk.Button(echolocate_row, text="AllCallState", command=self.filter_allcallstate).pack(side=tk.LEFT, padx=(0, 5))
@@ -829,7 +830,16 @@ class UIManager:
     def pull_echolocate_file(self):
         """拉取Echolocate文件"""
         self.app.echolocate_manager.pull_echolocate_file()
+    def delete_echolocate_file(self):
+        """删除Echolocate文件"""
+        self.app.echolocate_manager.delete_echolocate_file()
+
+    # Echolocate过滤相关方法
+    def filter_callid(self):
+        """过滤CallID"""
+        self.app.echolocate_manager.filter_callid()
     
+    # CallState过滤
     def filter_callstate(self):
         """过滤CallState"""
         self.app.echolocate_manager.filter_callstate()

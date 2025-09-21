@@ -275,7 +275,7 @@ class EcholocateManager:
             'device': self.app.selected_device.get()
         }
     
-    def process_file_filter(self, keywords, filter_name, special_logic=None):
+    def process_file_filter(self, keywords, filter_name, special_logic=None, source_file=None):
         """
         处理文件过滤的通用方法
         
@@ -283,21 +283,23 @@ class EcholocateManager:
             keywords: 过滤关键字列表
             filter_name: 过滤名称，用于生成输出文件名
             special_logic: 特殊逻辑函数，用于处理特殊的过滤规则
+            source_file: 源文件路径，如果为None则弹出文件选择对话框
         
         Returns:
             bool: 处理是否成功
         """
         try:
-            # 让用户选择文件
-            source_file = filedialog.askopenfilename(
-                title=f"选择要过滤的文件 - {filter_name}",
-                filetypes=[("文本文件", "*.txt"), ("所有文件", "*.*")],
-                parent=self.app.root
-            )
-            
-            if not source_file:
-                messagebox.showinfo("取消", "用户取消文件选择")
-                return False
+            # 如果没有提供源文件路径，则让用户选择文件
+            if source_file is None:
+                source_file = filedialog.askopenfilename(
+                    title=f"选择要过滤的文件 - {filter_name}",
+                    filetypes=[("文本文件", "*.txt"), ("所有文件", "*.*")],
+                    parent=self.app.root
+                )
+                
+                if not source_file:
+                    messagebox.showinfo("取消", "用户取消文件选择")
+                    return False
             
             # 获取文件目录和文件名
             file_dir = os.path.dirname(source_file)
@@ -337,10 +339,10 @@ class EcholocateManager:
             # 打开生成的文件
             try:
                 os.startfile(output_file)
-                messagebox.showinfo("成功", f"过滤完成！\n找到 {len(result_lines)} 行匹配内容\n文件已保存: {output_file}")
+                # messagebox.showinfo("成功", f"过滤完成！\n找到 {len(result_lines)} 行匹配内容\n文件已保存: {output_file}")
             except Exception as e:
                 print(f"[DEBUG] 打开文件失败: {str(e)}")
-                messagebox.showinfo("成功", f"过滤完成！\n找到 {len(result_lines)} 行匹配内容\n文件已保存: {output_file}")
+                # messagebox.showinfo("成功", f"过滤完成！\n找到 {len(result_lines)} 行匹配内容\n文件已保存: {output_file}")
             
             return True
             
@@ -350,30 +352,91 @@ class EcholocateManager:
         except Exception as e:
             messagebox.showerror("错误", f"处理文件过滤失败: {str(e)}")
             return False
+    def delete_echolocate_file(self):
+        """删除手机上的Echolocate文件"""
+        try:
+            selected_device = self.app.selected_device.get()
+            if not selected_device:
+                messagebox.showerror("错误", "请先选择设备")
+                return False
+            
+            # 检查设备连接
+            if not self.device_manager.check_device_connection(selected_device):
+                return False
+            
+            
+            # 执行删除命令
+            try:
+                cmd = f"adb -s {selected_device} shell rm -rf /sdcard/Android/data/com.tmobile.echolocate/cache/dia_debug/*"
+                result = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=30)
+                
+                if result.returncode == 0:
+                    messagebox.showinfo("成功", "Echolocate文件删除完成")
+                    return True
+                else:
+                    messagebox.showerror("错误", f"删除文件失败\n{result.stderr}")
+                    return False
+                    
+            except subprocess.TimeoutExpired:
+                messagebox.showerror("错误", "删除文件超时")
+                return False
+            except Exception as e:
+                messagebox.showerror("错误", f"删除文件异常\n{str(e)}")
+                return False
+            
+        except Exception as e:
+            messagebox.showerror("错误", f"删除Echolocate文件失败: {str(e)}")
+            return False
+    def filter_callid(self, source_file=None):
+        """过滤CallID"""
+        keywords = ['CallID']
+        return self.process_file_filter(keywords, 'CallID', source_file=source_file)
     
-    def filter_callstate(self):
-        """过滤CallState - 查找CallID或CallState ENDED"""
-        def callid_logic(words):
-            return 'CallID' in words or ('CallState' in words and 'ENDED' in words)
-        
-        return self.process_file_filter([], 'CallID', callid_logic)
+    def filter_callstate(self, source_file=None):
+        """过滤CallState"""
+        keywords = ['CallState']
+        return self.process_file_filter(keywords, 'CallState', source_file=source_file)
     
-    def filter_uicallstate(self):
+    def filter_uicallstate(self, source_file=None):
         """过滤UICallState"""
         keywords = ['UICallState']
-        return self.process_file_filter(keywords, 'UICallState')
+        return self.process_file_filter(keywords, 'UICallState', source_file=source_file)
     
-    def filter_allcallstate(self):
+    def filter_allcallstate(self, source_file=None):
         """过滤AllCallState - 查找UICallState或CallState"""
         keywords = ['UICallState', 'CallState']
-        return self.process_file_filter(keywords, 'AllCallState')
+        return self.process_file_filter(keywords, 'AllCallState', source_file=source_file)
     
-    def filter_ims_signalling(self):
+    def filter_ims_signalling(self, source_file=None):
         """过滤IMSSignallingMessageLine1"""
         keywords = ['IMSSignallingMessageLine1']
-        return self.process_file_filter(keywords, 'IMSSignallingMessageLine1')
+        return self.process_file_filter(keywords, 'IMSSignallingMessageLine1', source_file=source_file)
     
     def filter_allcallflow(self):
         """过滤AllCallFlow - 查找UICallState、CallState或IMSSignallingMessageLine1"""
         keywords = ['UICallState', 'CallState', 'IMSSignallingMessageLine1']
-        return self.process_file_filter(keywords, 'AllCallFlow')
+        
+        # 先让用户选择源文件
+        source_file = filedialog.askopenfilename(
+            title="选择要过滤的文件 - AllCallFlow",
+            filetypes=[("文本文件", "*.txt"), ("所有文件", "*.*")],
+            parent=self.app.root
+        )
+        
+        if not source_file:
+            messagebox.showinfo("取消", "用户取消文件选择")
+            return False
+        
+        # 先执行主要的AllCallFlow过滤
+        result = self.process_file_filter(keywords, 'AllCallFlow', source_file=source_file)
+        
+        # 额外调用其他过滤函数，传递相同的源文件路径
+        try:
+            self.filter_ims_signalling(source_file)
+            self.filter_uicallstate(source_file)
+            self.filter_callstate(source_file)
+            self.filter_callid(source_file)
+        except Exception as e:
+            print(f"[DEBUG] 额外过滤函数调用失败: {str(e)}")
+        
+        return result
