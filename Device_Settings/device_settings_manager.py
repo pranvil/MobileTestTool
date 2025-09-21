@@ -1954,3 +1954,169 @@ class DeviceSettingsManager:
         except Exception as e:
             messagebox.showerror("错误", f"删除bugreport失败: {str(e)}")
             return False
+    
+    def show_input_text_dialog(self):
+        """显示输入文本对话框"""
+        try:
+            # 检查设备连接
+            device = self.app.device_manager.validate_device_selection()
+            if not device:
+                return False
+            
+            # 创建设备选择对话框
+            dialog = tk.Toplevel(self.app.root)
+            dialog.title("输入文本到设备")
+            dialog.geometry("500x400")
+            dialog.resizable(True, True)
+            dialog.transient(self.app.root)
+            dialog.grab_set()  # 模态对话框
+            
+            # 居中显示
+            dialog.geometry("+%d+%d" % (
+                self.app.root.winfo_rootx() + (self.app.root.winfo_width() - 500) // 2,
+                self.app.root.winfo_rooty() + (self.app.root.winfo_height() - 400) // 2
+            ))
+            
+            # 主框架
+            main_frame = ttk.Frame(dialog, padding="20")
+            main_frame.pack(fill=tk.BOTH, expand=True)
+            
+            # 标题
+            title_label = ttk.Label(main_frame, text="输入文本到Android设备", font=('Arial', 14, 'bold'))
+            title_label.pack(pady=(0, 15))
+            
+            # 说明文本
+            info_label = ttk.Label(main_frame, 
+                                 text="请在下方输入框中输入要发送到设备的文本。\n"
+                                      "注意：空格和特殊字符会被正确处理。", 
+                                 font=('Arial', 10))
+            info_label.pack(pady=(0, 15))
+            
+            # 文本输入框架
+            text_frame = ttk.LabelFrame(main_frame, text="输入文本", padding="10")
+            text_frame.pack(fill=tk.BOTH, expand=True, pady=(0, 15))
+            
+            # 文本输入框
+            text_input = tk.Text(text_frame, height=8, wrap=tk.WORD, font=('Arial', 11))
+            scrollbar = ttk.Scrollbar(text_frame, orient=tk.VERTICAL, command=text_input.yview)
+            text_input.configure(yscrollcommand=scrollbar.set)
+            
+            text_input.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+            scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+            
+            # 按钮框架
+            button_frame = ttk.Frame(main_frame)
+            button_frame.pack(fill=tk.X, pady=(15, 0))
+            
+            def on_send():
+                text_to_send = text_input.get(1.0, tk.END).strip()
+                if not text_to_send:
+                    messagebox.showwarning("输入错误", "请输入要发送的文本")
+                    return
+                
+                # 发送文本
+                success = self._send_text_to_device(device, text_to_send)
+                if success:
+                    messagebox.showinfo("成功", "文本已成功发送到设备")
+                    # 不关闭窗口，让用户主动关闭
+                else:
+                    messagebox.showerror("失败", "文本发送失败，请检查设备连接")
+            
+            def on_clear():
+                text_input.delete(1.0, tk.END)
+            
+            def on_cancel():
+                dialog.destroy()
+            
+            ttk.Button(button_frame, text="发送", command=on_send).pack(side=tk.RIGHT, padx=(5, 0))
+            ttk.Button(button_frame, text="清空", command=on_clear).pack(side=tk.RIGHT, padx=(5, 0))
+            ttk.Button(button_frame, text="取消", command=on_cancel).pack(side=tk.RIGHT)
+            
+            # 绑定快捷键
+            text_input.bind('<Control-Return>', lambda e: on_send())
+            dialog.bind('<Escape>', lambda e: on_cancel())
+            
+            # 设置焦点
+            text_input.focus()
+            
+            return True
+            
+        except Exception as e:
+            messagebox.showerror("错误", f"打开输入文本对话框失败: {str(e)}")
+            return False
+    
+    def _send_text_to_device(self, device, text):
+        """发送文本到设备"""
+        try:
+            # 处理特殊字符和空格
+            # adb shell input text 对某些字符有限制，需要特殊处理
+            processed_text = self._process_text_for_adb(text)
+            
+            # 构建adb命令
+            cmd = f"adb -s {device} shell input text '{processed_text}'"
+            
+            # 执行命令
+            result = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=10)
+            
+            if result.returncode == 0:
+                print(f"[DEBUG] 文本发送成功: {text}")
+                return True
+            else:
+                print(f"[DEBUG] 文本发送失败: {result.stderr}")
+                return False
+                
+        except subprocess.TimeoutExpired:
+            print("[DEBUG] 文本发送超时")
+            return False
+        except Exception as e:
+            print(f"[DEBUG] 文本发送异常: {str(e)}")
+            return False
+    
+    def _process_text_for_adb(self, text):
+        """处理文本以适配adb input text命令"""
+        try:
+            # adb shell input text 的限制：
+            # 1. 空格需要用%s表示
+            # 2. 某些特殊字符需要转义
+            # 3. 单引号需要特殊处理
+            
+            # 替换空格
+            processed = text.replace(' ', '%s')
+            
+            # 处理其他特殊字符
+            # 替换常见的需要转义的字符
+            char_replacements = {
+                '&': '%s&%s',
+                '(': '%s(%s',
+                ')': '%s)%s',
+                ';': '%s;%s',
+                '|': '%s|%s',
+                '*': '%s*%s',
+                '?': '%s?%s',
+                '<': '%s<%s',
+                '>': '%s>%s',
+                '[': '%s[%s',
+                ']': '%s]%s',
+                '{': '%s{%s',
+                '}': '%s}%s',
+                '^': '%s^%s',
+                '~': '%s~%s',
+                '`': '%s`%s',
+                '"': '%s"%s',
+                "'": "\\'",  # 单引号特殊处理
+
+            }
+            
+            # 应用字符替换
+            for char, replacement in char_replacements.items():
+                if char in processed:
+                    processed = processed.replace(char, replacement)
+            
+            # 清理多余的空格标记
+            processed = processed.replace('%s%s', '%s')
+            
+            return processed
+            
+        except Exception as e:
+            print(f"[DEBUG] 文本处理失败: {str(e)}")
+            return text  # 如果处理失败，返回原始文本
