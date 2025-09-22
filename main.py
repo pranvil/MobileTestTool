@@ -12,7 +12,7 @@ from tkinter import ttk
 # 导入自定义模块
 from ui_manager import UIManager
 from Device_Control import DeviceManager, MTKLogManager, ScreenshotManager, VideoManager
-from Device_Control.network_info_manager import NetworkInfoManager
+from Network_info.network_info_manager import NetworkInfoManager
 from Device_Control.enable_telephony import TelephonyManager
 from Log_Filter import LogProcessor, SearchManager, ADBLogManager
 from Log_Filter.google_log import GoogleLogManager
