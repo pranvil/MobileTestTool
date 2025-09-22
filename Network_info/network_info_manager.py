@@ -18,12 +18,16 @@ from .telephony_parser import compute_rows_for_registry, COLS
 from .utilities_ping import PingManager
 from .utilities_wifi_info import WifiInfoParser
 
+# 常量定义
+REFRESH_INTERVAL = 1.0  # 刷新间隔（秒）
+
 class NetworkInfoManager:
     def __init__(self, app_instance):
         self.app = app_instance
         self.is_running = False
         self.network_info_thread = None
         self.rows_data = []  # List[Dict] - 解析后的行数据
+        self.last_rows_data = []  # 上次的行数据，用于比较变化
         
         # 初始化工具模块
         self.ping_manager = PingManager(app_instance)
@@ -87,6 +91,20 @@ class NetworkInfoManager:
         except Exception as e:
             print(f"获取网络快照失败: {e}")
     
+    def _has_data_changed(self) -> bool:
+        """检查数据是否有变化"""
+        if len(self.rows_data) != len(self.last_rows_data):
+            return True
+        
+        # 比较每行数据的关键字段
+        for i, (current, last) in enumerate(zip(self.rows_data, self.last_rows_data)):
+            # 比较关键字段
+            key_fields = ['SIM', 'CC', 'RAT', 'BAND', 'DL_ARFCN', 'PCI', 'RSRP', 'RSRQ', 'SINR', 'RSSI']
+            for field in key_fields:
+                if current.get(field) != last.get(field):
+                    return True
+        
+        return False
     
     def start_network_info(self):
         """开始获取网络信息"""
@@ -121,15 +139,19 @@ class NetworkInfoManager:
                 # 获取网络信息快照
                 self._get_network_snapshot(device)
                 
-                # 更新UI显示
-                self.app.root.after(0, self._update_network_display)
+                # 检查数据是否有变化
+                if self._has_data_changed():
+                    # 只在数据变化时更新UI显示
+                    self.app.root.after(0, self._update_network_display)
+                    # 更新上次数据
+                    self.last_rows_data = [row.copy() for row in self.rows_data]
                 
-                # 每2秒更新一次
-                time.sleep(2)
+                # 使用常量定义的刷新间隔
+                time.sleep(REFRESH_INTERVAL)
                 
             except Exception as e:
                 print(f"获取网络信息时发生错误: {e}")
-                time.sleep(2)
+                time.sleep(REFRESH_INTERVAL)
     
     def _update_network_display(self):
         """更新网络信息显示"""

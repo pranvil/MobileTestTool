@@ -25,7 +25,7 @@ from Device_Settings.tcpdump_capture import TCPDumpManager
 class LogcatFilterApp:
     def __init__(self, root):
         self.root = root
-        self.root.title("手机测试辅助工具 v2.1")
+        self.root.title("手机测试辅助工具 v2.0")
         self.root.geometry("1200x800")
         self.root.minsize(800, 600)
         

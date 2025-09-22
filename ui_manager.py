@@ -846,7 +846,7 @@ class UIManager:
         """显示关于对话框"""
         messagebox.showinfo("关于", 
             "手机测试辅助工具\n\n"
-            "版本: 2.1\n"
+            "版本: 2.0\n"
             "功能: Android设备日志管理和MTKLOG操作\n\n"
             "主要功能:\n"
             "• 实时过滤Android设备日志\n"

@@ -32,27 +32,150 @@ def _extract_key_values(text: str) -> Dict[str, str]:
     matches = re.findall(pattern, text)
     return {k: v.strip() for k, v in matches}
 
+def _parse_phone_metadata(raw: str) -> Dict[str, Any]:
+    """解析Phone元数据：活跃SIM判断所需的关键字段"""
+    metadata = {
+        'active_data_sub_id': None,
+        'default_sub_id': None,
+        'default_phone_id': None,
+        'phone_states': {}  # {phone_id: {radio_power, service_state, network, data_state, has_channels}}
+    }
+    
+    # 解析全局字段
+    active_data_match = re.search(r'mActiveDataSubId=(\d+)', raw)
+    if active_data_match:
+        metadata['active_data_sub_id'] = int(active_data_match.group(1))
+    
+    default_sub_match = re.search(r'mDefaultSubId=(\d+)', raw)
+    if default_sub_match:
+        metadata['default_sub_id'] = int(default_sub_match.group(1))
+    
+    default_phone_match = re.search(r'mDefaultPhoneId=(\d+)', raw)
+    if default_phone_match:
+        metadata['default_phone_id'] = int(default_phone_match.group(1))
+    
+    # 解析每个Phone Id的状态
+    phone_pattern = r'Phone Id=(\d+)(.*?)(?=Phone Id=\d+|$)'
+    for match in re.finditer(phone_pattern, raw, re.DOTALL):
+        phone_id = int(match.group(1))
+        phone_content = match.group(2)
+        
+        phone_state = {
+            'radio_power': None,
+            'service_state': None,
+            'network': None,
+            'data_state': None,
+            'has_channels': False
+        }
+        
+        # 解析mRadioPowerState
+        radio_match = re.search(r'mRadioPowerState=(\d+)', phone_content)
+        if radio_match:
+            phone_state['radio_power'] = int(radio_match.group(1))
+        
+        # 解析mServiceState - 需要更精确的匹配
+        service_match = re.search(r'mServiceState=\{.*?mVoiceRegState=(\d+)\(([^)]+)\).*?mDataRegState=(\d+)\(([^)]+)\)', phone_content, re.DOTALL)
+        if service_match:
+            voice_reg_state = int(service_match.group(1))
+            voice_state = service_match.group(2)
+            data_reg_state = int(service_match.group(3))
+            data_state = service_match.group(4)
+            
+            # 如果语音或数据状态为IN_SERVICE，则认为服务状态正常
+            if voice_state == 'IN_SERVICE' or data_state == 'IN_SERVICE':
+                phone_state['service_state'] = 'IN_SERVICE'
+            elif voice_state == 'POWER_OFF' or data_state == 'POWER_OFF':
+                phone_state['service_state'] = 'POWER_OFF'
+            else:
+                phone_state['service_state'] = 'UNKNOWN'
+        
+        # 解析mTelephonyDisplayInfo.network
+        network_match = re.search(r'mTelephonyDisplayInfo.*?network=([A-Z_]+)', phone_content)
+        if network_match:
+            phone_state['network'] = network_match.group(1)
+        
+        # 解析mDataConnectionState
+        data_match = re.search(r'mDataConnectionState=(\d+)', phone_content)
+        if data_match:
+            phone_state['data_state'] = int(data_match.group(1))
+        
+        # 检查是否有PhysicalChannelConfigs
+        if 'mPhysicalChannelConfigs=[' in phone_content and 'mPhysicalChannelConfigs=[]' not in phone_content:
+            phone_state['has_channels'] = True
+        
+        metadata['phone_states'][phone_id] = phone_state
+    
+    return metadata
+
+def _get_active_phone_ids(metadata: Dict[str, Any]) -> List[int]:
+    """按优先级选择活跃的Phone Id - 支持多SIM显示"""
+    active_phones = []
+    phone_states = metadata['phone_states']
+    
+    # 首先添加所有活跃的Phone（支持多SIM）
+    for phone_id, phone_state in phone_states.items():
+        # 判断是否为活跃状态
+        is_active = False
+        
+        # 条件1: mRadioPowerState==1 且 mServiceState 为 IN_SERVICE
+        if (phone_state['radio_power'] == 1 and 
+            phone_state['service_state'] == 'IN_SERVICE'):
+            is_active = True
+        
+        # 条件2: mPhysicalChannelConfigs 非空
+        elif phone_state['has_channels']:
+            is_active = True
+        
+        # 条件3: mTelephonyDisplayInfo.network != UNKNOWN 或 mDataConnectionState==2
+        elif (phone_state['network'] != 'UNKNOWN' or 
+              phone_state['data_state'] == 2):
+            is_active = True
+        
+        if is_active and phone_id not in active_phones:
+            active_phones.append(phone_id)
+    
+    # 如果没有任何活跃的Phone，尝试优先级1的逻辑
+    if not active_phones:
+        target_phone_ids = []
+        if metadata['active_data_sub_id'] is not None:
+            target_phone_ids.append(metadata['active_data_sub_id'])
+        if metadata['default_sub_id'] is not None:
+            target_phone_ids.append(metadata['default_sub_id'])
+        if metadata['default_phone_id'] is not None:
+            target_phone_ids.append(metadata['default_phone_id'])
+        
+        for phone_id in target_phone_ids:
+            if phone_id in phone_states and phone_id not in active_phones:
+                phone_state = phone_states[phone_id]
+                # 检查是否为有效状态（非POWER_OFF/UNKNOWN）
+                if (phone_state['service_state'] not in ['POWER_OFF', 'UNKNOWN'] and 
+                    phone_state['network'] != 'UNKNOWN'):
+                    active_phones.append(phone_id)
+    
+    return active_phones
+
 def _segment_by_phone_or_physical(raw: str) -> List[str]:
-    """分段：先Phone Id=，无则用最后一个非空PhysicalChannel块"""
-    # 1) 尝试Phone Id分段
+    """分段：只返回活跃的Phone Id段"""
+    # 1) 解析Phone元数据，获取活跃的Phone Id
+    metadata = _parse_phone_metadata(raw)
+    active_phone_ids = _get_active_phone_ids(metadata)
+    
+    if not active_phone_ids:
+        # 如果没有活跃的Phone，返回空列表
+        return []
+    
+    # 2) 根据活跃的Phone Id提取对应的段
+    sections = []
     phone_matches = list(re.finditer(r'Phone Id=(\d+)', raw))
-    if phone_matches:
-        sections = []
-        for i, match in enumerate(phone_matches):
+    
+    for i, match in enumerate(phone_matches):
+        phone_id = int(match.group(1))
+        if phone_id in active_phone_ids:
             start_pos = match.start()
             end_pos = phone_matches[i + 1].start() if i + 1 < len(phone_matches) else len(raw)
             sections.append(raw[start_pos:end_pos])
-        return sections
     
-    # 2) 备用方案：PhysicalChannel块分段
-    blocks = []
-    for m in re.finditer(r"mPhysicalChannelConfigs=\[(.*?)\]", raw, re.DOTALL):
-        content = m.group(1).strip()
-        if content:  # 只保留非空块
-            blocks.append("mPhysicalChannelConfigs=[" + content + "]")
-    
-    # 取最后2个非空块作为SIM1/SIM2
-    return blocks[-2:] if len(blocks) >= 2 else blocks[:1] if blocks else [raw]
+    return sections
 
 def _parse_physical_channels(section: str) -> List[Dict]:
     """解析PhysicalChannel配置"""
@@ -206,35 +329,35 @@ def _parse_cellinfo_fallback(section: str) -> List[Dict]:
     
     return cell_infos
 
+def _primary_first(chs: List[Dict]) -> List[Dict]:
+    """把主小区放到列表第一位：优先按 PrimaryServing，兜底按 DL 带宽最大"""
+    if not chs:
+        return []
+    primary = next((c for c in chs if c.get('connection_status') == 'PrimaryServing'), None)
+    if not primary:
+        primary = max(chs, key=lambda x: (x.get('bw_dl') or 0, x.get('dl_arfcn') or -1))
+    rest = [c for c in chs if c is not primary]
+    return [primary] + rest
+
 def _build_ca_endc_summary(lte_channels: List[Dict], nr_channels: List[Dict]) -> str:
     """构建CA/ENDC摘要"""
-    lte_count = len(lte_channels)
-    nr_count = len(nr_channels)
-    
-    if lte_count > 0 and nr_count > 0:
-        # ENDC情况
-        lte_bands = [f"b{c['band']}" for c in lte_channels if c.get('band')]
-        nr_bands = [f"n{c['band']}" for c in nr_channels if c.get('band')]
-        band_str = "_".join(sorted(lte_bands + nr_bands))
-        return f"EN_DC_{band_str}"
-    elif lte_count > 1:
-        # LTE CA
-        lte_bands = [f"b{c['band']}" for c in lte_channels if c.get('band')]
-        band_str = "_".join(sorted(lte_bands))
-        return f"CA_{band_str}"
-    elif lte_count == 1:
-        # 单LTE
-        band = lte_channels[0].get('band')
-        return f"LTE_b{band}" if band else "LTE_b?"
-    elif nr_count > 1:
-        # NR CA
-        nr_bands = [f"n{c['band']}" for c in nr_channels if c.get('band')]
-        band_str = "_".join(sorted(nr_bands))
-        return f"CA_{band_str}"
-    elif nr_count == 1:
-        # 单NR
-        band = nr_channels[0].get('band')
-        return f"NR_n{band}" if band else "NR_n?"
+    lte_ordered = _primary_first([c for c in lte_channels if c.get('band')])
+    nr_ordered = _primary_first([c for c in nr_channels if c.get('band')])
+
+    lte_bands = [f"b{c['band']}" for c in lte_ordered]
+    nr_bands = [f"n{c['band']}" for c in nr_ordered]
+
+    if lte_bands and nr_bands:
+        # ENDC：先 LTE（PCC,SCC...），再 NR（SpCell,SCells...）
+        return "EN_DC_" + "_".join(lte_bands + nr_bands)
+    elif len(nr_bands) > 1:
+        return "CA_" + "_".join(nr_bands)          # NR CA（主->辅）
+    elif len(lte_bands) > 1:
+        return "CA_" + "_".join(lte_bands)         # LTE CA（主->辅）
+    elif nr_bands:
+        return f"NR_{nr_bands[0]}"
+    elif lte_bands:
+        return f"LTE_{lte_bands[0]}"
     else:
         return "No active carriers"
 
@@ -347,7 +470,8 @@ def _build_rows(channels: List[Dict], signal_data: Dict, cell_infos: List[Dict],
     
     # NR载波
     if nr_channels:
-        primary_nr = max(nr_channels, key=lambda x: x['bw_dl'])
+        primary_nr = next((c for c in nr_channels if c.get('connection_status') == 'PrimaryServing'), None) \
+                     or max(nr_channels, key=lambda x: (x.get('bw_dl') or 0, x.get('dl_arfcn') or -1))
         
         row = {
             'SIM': sim_name,
@@ -400,12 +524,23 @@ def compute_rows_for_registry(raw: str) -> List[Dict]:
     """主入口：计算telephony.registry的行数据"""
     all_rows = []
     
-    # 1. 分段
+    # 1. 分段（只返回活跃的Phone Id段）
     sections = _segment_by_phone_or_physical(raw)
+    
+    # 调试信息
+    if not sections:
+        print("警告：没有检测到活跃的SIM卡")
+        return all_rows
     
     # 2. 为每个段构建行
     for idx, section in enumerate(sections):
-        sim_name = f"SIM{idx + 1}"
+        # 从section中提取Phone Id来确定SIM名称
+        phone_id_match = re.search(r'Phone Id=(\d+)', section)
+        if phone_id_match:
+            phone_id = int(phone_id_match.group(1))
+            sim_name = f"SIM{phone_id + 1}"  # Phone Id=0 -> SIM1, Phone Id=1 -> SIM2
+        else:
+            sim_name = f"SIM{idx + 1}"  # 备用方案
         
         # 3. 解析各个组件
         channels = _parse_physical_channels(section)
