@@ -250,7 +250,7 @@ def _build_rows(channels: List[Dict], signal_data: Dict, cell_infos: List[Dict],
                 
             row = {
                 'SIM': sim_name,
-                'CC': 'PCC' if cell['type'] == 'LTE' else 'SpCell',
+                'CC': 'PCC' if cell['type'] == 'LTE' else 'PCell',  # IDLE场景下NR用PCell而不是SpCell
                 'RAT': cell['type'],
                 'BAND': f"B{cell['bands'][0]}" if cell['type'] == 'LTE' and cell.get('bands') else f"n{cell['bands'][0]}" if cell.get('bands') else '',
                 'DL_ARFCN': cell.get('earfcn', 0) if cell['type'] == 'LTE' else cell.get('nr_arfcn', 0),
@@ -380,7 +380,7 @@ def _build_rows(channels: List[Dict], signal_data: Dict, cell_infos: List[Dict],
             if channel != primary_nr:
                 row = {
                     'SIM': '',  # 副载波SIM列留空
-                    'CC': f"SCells#{scc_count}" if primary_lte else f"SCC{scc_count}",
+                    'CC': f"SCell#{scc_count}",  # 无论ENDC还是NR-CA，NR的辅载波都叫SCell
                     'RAT': 'NR',
                     'BAND': f"n{channel['band']}",
                     'DL_ARFCN': channel['dl_arfcn'],
