@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-网络信息管理模块
-负责获取和显示设备网络信息
+网络信息管理模块 V2
+按照 ca_endc_table_multi_cmd_spec.json 规范重构
+负责获取和显示设备网络信息，支持CA/ENDC表格
 """
 
 import subprocess
@@ -12,94 +13,139 @@ import threading
 import time
 import re
 from datetime import datetime
+from typing import Dict, List, Optional, Tuple, Any
 
 MAXINT = 2147483647
+
+class CarrierInfo:
+    """载波信息类"""
+    def __init__(self):
+        self.sim = ""
+        self.cc = ""  # PCC/SCC1/SpCell/SCells#1
+        self.rat = ""  # LTE/NR
+        self.band = ""  # B66/n41
+        self.dl_arfcn = 0
+        self.ul_arfcn = 0
+        self.pci = 0
+        self.rsrp = None
+        self.rsrq = None
+        self.sinr = None
+        self.rssi = None
+        self.bw_dl = 0  # MHz
+        self.bw_ul = 0  # MHz
+        self.ca_endc = ""  # CA/ENDC摘要
+        self.cqi = None
+        self.note = ""
 
 class NetworkInfoManager:
     def __init__(self, app_instance):
         self.app = app_instance
         self.is_running = False
         self.network_info_thread = None
+        self.carriers_data = []  # List[CarrierInfo]
+        
+        # Ping相关变量
         self.is_ping_running = False
         self.ping_thread = None
         self.ping_process = None
-        self.network_info_data = {
-            'SIM1': {
-                'LTE': {
-                    'Band': '',
-                    'arfcn': '',
-                    'PCI': '',
-                    'rssi': '',
-                    'rsrp': '',
-                    'rsrq': '',
-                    'rssnr': ''
-                },
-                'NR': {
-                    'Band': '',
-                    'arfcn': '',
-                    'PCI': '',
-                    'ssRsrp': '',
-                    'ssRsrq': '',
-                    'ssSinr': '',
-                    'rssnr': ''
-                }
-            },
-            'SIM2': {
-                'LTE': {
-                    'Band': '',
-                    'arfcn': '',
-                    'PCI': '',
-                    'rssi': '',
-                    'rsrp': '',
-                    'rsrq': '',
-                    'rssnr': ''
-                },
-                'NR': {
-                    'Band': '',
-                    'arfcn': '',
-                    'PCI': '',
-                    'ssRsrp': '',
-                    'ssRsrq': '',
-                    'ssSinr': '',
-                    'rssnr': ''
-                }
-            },
-            'WIFI': {
-                'SSID': '',
-                'BSSID': '',
-                'RSSI': '',
-                'Freq': '',
-                'State': ''
-            }
-        }
         
         # 正则表达式模式
-        self.SIG_BLOCK_RE = re.compile(r"mSignalStrength=SignalStrength:\{", re.DOTALL)
-        self.PRIMARY_RE = re.compile(r"primary=(?P<primary>\w+)")
-        
-        self.LTE_SIG_RE = re.compile(
-            r"CellSignalStrengthLte:.*?rssi=(?P<rssi>-?\d+|%d).*?rsrp=(?P<rsrp>-?\d+|%d).*?rsrq=(?P<rsrq>-?\d+|%d).*?rssnr=(?P<rssnr>-?\d+|%d).*?ta=(?P<ta>-?\d+|%d).*?level=(?P<level>-?\d+)"
-            % (MAXINT, MAXINT, MAXINT, MAXINT, MAXINT),
-            re.DOTALL,
+        self._init_regex_patterns()
+    
+    def _init_regex_patterns(self):
+        """初始化正则表达式模式"""
+        # PhysicalChannel配置解析 - 使用贪婪匹配获取完整块
+        self.PHYSICAL_CHANNEL_RE = re.compile(
+            r"mPhysicalChannelConfigs=\[(.*?)\]",
+            re.DOTALL
         )
         
-        self.NR_SIG_RE = re.compile(
-            r"CellSignalStrengthNr:\{.*?ssRsrp\s*=\s*(?P<ssrsrp>-?\d+|%d).*?ssRsrq\s*=\s*(?P<ssrsrq>-?\d+|%d).*?ssSinr\s*=\s*(?P<sssinr>-?\d+|%d).*?level\s*=\s*(?P<level>-?\d+)"
-            % (MAXINT, MAXINT, MAXINT),
-            re.DOTALL,
+        self.CHANNEL_CONFIG_RE = re.compile(
+            r"\{mConnectionStatus=(?P<conn_status>\w+),"
+            r"mCellBandwidthDownlinkKhz=(?P<bw_dl>\d+),"
+            r"mCellBandwidthUplinkKhz=(?P<bw_ul>\d+),"
+            r"mNetworkType=(?P<rat>\w+),"
+            r"mFrequencyRange=(?P<freq_range>\w+),"
+            r"mDownlinkChannelNumber=(?P<dl_arfcn>\d+),"
+            r"mUplinkChannelNumber=(?P<ul_arfcn>\d+),"
+            r"mContextIds=\[.*?\],"
+            r"mPhysicalCellId=(?P<pci>\d+),"
+            r"mBand=(?P<band>\d+),"
+            r"mDownlinkFrequency=(?P<dl_freq>-?\d+),"
+            r"mUplinkFrequency=(?P<ul_freq>-?\d+)\}"
         )
         
-        self.LTE_ID_RE = re.compile(
-            r"CellIdentityLte:\{.*?mPci=(?P<pci>\d+).*?mTac=(?P<tac>\d+).*?mEarfcn=(?P<earfcn>\d+).*?mBands=\[(?P<bands>[^\]]*)\].*?mMcc=(?P<mcc>\d+).*?mMnc=(?P<mnc>\d+)",
-            re.DOTALL,
+        # SignalStrength解析
+        self.SIGNAL_STRENGTH_RE = re.compile(
+            r"mSignalStrength=SignalStrength:\{(.*?)\}",
+            re.DOTALL
         )
         
-        self.NR_ID_RE = re.compile(
-            r"CellIdentityNr:\{.*?mPci\s*=\s*(?P<pci>\d+).*?mTac\s*=\s*(?P<tac>\d+).*?mNrArfcn\s*=\s*(?P<nrarfcn>\d+).*?mBands\s*=\s*\[(?P<bands>[^\]]*)\].*?mMcc\s*=\s*(?P<mcc>null|\d+).*?mMnc\s*=\s*(?P<mnc>null|\d+).*?mNci\s*=\s*(?P<nci>\d+)",
-            re.DOTALL,
+        self.LTE_SIGNAL_RE = re.compile(
+            r"mLte=CellSignalStrengthLte:\s*"
+            r"rssi=(?P<rssi>-?\d+|%d)\s*"
+            r"rsrp=(?P<rsrp>-?\d+|%d)\s*"
+            r"rsrq=(?P<rsrq>-?\d+|%d)\s*"
+            r"rssnr=(?P<rssnr>-?\d+|%d)\s*"
+            r"cqiTableIndex=(?P<cqi_table>-?\d+|%d)\s*"
+            r"cqi=(?P<cqi>-?\d+|%d)\s*"
+            r"ta=(?P<ta>-?\d+|%d)\s*"
+            r"level=(?P<level>-?\d+)"
+            % (MAXINT, MAXINT, MAXINT, MAXINT, MAXINT, MAXINT, MAXINT),
+            re.DOTALL
         )
         
-        self.REG_FLAG_RE = re.compile(r"mRegistered=(?P<yesno>YES|NO)")
+        self.NR_SIGNAL_RE = re.compile(
+            r"mNr=CellSignalStrengthNr:\{.*?"
+            r"csiRsrp\s*=\s*(?P<csi_rsrp>-?\d+|%d).*?"
+            r"csiRsrq\s*=\s*(?P<csi_rsrq>-?\d+|%d).*?"
+            r"csiCqiTableIndex\s*=\s*(?P<csi_cqi_table>-?\d+|%d).*?"
+            r"csiCqiReport\s*=\s*\[(?P<csi_cqi_report>[^\]]*)\].*?"
+            r"ssRsrp\s*=\s*(?P<ss_rsrp>-?\d+|%d).*?"
+            r"ssRsrq\s*=\s*(?P<ss_rsrq>-?\d+|%d).*?"
+            r"ssSinr\s*=\s*(?P<ss_sinr>-?\d+|%d).*?"
+            r"level\s*=\s*(?P<level>-?\d+).*?"
+            r"parametersUseForLevel\s*=\s*(?P<params>-?\d+).*?"
+            r"timingAdvance\s*=\s*(?P<timing>-?\d+|%d).*?(?:\}|,primary=)"
+            % (MAXINT, MAXINT, MAXINT, MAXINT, MAXINT, MAXINT, MAXINT),
+            re.DOTALL
+        )
+        
+        # CellInfo解析 - 使用贪婪匹配获取完整块
+        self.CELL_INFO_RE = re.compile(
+            r"mCellInfo=\[(.*)\]",
+            re.DOTALL
+        )
+        
+        self.CELL_INFO_LTE_RE = re.compile(
+            r"CellInfoLte:\{.*?mRegistered=(?P<registered>\w+).*?"
+            r"CellIdentityLte:\{.*?"
+            r"mCi=(?P<ci>\d+).*?"
+            r"mPci=(?P<pci>\d+).*?"
+            r"mTac=(?P<tac>\d+).*?"
+            r"mEarfcn=(?P<earfcn>\d+).*?"
+            r"mBands=\[(?P<bands>[^\]]*)\].*?"
+            r"mBandwidth=(?P<bandwidth>-?\d+|%d).*?"
+            r"mMcc=(?P<mcc>\d+).*?"
+            r"mMnc=(?P<mnc>\d+).*?\}"
+            % MAXINT,
+            re.DOTALL
+        )
+        
+        self.CELL_INFO_NR_RE = re.compile(
+            r"CellInfoNr:\{.*?"
+            r"mRegistered=(?P<registered>\w+).*?"
+            r"CellIdentityNr:\{.*?"
+            r"mPci\s*=\s*(?P<pci>\d+).*?"
+            r"mTac\s*=\s*(?P<tac>-?\d+|%d).*?"
+            r"mNrArfcn\s*=\s*(?P<nr_arfcn>\d+).*?"
+            r"mBands\s*=\s*\[(?P<bands>[^\]]*)\].*?"
+            r"mMcc\s*=\s*(?P<mcc>null|\d+).*?"
+            r"mMnc\s*=\s*(?P<mnc>null|\d+).*?"
+            r"mNci\s*=\s*(?P<nci>\d+).*?\}"
+            % MAXINT,
+            re.DOTALL
+        )
         
         # WiFi正则表达式
         self.WIFI_BLOCK_RES = [
@@ -107,21 +153,666 @@ class NetworkInfoManager:
             re.compile(r"WifiInfo\{(?P<info>.*?)\}", re.DOTALL),
         ]
         
-        self.SSID_RE_LIST = [
+    def _to_int(self, value: Any) -> Optional[int]:
+        """转换为整数，处理MAXINT"""
+        if value is None:
+            return None
+        try:
+            iv = int(value)
+            return None if iv == MAXINT else iv
+        except:
+            return None
+    
+    def _val_ok(self, value: Any) -> bool:
+        """检查值是否有效"""
+        return value is not None and value != MAXINT
+    
+    def _run_adb(self, cmd: List[str]) -> str:
+        """运行ADB命令"""
+        try:
+            result = subprocess.run(
+                ["adb", "-s", self.app.selected_device.get().strip()] + cmd,
+                                  capture_output=True, text=True, timeout=10, 
+                creationflags=subprocess.CREATE_NO_WINDOW
+            )
+            if result.returncode == 0:
+                return result.stdout
+        except Exception as e:
+            print(f"ADB命令执行失败: {e}")
+        return ""
+    
+    def _parse_physical_channels(self, raw_data: str) -> List[Dict]:
+        """解析PhysicalChannel配置 - 支持多块解析，选择最后一个非空块"""
+        channels = []
+        
+        # 手动解析PhysicalChannel块，处理嵌套方括号
+        start_pattern = 'mPhysicalChannelConfigs=['
+        start_positions = []
+        
+        # 找到所有开始位置
+        pos = 0
+        while True:
+            pos = raw_data.find(start_pattern, pos)
+            if pos == -1:
+                break
+            start_positions.append(pos)
+            pos += len(start_pattern)
+        
+        if not start_positions:
+            return channels
+        
+        # 解析每个块
+        block_contents = []
+        for start_pos in start_positions:
+            content_start = start_pos + len(start_pattern)
+            remaining = raw_data[content_start:]
+            
+            # 找到匹配的结束位置
+            depth = 0
+            end_pos = content_start
+            for i, char in enumerate(remaining):
+                if char == '[':
+                    depth += 1
+                elif char == ']':
+                    if depth == 0:
+                        end_pos = content_start + i
+                        break
+                    depth -= 1
+            
+            content = raw_data[content_start:end_pos]
+            block_contents.append(content)
+        
+        # 选择最后一个非空块
+        chosen = None
+        for content in block_contents:
+            if not content.strip():
+                continue
+                
+            tmp = []
+            for m in self.CHANNEL_CONFIG_RE.finditer(content):
+                g = m.groupdict()
+                tmp.append({
+                    'connection_status': g['conn_status'],
+                    'bw_dl_khz': int(g['bw_dl']),
+                    'bw_ul_khz': int(g['bw_ul']),
+                    'rat': g['rat'],
+                    'freq_range': g['freq_range'],
+                    'dl_arfcn': int(g['dl_arfcn']),
+                    'ul_arfcn': int(g['ul_arfcn']),
+                    'pci': int(g['pci']),
+                    'band': int(g['band']),
+                    'dl_freq': int(g['dl_freq']),
+                    'ul_freq': int(g['ul_freq'])
+                })
+            if tmp:  # 记录最后一个非空块
+                chosen = tmp
+        
+        return chosen or []  # 没有非空块则空列表
+    
+    def _parse_signal_strength(self, raw_data: str) -> Dict:
+        """解析SignalStrength信息"""
+        signal_data = {'lte': {}, 'nr': {}}
+        
+        # 查找所有SignalStrength块
+        matches = self.SIGNAL_STRENGTH_RE.finditer(raw_data)
+        
+        for match in matches:
+            signal_text = match.group(1)
+            
+            # 解析LTE信号
+            lte_match = self.LTE_SIGNAL_RE.search(signal_text)
+            if lte_match:
+                lte_data = lte_match.groupdict()
+                # 只使用有效的信号强度数据（不是MAXINT）
+                if self._val_ok(self._to_int(lte_data['rsrp'])):
+                    signal_data['lte'] = {
+                        'rssi': self._to_int(lte_data['rssi']),
+                        'rsrp': self._to_int(lte_data['rsrp']),
+                        'rsrq': self._to_int(lte_data['rsrq']),
+                        'rssnr': self._to_int(lte_data['rssnr']),
+                        'cqi_table': self._to_int(lte_data['cqi_table']),
+                        'cqi': self._to_int(lte_data['cqi']),
+                        'ta': self._to_int(lte_data['ta']),
+                        'level': self._to_int(lte_data['level'])
+                    }
+            
+            # 解析NR信号 - 使用简化的方法
+            if "mNr=" in signal_text:
+                # 提取关键字段
+                ss_rsrp_match = re.search(r"ssRsrp\s*=\s*(-?\d+|%d)" % MAXINT, signal_text)
+                ss_rsrq_match = re.search(r"ssRsrq\s*=\s*(-?\d+|%d)" % MAXINT, signal_text)
+                ss_sinr_match = re.search(r"ssSinr\s*=\s*(-?\d+|%d)" % MAXINT, signal_text)
+                csi_cqi_report_match = re.search(r"csiCqiReport\s*=\s*\[([^\]]*)\]", signal_text)
+                
+                if ss_rsrp_match and self._val_ok(self._to_int(ss_rsrp_match.group(1))):
+                    signal_data['nr'] = {
+                        'csi_rsrp': None,
+                        'csi_rsrq': None,
+                        'csi_cqi_table': None,
+                        'csi_cqi_report': csi_cqi_report_match.group(1) if csi_cqi_report_match else None,
+                        'ss_rsrp': self._to_int(ss_rsrp_match.group(1)),
+                        'ss_rsrq': self._to_int(ss_rsrq_match.group(1)) if ss_rsrq_match else None,
+                        'ss_sinr': self._to_int(ss_sinr_match.group(1)) if ss_sinr_match else None,
+                        'level': None,
+                        'timing': None
+                    }
+        
+        return signal_data
+    
+    def _parse_cell_info(self, raw_data: str) -> List[Dict]:
+        """解析CellInfo信息 - 使用简化的字符串搜索方法"""
+        cell_infos = []
+        
+        # 查找CellInfo块
+        match = self.CELL_INFO_RE.search(raw_data)
+        if not match:
+            return cell_infos
+        
+        cell_info_text = match.group(1)
+        
+        # 简化的LTE CellInfo解析 - 使用字符串搜索
+        if "CellInfoLte:" in cell_info_text:
+            # 提取关键字段
+            registered_match = re.search(r"mRegistered=(\w+)", cell_info_text)
+            pci_match = re.search(r"mPci=(\d+)", cell_info_text)
+            earfcn_match = re.search(r"mEarfcn=(\d+)", cell_info_text)
+            bands_match = re.search(r"mBands=\[([^\]]*)\]", cell_info_text)
+            mcc_match = re.search(r"mMcc=(\d+)", cell_info_text)
+            mnc_match = re.search(r"mMnc=(\d+)", cell_info_text)
+            
+            if pci_match and earfcn_match:
+                cell_info = {
+                    'type': 'LTE',
+                    'registered': registered_match.group(1) == 'YES' if registered_match else False,
+                    'ci': 0,  # 简化处理
+                    'pci': int(pci_match.group(1)),
+                    'tac': 0,  # 简化处理
+                    'earfcn': int(earfcn_match.group(1)),
+                    'bands': [b.strip() for b in bands_match.group(1).split(',')] if bands_match else [],
+                    'bandwidth': None,  # CellInfo中没有带宽信息
+                    'mcc': mcc_match.group(1) if mcc_match else None,
+                    'mnc': mnc_match.group(1) if mnc_match else None
+                }
+                cell_infos.append(cell_info)
+        
+        # 简化的NR CellInfo解析 - 使用字符串搜索
+        if "CellInfoNr:" in cell_info_text:
+            # 提取关键字段
+            registered_match = re.search(r"mRegistered=(\w+)", cell_info_text)
+            pci_match = re.search(r"mPci\s*=\s*(\d+)", cell_info_text)
+            nr_arfcn_match = re.search(r"mNrArfcn\s*=\s*(\d+)", cell_info_text)
+            bands_match = re.search(r"mBands\s*=\s*\[([^\]]*)\]", cell_info_text)
+            mcc_match = re.search(r"mMcc\s*=\s*(null|\d+)", cell_info_text)
+            mnc_match = re.search(r"mMnc\s*=\s*(null|\d+)", cell_info_text)
+            
+            if pci_match and nr_arfcn_match:
+                cell_info = {
+                    'type': 'NR',
+                    'registered': registered_match.group(1) == 'YES' if registered_match else False,
+                    'pci': int(pci_match.group(1)),
+                    'tac': 0,  # 简化处理
+                    'nr_arfcn': int(nr_arfcn_match.group(1)),
+                    'bands': [b.strip() for b in bands_match.group(1).split(',')] if bands_match else [],
+                    'mcc': mcc_match.group(1) if mcc_match and mcc_match.group(1) != 'null' else None,
+                    'mnc': mnc_match.group(1) if mnc_match and mnc_match.group(1) != 'null' else None,
+                    'nci': 0  # 简化处理
+                }
+                cell_infos.append(cell_info)
+        
+        return cell_infos
+    
+    def _parse_wifi(self, raw_wifi):
+        """解析WiFi信息 - 参考backup文件实现更严格的连接状态判断"""
+        txt = None
+        for pat in self.WIFI_BLOCK_RES:
+            m = pat.search(raw_wifi)
+            if m:
+                txt = m.group("info")
+                break
+        if not txt:
+            txt = raw_wifi
+
+        def first_match(text, pats):
+            for p in pats:
+                m = p.search(text)
+                if m:
+                    return m.groupdict()
+            return {}
+
+        # 使用backup文件的正则表达式列表
+        ssid_re_list = [
             re.compile(r'SSID:\s*"(?P<ssid>[^"]*)"'),
             re.compile(r"SSID:\s*(?P<ssid><unknown ssid>|[^\s,}]+)"),
             re.compile(r"mSSID:\s*SSID\{(?P<ssid>[^}]*)\}"),
         ]
         
-        self.RSSI_RE_LIST = [
+        rssi_re_list = [
             re.compile(r"RSSI:\s*(?P<rssi>-?\d+)"), 
             re.compile(r"mRssi=\s*(?P<rssi>-?\d+)")
         ]
         
-        self.BSSID_RE = re.compile(r"BSSID:\s*(?P<bssid>[0-9a-fA-F:]{11,})")
-        self.LINKSPD_RE = re.compile(r"LinkSpeed:\s*(?P<ls>\d+)\s*Mbps")
-        self.FREQ_RE = re.compile(r"Frequency:\s*(?P<freq>\d+)")
-        self.SUPPL_RE = re.compile(r"Supplicant state:\s*(?P<state>\w+)", re.IGNORECASE)
+        bssid_re = re.compile(r"BSSID:\s*(?P<bssid>[0-9a-fA-F:]{11,})")
+        linkspd_re = re.compile(r"LinkSpeed:\s*(?P<ls>\d+)\s*Mbps")
+        freq_re = re.compile(r"Frequency:\s*(?P<freq>\d+)")
+        suppl_re = re.compile(r"Supplicant state:\s*(?P<state>\w+)", re.IGNORECASE)
+
+        ssid_m = first_match(txt, ssid_re_list)
+        rssi_m = first_match(txt, rssi_re_list)
+        bssid_m = bssid_re.search(txt) or {}
+        link_m = linkspd_re.search(txt) or {}
+        freq_m = freq_re.search(txt) or {}
+        supp_m = suppl_re.search(txt) or {}
+
+        ssid = (ssid_m.get("ssid") if ssid_m else None)
+        if ssid == "<unknown ssid>":
+            ssid = None
+
+        wifi = {
+            "ssid": ssid,
+            "rssi": self._to_int((rssi_m.get("rssi") if rssi_m else None)),
+            "bssid": (bssid_m.group("bssid") if hasattr(bssid_m, "group") else None),
+            "linkMbps": self._to_int((link_m.group("ls") if hasattr(link_m, "group") else None)),
+            "freqMHz": self._to_int((freq_m.group("freq") if hasattr(freq_m, "group") else None)),
+            "state": (supp_m.group("state") if hasattr(supp_m, "group") else None),
+        }
+        
+        band = None
+        if wifi["freqMHz"]:
+            f = wifi["freqMHz"]
+            if 2400 <= f < 2500:
+                band = "2.4GHz"
+            elif 4900 <= f < 5900:
+                band = "5GHz"
+            elif 5925 <= f < 7125:
+                band = "6GHz"
+        
+        wifi["band"] = band
+        # 更严格的连接状态判断：需要SSID、RSSI和有效的supplicant状态
+        wifi["connected"] = (
+            wifi["ssid"] is not None and 
+            wifi["rssi"] is not None and 
+            wifi["state"] is not None and
+            wifi["state"].lower() in ["completed", "associated"]
+        )
+        return wifi
+    
+    def _build_carrier_table(self, channels: List[Dict], signal_data: Dict, cell_infos: List[Dict]) -> List[CarrierInfo]:
+        """构建载波表格"""
+        carriers = []
+        
+        # 按SIM分组（简化处理，假设第一个SIM）
+        sim = "SIM1"
+        
+        # 分析CA/ENDC配置
+        lte_channels = [c for c in channels if c['rat'] == 'LTE']
+        nr_channels = [c for c in channels if c['rat'] == 'NR']
+        
+        # 如果没有PhysicalChannel配置（IDLE情况），尝试从CellInfo构建载波信息
+        if not channels and cell_infos:
+            return self._build_carrier_from_cellinfo(cell_infos, signal_data)
+        
+        # 确定主载波
+        primary_lte = None
+        primary_nr = None
+        
+        for channel in lte_channels:
+            if channel['connection_status'] == 'PrimaryServing':
+                primary_lte = channel
+                break
+        
+        for channel in nr_channels:
+            if channel['connection_status'] == 'PrimaryServing':
+                primary_nr = channel
+                break
+        
+        # 生成CA/ENDC摘要
+        ca_endc_summary = self._generate_ca_endc_summary(lte_channels, nr_channels)
+        
+        # 构建载波信息
+        if primary_lte:
+            # LTE主载波
+            carrier = CarrierInfo()
+            carrier.sim = sim
+            carrier.cc = "PCC"
+            carrier.rat = "LTE"
+            carrier.band = f"B{primary_lte['band']}"
+            carrier.dl_arfcn = primary_lte['dl_arfcn']
+            carrier.ul_arfcn = primary_lte['ul_arfcn']
+            carrier.pci = primary_lte['pci']
+            carrier.bw_dl = primary_lte['bw_dl_khz'] // 1000
+            carrier.bw_ul = primary_lte['bw_ul_khz'] // 1000
+            carrier.ca_endc = ca_endc_summary
+            
+            # 添加信号强度
+            if signal_data.get('lte'):
+                lte_sig = signal_data['lte']
+                carrier.rsrp = lte_sig.get('rsrp')
+                carrier.rsrq = lte_sig.get('rsrq')
+                carrier.sinr = lte_sig.get('rssnr')
+                carrier.rssi = lte_sig.get('rssi')
+                carrier.cqi = lte_sig.get('cqi')
+            
+            carrier.note = "Anchor LTE"
+            carriers.append(carrier)
+            
+            # LTE辅载波
+            scc_count = 1
+            for channel in lte_channels:
+                if channel['connection_status'] == 'SecondaryServing':
+                    carrier = CarrierInfo()
+                    carrier.sim = ""  # 副载波SIM列留空
+                    carrier.cc = f"SCC{scc_count}"
+                    carrier.rat = "LTE"
+                    carrier.band = f"B{channel['band']}"
+                    carrier.dl_arfcn = channel['dl_arfcn']
+                    carrier.ul_arfcn = channel['ul_arfcn']
+                    carrier.pci = channel['pci']
+                    carrier.bw_dl = channel['bw_dl_khz'] // 1000
+                    carrier.bw_ul = channel['bw_ul_khz'] // 1000
+                    carrier.ca_endc = ca_endc_summary
+                    carrier.note = "DL-only" if carrier.ul_arfcn == 0 else ""
+                    carriers.append(carrier)
+                    scc_count += 1
+        
+        # NR载波
+        if nr_channels:
+            # 确定主载波（最大带宽的NR载波）
+            primary_nr = max(nr_channels, key=lambda x: x['bw_dl_khz'])
+            
+            carrier = CarrierInfo()
+            carrier.sim = sim
+            # 如果有LTE主载波，NR是SpCell；如果没有LTE，NR是PCell
+            carrier.cc = "SpCell" if primary_lte else "PCell"
+            carrier.rat = "NR"
+            carrier.band = f"n{primary_nr['band']}"
+            carrier.dl_arfcn = primary_nr['dl_arfcn']
+            carrier.ul_arfcn = primary_nr['ul_arfcn']
+            carrier.pci = primary_nr['pci']
+            carrier.bw_dl = primary_nr['bw_dl_khz'] // 1000
+            carrier.bw_ul = primary_nr['bw_ul_khz'] // 1000
+            carrier.ca_endc = ca_endc_summary
+            
+            # 添加信号强度
+            if signal_data.get('nr'):
+                nr_sig = signal_data['nr']
+                carrier.rsrp = nr_sig.get('ss_rsrp')
+                carrier.rsrq = nr_sig.get('ss_rsrq')
+                carrier.sinr = nr_sig.get('ss_sinr')
+                carrier.cqi = nr_sig.get('csi_cqi_report')
+            
+            carrier.note = "Anchor NR" if not primary_lte else ""
+            carriers.append(carrier)
+            
+            # NR辅载波
+            scc_count = 1
+            for channel in nr_channels:
+                if channel != primary_nr:
+                    carrier = CarrierInfo()
+                    carrier.sim = ""  # 副载波SIM列留空
+                    # 如果有LTE主载波，NR辅载波是SCells；如果没有LTE，NR辅载波是SCC
+                    carrier.cc = f"SCells#{scc_count}" if primary_lte else f"SCC{scc_count}"
+                    carrier.rat = "NR"
+                    carrier.band = f"n{channel['band']}"
+                    carrier.dl_arfcn = channel['dl_arfcn']
+                    carrier.ul_arfcn = channel['ul_arfcn']
+                    carrier.pci = channel['pci']
+                    carrier.bw_dl = channel['bw_dl_khz'] // 1000
+                    carrier.bw_ul = channel['bw_ul_khz'] // 1000
+                    carrier.ca_endc = ca_endc_summary
+                    carrier.note = "DL-only" if carrier.ul_arfcn == 0 else ""
+                    carriers.append(carrier)
+                    scc_count += 1
+        
+        return carriers
+    
+    def _build_carrier_from_cellinfo(self, cell_infos: List[Dict], signal_data: Dict) -> List[CarrierInfo]:
+        """从CellInfo构建载波信息（用于IDLE情况）"""
+        carriers = []
+        sim = "SIM1"  # 简化处理
+        
+        # 按RAT分组
+        lte_cells = [c for c in cell_infos if c['type'] == 'LTE']
+        nr_cells = [c for c in cell_infos if c['type'] == 'NR']
+        
+        # 生成CA/ENDC摘要
+        ca_endc_summary = self._generate_ca_endc_summary(lte_cells, nr_cells)
+        
+        # 处理LTE小区
+        if lte_cells:
+            # 找到已注册的LTE小区
+            registered_lte = [c for c in lte_cells if c.get('registered', False)]
+            if registered_lte:
+                cell = registered_lte[0]  # 取第一个已注册的小区
+                carrier = CarrierInfo()
+                carrier.sim = sim
+                carrier.cc = "PCC"
+                carrier.rat = "LTE"
+                carrier.band = f"B{cell['bands'][0]}" if cell.get('bands') else ""
+                carrier.dl_arfcn = cell.get('earfcn', 0)
+                carrier.ul_arfcn = 0  # CellInfo中没有UL信息
+                carrier.pci = cell.get('pci', 0)
+                carrier.bw_dl = 0  # CellInfo中没有带宽信息
+                carrier.bw_ul = 0
+                carrier.ca_endc = ca_endc_summary
+                carrier.note = "IDLE状态"
+                
+                # 添加信号强度
+                if signal_data.get('lte'):
+                    lte_sig = signal_data['lte']
+                    carrier.rsrp = lte_sig.get('rsrp')
+                    carrier.rsrq = lte_sig.get('rsrq')
+                    carrier.sinr = lte_sig.get('rssnr')
+                    carrier.rssi = lte_sig.get('rssi')
+                    carrier.cqi = lte_sig.get('cqi')
+                
+                carriers.append(carrier)
+        
+        # 处理NR小区
+        if nr_cells:
+            # 找到已注册的NR小区
+            registered_nr = [c for c in nr_cells if c.get('registered', False)]
+            if registered_nr:
+                cell = registered_nr[0]  # 取第一个已注册的小区
+                carrier = CarrierInfo()
+                carrier.sim = sim
+                carrier.cc = "SpCell"
+                carrier.rat = "NR"
+                carrier.band = f"n{cell['bands'][0]}" if cell.get('bands') else ""
+                carrier.dl_arfcn = cell.get('nr_arfcn', 0)
+                carrier.ul_arfcn = 0  # CellInfo中没有UL信息
+                carrier.pci = cell.get('pci', 0)
+                carrier.bw_dl = 0  # CellInfo中没有带宽信息
+                carrier.bw_ul = 0
+                carrier.ca_endc = ca_endc_summary
+                carrier.note = "IDLE状态"
+                
+                # 添加信号强度
+                if signal_data.get('nr'):
+                    nr_sig = signal_data['nr']
+                    carrier.rsrp = nr_sig.get('ss_rsrp')
+                    carrier.rsrq = nr_sig.get('ss_rsrq')
+                    carrier.sinr = nr_sig.get('ss_sinr')
+                    carrier.cqi = nr_sig.get('csi_cqi_report')
+                
+                carriers.append(carrier)
+        
+        return carriers
+    
+    def _generate_ca_endc_summary(self, lte_channels: List[Dict], nr_channels: List[Dict]) -> str:
+        """生成CA/ENDC摘要 - 显示具体的band组合"""
+        lte_count = len(lte_channels)
+        nr_count = len(nr_channels)
+        
+        # 如果是CellInfo数据，需要特殊处理
+        if lte_count > 0 and isinstance(lte_channels[0], dict) and 'type' in lte_channels[0]:
+            # 这是CellInfo数据，不是PhysicalChannel数据
+            lte_count = len([c for c in lte_channels if c.get('registered', False)])
+            nr_count = len([c for c in nr_channels if c.get('registered', False)])
+        
+        if lte_count > 0 and nr_count > 0:
+            # ENDC情况：LTE + NR
+            lte_bands = []
+            nr_bands = []
+            for c in lte_channels:
+                if 'band' in c:
+                    lte_bands.append(f"b{c['band']}")
+                elif 'bands' in c and c['bands']:
+                    lte_bands.extend([f"b{b}" for b in c['bands']])
+            for c in nr_channels:
+                if 'band' in c:
+                    nr_bands.append(f"n{c['band']}")
+                elif 'bands' in c and c['bands']:
+                    nr_bands.extend([f"n{b}" for b in c['bands']])
+            band_str = "_".join(sorted(lte_bands + nr_bands))
+            return f"EN_DC_{band_str}"
+        elif lte_count > 1:
+            # LTE CA情况
+            lte_bands = []
+            for c in lte_channels:
+                if 'band' in c:
+                    lte_bands.append(f"b{c['band']}")
+                elif 'bands' in c and c['bands']:
+                    lte_bands.extend([f"b{b}" for b in c['bands']])
+            band_str = "_".join(sorted(lte_bands))
+            return f"CA_{band_str}"
+        elif lte_count == 1:
+            # 单LTE载波
+            c = lte_channels[0]
+            if 'band' in c:
+                lte_band = f"b{c['band']}"
+            elif 'bands' in c and c['bands']:
+                lte_band = f"b{c['bands'][0]}"
+            else:
+                lte_band = "b?"
+            return f"LTE_{lte_band}"
+        elif nr_count > 1:
+            # NR CA情况
+            nr_bands = []
+            for c in nr_channels:
+                if 'band' in c:
+                    nr_bands.append(f"n{c['band']}")
+                elif 'bands' in c and c['bands']:
+                    nr_bands.extend([f"n{b}" for b in c['bands']])
+            band_str = "_".join(sorted(nr_bands))
+            return f"CA_{band_str}"
+        elif nr_count == 1:
+            # 单NR载波
+            c = nr_channels[0]
+            if 'band' in c:
+                nr_band = f"n{c['band']}"
+            elif 'bands' in c and c['bands']:
+                nr_band = f"n{c['bands'][0]}"
+            else:
+                nr_band = "n?"
+            return f"NR_{nr_band}"
+        else:
+            return "No active carriers"
+    
+    def _get_network_snapshot(self, device: str):
+        """获取网络信息快照 - 按照dual_sim_patch_spec.json实现双SIM支持"""
+        try:
+            # 获取完整的telephony.registry数据
+            tel_raw = self._run_adb(["shell", "dumpsys", "telephony.registry"])
+            if not tel_raw:
+                return
+            
+            # 1) 尝试现有的phone-id分段
+            phone_sections = self._split_by_phone_id(tel_raw)
+            
+            # 2) 备用方案：如果phone-id分段不够，使用PhysicalChannel块分段
+            if len(phone_sections) <= 1:
+                phys_blocks = self._split_by_physical_blocks(tel_raw)
+                useful = []
+                for b in phys_blocks:
+                    try:
+                        carriers = self._parse_physical_channels(b)
+                        if carriers:
+                            useful.append(b)
+                    except Exception:
+                        continue
+                # 使用前2个有用的段作为SIM1/SIM2
+                phone_sections = useful[:2] if useful else [tel_raw]
+            
+            # 3) 为每个段构建行，分配SIM标签
+            all_carriers = []
+            for idx, section in enumerate(phone_sections):
+                sim_name = f"SIM{idx + 1}"
+                
+                # 解析各个组件
+                channels = self._parse_physical_channels(section)
+                signal_data = self._parse_signal_strength(section)
+                cell_infos = self._parse_cell_info(section)
+                
+                # 构建载波表格
+                carriers = self._build_carrier_table(channels, signal_data, cell_infos)
+                
+                # 更新SIM名称
+                for carrier in carriers:
+                    carrier.sim = sim_name
+                
+                all_carriers.extend(carriers)
+            
+            self.carriers_data = all_carriers
+            
+            # 获取WiFi信息
+            try:
+                wifi_raw = self._run_adb(["shell", "dumpsys", "wifi"])
+                if wifi_raw:
+                    wifi = self._parse_wifi(wifi_raw)
+                    # 将WiFi信息添加到载波数据中
+                    if wifi.get('connected'):
+                        wifi_carrier = CarrierInfo()
+                        wifi_carrier.sim = "WIFI"
+                        wifi_carrier.cc = "WIFI"
+                        wifi_carrier.rat = "WIFI"
+                        wifi_carrier.band = wifi.get('band', '')
+                        wifi_carrier.dl_arfcn = wifi.get('freqMHz', 0)
+                        wifi_carrier.ul_arfcn = 0
+                        wifi_carrier.pci = 0
+                        wifi_carrier.rsrp = None  # WIFI没有RSRP
+                        wifi_carrier.rsrq = None
+                        wifi_carrier.sinr = None
+                        wifi_carrier.rssi = wifi.get('rssi')  # WIFI只有RSSI
+                        wifi_carrier.bw_dl = 0
+                        wifi_carrier.bw_ul = 0
+                        wifi_carrier.ca_endc = ""  # WIFI不需要CA_ENDC_Comb
+                        wifi_carrier.cqi = None
+                        wifi_carrier.note = f"SSID: {wifi.get('ssid', '')}"
+                        self.carriers_data.append(wifi_carrier)
+            except Exception as e:
+                print(f"获取WiFi信息失败: {e}")
+                        
+        except Exception as e:
+            print(f"获取网络快照失败: {e}")
+    
+    def _split_by_phone_id(self, raw_data: str) -> List[str]:
+        """按Phone Id分段数据"""
+        import re
+        
+        # 查找所有Phone Id=的位置
+        phone_id_pattern = r'Phone Id=(\d+)'
+        phone_id_matches = list(re.finditer(phone_id_pattern, raw_data))
+        
+        if not phone_id_matches:
+            return [raw_data]  # 如果没有找到Phone Id，返回整个数据
+        
+        sections = []
+        for i, match in enumerate(phone_id_matches):
+            start_pos = match.start()
+            # 下一个Phone Id的位置，如果没有就是文件结尾
+            end_pos = phone_id_matches[i + 1].start() if i + 1 < len(phone_id_matches) else len(raw_data)
+            
+            section = raw_data[start_pos:end_pos]
+            sections.append(section)
+        
+        return sections
+    
+    def _split_by_physical_blocks(self, raw: str) -> List[str]:
+        """按PhysicalChannel块分段数据 - 作为Phone Id分段的备用方案"""
+        blocks = []
+        for m in re.finditer(r"mPhysicalChannelConfigs=\[(.*?)\]", raw, re.DOTALL):
+            blocks.append("mPhysicalChannelConfigs=[" + m.group(1) + "]")
+        return blocks
     
     def start_network_info(self):
         """开始获取网络信息"""
@@ -160,299 +851,11 @@ class NetworkInfoManager:
                 self.app.root.after(0, self._update_network_display)
                 
                 # 每2秒更新一次
-                time.sleep(1)
+                time.sleep(2)
                 
             except Exception as e:
                 print(f"获取网络信息时发生错误: {e}")
                 time.sleep(2)
-    
-    def _run_adb(self, cmd):
-        """运行ADB命令"""
-        try:
-            result = subprocess.run(["adb", "-s", self.app.selected_device.get().strip(), "shell"] + cmd, 
-                                  capture_output=True, text=True, timeout=10, 
-                                  creationflags=subprocess.CREATE_NO_WINDOW)
-            if result.returncode == 0:
-                return result.stdout
-        except Exception as e:
-            print(f"ADB命令执行失败: {e}")
-        return ""
-    
-    def _to_int(self, v):
-        """转换为整数，处理MAXINT"""
-        if v is None:
-            return None
-        try:
-            iv = int(v)
-            return None if iv == MAXINT else iv
-        except:
-            return None
-    
-    def _val_ok(self, v):
-        """检查值是否有效"""
-        return v is not None
-    
-    def _split_segments(self, raw):
-        """按每个 mSignalStrength 起点分段"""
-        starts = [m.start() for m in self.SIG_BLOCK_RE.finditer(raw)]
-        if not starts:
-            return []
-        bounds = []
-        for i, s in enumerate(starts):
-            e = starts[i+1] if i+1 < len(starts) else len(raw)
-            bounds.append(raw[s:e])
-        return bounds
-    
-    def _parse_signal_from_segment(self, seg):
-        """从段内解析 mSignalStrength 的 LTE/NR 数值 + primary"""
-        primary = None
-        mpri = self.PRIMARY_RE.search(seg)
-        if mpri:
-            primary = mpri.group("primary")
-
-        lte = nr = None
-        ml = self.LTE_SIG_RE.search(seg)
-        if ml:
-            lte = {k: self._to_int(ml.group(k)) for k in ("rssi", "rsrp", "rsrq", "rssnr", "ta", "level")}
-            if not any(self._val_ok(v) for v in lte.values()):
-                lte = None
-
-        mn = self.NR_SIG_RE.search(seg)
-        if mn:
-            nr = {
-                "ssRsrp": self._to_int(mn.group("ssrsrp")),
-                "ssRsrq": self._to_int(mn.group("ssrsrq")),
-                "ssSinr": self._to_int(mn.group("sssinr")),
-                "level": self._to_int(mn.group("level"))
-            }
-            if not any(self._val_ok(v) for v in (nr["ssRsrp"], nr["ssRsrq"], nr["ssSinr"])):
-                nr = None
-
-        return {"primary": primary, "lte": lte, "nr": nr}
-    
-    def _iter_cellinfo_chunks(self, seg, kind="NR"):
-        """粗切片：从 'CellInfoNr:{' 或 'CellInfoLte:{' 到下一个 CellInfo/Signal/Carrier 标记"""
-        start_tag = "CellInfoNr:{" if kind == "NR" else "CellInfoLte:{"
-        i = 0
-        while True:
-            s = seg.find(start_tag, i)
-            if s < 0:
-                break
-            # 下一个边界
-            nexts = []
-            for tag in ("CellInfoNr:{", "CellInfoLte:{", "mCarrierRoaming", "mSignalStrength=", "mPhysicalChannelConfigs="):
-                p = seg.find(tag, s+1)
-                if p != -1:
-                    nexts.append(p)
-            e = min(nexts) if nexts else len(seg)
-            yield seg[s:e]
-            i = s + 1
-    
-    def _parse_cellinfo_from_segment(self, seg):
-        """返回 (best_nr, best_lte)，优先 registered=YES；否则按 RSRP 最大"""
-        nrs, ltes = [], []
-
-        for chunk in self._iter_cellinfo_chunks(seg, "NR"):
-            reg = self.REG_FLAG_RE.search(chunk)
-            idm = self.NR_ID_RE.search(chunk)
-            sgm = self.NR_SIG_RE.search(chunk)
-            entry = {
-                "type": "NR",
-                "registered": (reg and reg.group("yesno") == "YES"),
-                "pci": self._to_int(idm.group("pci")) if idm else None,
-                "tac": self._to_int(idm.group("tac")) if idm else None,
-                "nrarfcn": self._to_int(idm.group("nrarfcn")) if idm else None,
-                "bands": [b.strip() for b in (idm.group("bands") if idm else "").split(",")] if idm else [],
-                "mcc": None if not idm or idm.group("mcc") in (None, "null") else idm.group("mcc"),
-                "mnc": None if not idm or idm.group("mnc") in (None, "null") else idm.group("mnc"),
-                "nci": self._to_int(idm.group("nci")) if idm else None,
-                "ssRsrp": self._to_int(sgm.group("ssrsrp")) if sgm else None,
-                "ssRsrq": self._to_int(sgm.group("ssrsrq")) if sgm else None,
-                "ssSinr": self._to_int(sgm.group("sssinr")) if sgm else None,
-                "level": self._to_int(sgm.group("level")) if sgm else None,
-            }
-            if any(self._val_ok(entry[k]) for k in ("ssRsrp", "ssRsrq", "ssSinr")):
-                nrs.append(entry)
-
-        for chunk in self._iter_cellinfo_chunks(seg, "LTE"):
-            reg = self.REG_FLAG_RE.search(chunk)
-            idm = self.LTE_ID_RE.search(chunk)
-            sgm = self.LTE_SIG_RE.search(chunk)
-            entry = {
-                "type": "LTE",
-                "registered": (reg and reg.group("yesno") == "YES"),
-                "pci": self._to_int(idm.group("pci")) if idm else None,
-                "tac": self._to_int(idm.group("tac")) if idm else None,
-                "earfcn": self._to_int(idm.group("earfcn")) if idm else None,
-                "bands": [b.strip() for b in (idm.group("bands") if idm else "").split(",")] if idm else [],
-                "mcc": idm.group("mcc") if idm else None,
-                "mnc": idm.group("mnc") if idm else None,
-                "rssi": self._to_int(sgm.group("rssi")) if sgm else None,
-                "rsrp": self._to_int(sgm.group("rsrp")) if sgm else None,
-                "rsrq": self._to_int(sgm.group("rsrq")) if sgm else None,
-                "rssnr": self._to_int(sgm.group("rssnr")) if sgm else None,
-                "ta": self._to_int(sgm.group("ta")) if sgm else None,
-                "level": self._to_int(sgm.group("level")) if sgm else None,
-            }
-            if any(self._val_ok(entry[k]) for k in ("rsrp", "rsrq", "rssnr", "rssi")):
-                ltes.append(entry)
-
-        def pick_best(items, is_nr):
-            regs = [x for x in items if x.get("registered")]
-            if regs:
-                return regs[0]
-            key = (lambda x: x.get("ssRsrp")) if is_nr else (lambda x: x.get("rsrp"))
-            cand = [x for x in items if self._val_ok(key(x))]
-            if cand:
-                return sorted(cand, key=key, reverse=True)[0]
-            return items[0] if items else None
-
-        return pick_best(nrs, True), pick_best(ltes, False)
-    
-    def _parse_wifi(self, raw_wifi):
-        """解析WiFi信息"""
-        txt = None
-        for pat in self.WIFI_BLOCK_RES:
-            m = pat.search(raw_wifi)
-            if m:
-                txt = m.group("info")
-                break
-        if not txt:
-            txt = raw_wifi
-
-        def first_match(text, pats):
-            for p in pats:
-                m = p.search(text)
-                if m:
-                    return m.groupdict()
-            return {}
-
-        ssid_m = first_match(txt, self.SSID_RE_LIST)
-        rssi_m = first_match(txt, self.RSSI_RE_LIST)
-        bssid_m = self.BSSID_RE.search(txt) or {}
-        link_m = self.LINKSPD_RE.search(txt) or {}
-        freq_m = self.FREQ_RE.search(txt) or {}
-        supp_m = self.SUPPL_RE.search(txt) or {}
-
-        ssid = (ssid_m.get("ssid") if ssid_m else None)
-        if ssid == "<unknown ssid>":
-            ssid = None
-
-        wifi = {
-            "ssid": ssid,
-            "rssi": self._to_int((rssi_m.get("rssi") if rssi_m else None)),
-            "bssid": (bssid_m.group("bssid") if hasattr(bssid_m, "group") else None),
-            "linkMbps": self._to_int((link_m.group("ls") if hasattr(link_m, "group") else None)),
-            "freqMHz": self._to_int((freq_m.group("freq") if hasattr(freq_m, "group") else None)),
-            "state": (supp_m.group("state") if hasattr(supp_m, "group") else None),
-        }
-        
-        band = None
-        if wifi["freqMHz"]:
-            f = wifi["freqMHz"]
-            if 2400 <= f < 2500:
-                band = "2.4GHz"
-            elif 4900 <= f < 5900:
-                band = "5GHz"
-            elif 5925 <= f < 7125:
-                band = "6GHz"
-        
-        wifi["band"] = band
-        wifi["connected"] = (wifi["ssid"] is not None) and (wifi["rssi"] is not None)
-        return wifi
-    
-    def _get_network_snapshot(self, device):
-        """获取网络信息快照"""
-        try:
-            # 重置所有数据
-            for sim in ['SIM1', 'SIM2']:
-                for tech in ['LTE', 'NR']:
-                    for key in self.network_info_data[sim][tech]:
-                        self.network_info_data[sim][tech][key] = ''
-            
-            for key in self.network_info_data['WIFI']:
-                self.network_info_data['WIFI'][key] = ''
-            
-            # 获取telephony信息
-            tel = self._run_adb(["dumpsys", "telephony.registry"])
-            if not tel:
-                return
-            
-            # 获取WiFi信息
-            wifi_raw = self._run_adb(["dumpsys", "wifi"])
-            wifi = self._parse_wifi(wifi_raw)
-            
-            # 更新WiFi信息
-            self.network_info_data['WIFI']['SSID'] = str(wifi.get('ssid', ''))
-            self.network_info_data['WIFI']['BSSID'] = str(wifi.get('bssid', ''))
-            self.network_info_data['WIFI']['RSSI'] = str(wifi.get('rssi', ''))
-            self.network_info_data['WIFI']['Freq'] = str(wifi.get('freqMHz', ''))
-            self.network_info_data['WIFI']['State'] = str(wifi.get('state', ''))
-            
-            # 分段处理SIM信息
-            segments = self._split_segments(tel)
-            for i, seg in enumerate(segments[:2]):  # 最多处理2个SIM
-                sim_key = f'SIM{i+1}'
-                
-                sig = self._parse_signal_from_segment(seg)
-                best_nr, best_lte = self._parse_cellinfo_from_segment(seg)
-                
-                # 更新LTE信息
-                if best_lte:
-                    self.network_info_data[sim_key]['LTE']['PCI'] = str(best_lte.get('pci', '')) if best_lte.get('pci') else ''
-                    self.network_info_data[sim_key]['LTE']['arfcn'] = str(best_lte.get('earfcn', '')) if best_lte.get('earfcn') else ''
-                    self.network_info_data[sim_key]['LTE']['rssi'] = str(best_lte.get('rssi', '')) if best_lte.get('rssi') else ''
-                    self.network_info_data[sim_key]['LTE']['rsrp'] = str(best_lte.get('rsrp', '')) if best_lte.get('rsrp') else ''
-                    self.network_info_data[sim_key]['LTE']['rsrq'] = str(best_lte.get('rsrq', '')) if best_lte.get('rsrq') else ''
-                    self.network_info_data[sim_key]['LTE']['rssnr'] = str(best_lte.get('rssnr', '')) if best_lte.get('rssnr') else ''
-                    self.network_info_data[sim_key]['LTE']['registered'] = best_lte.get('registered', None)
-                    
-                    if best_lte.get('bands'):
-                        self.network_info_data[sim_key]['LTE']['Band'] = str(best_lte['bands'][0])
-                    else:
-                        self.network_info_data[sim_key]['LTE']['Band'] = ''
-                
-                # 更新NR信息
-                if best_nr:
-                    self.network_info_data[sim_key]['NR']['PCI'] = str(best_nr.get('pci', '')) if best_nr.get('pci') else ''
-                    self.network_info_data[sim_key]['NR']['arfcn'] = str(best_nr.get('nrarfcn', '')) if best_nr.get('nrarfcn') else ''
-                    self.network_info_data[sim_key]['NR']['ssRsrp'] = str(best_nr.get('ssRsrp', '')) if best_nr.get('ssRsrp') else ''
-                    self.network_info_data[sim_key]['NR']['ssRsrq'] = str(best_nr.get('ssRsrq', '')) if best_nr.get('ssRsrq') else ''
-                    self.network_info_data[sim_key]['NR']['ssSinr'] = str(best_nr.get('ssSinr', '')) if best_nr.get('ssSinr') else ''
-                    self.network_info_data[sim_key]['NR']['rssnr'] = str(best_nr.get('level', '')) if best_nr.get('level') else ''
-                    self.network_info_data[sim_key]['NR']['registered'] = best_nr.get('registered', None)
-                    
-                    if best_nr.get('bands'):
-                        self.network_info_data[sim_key]['NR']['Band'] = str(best_nr['bands'][0])
-                    else:
-                        self.network_info_data[sim_key]['NR']['Band'] = ''
-                
-                # 如果信号强度信息可用，优先使用
-                if sig.get('lte'):
-                    lte_sig = sig['lte']
-                    if self._val_ok(lte_sig.get('rssi')):
-                        self.network_info_data[sim_key]['LTE']['rssi'] = str(lte_sig['rssi'])
-                    if self._val_ok(lte_sig.get('rsrp')):
-                        self.network_info_data[sim_key]['LTE']['rsrp'] = str(lte_sig['rsrp'])
-                    if self._val_ok(lte_sig.get('rsrq')):
-                        self.network_info_data[sim_key]['LTE']['rsrq'] = str(lte_sig['rsrq'])
-                    if self._val_ok(lte_sig.get('rssnr')):
-                        self.network_info_data[sim_key]['LTE']['rssnr'] = str(lte_sig['rssnr'])
-                
-                if sig.get('nr'):
-                    nr_sig = sig['nr']
-                    if self._val_ok(nr_sig.get('ssRsrp')):
-                        self.network_info_data[sim_key]['NR']['ssRsrp'] = str(nr_sig['ssRsrp'])
-                    if self._val_ok(nr_sig.get('ssRsrq')):
-                        self.network_info_data[sim_key]['NR']['ssRsrq'] = str(nr_sig['ssRsrq'])
-                    if self._val_ok(nr_sig.get('ssSinr')):
-                        self.network_info_data[sim_key]['NR']['ssSinr'] = str(nr_sig['ssSinr'])
-                    if self._val_ok(nr_sig.get('level')):
-                        self.network_info_data[sim_key]['NR']['rssnr'] = str(nr_sig['level'])
-                        
-        except Exception as e:
-            print(f"获取网络快照失败: {e}")
-    
     
     def _update_network_display(self):
         """更新网络信息显示"""
@@ -472,33 +875,39 @@ class NetworkInfoManager:
             print(f"更新网络信息显示失败: {e}")
     
     def _create_network_table(self):
-        """创建基于Treeview的紧凑网络信息表格"""
+        """创建基于Treeview的CA/ENDC表格"""
         # 清空现有内容
         for widget in self.app.ui.network_info_frame.winfo_children():
             widget.destroy()
         
         # 创建主框架
         main_frame = ttk.Frame(self.app.ui.network_info_frame)
-        main_frame.pack(fill=tk.X, expand=False, padx=2, pady=2)
+        main_frame.pack(fill=tk.BOTH, expand=True, padx=2, pady=2)
         main_frame.columnconfigure(0, weight=1)
+        main_frame.rowconfigure(0, weight=1)
         
-        # 定义列配置（按照spec.json）
+        # 定义列配置（按照spec.json的required_output_columns）
         columns = [
-            ('SIM', 42, 'center'),
-            ('RAT', 42, 'center'),
-            ('Band', 50, 'center'),
-            ('CH', 64, 'center'),
+            ('SIM', 50, 'center'),
+            ('CC', 80, 'center'),
+            ('RAT', 50, 'center'),
+            ('BAND', 60, 'center'),
+            ('DL_ARFCN', 80, 'center'),
+            ('UL_ARFCN', 80, 'center'),
             ('PCI', 50, 'center'),
-            ('RSRP', 64, 'e'),
-            ('RSRQ', 64, 'e'),
-            ('SINR', 58, 'e'),
-            ('RSSI', 58, 'e'),
-            ('CA', 40, 'e'),
-            ('NOTE', 160, 'w')
+            ('RSRP', 60, 'center'),
+            ('RSRQ', 60, 'center'),
+            ('SINR', 60, 'center'),
+            ('RSSI', 60, 'center'),
+            ('BW_DL', 60, 'center'),
+            ('BW_UL', 60, 'center'),
+            ('CA_ENDC_Comb', 120, 'center'),
+            ('CQI', 60, 'center'),
+            ('NOTE', 200, 'w')
         ]
         
         # 创建Treeview
-        self.network_tree = ttk.Treeview(main_frame, columns=[col[0] for col in columns], show='headings', height=5)
+        self.network_tree = ttk.Treeview(main_frame, columns=[col[0] for col in columns], show='headings', height=8)
         
         # 配置列标题和宽度
         for col_id, width, anchor in columns:
@@ -509,27 +918,21 @@ class NetworkInfoManager:
             else:
                 self.network_tree.column(col_id, width=width, anchor=anchor, minwidth=width)
         
-        # 设置紧凑样式
+        # 设置样式
         style = ttk.Style()
-        style.configure("Compact.Treeview", font=('Arial', 9), rowheight=16)
-        style.configure("Compact.Treeview.Heading", font=('Arial', 9, 'bold'))
-        self.network_tree.configure(style="Compact.Treeview")
+        style.configure("Network.Treeview", font=('Arial', 9), rowheight=18)
+        style.configure("Network.Treeview.Heading", font=('Arial', 9, 'bold'))
+        self.network_tree.configure(style="Network.Treeview")
         
-        # 创建垂直滚动条
+        # 创建滚动条
         v_scrollbar = ttk.Scrollbar(main_frame, orient=tk.VERTICAL, command=self.network_tree.yview)
-        self.network_tree.configure(yscrollcommand=v_scrollbar.set)
-        
-        # 创建水平滚动条
         h_scrollbar = ttk.Scrollbar(main_frame, orient=tk.HORIZONTAL, command=self.network_tree.xview)
-        self.network_tree.configure(xscrollcommand=h_scrollbar.set)
+        self.network_tree.configure(yscrollcommand=v_scrollbar.set, xscrollcommand=h_scrollbar.set)
         
-        # 布局 - 不使用垂直拉伸
-        self.network_tree.grid(row=0, column=0, sticky=(tk.W, tk.E))
+        # 布局
+        self.network_tree.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
         v_scrollbar.grid(row=0, column=1, sticky=(tk.N, tk.S))
         h_scrollbar.grid(row=1, column=0, sticky=(tk.W, tk.E))
-        
-        # 初始化行ID存储
-        self.network_row_ids = {}
     
     def _update_network_data(self):
         """更新Treeview中的网络数据"""
@@ -541,176 +944,95 @@ class NetworkInfoManager:
             for item in self.network_tree.get_children():
                 self.network_tree.delete(item)
             
-            # 准备所有行数据
-            rows_data = []
-            
-            # SIM1 LTE
-            sim1_lte = self.network_info_data['SIM1']['LTE']
-            if any(sim1_lte[key] for key in ['Band', 'arfcn', 'PCI', 'rssi', 'rsrp', 'rsrq', 'rssnr']):
-                # 检查是否已注册
-                if sim1_lte.get('registered') == False:
-                    # 未注册，显示为缓存状态
-                    note = self._generate_cellular_note('SIM1', 'LTE', sim1_lte) + " (缓存)"
-                    rows_data.append([
-                        'SIM1', 'LTE', 
-                        '-', '-', '-', '-', '-', '-', '-', '-', note
-                    ])
-                else:
-                    # 已注册或状态未知，显示实际数据
-                    note = self._generate_cellular_note('SIM1', 'LTE', sim1_lte)
-                    rows_data.append([
-                        'SIM1', 'LTE', 
-                        sim1_lte.get('Band', ''),
-                        sim1_lte.get('arfcn', ''),
-                        sim1_lte.get('PCI', ''),
-                        sim1_lte.get('rsrp', ''),
-                        sim1_lte.get('rsrq', ''),
-                        sim1_lte.get('rssnr', ''),  # SINR for LTE
-                        sim1_lte.get('rssi', ''),
-                        '',  # TA for LTE (not implemented yet)
-                        note
-                    ])
-            
-            # SIM1 NR
-            sim1_nr = self.network_info_data['SIM1']['NR']
-            if any(sim1_nr[key] for key in ['Band', 'arfcn', 'PCI', 'ssRsrp', 'ssRsrq', 'ssSinr', 'rssnr']):
-                # 检查是否已注册
-                if sim1_nr.get('registered') == False:
-                    # 未注册，显示为缓存状态
-                    note = self._generate_cellular_note('SIM1', 'NR', sim1_nr) + " (缓存)"
-                    rows_data.append([
-                        'SIM1', 'NR',
-                        '-', '-', '-', '-', '-', '-', '-', '-', note
-                    ])
-                else:
-                    # 已注册或状态未知，显示实际数据
-                    note = self._generate_cellular_note('SIM1', 'NR', sim1_nr)
-                    rows_data.append([
-                        'SIM1', 'NR',
-                        sim1_nr.get('Band', ''),
-                        sim1_nr.get('arfcn', ''),
-                        sim1_nr.get('PCI', ''),
-                        sim1_nr.get('ssRsrp', ''),
-                        sim1_nr.get('ssRsrq', ''),
-                        sim1_nr.get('ssSinr', ''),  # SINR for NR
-                        '',  # RSSI not available for NR
-                        '',  # TA not available for NR
-                        note
-                    ])
-            
-            # SIM2 LTE
-            sim2_lte = self.network_info_data['SIM2']['LTE']
-            if any(sim2_lte[key] for key in ['Band', 'arfcn', 'PCI', 'rssi', 'rsrp', 'rsrq', 'rssnr']):
-                # 检查是否已注册
-                if sim2_lte.get('registered') == False:
-                    # 未注册，显示为缓存状态
-                    note = self._generate_cellular_note('SIM2', 'LTE', sim2_lte) + " (缓存)"
-                    rows_data.append([
-                        'SIM2', 'LTE',
-                        '-', '-', '-', '-', '-', '-', '-', '-', note
-                    ])
-                else:
-                    # 已注册或状态未知，显示实际数据
-                    note = self._generate_cellular_note('SIM2', 'LTE', sim2_lte)
-                    rows_data.append([
-                        'SIM2', 'LTE',
-                        sim2_lte.get('Band', ''),
-                        sim2_lte.get('arfcn', ''),
-                        sim2_lte.get('PCI', ''),
-                        sim2_lte.get('rsrp', ''),
-                        sim2_lte.get('rsrq', ''),
-                        sim2_lte.get('rssnr', ''),  # SINR for LTE
-                        sim2_lte.get('rssi', ''),
-                        '',  # TA for LTE (not implemented yet)
-                        note
-                    ])
-            
-            # SIM2 NR
-            sim2_nr = self.network_info_data['SIM2']['NR']
-            if any(sim2_nr[key] for key in ['Band', 'arfcn', 'PCI', 'ssRsrp', 'ssRsrq', 'ssSinr', 'rssnr']):
-                # 检查是否已注册
-                if sim2_nr.get('registered') == False:
-                    # 未注册，显示为缓存状态
-                    note = self._generate_cellular_note('SIM2', 'NR', sim2_nr) + " (缓存)"
-                    rows_data.append([
-                        'SIM2', 'NR',
-                        '-', '-', '-', '-', '-', '-', '-', '-', note
-                    ])
-                else:
-                    # 已注册或状态未知，显示实际数据
-                    note = self._generate_cellular_note('SIM2', 'NR', sim2_nr)
-                    rows_data.append([
-                        'SIM2', 'NR',
-                        sim2_nr.get('Band', ''),
-                        sim2_nr.get('arfcn', ''),
-                        sim2_nr.get('PCI', ''),
-                        sim2_nr.get('ssRsrp', ''),
-                        sim2_nr.get('ssRsrq', ''),
-                        sim2_nr.get('ssSinr', ''),  # SINR for NR
-                        '',  # RSSI not available for NR
-                        '',  # TA not available for NR
-                        note
-                    ])
-            
-            # WiFi
-            wifi = self.network_info_data['WIFI']
-            if wifi.get('SSID') or wifi.get('RSSI'):
-                note = self._generate_wifi_note(wifi)
-                rows_data.append([
-                    'Wi-Fi', 'WLAN',
-                    '',  # Band
-                    '',  # CH
-                    '',  # PCI
-                    '',  # RSRP
-                    '',  # RSRQ
-                    '',  # SINR
-                    wifi.get('RSSI', ''),
-                    '',  # CA
-                    note
-                ])
-            
-            # 插入数据到Treeview
-            for row_data in rows_data:
+            # 插入载波数据
+            for carrier in self.carriers_data:
+                row_data = [
+                    carrier.sim,
+                    carrier.cc,
+                    carrier.rat,
+                    carrier.band,
+                    str(carrier.dl_arfcn) if carrier.dl_arfcn else '',
+                    str(carrier.ul_arfcn) if carrier.ul_arfcn else '',
+                    str(carrier.pci) if carrier.pci else '',
+                    str(carrier.rsrp) if carrier.rsrp is not None else '',
+                    str(carrier.rsrq) if carrier.rsrq is not None else '',
+                    str(carrier.sinr) if carrier.sinr is not None else '',
+                    str(carrier.rssi) if carrier.rssi is not None else '',
+                    str(carrier.bw_dl) if carrier.bw_dl else '',
+                    str(carrier.bw_ul) if carrier.bw_ul else '',
+                    carrier.ca_endc,
+                    str(carrier.cqi) if carrier.cqi is not None else '',
+                    carrier.note
+                ]
                 self.network_tree.insert('', tk.END, values=row_data)
                     
         except Exception as e:
             print(f"更新网络数据失败: {e}")
     
-    def _generate_cellular_note(self, sim, rat, data):
-        """生成蜂窝网络备注信息"""
-        note_parts = []
-        
-        # 如果有PLMN信息，可以在这里添加
-        # if data.get('mcc') and data.get('mnc'):
-        #     note_parts.append(f"PLMN={data['mcc']}{data['mnc']}")
-        
-        # 如果有频段信息，添加频段标签
-        if data.get('Band'):
-            band_label = f"B{data['Band']}" if rat == 'LTE' else f"n{data['Band']}"
-            note_parts.append(band_label)
-        
-        # 如果有带宽信息，可以在这里添加CA信息
-        # if data.get('dl_bw_khz'):
-        #     note_parts.append(f"DL={data['dl_bw_khz']/1000:.0f}MHz")
-        
-        return '; '.join(note_parts) if note_parts else ''
-    
-    def _generate_wifi_note(self, wifi_data):
-        """生成WiFi备注信息"""
-        note_parts = []
-        
-        if wifi_data.get('SSID'):
-            ssid = wifi_data['SSID']
-            if len(ssid) > 15:
-                ssid = ssid[:15] + '…'
-            note_parts.append(f"SSID={ssid}")
-        
-        if wifi_data.get('Freq'):
-            freq = wifi_data['Freq']
-            if freq:
-                note_parts.append(f"Freq={freq}MHz")
-        
-        return '; '.join(note_parts) if note_parts else ''
+    def test_with_dump_data(self, dump_file_path: str):
+        """使用dump.txt测试数据 - 支持双SIM"""
+        try:
+            with open(dump_file_path, 'r', encoding='utf-8') as f:
+                dump_data = f.read()
+            
+            # 使用新的双SIM逻辑
+            # 1) 尝试现有的phone-id分段
+            phone_sections = self._split_by_phone_id(dump_data)
+            
+            # 2) 备用方案：如果phone-id分段不够，使用PhysicalChannel块分段
+            if len(phone_sections) <= 1:
+                phys_blocks = self._split_by_physical_blocks(dump_data)
+                useful = []
+                for b in phys_blocks:
+                    try:
+                        carriers = self._parse_physical_channels(b)
+                        if carriers:
+                            useful.append(b)
+                    except Exception:
+                        continue
+                # 使用前2个有用的段作为SIM1/SIM2
+                phone_sections = useful[:2] if useful else [dump_data]
+            
+            print("=== 测试结果 ===")
+            print(f"分段数量: {len(phone_sections)}")
+            
+            # 3) 为每个段构建行，分配SIM标签
+            all_carriers = []
+            for idx, section in enumerate(phone_sections):
+                sim_name = f"SIM{idx + 1}"
+                print(f"\n--- {sim_name} ---")
+                
+                # 解析各个组件
+                channels = self._parse_physical_channels(section)
+                signal_data = self._parse_signal_strength(section)
+                cell_infos = self._parse_cell_info(section)
+                
+                print(f"PhysicalChannel配置数量: {len(channels)}")
+                for i, channel in enumerate(channels):
+                    print(f"  载波{i+1}: {channel['rat']} B{channel['band']} PCI={channel['pci']} DL={channel['dl_arfcn']}")
+                
+                print(f"CellInfo数量: {len(cell_infos)}")
+                for cell in cell_infos:
+                    print(f"  {cell['type']}: PCI={cell['pci']} Registered={cell['registered']}")
+                
+                # 构建载波表格
+                carriers = self._build_carrier_table(channels, signal_data, cell_infos)
+                
+                # 更新SIM名称
+                for carrier in carriers:
+                    carrier.sim = sim_name
+                
+                all_carriers.extend(carriers)
+            
+            print(f"\n总载波表格行数: {len(all_carriers)}")
+            for carrier in all_carriers:
+                print(f"  {carrier.sim} {carrier.cc} {carrier.rat} {carrier.band} PCI={carrier.pci} RSRP={carrier.rsrp}")
+            
+            return all_carriers
+            
+        except Exception as e:
+            print(f"测试失败: {e}")
+            return []
     
     def start_network_ping(self):
         """开始网络Ping测试"""
@@ -738,33 +1060,25 @@ class NetworkInfoManager:
     def stop_network_ping(self):
         """停止网络Ping测试"""
         try:
-            # 设置停止标志
             self.is_ping_running = False
             
             # 终止ping进程
             if self.ping_process:
                 try:
-                    # 先尝试优雅终止
                     self.ping_process.terminate()
-                    
-                    # 等待进程结束，最多等待2秒
                     try:
                         self.ping_process.wait(timeout=2)
                     except subprocess.TimeoutExpired:
-                        # 如果进程没有在2秒内结束，强制杀死
                         self.ping_process.kill()
                         self.ping_process.wait()
-                    
-                    self.ping_process = None
                 except Exception as e:
                     print(f"[DEBUG] 终止ping进程失败: {str(e)}")
-                    # 即使终止失败，也要清理引用
+                finally:
                     self.ping_process = None
             
             # 更新UI
             self.app.ui.network_ping_button.config(text="Ping")
             
-            # 更新状态显示
             if hasattr(self.app.ui, 'network_ping_status_label'):
                 self.app.ui.network_ping_status_label.config(text="Ping已停止", foreground="gray")
             
@@ -772,7 +1086,7 @@ class NetworkInfoManager:
             print(f"[DEBUG] 停止Ping测试失败: {str(e)}")
     
     def _ping_worker(self, device):
-        """Ping工作线程 - 按照network_ping_monitor_spec.json规范实现"""
+        """Ping工作线程"""
         try:
             # 执行ping命令 - 使用无限ping，但通过停止标志控制
             cmd = f"adb -s {device} shell ping www.google.com"
@@ -784,40 +1098,37 @@ class NetworkInfoManager:
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=True,
-                creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0
+                bufsize=1,
+                universal_newlines=True,
+                creationflags=subprocess.CREATE_NO_WINDOW
             )
             
-            # 启动两个独立的线程来监控stdout和stderr
-            stdout_thread = threading.Thread(target=self._read_stdout, daemon=True)
-            stderr_thread = threading.Thread(target=self._read_stderr, daemon=True)
-            
-            stdout_thread.start()
-            stderr_thread.start()
-            
-            # 主线程等待进程结束或停止标志
+            # 监控ping进程状态
             while self.is_ping_running and self.ping_process:
                 try:
-                    # 检查进程是否还在运行
                     if self.ping_process.poll() is not None:
                         # 进程已结束
                         break
-                    
-                    # 短暂休眠，避免CPU占用过高
                     time.sleep(0.1)
-                    
                 except Exception as e:
                     print(f"[DEBUG] Ping监控异常: {str(e)}")
                     break
             
-            # 等待子线程结束
-            stdout_thread.join(timeout=1)
-            stderr_thread.join(timeout=1)
+            # 启动输出读取线程
+            if self.is_ping_running:
+                stdout_thread = threading.Thread(target=self._read_ping_stdout, daemon=True)
+                stderr_thread = threading.Thread(target=self._read_ping_stderr, daemon=True)
+                stdout_thread.start()
+                stderr_thread.start()
+                
+                # 等待线程结束
+                stdout_thread.join()
+                stderr_thread.join()
                 
         except Exception as e:
             print(f"[DEBUG] Ping测试异常: {str(e)}")
             self._update_ping_status("Ping测试失败", "red")
         finally:
-            # 清理状态
             self.is_ping_running = False
             self.ping_process = None
             
@@ -825,8 +1136,8 @@ class NetworkInfoManager:
             if hasattr(self.app.ui, 'network_ping_button'):
                 self.app.ui.network_ping_button.config(text="Ping")
     
-    def _read_stdout(self):
-        """读取stdout输出 - 检测成功响应"""
+    def _read_ping_stdout(self):
+        """读取ping标准输出"""
         try:
             while self.is_ping_running and self.ping_process:
                 line = self.ping_process.stdout.readline()
@@ -835,16 +1146,16 @@ class NetworkInfoManager:
                 
                 line_lower = line.lower().strip()
                 
-                # 检查成功响应 - 按照spec.json规范
+                # 检查成功响应 - 按照backup文件规范
                 if "bytes from" in line_lower:
                     # 每次成功响应都更新状态为正常（支持状态切换）
                     self._update_ping_status("网络正常", "green")
                         
         except Exception as e:
-            print(f"[DEBUG] 读取stdout异常: {str(e)}")
+            print(f"[DEBUG] 读取ping stdout异常: {str(e)}")
     
-    def _read_stderr(self):
-        """读取stderr输出 - 检测网络错误"""
+    def _read_ping_stderr(self):
+        """读取ping错误输出"""
         try:
             while self.is_ping_running and self.ping_process:
                 line = self.ping_process.stderr.readline()
@@ -853,7 +1164,7 @@ class NetworkInfoManager:
                 
                 line_lower = line.lower().strip()
                 
-                # 按照spec.json规范检测各种错误
+                # 按照backup文件规范检测各种错误
                 if "network is unreachable" in line_lower:
                     self._update_ping_status("网络不可达", "red")
                 elif "destination host unreachable" in line_lower:
@@ -874,7 +1185,7 @@ class NetworkInfoManager:
                         self._update_ping_status("网络异常", "red")
                         
         except Exception as e:
-            print(f"[DEBUG] 读取stderr异常: {str(e)}")
+            print(f"[DEBUG] 读取ping stderr异常: {str(e)}")
     
     def _update_ping_status(self, status_text, color):
         """更新Ping状态显示"""
