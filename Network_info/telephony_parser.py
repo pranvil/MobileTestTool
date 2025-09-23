@@ -86,6 +86,8 @@ def _parse_phone_metadata(raw: str) -> Dict[str, Any]:
                 phone_state['service_state'] = 'IN_SERVICE'
             elif voice_state == 'POWER_OFF' or data_state == 'POWER_OFF':
                 phone_state['service_state'] = 'POWER_OFF'
+            elif voice_state == 'OUT_OF_SERVICE' or data_state == 'OUT_OF_SERVICE':
+                phone_state['service_state'] = 'OUT_OF_SERVICE'
             else:
                 phone_state['service_state'] = 'UNKNOWN'
         
@@ -122,12 +124,13 @@ def _get_active_phone_ids(metadata: Dict[str, Any]) -> List[int]:
             phone_state['service_state'] == 'IN_SERVICE'):
             is_active = True
         
-        # 条件2: mPhysicalChannelConfigs 非空
-        elif phone_state['has_channels']:
+        # 条件2: mPhysicalChannelConfigs 非空 且 ServiceState不是OUT_OF_SERVICE
+        elif (phone_state['has_channels'] and 
+              phone_state['service_state'] not in ['OUT_OF_SERVICE', 'POWER_OFF']):
             is_active = True
         
         # 条件3: mTelephonyDisplayInfo.network != UNKNOWN 或 mDataConnectionState==2
-        elif (phone_state['network'] != 'UNKNOWN' or 
+        elif ((phone_state['network'] and phone_state['network'] != 'UNKNOWN') or 
               phone_state['data_state'] == 2):
             is_active = True
         
@@ -147,8 +150,8 @@ def _get_active_phone_ids(metadata: Dict[str, Any]) -> List[int]:
         for phone_id in target_phone_ids:
             if phone_id in phone_states and phone_id not in active_phones:
                 phone_state = phone_states[phone_id]
-                # 检查是否为有效状态（非POWER_OFF/UNKNOWN）
-                if (phone_state['service_state'] not in ['POWER_OFF', 'UNKNOWN'] and 
+                # 检查是否为有效状态（非POWER_OFF/UNKNOWN/OUT_OF_SERVICE）
+                if (phone_state['service_state'] not in ['POWER_OFF', 'UNKNOWN', 'OUT_OF_SERVICE'] and 
                     phone_state['network'] != 'UNKNOWN'):
                     active_phones.append(phone_id)
     
@@ -215,12 +218,22 @@ def _parse_physical_channels(section: str) -> List[Dict]:
             start_pos = end_pos
             kv = _extract_key_values(block)
             if 'mNetworkType' in kv and 'mBand' in kv:
+                # 获取ARFCN - 优先从PhysicalChannelConfigs，如果为0则从ServiceState获取（仅限PCC）
+                dl_arfcn = _to_int(kv.get('mDownlinkChannelNumber'))
+                ul_arfcn = _to_int(kv.get('mUplinkChannelNumber'))
+                
+                # 如果ARFCN为0或无效，且是PCC，则尝试从ServiceState中获取
+                if (not dl_arfcn or dl_arfcn == 0) and kv.get('mConnectionStatus') == 'PrimaryServing':
+                    service_match = re.search(r'mServiceState=\{.*?mChannelNumber=(\d+)', section, re.DOTALL)
+                    if service_match:
+                        dl_arfcn = int(service_match.group(1))
+                
                 channel = {
                     'connection_status': kv.get('mConnectionStatus', ''),
                     'rat': kv.get('mNetworkType', ''),
                     'band': _to_int(kv.get('mBand')),
-                    'dl_arfcn': _to_int(kv.get('mDownlinkChannelNumber')),
-                    'ul_arfcn': _to_int(kv.get('mUplinkChannelNumber')),
+                    'dl_arfcn': dl_arfcn,
+                    'ul_arfcn': ul_arfcn,
                     'pci': _to_int(kv.get('mPhysicalCellId')),
                     'bw_dl': _to_int(kv.get('mCellBandwidthDownlinkKhz', 0)) // 1000 if kv.get('mCellBandwidthDownlinkKhz') else 0,
                     'bw_ul': _to_int(kv.get('mCellBandwidthUplinkKhz', 0)) // 1000 if kv.get('mCellBandwidthUplinkKhz') else 0,
@@ -235,25 +248,27 @@ def _parse_signal_strength(section: str) -> Dict:
     """解析信号强度"""
     signal_data = {'lte': {}, 'nr': {}}
     
-    # 查找SignalStrength块
+    # 查找SignalStrength块 - 支持两种格式
     signal_match = re.search(r"mSignalStrength=SignalStrength:\{(.*?)\}", section, re.DOTALL)
     if not signal_match:
         return signal_data
     
     signal_text = signal_match.group(1)
     
-    # LTE信号解析 - 使用简化的字符串搜索
+    # LTE信号解析 - 支持两种格式
     if "mLte=CellSignalStrengthLte:" in signal_text:
-        # 提取LTE信号强度
+        # 提取LTE信号强度 - 支持新格式（带冒号）
         rssi_match = re.search(r"rssi=(-?\d+)", signal_text)
         rsrp_match = re.search(r"rsrp=(-?\d+)", signal_text)
         rsrq_match = re.search(r"rsrq=(-?\d+)", signal_text)
         rssnr_match = re.search(r"rssnr=(-?\d+)", signal_text)
         cqi_match = re.search(r"cqi=(-?\d+)", signal_text)
         
-        if rsrp_match and _to_int(rsrp_match.group(1)):  # 只使用有效信号
+        # 检查信号是否有效（不是MAXINT）
+        rsrp_val = _to_int(rsrp_match.group(1)) if rsrp_match else None
+        if rsrp_val:  # 只使用有效信号
             signal_data['lte'] = {
-                'rsrp': _to_int(rsrp_match.group(1)),
+                'rsrp': rsrp_val,
                 'rsrq': _to_int(rsrq_match.group(1)) if rsrq_match else None,
                 'rssnr': _to_int(rssnr_match.group(1)) if rssnr_match else None,
                 'rssi': _to_int(rssi_match.group(1)) if rssi_match else None,
@@ -267,9 +282,10 @@ def _parse_signal_strength(section: str) -> Dict:
         ss_rsrq_match = re.search(r"ssRsrq\s*=\s*(-?\d+)", signal_text)
         ss_sinr_match = re.search(r"ssSinr\s*=\s*(-?\d+)", signal_text)
         
-        if ss_rsrp_match and _to_int(ss_rsrp_match.group(1)):  # 只使用有效信号
+        ss_rsrp_val = _to_int(ss_rsrp_match.group(1)) if ss_rsrp_match else None
+        if ss_rsrp_val:  # 只使用有效信号
             signal_data['nr'] = {
-                'ss_rsrp': _to_int(ss_rsrp_match.group(1)),
+                'ss_rsrp': ss_rsrp_val,
                 'ss_rsrq': _to_int(ss_rsrq_match.group(1)) if ss_rsrq_match else None,
                 'ss_sinr': _to_int(ss_sinr_match.group(1)) if ss_sinr_match else None,
             }
@@ -411,7 +427,7 @@ def _build_rows(channels: List[Dict], signal_data: Dict, cell_infos: List[Dict],
         return rows
     
     # 分析CA/ENDC配置
-    lte_channels = [c for c in channels if c['rat'] == 'LTE']
+    lte_channels = [c for c in channels if c['rat'] in ['LTE', 'LTE_CA']]
     nr_channels = [c for c in channels if c['rat'] == 'NR']
     
     # 生成CA/ENDC摘要

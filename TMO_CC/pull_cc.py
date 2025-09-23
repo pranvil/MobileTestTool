@@ -93,7 +93,10 @@ class PullCCManager:
             return
         
         # 1) 先做本地同步检查
-        target_dir = r"C:\log\ccfile"
+        # 创建统一的日志目录路径 c:\log\yyyymmdd\ccfile
+        from datetime import datetime
+        date_str = datetime.now().strftime("%Y%m%d")
+        target_dir = f"C:\\log\\{date_str}\\ccfile"
         os.makedirs(target_dir, exist_ok=True)
         deviceinfo_path = os.path.join(target_dir, "deviceInfo")
         

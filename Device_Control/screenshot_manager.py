@@ -28,10 +28,15 @@ class ScreenshotManager:
             progress_var.set(20)
             progress_dialog.update()
             
-            # 获取桌面路径
-            desktop_path = os.path.join(os.path.expanduser("~"), "Desktop")
-            screenshot_folder = os.path.join(desktop_path, "screenshot")
+            # 创建统一的日志目录路径 c:\log\yyyymmdd\screenshot
+            current_time = datetime.datetime.now()
+            date_str = current_time.strftime("%Y%m%d")
+            log_dir = f"c:\\log\\{date_str}"
+            screenshot_folder = os.path.join(log_dir, "screenshot")
             
+            if not os.path.exists(log_dir):
+                os.makedirs(log_dir)
+                print(f"创建日志目录: {log_dir}")
             if not os.path.exists(screenshot_folder):
                 os.makedirs(screenshot_folder)
                 print(f"创建截图文件夹: {screenshot_folder}")

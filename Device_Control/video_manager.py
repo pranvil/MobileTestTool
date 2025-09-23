@@ -214,7 +214,10 @@ class VideoManager:
             progress_var.set(20)
             progress_dialog.update()
             
-            log_dir = "c:\\log"
+            # 创建统一的日志目录路径 c:\log\yyyymmdd\video
+            from datetime import datetime
+            date_str = datetime.now().strftime("%Y%m%d")
+            log_dir = f"c:\\log\\{date_str}"
             video_dir = os.path.join(log_dir, "video")
             
             if not os.path.exists(log_dir):

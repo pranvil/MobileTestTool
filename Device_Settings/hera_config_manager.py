@@ -68,23 +68,24 @@ class HeraConfigManager:
         self.icon_xpath = '//*[@resource-id="android:id/action_bar"]/android.widget.LinearLayout[2]'
         self.test_package_name = "com.example.test"
         
-        # 创建输出目录
-        self.output_dir = self._create_output_directory()
+        # 输出目录将在需要时创建
+        self.output_dir = None
         
         # 检查uiautomator2是否可用
         if not HAS_UIAUTOMATOR2:
             print("[WARNING] uiautomator2 not available, some features may not work")
     
-    def _create_output_directory(self):
-        """创建输出目录"""
-        try:
-            today = datetime.now().strftime("%Y%m%d")
-            output_dir = f"C:\\log\\{today}\\hera"
-            os.makedirs(output_dir, exist_ok=True)
-            return output_dir
-        except Exception as e:
-            print(f"[WARNING] 创建输出目录失败: {str(e)}")
-            return "."
+    def _ensure_output_directory(self):
+        """确保输出目录存在，如果不存在则创建"""
+        if self.output_dir is None:
+            try:
+                today = datetime.now().strftime("%Y%m%d")
+                self.output_dir = f"C:\\log\\{today}\\hera"
+                os.makedirs(self.output_dir, exist_ok=True)
+            except Exception as e:
+                print(f"[WARNING] 创建输出目录失败: {str(e)}")
+                self.output_dir = "."
+        return self.output_dir
     
     def configure_hera(self):
         """配置赫拉 - 主入口函数"""
@@ -129,7 +130,13 @@ class HeraConfigManager:
             # 1. 安装APK
             if config_options.get('install_apk', True):
                 if not self._install_apk():
-                    failed_items.append("APK安装")
+                    # APK安装失败，立即终止配置流程
+                    self._log_message("❌ 赫拉配置终止：必须安装com.example.test.apk")
+                    self.app.root.after(0, lambda: messagebox.showerror("配置终止", 
+                        "赫拉配置已终止！\n\n"
+                        "必须安装com.example.test.apk才能继续配置。\n\n"
+                        "请确保APK文件存在并重新运行配置。"))
+                    return
                 time.sleep(0.5)
             
             # 2. 初始化uiautomator2 (可选)
@@ -281,38 +288,21 @@ class HeraConfigManager:
                 self._log_message("✅ 测试APK已安装，跳过安装步骤")
                 return True
             
-            # 首先在同级目录查找APK文件
-            current_dir = os.path.dirname(os.path.abspath(__file__))
-            apk_files = []
+            # 尝试从打包的资源中提取APK文件
+            apk_file = self._extract_apk_from_resources()
             
-            # 查找常见的APK文件名
-            common_names = [
-                "Heratest-trigger-com.example.test.apk",
-                "hera-test.apk",
-                "test-trigger.apk"
-            ]
+            # 如果资源中没有找到，尝试从文件系统查找
+            if not apk_file:
+                apk_file = self._find_apk_in_filesystem()
             
-            for name in common_names:
-                apk_path = os.path.join(current_dir, name)
-                if os.path.exists(apk_path):
-                    apk_files.append(apk_path)
-            
-            # 如果没找到，让用户选择
-            if not apk_files:
-                apk_file = filedialog.askopenfilename(
-                    title="选择赫拉测试APK文件",
-                    filetypes=[("APK文件", "*.apk"), ("所有文件", "*.*")],
-                    parent=self.app.root
-                )
-                
+            # 如果还是没找到，让用户选择
+            if not apk_file:
+                apk_file = self._ask_user_to_select_apk()
                 if not apk_file:
-                    self._log_message("用户取消APK安装")
+                    self._log_message("❌ 用户取消APK安装 - 必须安装com.example.test.apk")
                     return False
-                
-                apk_files = [apk_file]
             
             # 安装APK
-            apk_file = apk_files[0]
             self._log_message(f"正在安装APK: {os.path.basename(apk_file)}")
             
             selected_device = self.app.selected_device.get()
@@ -329,6 +319,82 @@ class HeraConfigManager:
         except Exception as e:
             self._log_message(f"❌ APK安装异常: {str(e)}")
             return False
+    
+    def _extract_apk_from_resources(self):
+        """从打包的资源中提取APK文件"""
+        try:
+            import sys
+            import tempfile
+            
+            # 检查是否在PyInstaller打包的环境中
+            if hasattr(sys, '_MEIPASS'):
+                # 在打包环境中，从临时目录查找APK
+                resource_dir = sys._MEIPASS
+                apk_path = os.path.join(resource_dir, "Heratest-trigger-com.example.test.apk")
+                
+                if os.path.exists(apk_path):
+                    # 将APK复制到临时目录
+                    temp_dir = tempfile.gettempdir()
+                    temp_apk = os.path.join(temp_dir, "Heratest-trigger-com.example.test.apk")
+                    
+                    import shutil
+                    shutil.copy2(apk_path, temp_apk)
+                    self._log_message("✅ 从打包资源中找到APK文件")
+                    return temp_apk
+            
+            return None
+            
+        except Exception as e:
+            self._log_message(f"⚠️ 从资源提取APK失败: {str(e)}")
+            return None
+    
+    def _find_apk_in_filesystem(self):
+        """在文件系统中查找APK文件"""
+        try:
+            # 首先在同级目录查找APK文件
+            current_dir = os.path.dirname(os.path.abspath(__file__))
+            apk_files = []
+            
+            # 查找常见的APK文件名
+            common_names = [
+                "Heratest-trigger-com.example.test.apk",
+                "hera-test.apk",
+                "test-trigger.apk"
+            ]
+            
+            for name in common_names:
+                apk_path = os.path.join(current_dir, name)
+                if os.path.exists(apk_path):
+                    apk_files.append(apk_path)
+            
+            if apk_files:
+                self._log_message("✅ 在文件系统中找到APK文件")
+                return apk_files[0]
+            
+            return None
+            
+        except Exception as e:
+            self._log_message(f"⚠️ 在文件系统中查找APK失败: {str(e)}")
+            return None
+    
+    def _ask_user_to_select_apk(self):
+        """让用户选择APK文件"""
+        try:
+            apk_file = filedialog.askopenfilename(
+                title="选择赫拉测试APK文件 (com.example.test.apk)",
+                filetypes=[("APK文件", "*.apk"), ("所有文件", "*.*")],
+                parent=self.app.root
+            )
+            
+            if apk_file:
+                self._log_message("✅ 用户选择了APK文件")
+                return apk_file
+            
+            return None
+            
+        except Exception as e:
+            self._log_message(f"⚠️ 用户选择APK文件失败: {str(e)}")
+            return None
     
     def _check_apk_installed(self):
         """检查APK是否已安装"""
@@ -707,7 +773,8 @@ class HeraConfigManager:
     def _dump_feature(self):
         """导出feature信息"""
         try:
-            output_file = os.path.join(self.output_dir, 'dumpfeature.txt')
+            output_dir = self._ensure_output_directory()
+            output_file = os.path.join(output_dir, 'dumpfeature.txt')
             run_adb_command(['adb', 'shell', 'dumpsys', 'feature'], 
                           stdout=open(output_file, 'w'), check=True)
             self._log_message(f"✅ Feature信息已导出到: {output_file}")
@@ -748,7 +815,8 @@ class HeraConfigManager:
         """检查在线支持服务状态"""
         try:
             # 导出服务信息
-            output_file = os.path.join(self.output_dir, 'onlinesupport1.txt')
+            output_dir = self._ensure_output_directory()
+            output_file = os.path.join(output_dir, 'onlinesupport1.txt')
             run_adb_command(['adb', 'shell', 'dumpsys', 'activity', 'service', 'Onlinesupport'], 
                           stdout=open(output_file, 'w'), check=True)
             
@@ -772,7 +840,8 @@ class HeraConfigManager:
             
             # 生成带时间戳的文件名
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            output_file = os.path.join(self.output_dir, f'bugreport_{timestamp}.txt')
+            output_dir = self._ensure_output_directory()
+            output_file = os.path.join(output_dir, f'bugreport_{timestamp}.txt')
             
             with open(output_file, 'w', encoding='utf-8') as f:
                 result = run_adb_command(['adb', 'bugreport'], 
