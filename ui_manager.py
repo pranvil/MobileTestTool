@@ -676,6 +676,10 @@ class UIManager:
         # 绑定Alt+Tab快捷键
         self.root.bind("<Alt-Tab>", self.on_alt_tab)
         
+        # 绑定窗口激活事件（Windows特有）
+        self.root.bind("<Activate>", self.on_window_activate)
+        self.root.bind("<Deactivate>", self.on_window_deactivate)
+        
         # 设置窗口属性
         self.root.attributes('-topmost', False)
         self.root.lift()
@@ -691,6 +695,10 @@ class UIManager:
         
         # 添加全局快捷键支持
         self.root.bind_all("<Control-Shift-L>", lambda e: self.bring_to_front())
+        
+        # 初始化窗口状态跟踪
+        self._window_was_minimized = False
+        self._last_focus_time = 0
     
     def on_mousewheel(self, event):
         """处理鼠标滚轮事件"""
@@ -706,18 +714,68 @@ class UIManager:
         """窗口显示时调用"""
         self.root.lift()
         self.root.focus_force()
+        self._window_was_minimized = False
     
     def on_window_unmap(self, event):
         """窗口隐藏时调用"""
-        pass
+        self._window_was_minimized = True
     
     def on_window_focus(self, event):
         """窗口获得焦点时调用"""
+        import time
+        self._last_focus_time = time.time()
         self.root.lift()
     
     def on_window_focus_out(self, event):
         """窗口失去焦点时调用"""
         pass
+    
+    def on_window_activate(self, event):
+        """窗口激活时调用（Windows特有）"""
+        import time
+        current_time = time.time()
+        # 如果距离上次失去焦点超过1秒，说明用户从其他地方切换回来
+        if current_time - self._last_focus_time > 1.0:
+            self.root.after(100, self._force_window_focus)
+    
+    def on_window_deactivate(self, event):
+        """窗口失活时调用（Windows特有）"""
+        pass
+    
+    def _force_window_focus(self):
+        """强制窗口获得焦点"""
+        try:
+            self.root.lift()
+            self.root.focus_force()
+            self.root.attributes('-topmost', True)
+            self.root.after(100, lambda: self.root.attributes('-topmost', False))
+        except Exception as e:
+            print(f"强制窗口焦点失败: {e}")
+    
+    def restore_focus_after_dialog(self):
+        """在对话框关闭后恢复主窗口焦点"""
+        def restore():
+            try:
+                # 使用多种方法确保窗口能被激活
+                self.root.lift()
+                self.root.focus_force()
+                self.root.attributes('-topmost', True)
+                self.root.after(100, lambda: self.root.attributes('-topmost', False))
+                
+                # 尝试使用Windows API强制激活（如果可用）
+                try:
+                    import ctypes
+                    hwnd = self.root.winfo_id()
+                    ctypes.windll.user32.SetForegroundWindow(hwnd)
+                    ctypes.windll.user32.BringWindowToTop(hwnd)
+                except Exception:
+                    pass  # Windows API不可用时忽略
+                    
+            except Exception as e:
+                print(f"恢复窗口焦点失败: {e}")
+        
+        # 延迟执行，确保对话框完全关闭
+        self.root.after(200, restore)
     
     def on_alt_tab(self, event):
         """Alt+Tab时调用"""
@@ -1045,6 +1103,8 @@ class UIManager:
                 self._enable_all_widgets(self.root)
                 # 关闭进度对话框
                 progress_dialog.destroy()
+                # 强制恢复主窗口焦点
+                self.root.after(100, self._force_window_focus)
                 # 执行回调
                 if callback:
                     callback(result)
@@ -1056,6 +1116,8 @@ class UIManager:
                 mask_frame.destroy()
                 self._enable_all_widgets(self.root)
                 progress_dialog.destroy()
+                # 强制恢复主窗口焦点
+                self.root.after(100, self._force_window_focus)
                 if callback:
                     callback(result)
             except:

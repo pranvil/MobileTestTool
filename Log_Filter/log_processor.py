@@ -380,6 +380,9 @@ class LogProcessor:
             title="保存日志文件"
         )
         
+        # 恢复主窗口焦点
+        self.app.ui.restore_focus_after_dialog()
+        
         if filename:
             try:
                 with open(filename, 'w', encoding='utf-8') as f:
@@ -718,6 +721,9 @@ class LogProcessor:
             ],
             parent=self.app.root
         )
+        
+        # 恢复主窗口焦点
+        self.app.ui.restore_focus_after_dialog()
         
         if not file_path:
             print(f"[DEBUG] 用户取消文件选择")

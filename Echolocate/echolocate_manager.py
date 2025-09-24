@@ -619,6 +619,9 @@ class EcholocateManager:
                 parent=self.app.root
             )
             
+            # 恢复主窗口焦点
+            self.app.ui.restore_focus_after_dialog()
+            
             if not source_file:
                 messagebox.showinfo("取消", "用户取消文件选择")
                 return False

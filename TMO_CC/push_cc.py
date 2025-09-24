@@ -71,6 +71,9 @@ class PushCCManager:
             parent=self.app.root
         )
         
+        # 恢复主窗口焦点
+        self.app.ui.restore_focus_after_dialog()
+        
         if not file_paths:
             print(f"[DEBUG] 用户取消文件选择")
             self.app.ui.status_var.set("用户取消文件选择")

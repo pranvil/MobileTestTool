@@ -284,6 +284,9 @@ class DeviceSettingsManager:
                 parent=dialog
             )
             
+            # 恢复主窗口焦点
+            self.app.ui.restore_focus_after_dialog()
+            
             if not base_path:
                 return
             
@@ -339,6 +342,9 @@ class DeviceSettingsManager:
             path = filedialog.askdirectory(
                 title="选择Wireshark安装目录"
             )
+            
+            # 恢复主窗口焦点
+            self.app.ui.restore_focus_after_dialog()
             
             if path:
                 # 验证mergecap.exe是否存在
@@ -1971,6 +1977,10 @@ class DeviceSettingsManager:
             dialog.transient(self.app.root)
             dialog.grab_set()  # 模态对话框
             
+            # 绑定对话框的焦点事件
+            dialog.bind("<FocusOut>", lambda e: self._on_dialog_focus_out(dialog))
+            dialog.bind("<Map>", lambda e: self._on_dialog_map(dialog))
+            
             # 居中显示
             dialog.geometry("+%d+%d" % (
                 self.app.root.winfo_rootx() + (self.app.root.winfo_width() - 500) // 2,
@@ -2016,17 +2026,20 @@ class DeviceSettingsManager:
                 
                 # 发送文本
                 success = self._send_text_to_device(device, text_to_send)
-                if success:
-                    messagebox.showinfo("成功", "文本已成功发送到设备")
-                    # 不关闭窗口，让用户主动关闭
-                else:
-                    messagebox.showerror("失败", "文本发送失败，请检查设备连接")
+                # if success:
+                #     # 成功发送，不显示消息框，让用户继续使用
+                #     pass
+                # else:
+                #     messagebox.showerror("失败", "文本发送失败，请检查设备连接")
             
             def on_clear():
                 text_input.delete(1.0, tk.END)
             
             def on_cancel():
+                dialog.grab_release()  # 释放模态锁定
                 dialog.destroy()
+                # 恢复主窗口焦点
+                self.app.ui.restore_focus_after_dialog()
             
             ttk.Button(button_frame, text="发送", command=on_send).pack(side=tk.RIGHT, padx=(5, 0))
             ttk.Button(button_frame, text="清空", command=on_clear).pack(side=tk.RIGHT, padx=(5, 0))
@@ -2035,6 +2048,12 @@ class DeviceSettingsManager:
             # 绑定快捷键
             text_input.bind('<Control-Return>', lambda e: on_send())
             dialog.bind('<Escape>', lambda e: on_cancel())
+            
+            # 绑定窗口关闭事件
+            dialog.protocol("WM_DELETE_WINDOW", on_cancel)
+            
+            # 绑定对话框的窗口事件
+            dialog.bind("<Unmap>", lambda e: self._on_dialog_unmap(dialog))
             
             # 设置焦点
             text_input.focus()
@@ -2120,3 +2139,41 @@ class DeviceSettingsManager:
         except Exception as e:
             print(f"[DEBUG] 文本处理失败: {str(e)}")
             return text  # 如果处理失败，返回原始文本
+    
+    def _on_dialog_focus_out(self, dialog):
+        """对话框失去焦点时的处理"""
+        try:
+            # 检查对话框是否仍然存在
+            if dialog.winfo_exists():
+                # 延迟检查，如果对话框仍然可见，尝试重新获得焦点
+                dialog.after(100, lambda: self._check_dialog_focus(dialog))
+        except Exception as e:
+            print(f"对话框焦点处理失败: {e}")
+    
+    def _on_dialog_map(self, dialog):
+        """对话框显示时的处理"""
+        try:
+            # 确保对话框获得焦点
+            dialog.focus_force()
+        except Exception as e:
+            print(f"对话框显示处理失败: {e}")
+    
+    def _check_dialog_focus(self, dialog):
+        """检查对话框焦点状态"""
+        try:
+            if dialog.winfo_exists() and dialog.winfo_viewable():
+                # 如果对话框可见但没有焦点，尝试重新获得焦点
+                if not dialog.focus_get():
+                    dialog.focus_force()
+        except Exception as e:
+            print(f"检查对话框焦点失败: {e}")
+    
+    def _on_dialog_unmap(self, dialog):
+        """对话框隐藏时的处理"""
+        try:
+            # 释放模态锁定
+            dialog.grab_release()
+            # 恢复主窗口焦点
+            self.app.ui.restore_focus_after_dialog()
+        except Exception as e:
+            print(f"对话框隐藏处理失败: {e}")
