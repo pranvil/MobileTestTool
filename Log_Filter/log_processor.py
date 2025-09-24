@@ -100,45 +100,126 @@ class LogProcessor:
     
     def run_logcat(self):
         """运行adb logcat命令"""
-        try:
-            # 检查设备选择
-            device = self.app.selected_device.get().strip()
-            if not device or device in ["无设备", "检测失败", "检测超时", "adb未安装", "检测错误"]:
-                self.log_queue.put("ERROR: 请先选择有效的设备")
-                return
-            
-            # 构建adb logcat命令，添加-b all参数确保完全输出
-            cmd = ["adb", "-s", device, "logcat", "-b", "all", "-v", "time"]
-            
-            # 启动进程
-            self.log_process = subprocess.Popen(
-                cmd,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True,
-                encoding='utf-8',
-                errors='replace',  # 遇到无法解码的字符时用替换字符代替
-                bufsize=1,
-                universal_newlines=True,
-                creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0
-            )
-            
-            # 读取输出
-            for line in iter(self.log_process.stdout.readline, ''):
+        while self.app.is_running:
+            try:
+                # 检查设备选择
+                device = self.app.selected_device.get().strip()
+                if not device or device in ["无设备", "检测失败", "检测超时", "adb未安装", "检测错误"]:
+                    self.log_queue.put("ERROR: 请先选择有效的设备")
+                    return
+                
+                # 构建adb logcat命令，添加-b all参数确保完全输出
+                cmd = ["adb", "-s", device, "logcat", "-b", "all", "-v", "time"]
+                
+                # 启动进程
+                print(f"[DEBUG] 启动ADB logcat进程")
+                self.log_process = subprocess.Popen(
+                    cmd,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True,
+                    encoding='utf-8',
+                    errors='replace',  # 遇到无法解码的字符时用替换字符代替
+                    bufsize=1,
+                    universal_newlines=True,
+                    creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0
+                )
+                
+                print(f"[DEBUG] 进程启动完成，PID: {self.log_process.pid}")
+                
+                # 更新状态显示
+                self.app.root.after(0, lambda: self.app.ui.status_var.set("正在过滤..."))
+                
+                # 读取输出
+                line_count = 0
+                waiting_for_device = False
+                
+                for line in iter(self.log_process.stdout.readline, ''):
+                    if not self.app.is_running:
+                        print(f"[DEBUG] 用户停止过滤")
+                        break
+                    
+                    line_count += 1
+                    
+                    # 检查是否是"waiting for device"状态
+                    if "waiting for device" in line.lower():
+                        if not waiting_for_device:
+                            print(f"[DEBUG] 检测到 waiting for device 状态")
+                            waiting_for_device = True
+                            self.app.root.after(0, lambda: self.app.ui.status_var.set("ADB断开，等待重连..."))
+                        continue  # 跳过这行，不处理
+                    
+                    # 如果之前是waiting状态，现在收到正常日志，说明重连成功
+                    if waiting_for_device:
+                        print(f"[DEBUG] ADB重连成功，恢复正常过滤")
+                        waiting_for_device = False
+                        self.app.root.after(0, lambda: self.app.ui.status_var.set("正在过滤..."))
+                    
+                    if line_count <= 5:  # 只打印前5行用于调试
+                        print(f"[DEBUG] 收到日志行 {line_count}: {line.strip()[:100]}")
+                    
+                    # 过滤日志
+                    if self.filter_line(line):
+                        self.log_queue.put(line)
+                
+                print(f"[DEBUG] 读取循环结束，总共处理了 {line_count} 行")
+                
+                # 如果用户没有主动停止，说明连接断开，重新启动
+                if self.app.is_running:
+                    print(f"[DEBUG] 连接断开，重新启动logcat")
+                    self.app.root.after(0, lambda: self.app.ui.status_var.set("ADB断开，等待重连..."))
+                    
+                    # 清理当前进程
+                    if self.log_process:
+                        try:
+                            self.log_process.terminate()
+                            self.log_process.wait(timeout=2)
+                        except:
+                            pass
+                        self.log_process = None
+                    
+                    # 短暂等待后重新启动
+                    import time
+                    time.sleep(1)
+                else:
+                    # 用户主动停止
+                    break
+                    
+            except FileNotFoundError:
+                self.log_queue.put("ERROR: 未找到adb命令，请确保Android SDK已安装并配置PATH")
+                break
+            except Exception as e:
+                print(f"[DEBUG] ADB连接异常: {e}")
+                self.app.root.after(0, lambda: self.app.ui.status_var.set("ADB连接异常，等待重连..."))
+                
+                # 清理当前进程
+                if self.log_process:
+                    try:
+                        self.log_process.terminate()
+                        self.log_process.wait(timeout=2)
+                    except:
+                        pass
+                    self.log_process = None
+                
+                # 等待后重新尝试
+                import time
+                time.sleep(2)
+                
                 if not self.app.is_running:
                     break
-                
-                # 过滤日志
-                if self.filter_line(line):
-                    self.log_queue.put(line)
-            
-        except FileNotFoundError:
-            self.log_queue.put("ERROR: 未找到adb命令，请确保Android SDK已安装并配置PATH")
-        except Exception as e:
-            self.log_queue.put(f"ERROR: {e}")
-        finally:
-            self.app.is_running = False
-            self.app.root.after(0, self.filtering_stopped)
+        
+        # 清理资源
+        if self.log_process:
+            try:
+                self.log_process.terminate()
+                self.log_process.wait(timeout=5)
+            except:
+                pass
+            self.log_process = None
+        
+        # 停止过滤
+        self.app.is_running = False
+        self.app.root.after(0, self.filtering_stopped)
     
     def filter_line(self, line):
         """过滤日志行"""
@@ -340,9 +421,16 @@ class LogProcessor:
         """停止过滤"""
         self.app.is_running = False
         if self.log_process:
-            self.log_process.terminate()
-            self.log_process.wait()  # 等待进程结束，避免僵尸进程
-            self.log_process = None
+            try:
+                self.log_process.terminate()
+                self.log_process.wait(timeout=5)  # 等待进程结束，避免僵尸进程，最多等待5秒
+            except:
+                try:
+                    self.log_process.kill()  # 如果terminate失败，强制杀死进程
+                except:
+                    pass
+            finally:
+                self.log_process = None
     
     def filtering_stopped(self):
         """过滤停止后的处理"""
