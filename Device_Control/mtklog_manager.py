@@ -26,7 +26,11 @@ class MTKLogManager:
             return
         
         # 定义后台工作函数
-        def mtklog_start_worker(progress_var, status_label, progress_dialog):
+        def mtklog_start_worker(progress_var, status_label, progress_dialog, stop_flag):
+            # 检查是否被要求停止
+            if stop_flag and stop_flag.is_set():
+                return {"success": False, "message": "操作已取消"}
+            
             # 命令序列：停止logger -> 清除旧日志 -> 设置缓存大小 -> 开启logger
             commands = [
                 # 1. 停止logger,加5s时间保护
@@ -50,6 +54,10 @@ class MTKLogManager:
             
             # 执行命令序列
             for i, cmd in enumerate(commands, 1):
+                # 检查是否被要求停止
+                if stop_flag and stop_flag.is_set():
+                    return {"success": False, "message": "操作已取消"}
+                
                 # 更新状态
                 status_label.config(text=f"步骤 {i}/4: {step_names[i-1]}")
                 progress_var.set((i-1) * 25)
@@ -88,7 +96,10 @@ class MTKLogManager:
         
         # 定义完成回调
         def on_mtklog_start_done(result):
-            self.app.ui.status_var.set(f"MTKLOG已开启 - {result['device']}")
+            if result.get("success") == False and result.get("message") == "操作已取消":
+                self.app.ui.status_var.set("操作已取消")
+            else:
+                self.app.ui.status_var.set(f"MTKLOG已开启 - {result['device']}")
         
         # 定义错误回调
         def on_mtklog_start_error(error):
@@ -121,7 +132,11 @@ class MTKLogManager:
             "选择'是'将额外导出这些媒体文件。")
         
         # 定义后台工作函数
-        def mtklog_worker(progress_var, status_label, progress_dialog):
+        def mtklog_worker(progress_var, status_label, progress_dialog, stop_flag):
+            # 检查是否被要求停止
+            if stop_flag and stop_flag.is_set():
+                return {"success": False, "message": "操作已取消"}
+            
             # 1. 停止logger命令,加5s时间保护
             status_label.config(text="停止logger...")
             progress_var.set(20)
@@ -139,6 +154,10 @@ class MTKLogManager:
             status_label.config(text="等待5秒保护时间...")
             progress_dialog.update()
             time.sleep(5)
+            
+            # 检查是否被要求停止
+            if stop_flag and stop_flag.is_set():
+                return {"success": False, "message": "操作已取消"}
             
             # 2. 创建日志目录
             status_label.config(text="创建日志目录...")
@@ -199,30 +218,33 @@ class MTKLogManager:
         
         # 定义完成回调
         def on_mtklog_done(result):
-            # 打开日志文件夹
-            if result["log_folder"]:
-                os.startfile(result["log_folder"])
-            
-            # 更新状态和显示完成信息
-            if result["export_media"]:
-                self.app.ui.status_var.set(f"MTKLOG已停止并导出(含媒体文件) - {result['device']}")
-                messagebox.showinfo("导出完成", 
-                    f"MTKLOG导出完成！\n\n"
-                    f"导出目录: {result['log_folder']}\n"
-                    f"设备: {result['device']}\n\n"
-                    f"已导出内容:\n"
-                    f"• MTKLOG日志文件\n"
-                    f"• 屏幕录制视频\n"
-                    f"• 截图文件\n\n"
-                    f"文件夹已自动打开。")
+            if result.get("success") == False and result.get("message") == "操作已取消":
+                self.app.ui.status_var.set("操作已取消")
             else:
-                self.app.ui.status_var.set(f"MTKLOG已停止并导出 - {result['device']}")
-                messagebox.showinfo("导出完成", 
-                    f"MTKLOG导出完成！\n\n"
-                    f"导出目录: {result['log_folder']}\n"
-                    f"设备: {result['device']}\n\n"
-                    f"已导出MTKLOG日志文件。\n\n"
-                    f"文件夹已自动打开。")
+                # 打开日志文件夹
+                if result["log_folder"]:
+                    os.startfile(result["log_folder"])
+                
+                # 更新状态和显示完成信息
+                if result["export_media"]:
+                    self.app.ui.status_var.set(f"MTKLOG已停止并导出(含媒体文件) - {result['device']}")
+                    messagebox.showinfo("导出完成", 
+                        f"MTKLOG导出完成！\n\n"
+                        f"导出目录: {result['log_folder']}\n"
+                        f"设备: {result['device']}\n\n"
+                        f"已导出内容:\n"
+                        f"• MTKLOG日志文件\n"
+                        f"• 屏幕录制视频\n"
+                        f"• 截图文件\n\n"
+                        f"文件夹已自动打开。")
+                else:
+                    self.app.ui.status_var.set(f"MTKLOG已停止并导出 - {result['device']}")
+                    messagebox.showinfo("导出完成", 
+                        f"MTKLOG导出完成！\n\n"
+                        f"导出目录: {result['log_folder']}\n"
+                        f"设备: {result['device']}\n\n"
+                        f"已导出MTKLOG日志文件。\n\n"
+                        f"文件夹已自动打开。")
         
         # 定义错误回调
         def on_mtklog_error(error):
@@ -242,7 +264,11 @@ class MTKLogManager:
             return
         
         # 定义后台工作函数
-        def delete_worker(progress_var, status_label, progress_dialog):
+        def delete_worker(progress_var, status_label, progress_dialog, stop_flag):
+            # 检查是否被要求停止
+            if stop_flag and stop_flag.is_set():
+                return {"success": False, "message": "操作已取消"}
+            
             # 删除logger命令
             status_label.config(text="执行删除命令...")
             progress_var.set(50)
@@ -267,7 +293,10 @@ class MTKLogManager:
         
         # 定义完成回调
         def on_delete_done(result):
-            self.app.ui.status_var.set(f"MTKLOG已删除 - {result['device']}")
+            if result.get("success") == False and result.get("message") == "操作已取消":
+                self.app.ui.status_var.set("操作已取消")
+            else:
+                self.app.ui.status_var.set(f"MTKLOG已删除 - {result['device']}")
         
         # 定义错误回调
         def on_delete_error(error):
@@ -362,7 +391,11 @@ class MTKLogManager:
             return
         
         # 定义后台工作函数
-        def install_worker(progress_var, status_label, progress_dialog):
+        def install_worker(progress_var, status_label, progress_dialog, stop_flag):
+            # 检查是否被要求停止
+            if stop_flag and stop_flag.is_set():
+                return {"success": False, "message": "操作已取消"}
+            
             # 1. 安装MTKLOGGER
             status_label.config(text="安装MTKLOGGER...")
             progress_var.set(30)
@@ -405,12 +438,15 @@ class MTKLogManager:
         
         # 定义完成回调
         def on_install_done(result):
-            messagebox.showinfo("成功", 
-                f"MTKLOGGER安装成功!\n\n"
-                f"设备: {result['device']}\n"
-                f"APK文件: {result['apk_file']}\n\n"
-                f"MTKLOGGER已启动，现在可以使用MTKLOG相关功能。")
-            self.app.ui.status_var.set(f"MTKLOGGER安装成功 - {result['device']}")
+            if result.get("success") == False and result.get("message") == "操作已取消":
+                self.app.ui.status_var.set("操作已取消")
+            else:
+                messagebox.showinfo("成功", 
+                    f"MTKLOGGER安装成功!\n\n"
+                    f"设备: {result['device']}\n"
+                    f"APK文件: {result['apk_file']}\n\n"
+                    f"MTKLOGGER已启动，现在可以使用MTKLOG相关功能。")
+                self.app.ui.status_var.set(f"MTKLOGGER安装成功 - {result['device']}")
         
         # 定义错误回调
         def on_install_error(error):

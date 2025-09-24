@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Android ADB Logcat 关键字过滤工具 v2.0
+Android ADB Logcat 关键字过滤工具 v0.1
 支持正则表达式、大小写敏感、彩色显示和保存功能
 重构版本 - 模块化设计
 """

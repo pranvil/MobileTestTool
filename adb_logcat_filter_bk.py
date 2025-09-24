@@ -17,7 +17,7 @@ import queue
 class LogcatFilterApp:
     def __init__(self, root):
         self.root = root
-        self.root.title("手机日志辅助工具 v2.0")
+        self.root.title("手机日志辅助工具 v 0.1")
         self.root.geometry("1000x700")
         
         # 变量
@@ -332,7 +332,7 @@ class LogcatFilterApp:
         """显示关于对话框"""
         messagebox.showinfo("关于", 
             "手机log辅助工具\n\n"
-            "版本: 2.0\n"
+            "版本: 0.1\n"
             "功能: Android设备日志管理和MTKLOG操作\n\n"
             "主要功能:\n"
             "• 实时过滤Android设备日志\n"
@@ -1740,7 +1740,7 @@ class LogcatFilterApp:
             return
         
         # 定义后台工作函数
-        def mtklog_worker(progress_var, status_label, progress_dialog):
+        def mtklog_worker(progress_var, status_label, progress_dialog, stop_flag):
             import os
             import datetime
             import time
@@ -2366,7 +2366,7 @@ class LogcatFilterApp:
         log_name = log_name.replace(" ", "_")
         
         # 定义后台工作函数
-        def adblog_start_worker(progress_var, status_label, progress_dialog):
+        def adblog_start_worker(progress_var, status_label, progress_dialog, stop_flag):
             import time
             import datetime
             
@@ -2455,7 +2455,7 @@ class LogcatFilterApp:
             return
         
         # 定义后台工作函数
-        def adblog_worker(progress_var, status_label, progress_dialog):
+        def adblog_worker(progress_var, status_label, progress_dialog, stop_flag):
             import os
             import datetime
             import time
@@ -2650,7 +2650,7 @@ class LogcatFilterApp:
             return
         
         # 定义后台工作函数
-        def install_worker(progress_var, status_label, progress_dialog):
+        def install_worker(progress_var, status_label, progress_dialog, stop_flag):
             import time
             
             # 1. 卸载旧版本（如果存在）

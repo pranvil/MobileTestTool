@@ -74,7 +74,8 @@ class EcholocateManager:
                 )
                 
                 if not apk_file:
-                    messagebox.showinfo("取消", "用户取消安装")
+                    # messagebox.showinfo("取消", "用户取消安装")
+                    pass
                     return False
                 
                 try:
@@ -229,7 +230,8 @@ class EcholocateManager:
             rename_dialog.wait_window()
             
             if not result[0]:
-                messagebox.showinfo("取消", "用户取消操作")
+                # messagebox.showinfo("取消", "用户取消操作")
+                pass
                 return False
             
             target_dir = result[0]
@@ -365,7 +367,8 @@ class EcholocateManager:
                 )
                 
                 if not source_file:
-                    messagebox.showinfo("取消", "用户取消文件选择")
+                    # messagebox.showinfo("取消", "用户取消文件选择")
+                    pass
                     return False
             
             # 获取文件目录和文件名
@@ -491,7 +494,8 @@ class EcholocateManager:
         )
         
         if not source_file:
-            messagebox.showinfo("取消", "用户取消文件选择")
+            # messagebox.showinfo("取消", "用户取消文件选择")
+            pass
             return False
         
         # 先执行主要的AllCallFlow过滤
@@ -570,11 +574,12 @@ class EcholocateManager:
             )
             
             if not test_case_id:
-                messagebox.showinfo("取消", "用户取消测试")
+                # messagebox.showinfo("取消", "用户取消测试")
+                pass
                 return False
             
             # 定义后台工作函数
-            def voice_intent_test_worker(progress_var, status_label, progress_dialog):
+            def voice_intent_test_worker(progress_var, status_label, progress_dialog, stop_flag):
                 return self._execute_voice_intent_test_worker(device, test_case_id, progress_var, status_label, progress_dialog)
             
             # 定义完成回调
@@ -623,7 +628,8 @@ class EcholocateManager:
             self.app.ui.restore_focus_after_dialog()
             
             if not source_file:
-                messagebox.showinfo("取消", "用户取消文件选择")
+                # messagebox.showinfo("取消", "用户取消文件选择")
+                pass
                 return False
             
             # 显示intent类型选择对话框
@@ -703,7 +709,7 @@ class EcholocateManager:
             messagebox.showerror("错误", f"提取voice_intent失败: {str(e)}")
             return False
     
-    def _execute_voice_intent_test_worker(self, device, test_case_id, progress_var, status_label, progress_dialog):
+    def _execute_voice_intent_test_worker(self, device, test_case_id, progress_var, status_label, progress_dialog, stop_flag=None):
         """执行voice_intent测试的后台工作函数"""
         try:
             import datetime

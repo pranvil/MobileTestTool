@@ -22,7 +22,11 @@ class ScreenshotManager:
             return
         
         # 定义后台工作函数
-        def screenshot_worker(progress_var, status_label, progress_dialog):
+        def screenshot_worker(progress_var, status_label, progress_dialog, stop_flag):
+            # 检查是否被要求停止
+            if stop_flag and stop_flag.is_set():
+                return {"success": False, "message": "操作已取消"}
+            
             # 1. 检查并创建screenshot文件夹
             status_label.config(text="检查截图文件夹...")
             progress_var.set(20)
@@ -98,11 +102,14 @@ class ScreenshotManager:
         
         # 定义完成回调
         def on_screenshot_done(result):
-            # 打开截图文件夹
-            if result["screenshot_folder"]:
-                os.startfile(result["screenshot_folder"])
-            # 更新状态
-            self.app.ui.status_var.set(f"截图已保存 - {result['device']} - {result['filename']}")
+            if result.get("success") == False and result.get("message") == "操作已取消":
+                self.app.ui.status_var.set("操作已取消")
+            else:
+                # 打开截图文件夹
+                if result["screenshot_folder"]:
+                    os.startfile(result["screenshot_folder"])
+                # 更新状态
+                self.app.ui.status_var.set(f"截图已保存 - {result['device']} - {result['filename']}")
         
         # 定义错误回调
         def on_screenshot_error(error):

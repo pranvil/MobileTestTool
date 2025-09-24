@@ -146,8 +146,12 @@ class PullCCManager:
                 return
         
         # 2) 再启动真正的拉取
-        def pull_cc_worker(progress_var, status_label, progress_dialog):
+        def pull_cc_worker(progress_var, status_label, progress_dialog, stop_flag):
             try:
+                # 检查是否被要求停止
+                if stop_flag and stop_flag.is_set():
+                    return {"success": False, "message": "操作已取消"}
+                
                 print(f"[DEBUG] 开始拉CC文件，设备: {device}")
                 
                 status_label.config(text="开始拉取 /data/deviceInfo...")
@@ -162,6 +166,10 @@ class PullCCManager:
                 print(f"[DEBUG] pull命令返回码: {result.returncode}")
                 print(f"[DEBUG] pull命令输出: {result.stdout}")
                 print(f"[DEBUG] pull命令错误: {result.stderr}")
+                
+                # 检查是否被要求停止
+                if stop_flag and stop_flag.is_set():
+                    return {"success": False, "message": "操作已取消"}
                 
                 # 检查是否出现Permission denied错误
                 if result.returncode != 0 and "Permission denied" in result.stderr:
@@ -181,6 +189,10 @@ class PullCCManager:
                     
                     if "adbd cannot run as root in production builds" in output:
                         raise Exception("设备没有root权限，操作无法执行")
+                    
+                    # 检查是否被要求停止
+                    if stop_flag and stop_flag.is_set():
+                        return {"success": False, "message": "操作已取消"}
                     
                     # root权限检查通过，重新执行pull
                     status_label.config(text="Root权限检查通过，重新拉取文件...")
@@ -227,14 +239,17 @@ class PullCCManager:
         
         # 定义成功回调
         def on_pull_cc_done(result):
-            # 正常完成的情况
-            self.app.ui.status_var.set(f"CC文件已拉取完成 - {result['device']} - {result['deviceinfo_path']}")
-            
-            # 直接打开文件夹
-            try:
-                os.startfile(result['target_dir'])
-            except Exception as e:
-                messagebox.showerror("错误", f"无法打开文件夹: {str(e)}")
+            if result.get("success") == False and result.get("message") == "操作已取消":
+                self.app.ui.status_var.set("操作已取消")
+            else:
+                # 正常完成的情况
+                self.app.ui.status_var.set(f"CC文件已拉取完成 - {result['device']} - {result['deviceinfo_path']}")
+                
+                # 直接打开文件夹
+                try:
+                    os.startfile(result['target_dir'])
+                except Exception as e:
+                    messagebox.showerror("错误", f"无法打开文件夹: {str(e)}")
         
         # 定义错误回调
         def on_pull_cc_error(error):

@@ -20,7 +20,11 @@ class GoogleLogManager:
     def start_google_log(self, device, ui_manager):
         """开始Google日志收集"""
         # 定义后台工作函数
-        def google_log_worker(progress_var, status_label, progress_dialog):
+        def google_log_worker(progress_var, status_label, progress_dialog, stop_flag):
+            # 检查是否被要求停止
+            if stop_flag and stop_flag.is_set():
+                return {"success": False, "message": "操作已取消"}
+            
             # 1. 创建日志目录
             status_label.config(text="创建Google日志目录...")
             progress_var.set(10)
@@ -122,9 +126,12 @@ class GoogleLogManager:
         
         # 定义完成回调
         def on_google_log_start_done(result):
-            self.google_log_running = True
-            ui_manager.google_log_button.config(text="停止Google日志")
-            self.app.ui.status_var.set(f"Google日志收集已启动 - {result['folder']}")
+            if result.get("success") == False and result.get("message") == "操作已取消":
+                self.app.ui.status_var.set("操作已取消")
+            else:
+                self.google_log_running = True
+                ui_manager.google_log_button.config(text="停止Google日志")
+                self.app.ui.status_var.set(f"Google日志收集已启动 - {result['folder']}")
         
         # 定义错误回调
         def on_google_log_start_error(error):
@@ -138,7 +145,11 @@ class GoogleLogManager:
     def start_bugreport_only(self, device, ui_manager):
         """仅执行bugreport"""
         # 定义后台工作函数
-        def bugreport_only_worker(progress_var, status_label, progress_dialog):
+        def bugreport_only_worker(progress_var, status_label, progress_dialog, stop_flag):
+            # 检查是否被要求停止
+            if stop_flag and stop_flag.is_set():
+                return {"success": False, "message": "操作已取消"}
+            
             # 1. 创建日志目录
             status_label.config(text="创建Google日志目录...")
             progress_var.set(20)
@@ -171,12 +182,15 @@ class GoogleLogManager:
         
         # 定义完成回调
         def on_bugreport_done(result):
-            ui_manager.google_log_button.config(text="Google日志")
-            self.app.ui.status_var.set(f"bugreport生成完成 - {result['folder']}")
-            
-            # 打开日志文件夹
-            if result["folder"]:
-                os.startfile(result["folder"])
+            if result.get("success") == False and result.get("message") == "操作已取消":
+                self.app.ui.status_var.set("操作已取消")
+            else:
+                ui_manager.google_log_button.config(text="Google日志")
+                self.app.ui.status_var.set(f"bugreport生成完成 - {result['folder']}")
+                
+                # 打开日志文件夹
+                if result["folder"]:
+                    os.startfile(result["folder"])
         
         # 定义错误回调
         def on_bugreport_error(error):
@@ -190,7 +204,11 @@ class GoogleLogManager:
     def stop_google_log(self, device, ui_manager):
         """停止Google日志收集"""
         # 定义后台工作函数
-        def google_log_stop_worker(progress_var, status_label, progress_dialog):
+        def google_log_stop_worker(progress_var, status_label, progress_dialog, stop_flag):
+            # 检查是否被要求停止
+            if stop_flag and stop_flag.is_set():
+                return {"success": False, "message": "操作已取消"}
+            
             # 1. 停止ADB日志并导出
             status_label.config(text="停止ADB日志并导出...")
             progress_var.set(25)
@@ -232,13 +250,16 @@ class GoogleLogManager:
         
         # 定义完成回调
         def on_google_log_stop_done(result):
-            self.google_log_running = False
-            ui_manager.google_log_button.config(text="Google日志")
-            self.app.ui.status_var.set(f"Google日志收集已完成 - {result['folder']}")
-            
-            # 打开日志文件夹
-            if result["folder"]:
-                os.startfile(result["folder"])
+            if result.get("success") == False and result.get("message") == "操作已取消":
+                self.app.ui.status_var.set("操作已取消")
+            else:
+                self.google_log_running = False
+                ui_manager.google_log_button.config(text="Google日志")
+                self.app.ui.status_var.set(f"Google日志收集已完成 - {result['folder']}")
+                
+                # 打开日志文件夹
+                if result["folder"]:
+                    os.startfile(result["folder"])
         
         # 定义错误回调
         def on_google_log_stop_error(error):

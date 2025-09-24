@@ -39,7 +39,11 @@ class VideoManager:
             return
         
         # 定义后台工作函数
-        def recording_start_worker(progress_var, status_label, progress_dialog):
+        def recording_start_worker(progress_var, status_label, progress_dialog, stop_flag):
+            # 检查是否被要求停止
+            if stop_flag and stop_flag.is_set():
+                return {"success": False, "message": "操作已取消"}
+            
             # 1. 检查屏幕状态
             status_label.config(text="检查屏幕状态...")
             progress_var.set(20)
@@ -70,6 +74,10 @@ class VideoManager:
             else:
                 print(f"警告: 检查屏幕状态失败: {result.stderr.strip()}")
             
+            # 检查是否被要求停止
+            if stop_flag and stop_flag.is_set():
+                return {"success": False, "message": "操作已取消"}
+            
             # 2. 等待设备连接
             status_label.config(text="等待设备连接...")
             progress_var.set(60)
@@ -81,6 +89,10 @@ class VideoManager:
             if result.returncode != 0:
                 raise Exception(f"设备连接失败: {result.stderr.strip()}")
             
+            # 检查是否被要求停止
+            if stop_flag and stop_flag.is_set():
+                return {"success": False, "message": "操作已取消"}
+            
             # 3. 设置时钟显示秒数
             status_label.config(text="设置系统参数...")
             progress_var.set(80)
@@ -89,6 +101,10 @@ class VideoManager:
             clock_cmd = ["adb", "-s", device, "shell", "settings", "put", "secure", "clock_seconds", "1"]
             subprocess.run(clock_cmd, capture_output=True, text=True, timeout=15, 
                          creationflags=subprocess.CREATE_NO_WINDOW)
+            
+            # 检查是否被要求停止
+            if stop_flag and stop_flag.is_set():
+                return {"success": False, "message": "操作已取消"}
             
             # 4. 开始录制
             status_label.config(text="开始录制视频...")
@@ -99,10 +115,13 @@ class VideoManager:
         
         # 定义完成回调
         def on_recording_start_done(result):
-            # 开始实际录制
-            self._start_actual_recording(result["device"])
-            # 更新状态
-            self.app.ui.status_var.set(f"视频录制已开始 - {result['device']}")
+            if result.get("success") == False and result.get("message") == "操作已取消":
+                self.app.ui.status_var.set("操作已取消")
+            else:
+                # 开始实际录制
+                self._start_actual_recording(result["device"])
+                # 更新状态
+                self.app.ui.status_var.set(f"视频录制已开始 - {result['device']}")
         
         # 定义错误回调
         def on_recording_start_error(error):
@@ -204,7 +223,11 @@ class VideoManager:
             self.recording_button.config(text="开始录制")
         
         # 定义后台工作函数 - 保存视频文件
-        def save_video_worker(progress_var, status_label, progress_dialog):
+        def save_video_worker(progress_var, status_label, progress_dialog, stop_flag):
+            # 检查是否被要求停止
+            if stop_flag and stop_flag.is_set():
+                return {"success": False, "message": "操作已取消"}
+            
             device = self.app.device_manager.get_selected_device()
             if not device:
                 raise Exception("未选择设备")
@@ -224,6 +247,10 @@ class VideoManager:
                 os.makedirs(log_dir)
             if not os.path.exists(video_dir):
                 os.makedirs(video_dir)
+            
+            # 检查是否被要求停止
+            if stop_flag and stop_flag.is_set():
+                return {"success": False, "message": "操作已取消"}
             
             # 2. 查找视频文件
             status_label.config(text="查找视频文件...")
@@ -274,6 +301,10 @@ class VideoManager:
             
             if not video_files:
                 raise Exception("未找到录制的视频文件")
+            
+            # 检查是否被要求停止
+            if stop_flag and stop_flag.is_set():
+                return {"success": False, "message": "操作已取消"}
             
             # 3. 保存视频文件
             status_label.config(text="保存视频文件...")
@@ -332,11 +363,14 @@ class VideoManager:
         
         # 定义完成回调
         def on_save_done(result):
-            # 打开视频文件夹
-            if result["video_folder"]:
-                os.startfile(result["video_folder"])
-            # 更新状态
-            self.app.ui.status_var.set(f"视频已保存 - {result['device']} - {result['saved_count']}个文件")
+            if result.get("success") == False and result.get("message") == "操作已取消":
+                self.app.ui.status_var.set("操作已取消")
+            else:
+                # 打开视频文件夹
+                if result["video_folder"]:
+                    os.startfile(result["video_folder"])
+                # 更新状态
+                self.app.ui.status_var.set(f"视频已保存 - {result['device']} - {result['saved_count']}个文件")
         
         # 定义错误回调
         def on_save_error(error):

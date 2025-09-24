@@ -23,9 +23,12 @@ class ServerManager:
             return
         
         # 使用模态执行器显示进度
-        def server_worker(progress_var, status_label, progress_dialog):
+        def server_worker(progress_var, status_label, progress_dialog, stop_flag):
             try:
                 # 1. 确保屏幕亮屏且解锁
+                if stop_flag and stop_flag.is_set():
+                    return {"success": False, "message": "操作已取消"}
+                
                 status_label.config(text="检查屏幕状态...")
                 progress_var.set(20)
                 progress_dialog.update()
@@ -34,6 +37,9 @@ class ServerManager:
                     raise Exception("无法确保屏幕状态")
                 
                 # 2. 启动Entitlement活动
+                if stop_flag and stop_flag.is_set():
+                    return {"success": False, "message": "操作已取消"}
+                
                 status_label.config(text=f"启动{server_type}服务器活动...")
                 progress_var.set(40)
                 progress_dialog.update()
@@ -47,6 +53,9 @@ class ServerManager:
                     raise Exception(f"启动{server_type}服务器活动失败: {error_msg}")
                 
                 # 3. 等待界面加载
+                if stop_flag and stop_flag.is_set():
+                    return {"success": False, "message": "操作已取消"}
+                
                 status_label.config(text="等待界面加载...")
                 progress_var.set(60)
                 progress_dialog.update()
@@ -55,6 +64,9 @@ class ServerManager:
                     raise Exception("等待界面加载超时")
                 
                 # 4. 设置URL
+                if stop_flag and stop_flag.is_set():
+                    return {"success": False, "message": "操作已取消"}
+                
                 status_label.config(text="设置服务器URL...")
                 progress_var.set(80)
                 progress_dialog.update()
@@ -62,6 +74,9 @@ class ServerManager:
                 self._set_entitlement_urls(device, server_type)
                 
                 # 5. 完成
+                if stop_flag and stop_flag.is_set():
+                    return {"success": False, "message": "操作已取消"}
+                
                 progress_var.set(100)
                 return {"success": True, "server_type": server_type, "device": device}
                 
@@ -73,7 +88,10 @@ class ServerManager:
                 raise Exception(str(e))
         
         def on_server_done(result):
-            self.app.ui.status_var.set(f"{result['server_type']}服务器活动已启动 - {result['device']}")
+            if result.get("success") == False and result.get("message") == "操作已取消":
+                self.app.ui.status_var.set("操作已取消")
+            else:
+                self.app.ui.status_var.set(f"{result['server_type']}服务器活动已启动 - {result['device']}")
         
         def on_server_error(error):
             error_str = str(error)

@@ -77,7 +77,11 @@ class ADBLogManager:
         log_name = log_name.replace(" ", "_")
         
         # 定义后台工作函数
-        def adblog_start_worker(progress_var, status_label, progress_dialog):
+        def adblog_start_worker(progress_var, status_label, progress_dialog, stop_flag):
+            # 检查是否被要求停止
+            if stop_flag and stop_flag.is_set():
+                return {"success": False, "message": "操作已取消"}
+            
             # 1. 生成带时间的log文件名
             status_label.config(text="生成log文件名...")
             progress_var.set(20)
@@ -122,8 +126,11 @@ class ADBLogManager:
         
         # 定义完成回调
         def on_adblog_start_done(result):
-            # 更新状态
-            self.app.ui.status_var.set(f"ADB log已开启 - {result['device']} - {result['log_filename']}")
+            if result.get("success") == False and result.get("message") == "操作已取消":
+                self.app.ui.status_var.set("操作已取消")
+            else:
+                # 更新状态
+                self.app.ui.status_var.set(f"ADB log已开启 - {result['device']} - {result['log_filename']}")
         
         # 定义错误回调
         def on_adblog_start_error(error):
@@ -140,7 +147,11 @@ class ADBLogManager:
             return
         
         # 定义后台工作函数
-        def adblog_worker(progress_var, status_label, progress_dialog):
+        def adblog_worker(progress_var, status_label, progress_dialog, stop_flag):
+            # 检查是否被要求停止
+            if stop_flag and stop_flag.is_set():
+                return {"success": False, "message": "操作已取消"}
+            
             # 1. 检查设备连接状态
             status_label.config(text="检查设备连接状态...")
             progress_var.set(10)
@@ -279,11 +290,14 @@ class ADBLogManager:
         
         # 定义完成回调
         def on_adblog_done(result):
-            # 打开日志文件夹
-            if result["log_folder"]:
-                os.startfile(result["log_folder"])
-            # 更新状态
-            self.app.ui.status_var.set(f"ADB log已导出 - {result['device']}")
+            if result.get("success") == False and result.get("message") == "操作已取消":
+                self.app.ui.status_var.set("操作已取消")
+            else:
+                # 打开日志文件夹
+                if result["log_folder"]:
+                    os.startfile(result["log_folder"])
+                # 更新状态
+                self.app.ui.status_var.set(f"ADB log已导出 - {result['device']}")
         
         # 定义错误回调
         def on_adblog_error(error):

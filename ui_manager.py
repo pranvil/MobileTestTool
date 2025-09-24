@@ -971,6 +971,11 @@ class UIManager:
         progress_dialog.resizable(False, False)
         progress_dialog.transient(self.root)
         
+        # 设置关闭按钮处理
+        def handle_dialog_close():
+            self._handle_dialog_close(progress_dialog, mask_frame, confirm_button, thread, thread_stop_flag)
+        progress_dialog.protocol("WM_DELETE_WINDOW", handle_dialog_close)
+        
         # 居中显示
         progress_dialog.geometry("+%d+%d" % (
             self.root.winfo_rootx() + (self.root.winfo_width() - 400) // 2,
@@ -1011,15 +1016,31 @@ class UIManager:
         # 更新进度条
         progress_dialog.update()
         
+        # 创建线程控制标志
+        thread_stop_flag = threading.Event()
+        
         # 后台线程执行
         def background_worker():
             try:
-                result = worker_fn(progress_var, status_label, progress_dialog)
+                # 检查是否被要求停止
+                if thread_stop_flag.is_set():
+                    return
+                
+                result = worker_fn(progress_var, status_label, progress_dialog, thread_stop_flag)
+                
+                # 再次检查是否被要求停止
+                if thread_stop_flag.is_set():
+                    return
+                
                 # 执行成功，回到主线程
                 self.root.after(0, lambda: self._finish_modal_execution(
                     mask_frame, progress_dialog, confirm_button, result, on_done, True
                 ))
             except Exception as error:
+                # 检查是否被要求停止
+                if thread_stop_flag.is_set():
+                    return
+                
                 # 执行失败，回到主线程
                 self.root.after(0, lambda err=error: self._finish_modal_execution(
                     mask_frame, progress_dialog, confirm_button, err, on_error, False
@@ -1120,6 +1141,59 @@ class UIManager:
                 self.root.after(100, self._force_window_focus)
                 if callback:
                     callback(result)
+            except:
+                pass
+    
+    def _handle_dialog_close(self, progress_dialog, mask_frame, confirm_button, thread, thread_stop_flag=None):
+        """处理弹框关闭按钮点击"""
+        try:
+            # 显示确认对话框
+            result = messagebox.askyesno(
+                "确认关闭", 
+                "操作正在进行中，确定要关闭吗？\n\n关闭后将终止当前操作。"
+            )
+            
+            if result:  # 用户确认关闭
+                # 终止后台线程
+                if thread_stop_flag:
+                    thread_stop_flag.set()
+                
+                # 等待线程结束（最多等待2秒）
+                if thread and thread.is_alive():
+                    thread.join(timeout=2.0)
+                
+                # 清理资源
+                try:
+                    mask_frame.destroy()
+                except:
+                    pass
+                
+                try:
+                    self._enable_all_widgets(self.root)
+                except:
+                    pass
+                
+                try:
+                    progress_dialog.destroy()
+                except:
+                    pass
+                
+                # 恢复主窗口焦点
+                self.root.after(100, self._force_window_focus)
+                
+                # 更新状态栏提示
+                self.status_var.set("操作已取消")
+            # 如果用户选择"否"，则不做任何操作，弹框保持打开状态
+        except Exception as e:
+            # 如果出现错误，强制清理资源
+            try:
+                if thread_stop_flag:
+                    thread_stop_flag.set()
+                mask_frame.destroy()
+                self._enable_all_widgets(self.root)
+                progress_dialog.destroy()
+                self.root.after(100, self._force_window_focus)
+                self.status_var.set("操作已取消")
             except:
                 pass
     
