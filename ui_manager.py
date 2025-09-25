@@ -66,7 +66,7 @@ class UIManager:
                         saved_position = max_position
                     
                     self.main_paned.sash_place(0, 0, saved_position)
-                    print(f"[DEBUG] 恢复分割条位置: {saved_position} (窗口高度: {window_height})")
+                    # print(f"[DEBUG] 恢复分割条位置: {saved_position} (窗口高度: {window_height})")
                 else:
                     # 如果窗口高度还没确定，使用默认位置
                     self.main_paned.sash_place(0, 0, 140)
@@ -76,7 +76,7 @@ class UIManager:
                 self.main_paned.sash_place(0, 0, 140)
                 print(f"[DEBUG] 使用默认分割条位置: 140")
         except Exception as e:
-            print(f"恢复分割条位置失败: {e}")
+            # print(f"恢复分割条位置失败: {e}")
             # 使用默认位置
             try:
                 self.main_paned.sash_place(0, 0, 140)

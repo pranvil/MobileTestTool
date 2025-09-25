@@ -26,59 +26,17 @@ class AEELogManager:
         if not device:
             return
         
-        # 定义后台工作函数
-        def aee_log_worker(progress_var, status_label, progress_dialog, stop_flag):
-            # 检查是否被要求停止
-            if stop_flag and stop_flag.is_set():
-                return {"success": False, "message": "操作已取消"}
-            
+        try:
             # 1. 检查com.tcl.logger是否已安装
-            status_label.config(text="检查com.tcl.logger是否已安装...")
-            progress_var.set(10)
-            progress_dialog.update()
+            self.app.ui.status_var.set("检查com.tcl.logger是否已安装...")
             
             if not self._check_tcl_logger_installed(device):
-                # 如果未安装，循环询问用户是否安装，直到安装成功或用户取消
-                progress_dialog.destroy()
-                
-                while True:
-                    if messagebox.askyesno("安装提示", 
-                        "com.tcl.logger未安装，是否选择APK文件进行安装？\n\n"
-                        "点击'是'选择APK文件进行安装\n"
-                        "点击'否'取消操作"):
-                        
-                        # 选择APK文件
-                        apk_file = filedialog.askopenfilename(
-                            title="选择com.tcl.logger APK文件",
-                            filetypes=[("APK文件", "*.apk"), ("所有文件", "*.*")],
-                            parent=self.app.root
-                        )
-                        
-                        if not apk_file:
-                            return {"success": False, "message": "用户取消安装"}
-                        
-                        # 安装APK
-                        if self._install_tcl_logger(device, apk_file):
-                            # 安装完成后再次检查包是否存在
-                            if self._check_tcl_logger_installed(device):
-                                break  # 安装成功，跳出循环
-                            else:
-                                # 安装后仍然没有找到包，继续询问
-                                continue
-                        else:
-                            # 安装失败，继续询问
-                            continue
-                    else:
-                        return {"success": False, "message": "用户取消安装"}
-            
-            # 检查是否被要求停止
-            if stop_flag and stop_flag.is_set():
-                return {"success": False, "message": "操作已取消"}
+                # 如果未安装，开始安装流程
+                self._handle_installation(device)
+                return
             
             # 2. 执行AEE日志打包命令
-            status_label.config(text="执行AEE日志打包命令...")
-            progress_var.set(50)
-            progress_dialog.update()
+            self.app.ui.status_var.set("执行AEE日志打包命令...")
             
             pack_cmd = ["adb", "-s", device, "shell", "am", "startservice", 
                        "-n", "com.tcl.logger/com.tcl.logger.service.ClearLogService", 
@@ -90,44 +48,84 @@ class AEELogManager:
             if result.returncode != 0:
                 raise Exception(f"执行AEE日志打包命令失败: {result.stderr.strip()}")
             
-            # 3. 完成打包命令执行
-            status_label.config(text="AEE日志打包命令已执行!")
-            progress_var.set(100)
-            progress_dialog.update()
+            # 3. 显示提示并开始等待
+            self.app.ui.status_var.set("AEE日志打包命令已执行")
             
-            return {"device": device, "status": "pack_command_completed"}
-        
-        # 定义完成回调
-        def on_aee_log_done(result):
-            if result.get("success") == False and result.get("message") == "操作已取消":
-                self.app.ui.status_var.set("操作已取消")
-            elif result.get("message") == "用户取消安装":
-                self.app.ui.status_var.set("用户取消AEE log操作")
-            elif result.get("status") == "pack_command_completed":
-                # 打包命令执行完成，现在显示提示并开始等待
-                device = result["device"]
-                
+            # 确保消息框显示在前台
+            self.app.root.lift()
+            self.app.root.attributes('-topmost', True)
+            messagebox.showinfo("提示", "log打包中，保持手机连接5分钟")
+            self.app.root.attributes('-topmost', False)
+            
+            # 更新状态
+            self.is_running = True
+            self.app.ui.status_var.set(f"AEE log打包中 - {device}")
+            
+            # 在后台线程中等待并拉取日志
+            self.waiting_thread = threading.Thread(target=self._wait_and_pull_logs, args=(device,), daemon=True)
+            self.waiting_thread.start()
+            
+        except Exception as e:
+            error_msg = f"启动AEE log时发生错误: {e}"
+            print(error_msg)
+            self.app.root.lift()
+            self.app.root.attributes('-topmost', True)
+            messagebox.showerror("错误", error_msg)
+            self.app.root.attributes('-topmost', False)
+            self.app.ui.status_var.set("启动AEE log失败")
+    
+    def _handle_installation(self, device):
+        """处理com.tcl.logger安装流程"""
+        try:
+            # 循环询问用户是否安装，直到安装成功或用户取消
+            while True:
                 # 确保消息框显示在前台
                 self.app.root.lift()
                 self.app.root.attributes('-topmost', True)
-                messagebox.showinfo("提示", "log打包中，保持手机连接5分钟")
-                self.app.root.attributes('-topmost', False)
                 
-                # 更新状态
-                self.is_running = True
-                self.app.ui.status_var.set(f"AEE log打包中 - {device}")
-                
-                # 在后台线程中等待并拉取日志
-                self.waiting_thread = threading.Thread(target=self._wait_and_pull_logs, args=(device,), daemon=True)
-                self.waiting_thread.start()
-        
-        # 定义错误回调
-        def on_aee_log_error(error):
-            messagebox.showerror("错误", f"启动AEE log时发生错误: {error}")
-            self.app.ui.status_var.set("启动AEE log失败")
-        
-        # 使用模态执行器
-        self.app.ui.run_with_modal("启动AEE Log", aee_log_worker, on_aee_log_done, on_aee_log_error)
+                if messagebox.askyesno("安装提示", 
+                    "com.tcl.logger未安装，是否选择APK文件进行安装？\n\n"
+                    "点击'是'选择APK文件进行安装\n"
+                    "点击'否'取消操作"):
+                    
+                    self.app.root.attributes('-topmost', False)
+                    
+                    # 选择APK文件
+                    apk_file = filedialog.askopenfilename(
+                        title="选择com.tcl.logger APK文件",
+                        filetypes=[("APK文件", "*.apk"), ("所有文件", "*.*")],
+                        parent=self.app.root
+                    )
+                    
+                    if not apk_file:
+                        self.app.ui.status_var.set("用户取消安装")
+                        return
+                    
+                    # 安装APK
+                    if self._install_tcl_logger(device, apk_file):
+                        # 安装完成后再次检查包是否存在
+                        if self._check_tcl_logger_installed(device):
+                            # 安装成功，重新启动AEE log流程
+                            self.start_aee_log()
+                            return
+                        else:
+                            # 安装后仍然没有找到包，继续询问
+                            continue
+                    else:
+                        # 安装失败，继续询问
+                        continue
+                else:
+                    self.app.root.attributes('-topmost', False)
+                    self.app.ui.status_var.set("用户取消AEE log操作")
+                    return
+                    
+        except Exception as e:
+            error_msg = f"处理安装流程时发生错误: {e}"
+            print(error_msg)
+            self.app.root.lift()
+            self.app.root.attributes('-topmost', True)
+            messagebox.showerror("错误", error_msg)
+            self.app.root.attributes('-topmost', False)
     
     def _check_tcl_logger_installed(self, device):
         """检查com.tcl.logger是否已安装"""
@@ -176,7 +174,7 @@ class AEELogManager:
                 self.app.ui.status_var.set(f"com.tcl.logger安装成功 - {device}")
                 return True
             else:
-                messagebox.showerror("验证失败", "安装后验证失败，包未找到")
+                messagebox.showerror("验证失败", "未找到usersupport应用，请确认安装了正确的apk")
                 return False
             
         except Exception as e:
@@ -200,7 +198,7 @@ class AEELogManager:
                 remaining_minutes = 5 - minute - 1
                 if remaining_minutes > 0:
                     print(f"等待中... 剩余 {remaining_minutes} 分钟")
-                    time.sleep(1)  # 等待1分钟
+                    time.sleep(60)  # 等待1分钟
                 else:
                     print("等待完成")
             
