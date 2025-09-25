@@ -6,5 +6,6 @@
 
 from .device_settings_manager import DeviceSettingsManager
 from .hera_config_manager import HeraConfigManager
+from .device_info_manager import DeviceInfoManager
 
-__all__ = ['DeviceSettingsManager', 'HeraConfigManager']
+__all__ = ['DeviceSettingsManager', 'HeraConfigManager', 'DeviceInfoManager']

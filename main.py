@@ -11,21 +11,19 @@ from tkinter import ttk
 
 # 导入自定义模块
 from ui_manager import UIManager
-from Device_Control import DeviceManager, MTKLogManager, ScreenshotManager, VideoManager
+from log_control import DeviceManager, MTKLogManager, ScreenshotManager, VideoManager, TelephonyManager, ADBLogManager, GoogleLogManager, TCPDumpManager, AEELogManager
 from Network_info.network_info_manager import NetworkInfoManager
-from Device_Control.enable_telephony import TelephonyManager
-from Log_Filter import LogProcessor, SearchManager, ADBLogManager
-from Log_Filter.google_log import GoogleLogManager
+from Log_Filter import LogProcessor, SearchManager
 from TMO_CC import PullCCManager, PushCCManager, ServerManager
 from Echolocate.echolocate_manager import EcholocateManager
 from Background_Data import BackgroundConfigManager, LogAnalysisManager
 from Device_Settings import DeviceSettingsManager, HeraConfigManager
-from Device_Settings.tcpdump_capture import TCPDumpManager
+from Device_Settings.device_info_manager import DeviceInfoManager
 
 class LogcatFilterApp:
     def __init__(self, root):
         self.root = root
-        self.root.title("手机测试辅助工具 v2.0")
+        self.root.title("手机测试辅助工具 v0.1")
         self.root.geometry("1200x800")
         self.root.minsize(800, 600)
         
@@ -72,6 +70,8 @@ class LogcatFilterApp:
         self.device_settings_manager = DeviceSettingsManager(self)
         self.hera_config_manager = HeraConfigManager(self)
         self.tcpdump_manager = TCPDumpManager(self)
+        self.device_info_manager = DeviceInfoManager(self)
+        self.aee_log_manager = AEELogManager(self)
         
         # 初始化UI管理器（必须在所有管理器初始化之后）
         self.ui = UIManager(self.root, self)
@@ -170,6 +170,38 @@ class LogcatFilterApp:
     def enable_telephony(self):
         """启用Telephony日志"""
         self.telephony_manager.enable_telephony_logs()
+    
+    # ADB Log相关方法
+    def start_adblog(self):
+        """开启ADB log"""
+        self.adblog_manager.start_adblog()
+    
+    def export_adblog(self):
+        """导出ADB log"""
+        self.adblog_manager.export_adblog()
+    
+    # Google日志相关方法
+    def toggle_google_log(self):
+        """切换Google日志状态"""
+        if self.google_log_manager.is_running():
+            self.google_log_manager.stop_google_log(self.selected_device.get(), self.ui)
+        else:
+            self.ui.show_google_log_options()
+    
+    # TCPDUMP相关方法
+    def show_tcpdump_dialog(self):
+        """显示TCPDUMP对话框"""
+        self.tcpdump_manager.show_tcpdump_dialog()
+    
+    # 删除bugreport相关方法
+    def delete_bugreport(self):
+        """删除bugreport"""
+        self.device_settings_manager.delete_bugreport()
+    
+    # AEE log相关方法
+    def aee_log(self):
+        """AEE log功能"""
+        self.aee_log_manager.start_aee_log()
 
 def main():
     """主函数"""

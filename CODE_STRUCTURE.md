@@ -7,7 +7,7 @@
 
 ```
 adb_filter_key_words/
-├── Device_Control/           # 设备控制模块
+├── log_control/           # log控制模块
 │   ├── __init__.py
 │   ├── device_manager.py     # 设备管理
 │   ├── mtklog_manager.py     # MTKLOG管理
@@ -28,7 +28,7 @@ adb_filter_key_words/
 
 ## 功能模块划分
 
-### Tab 1: 设备控制 (Device_Control)
+### Tab 1: log控制 (log_control)
 - **设备管理**: 设备选择、刷新、连接检查
 - **MTKLOG**: 开启、停止&导出、删除、SD模式、USB模式
 - **截图**: 设备截图功能
@@ -59,7 +59,7 @@ adb_filter_key_words/
 
 ```python
 # main.py
-from Device_Control import DeviceManager, MTKLogManager, ScreenshotManager, VideoManager
+from log_control import DeviceManager, MTKLogManager, ScreenshotManager, VideoManager
 from Log_Filter import LogProcessor, SearchManager, ADBLogManager
 from TMO_CC import PullCCManager
 from ui_manager import UIManager

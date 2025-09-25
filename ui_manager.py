@@ -52,15 +52,35 @@ class UIManager:
         try:
             state = self.load_ui_state()
             if "sashpos_main" in state:
-                self.main_paned.sash_place(0, 0, state["sashpos_main"])
+                saved_position = state["sashpos_main"]
+                # 获取当前窗口高度，确保分割条位置在合理范围内
+                window_height = self.root.winfo_height()
+                if window_height > 0:
+                    # 确保分割条位置不会太小或太大
+                    min_position = 80  # 最小高度
+                    max_position = max(200, window_height - 150)  # 最大高度，保留150px给日志区域
+                    
+                    if saved_position < min_position:
+                        saved_position = min_position
+                    elif saved_position > max_position:
+                        saved_position = max_position
+                    
+                    self.main_paned.sash_place(0, 0, saved_position)
+                    print(f"[DEBUG] 恢复分割条位置: {saved_position} (窗口高度: {window_height})")
+                else:
+                    # 如果窗口高度还没确定，使用默认位置
+                    self.main_paned.sash_place(0, 0, 140)
+                    print(f"[DEBUG] 窗口高度未确定，使用默认分割条位置: 140")
             else:
                 # 默认位置
                 self.main_paned.sash_place(0, 0, 140)
+                print(f"[DEBUG] 使用默认分割条位置: 140")
         except Exception as e:
             print(f"恢复分割条位置失败: {e}")
             # 使用默认位置
             try:
                 self.main_paned.sash_place(0, 0, 140)
+                print(f"[DEBUG] 异常情况下使用默认分割条位置: 140")
             except:
                 pass
     
@@ -71,6 +91,7 @@ class UIManager:
             x, y = self.main_paned.sash_coord(0)
             state["sashpos_main"] = y
             self.save_ui_state(state)
+            print(f"[DEBUG] 保存分割条位置: {y}")
         except Exception as e:
             print(f"保存分割条位置失败: {e}")
     
@@ -80,6 +101,16 @@ class UIManager:
             self.main_paned.sash_place(0, 0, 140)
         except Exception as e:
             print(f"重置分割条位置失败: {e}")
+    
+    def on_sash_drag(self, event):
+        """分割条拖拽过程中的处理"""
+        # 可以在这里添加拖拽过程中的视觉反馈
+        pass
+    
+    def on_sash_drag_end(self, event):
+        """分割条拖拽结束时的处理"""
+        # 延迟保存，确保位置已经更新
+        self.root.after(100, self.save_sash_position)
     
     def setup_ui(self):
         """设置用户界面"""
@@ -117,7 +148,7 @@ class UIManager:
         self.root.bind("<Configure>", self.on_window_configure)
         
         # 创建各个Tab页面
-        self.setup_device_control_tab()
+        self.setup_log_control_tab()
         self.setup_log_filter_tab()
         self.setup_network_info_tab()
         self.setup_tmo_cc_tab()
@@ -136,26 +167,30 @@ class UIManager:
         # 初始化时检查第一个Tab的滚动条
         self.root.after(200, self.check_current_tab_scrollbar)
         
-        # 恢复分割条位置
-        self.root.after_idle(self.restore_sash_position)
+        # 恢复分割条位置 - 延迟执行，确保窗口完全初始化
+        self.root.after(500, self.restore_sash_position)
         
         # 绑定双击重置分割条位置
         self.main_paned.bind("<Double-Button-1>", self.reset_sash_position)
+        
+        # 绑定分割条拖拽事件，实时保存位置
+        self.main_paned.bind("<ButtonRelease-1>", self.on_sash_drag_end)
+        self.main_paned.bind("<B1-Motion>", self.on_sash_drag)
     
-    def setup_device_control_tab(self):
-        """设置设备控制Tab页面"""
-        # 创建设备控制Tab
-        device_tab = ttk.Frame(self.notebook)
-        self.notebook.add(device_tab, text="设备控制")
+    def setup_log_control_tab(self):
+        """设置日志控制Tab页面"""
+        # 创建日志控制Tab
+        log_control_tab = ttk.Frame(self.notebook)
+        self.notebook.add(log_control_tab, text="log控制")
         
         # 创建滚动容器
-        device_container = ttk.Frame(device_tab)
-        device_container.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
-        device_container.columnconfigure(0, weight=1)
+        log_control_container = ttk.Frame(log_control_tab)
+        log_control_container.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
+        log_control_container.columnconfigure(0, weight=1)
         
         # 创建水平滚动的Canvas
-        canvas = tk.Canvas(device_container, height=30, highlightthickness=0)
-        scrollbar = ttk.Scrollbar(device_container, orient="horizontal", command=canvas.xview)
+        canvas = tk.Canvas(log_control_container, height=60, highlightthickness=0)  # 增加高度以容纳两行
+        scrollbar = ttk.Scrollbar(log_control_container, orient="horizontal", command=canvas.xview)
         scrollable_frame = ttk.Frame(canvas)
         
         # 配置滚动
@@ -176,48 +211,113 @@ class UIManager:
         # 绑定鼠标滚轮事件
         canvas.bind("<MouseWheel>", lambda e: canvas.xview_scroll(int(-1 * (e.delta / 120)), "units"))
         
-        # 设备控制行
-        device_row = scrollable_frame
+        # 使用Grid布局的两行按钮容器
+        buttons_frame = ttk.Frame(scrollable_frame)
+        buttons_frame.pack(fill=tk.X, pady=(0, 5))
+        
+        # 配置Grid列权重
+        for i in range(20):  # 假设最多20列
+            buttons_frame.columnconfigure(i, weight=1)
+        
+        # 第一行：设备选择和基础功能
+        row = 0
+        col = 0
         
         # 设备选择
-        ttk.Label(device_row, text="设备:").pack(side=tk.LEFT, padx=(0, 5))
-        self.device_combo = ttk.Combobox(device_row, textvariable=self.app.selected_device, width=18, state="readonly")
-        self.device_combo.pack(side=tk.LEFT, padx=(0, 10))
+        ttk.Label(buttons_frame, text="设备:").grid(row=row, column=col, sticky=tk.W, padx=(0, 5))
+        col += 1
+        self.device_combo = ttk.Combobox(buttons_frame, textvariable=self.app.selected_device, width=18, state="readonly")
+        self.device_combo.grid(row=row, column=col, sticky=tk.W, padx=(0, 10))
+        col += 1
         
-        ttk.Button(device_row, text="刷新设备", command=self.app.refresh_devices).pack(side=tk.LEFT, padx=(0, 5))
+        ttk.Button(buttons_frame, text="刷新设备", command=self.app.refresh_devices).grid(row=row, column=col, sticky=tk.W, padx=(0, 10))
+        col += 1
         
-        ttk.Button(device_row, text="截图", command=self.app.take_screenshot).pack(side=tk.LEFT, padx=(0, 5))
+        ttk.Button(buttons_frame, text="截图", command=self.app.take_screenshot).grid(row=row, column=col, sticky=tk.W, padx=(0, 5))
+        col += 1
         
         # 录制按钮
-        self.record_button = ttk.Button(device_row, text="开始录制", command=self.app.toggle_recording)
-        self.record_button.pack(side=tk.LEFT, padx=(0, 10))
+        self.record_button = ttk.Button(buttons_frame, text="开始录制", command=self.app.toggle_recording)
+        self.record_button.grid(row=row, column=col, sticky=tk.W, padx=(0, 10))
+        col += 1
         
         # MTKLOG控制
-        ttk.Label(device_row, text="MTKLOG:").pack(side=tk.LEFT, padx=(0, 5))
+        ttk.Label(buttons_frame, text="MTKLOG:").grid(row=row, column=col, sticky=tk.W, padx=(0, 5))
+        col += 1
         
-        self.start_mtklog_button = ttk.Button(device_row, text="开启", command=self.app.start_mtklog)
-        self.start_mtklog_button.pack(side=tk.LEFT, padx=(0, 3))
+        self.start_mtklog_button = ttk.Button(buttons_frame, text="开启", command=self.app.start_mtklog)
+        self.start_mtklog_button.grid(row=row, column=col, sticky=tk.W, padx=(0, 3))
+        col += 1
         
-        self.stop_export_mtklog_button = ttk.Button(device_row, text="停止&导出", command=self.app.stop_and_export_mtklog)
-        self.stop_export_mtklog_button.pack(side=tk.LEFT, padx=(0, 3))
+        self.stop_export_mtklog_button = ttk.Button(buttons_frame, text="停止&导出", command=self.app.stop_and_export_mtklog)
+        self.stop_export_mtklog_button.grid(row=row, column=col, sticky=tk.W, padx=(0, 3))
+        col += 1
         
-        self.delete_mtklog_button = ttk.Button(device_row, text="删除", command=self.app.delete_mtklog)
-        self.delete_mtklog_button.pack(side=tk.LEFT, padx=(0, 3))
+        self.delete_mtklog_button = ttk.Button(buttons_frame, text="删除", command=self.app.delete_mtklog)
+        self.delete_mtklog_button.grid(row=row, column=col, sticky=tk.W, padx=(0, 3))
+        col += 1
         
-        self.sd_mode_button = ttk.Button(device_row, text="SD模式", command=self.app.set_sd_mode)
-        self.sd_mode_button.pack(side=tk.LEFT, padx=(0, 3))
+        self.sd_mode_button = ttk.Button(buttons_frame, text="SD模式", command=self.app.set_sd_mode)
+        self.sd_mode_button.grid(row=row, column=col, sticky=tk.W, padx=(0, 3))
+        col += 1
         
-        self.usb_mode_button = ttk.Button(device_row, text="USB模式", command=self.app.set_usb_mode)
-        self.usb_mode_button.pack(side=tk.LEFT, padx=(0, 10))
-        
+        self.usb_mode_button = ttk.Button(buttons_frame, text="USB模式", command=self.app.set_usb_mode)
+        self.usb_mode_button.grid(row=row, column=col, sticky=tk.W, padx=(0, 10))
+        col += 1
         
         # Telephony控制
-        ttk.Button(device_row, text="Telephony", command=self.app.enable_telephony).pack(side=tk.LEFT)
+        ttk.Button(buttons_frame, text="Telephony", command=self.app.enable_telephony).grid(row=row, column=col, sticky=tk.W)
+        
+        # 第二行：日志相关功能
+        row = 1
+        col = 0
+        
+        # 空出设备选择的位置，让ADB Log和截图对齐
+        col += 2  # 跳过"设备:"标签和设备下拉框
+        
+        # # 空出刷新设备的位置
+        # col += 1
+        
+        # ADB Log控制（和截图对齐）
+        ttk.Label(buttons_frame, text="ADB Log:").grid(row=row, column=col, sticky=tk.W, padx=(0, 5))
+        col += 1
+        
+        self.start_adblog_button = ttk.Button(buttons_frame, text="开启", command=self.app.start_adblog)
+        self.start_adblog_button.grid(row=row, column=col, sticky=tk.W, padx=(0, 3))
+        col += 1
+        
+        self.export_adblog_button = ttk.Button(buttons_frame, text="导出", command=self.app.export_adblog)
+        self.export_adblog_button.grid(row=row, column=col, sticky=tk.W, padx=(0, 10))
+        col += 1
+        
+        # Google日志控制
+        ttk.Label(buttons_frame, text="Google日志:").grid(row=row, column=col, sticky=tk.W, padx=(0, 5))
+        col += 1
+        
+        self.google_log_button = ttk.Button(buttons_frame, text="Google日志", command=self.toggle_google_log)
+        self.google_log_button.grid(row=row, column=col, sticky=tk.W, padx=(0, 10))
+        col += 1
+        
+        # 删除bugreport按钮
+        ttk.Button(buttons_frame, text="删除bugreport", command=self.app.delete_bugreport).grid(row=row, column=col, sticky=tk.W, padx=(0, 10))
+        col += 1
+        
+        # 其他
+        ttk.Label(buttons_frame, text="其他:").grid(row=row, column=col, sticky=tk.W, padx=(0, 5))
+        col += 1
+        
+        # AEE log按钮
+        self.aee_log_button = ttk.Button(buttons_frame, text="aee log", command=self.app.aee_log)
+        self.aee_log_button.grid(row=row, column=col, sticky=tk.W, padx=(0, 10))
+        col += 1
+        
+        # TCPDUMP按钮
+        ttk.Button(buttons_frame, text="TCPDUMP", command=self.app.show_tcpdump_dialog).grid(row=row, column=col, sticky=tk.W)
         
         # 存储Canvas和滚动条引用，用于后续检查
-        self.device_canvas = canvas
-        self.device_scrollbar = scrollbar
-        self.device_scrollable_frame = scrollable_frame
+        self.log_control_canvas = canvas
+        self.log_control_scrollbar = scrollbar
+        self.log_control_scrollable_frame = scrollable_frame
     
     def setup_log_filter_tab(self):
         """设置日志过滤Tab页面"""
@@ -256,6 +356,13 @@ class UIManager:
         # 日志过滤行
         filter_row = scrollable_frame
         
+        # 设备选择
+        ttk.Label(filter_row, text="设备:").pack(side=tk.LEFT, padx=(0, 5))
+        device_combo_filter = ttk.Combobox(filter_row, textvariable=self.app.selected_device, width=18, state="readonly")
+        device_combo_filter.pack(side=tk.LEFT, padx=(0, 10))
+        
+        ttk.Button(filter_row, text="刷新设备", command=self.app.refresh_devices).pack(side=tk.LEFT, padx=(0, 10))
+        
         # 关键字输入
         ttk.Label(filter_row, text="关键字:").pack(side=tk.LEFT, padx=(0, 5))
         keyword_entry = ttk.Entry(filter_row, textvariable=self.app.filter_keyword, width=20)
@@ -279,20 +386,6 @@ class UIManager:
         ttk.Button(filter_row, text="设置行数", command=self.app.show_display_lines_dialog).pack(side=tk.LEFT, padx=(0, 5))
         ttk.Button(filter_row, text="保存日志", command=self.app.save_logs).pack(side=tk.LEFT)
         
-        # ADB Log控制
-        ttk.Label(filter_row, text="ADB Log:").pack(side=tk.LEFT, padx=(10, 5))
-        
-        self.start_adblog_button = ttk.Button(filter_row, text="开启", command=self.app.start_adblog)
-        self.start_adblog_button.pack(side=tk.LEFT, padx=(0, 3))
-        
-        self.export_adblog_button = ttk.Button(filter_row, text="导出", command=self.app.export_adblog)
-        self.export_adblog_button.pack(side=tk.LEFT, padx=(0, 10))
-        
-        # Google日志控制
-        ttk.Label(filter_row, text="Google日志:").pack(side=tk.LEFT, padx=(10, 5))
-        
-        self.google_log_button = ttk.Button(filter_row, text="Google日志", command=self.toggle_google_log)
-        self.google_log_button.pack(side=tk.LEFT, padx=(0, 10))
                 
         # 存储Canvas和滚动条引用，用于后续检查
         self.filter_canvas = canvas
@@ -390,6 +483,13 @@ class UIManager:
         # TMO CC控制行
         tmo_row = scrollable_frame
         
+        # 设备选择
+        ttk.Label(tmo_row, text="设备:").pack(side=tk.LEFT, padx=(0, 5))
+        device_combo_tmo = ttk.Combobox(tmo_row, textvariable=self.app.selected_device, width=18, state="readonly")
+        device_combo_tmo.pack(side=tk.LEFT, padx=(0, 10))
+        
+        ttk.Button(tmo_row, text="刷新设备", command=self.app.refresh_devices).pack(side=tk.LEFT, padx=(0, 10))
+        
         # TMO CC按钮
         ttk.Button(tmo_row, text="推CC文件", command=self.app.push_cc_manager.push_cc_file).pack(side=tk.LEFT, padx=(0, 10))
         ttk.Button(tmo_row, text="拉CC文件", command=self.app.tmo_cc_manager.pull_cc_file).pack(side=tk.LEFT, padx=(0, 10))
@@ -449,6 +549,13 @@ class UIManager:
         # TMO Echolocate控制行
         echolocate_row = scrollable_frame
         
+        # 设备选择
+        ttk.Label(echolocate_row, text="设备:").pack(side=tk.LEFT, padx=(0, 5))
+        device_combo_echolocate = ttk.Combobox(echolocate_row, textvariable=self.app.selected_device, width=18, state="readonly")
+        device_combo_echolocate.pack(side=tk.LEFT, padx=(0, 10))
+        
+        ttk.Button(echolocate_row, text="刷新设备", command=self.app.refresh_devices).pack(side=tk.LEFT, padx=(0, 10))
+        
         # TMO Echolocate按钮
         ttk.Button(echolocate_row, text="安装", command=self.app.echolocate_manager.install_echolocate).pack(side=tk.LEFT, padx=(0, 10))
         ttk.Button(echolocate_row, text="Trigger", command=self.app.echolocate_manager.trigger_echolocate).pack(side=tk.LEFT, padx=(0, 10))
@@ -506,6 +613,13 @@ class UIManager:
         # 24小时背景数据控制行
         background_row = scrollable_frame
         
+        # 设备选择
+        ttk.Label(background_row, text="设备:").pack(side=tk.LEFT, padx=(0, 5))
+        device_combo_background = ttk.Combobox(background_row, textvariable=self.app.selected_device, width=18, state="readonly")
+        device_combo_background.pack(side=tk.LEFT, padx=(0, 10))
+        
+        ttk.Button(background_row, text="刷新设备", command=self.app.refresh_devices).pack(side=tk.LEFT, padx=(0, 10))
+        
         # 24小时背景数据按钮
         ttk.Button(background_row, text="配置手机", command=self.app.background_config_manager.configure_phone).pack(side=tk.LEFT, padx=(0, 10))
         ttk.Button(background_row, text="导出log", command=self.app.background_config_manager.export_background_logs).pack(side=tk.LEFT, padx=(0, 10))
@@ -553,15 +667,21 @@ class UIManager:
         # 其他控制行
         other_row = scrollable_frame
         
+        # 设备选择
+        ttk.Label(other_row, text="设备:").pack(side=tk.LEFT, padx=(0, 5))
+        device_combo_other = ttk.Combobox(other_row, textvariable=self.app.selected_device, width=18, state="readonly")
+        device_combo_other.pack(side=tk.LEFT, padx=(0, 10))
+        
+        ttk.Button(other_row, text="刷新设备", command=self.app.refresh_devices).pack(side=tk.LEFT, padx=(0, 10))
+        
         # 其他按钮
+        ttk.Button(other_row, text="手机信息", command=self.app.device_info_manager.show_device_info_dialog).pack(side=tk.LEFT, padx=(0, 10))
         ttk.Button(other_row, text="设置灭屏时间", command=self.app.device_settings_manager.set_screen_timeout).pack(side=tk.LEFT, padx=(0, 10))
         ttk.Button(other_row, text="合并MTKlog", command=self.app.device_settings_manager.merge_mtklog).pack(side=tk.LEFT, padx=(0, 10))
         ttk.Button(other_row, text="MTKlog提取pcap", command=self.app.device_settings_manager.extract_pcap_from_mtklog).pack(side=tk.LEFT, padx=(0, 10))
         ttk.Button(other_row, text="合并PCAP", command=self.app.device_settings_manager.merge_pcap).pack(side=tk.LEFT, padx=(0, 10))
         ttk.Button(other_row, text="高通log提取pcap", command=self.app.device_settings_manager.extract_pcap_from_qualcomm_log).pack(side=tk.LEFT, padx=(0, 10))
-        ttk.Button(other_row, text="删除bugreport", command=self.app.device_settings_manager.delete_bugreport).pack(side=tk.LEFT, padx=(0, 10))
         ttk.Button(other_row, text="赫拉配置", command=self.app.hera_config_manager.configure_hera).pack(side=tk.LEFT, padx=(0, 10))
-        ttk.Button(other_row, text="TCPDUMP", command=self.app.tcpdump_manager.show_tcpdump_dialog).pack(side=tk.LEFT)
         ttk.Button(other_row, text="输入文本", command=self.app.device_settings_manager.show_input_text_dialog).pack(side=tk.LEFT, padx=(0, 10))
         
         # 存储Canvas和滚动条引用，用于后续检查
@@ -858,8 +978,8 @@ class UIManager:
             current_tab = self.notebook.select()
             tab_text = self.notebook.tab(current_tab, "text")
             
-            if tab_text == "设备控制" and hasattr(self, 'device_canvas'):
-                self.update_scrollbar_visibility(self.device_canvas, self.device_scrollbar, self.device_scrollable_frame)
+            if tab_text == "log控制" and hasattr(self, 'log_control_canvas'):
+                self.update_scrollbar_visibility(self.log_control_canvas, self.log_control_scrollbar, self.log_control_scrollable_frame)
             elif tab_text == "Log过滤" and hasattr(self, 'filter_canvas'):
                 self.update_scrollbar_visibility(self.filter_canvas, self.filter_scrollbar, self.filter_scrollable_frame)
             elif tab_text == "网络信息":
@@ -904,7 +1024,7 @@ class UIManager:
         """显示关于对话框"""
         messagebox.showinfo("关于", 
             "手机测试辅助工具\n\n"
-            "版本: 2.0\n"
+            "版本: 0.1\n"
             "功能: Android设备日志管理和MTKLOG操作\n\n"
             "主要功能:\n"
             "• 实时过滤Android设备日志\n"
