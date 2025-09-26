@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Android ADB Logcat 关键字过滤工具 v0.1
+Android ADB Logcat 关键字过滤工具 v0.2
 支持正则表达式、大小写敏感、彩色显示和保存功能
 重构版本 - 模块化设计
 """
@@ -23,7 +23,7 @@ from Device_Settings.device_info_manager import DeviceInfoManager
 class LogcatFilterApp:
     def __init__(self, root):
         self.root = root
-        self.root.title("手机测试辅助工具 v0.1")
+        self.root.title("手机测试辅助工具 v0.2")
         self.root.geometry("1200x800")
         self.root.minsize(800, 600)
         

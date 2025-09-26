@@ -466,7 +466,7 @@ class TelephonyManager:
                 return False
             
             # 2. 使用模态执行器执行命令
-            def worker_fn(progress_var, status_label, progress_dialog):
+            def worker_fn(progress_var, status_label, progress_dialog, stop_flag):
                 return self.execute_telephony_commands(progress_var, status_label, progress_dialog)
             
             def on_success(result):

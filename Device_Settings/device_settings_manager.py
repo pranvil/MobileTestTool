@@ -626,7 +626,7 @@ class DeviceSettingsManager:
                 return False
             
             # 定义后台工作函数
-            def mtklog_merge_worker(progress_var, status_label, progress_dialog):
+            def mtklog_merge_worker(progress_var, status_label, progress_dialog, stop_flag):
                 return self._execute_mtklog_merge_worker(log_folder, muxz_files, mtk_tool, progress_var, status_label, progress_dialog)
             
             # 定义完成回调
@@ -689,7 +689,7 @@ class DeviceSettingsManager:
                 return False
             
             # 定义后台工作函数
-            def mtklog_extraction_worker(progress_var, status_label, progress_dialog):
+            def mtklog_extraction_worker(progress_var, status_label, progress_dialog, stop_flag):
                 return self._execute_pcap_extraction_worker(log_folder, muxz_files, mtk_tool, progress_var, status_label, progress_dialog)
             
             # 定义完成回调
@@ -1786,7 +1786,7 @@ class DeviceSettingsManager:
                 return False
             
             # 定义后台工作函数
-            def qualcomm_extraction_worker(progress_var, status_label, progress_dialog):
+            def qualcomm_extraction_worker(progress_var, status_label, progress_dialog, stop_flag):
                 return self._execute_qualcomm_pcap_extraction_worker(log_folder, hdf_files, qualcomm_tool, progress_var, status_label, progress_dialog)
             
             # 定义完成回调
@@ -1928,7 +1928,7 @@ class DeviceSettingsManager:
                 return False
             
             # 定义后台工作函数
-            def delete_bugreport_worker(progress_var, status_label, progress_dialog):
+            def delete_bugreport_worker(progress_var, status_label, progress_dialog, stop_flag):
                 return self._execute_delete_bugreport_worker(device, progress_var, status_label, progress_dialog)
             
             # 定义完成回调

@@ -1,4 +1,4 @@
-# 手机log辅助工具 v0.1
+# 手机log辅助工具 v0.2
 
 一个功能强大的Android设备日志管理和MTKLOG操作工具，支持实时日志过滤、MTKLOG管理、ADB Log操作和多设备支持。
 
@@ -738,7 +738,7 @@ def test_module_functionality(self):
 
 ## 📝 更新日志
 
-### v0.1 (当前版本)
+### v0.2 (当前版本)
 - ✨ 新增MTKLOG管理功能
 - ✨ 新增ADB Log操作功能
 - ✨ 新增多设备支持
