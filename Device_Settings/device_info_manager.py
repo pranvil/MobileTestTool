@@ -330,203 +330,93 @@ class DeviceInfoManager:
         return result
 
     def show_device_info_dialog(self):
-        """显示设备信息对话框"""
+        """显示设备信息到主界面日志窗口"""
         # 验证设备选择
         device = self.device_manager.validate_device_selection()
         if not device:
             return
 
-        # 创建对话框
-        dialog = tk.Toplevel(self.app.root)
-        dialog.title("手机信息")
-        dialog.geometry("400x600")
-        dialog.resizable(True, True)
-        dialog.transient(self.app.root)
-        
-        # 设置窗口属性，确保可以重新激活
-        dialog.grab_set()  # 设置为模态
-        
-        # 绑定对话框的焦点事件
-        dialog.bind("<FocusOut>", lambda e: self._on_dialog_focus_out(dialog))
-        dialog.bind("<Map>", lambda e: self._on_dialog_map(dialog))
-        dialog.bind("<Unmap>", lambda e: self._on_dialog_unmap(dialog))
-        
-        # 窗口关闭时的处理
-        def on_closing():
-            dialog.grab_release()  # 释放模态
-            dialog.destroy()
-        
-        dialog.protocol("WM_DELETE_WINDOW", on_closing)
-
-        # 居中显示
-        dialog.geometry("+%d+%d" % (
-            self.app.root.winfo_rootx() + (self.app.root.winfo_width() - 800) // 2,
-            self.app.root.winfo_rooty() + (self.app.root.winfo_height() - 600) // 2
-        ))
-
-        # 主框架
-        main_frame = ttk.Frame(dialog, padding="10")
-        main_frame.pack(fill=tk.BOTH, expand=True)
-
-        # 标题
-        title_label = ttk.Label(main_frame, text="正在获取设备信息...", font=('Arial', 14, 'bold'))
-        title_label.pack(pady=(0, 10))
-
-        # 进度条
-        progress_var = tk.DoubleVar()
-        progress_bar = ttk.Progressbar(main_frame, variable=progress_var, maximum=100, length=400)
-        progress_bar.pack(pady=(0, 10))
-
-        # 状态标签
-        status_label = ttk.Label(main_frame, text="准备中...", font=('Arial', 10))
-        status_label.pack(pady=(0, 10))
-
-        # 信息显示框架
-        info_frame = ttk.Frame(main_frame)
-        info_frame.pack(fill=tk.BOTH, expand=True)
-
-        # 关闭按钮
-        close_button = ttk.Button(main_frame, text="关闭", command=on_closing)
-        close_button.pack(pady=(10, 0))
-
         # 在后台线程中获取设备信息
         def get_info_worker():
             try:
-                # 更新状态
-                dialog.after(0, lambda: status_label.config(text="正在获取设备基本信息..."))
-                dialog.after(0, lambda: progress_var.set(20))
+                # 记录开始获取信息
+                self._log_message("[设备信息] 开始获取设备信息...")
                 
                 # 获取设备信息
                 device_info = self.collect_device_info(device)
                 
-                dialog.after(0, lambda: status_label.config(text="正在格式化显示..."))
-                dialog.after(0, lambda: progress_var.set(80))
-                
-                # 更新UI显示
-                dialog.after(0, lambda: self._update_info_display(info_frame, device_info))
-                dialog.after(0, lambda: title_label.config(text=f"设备信息 - {device_info['device_model']}"))
-                dialog.after(0, lambda: progress_var.set(100))
-                dialog.after(0, lambda: status_label.config(text="获取完成"))
+                # 显示设备信息到主界面日志窗口
+                self.app.root.after(0, lambda: self._display_device_info(device_info))
                 
             except Exception as e:
-                dialog.after(0, lambda: status_label.config(text=f"获取失败: {str(e)}"))
-                dialog.after(0, lambda: messagebox.showerror("错误", f"获取设备信息失败:\n{str(e)}"))
+                error_msg = f"获取设备信息失败: {str(e)}"
+                self.app.root.after(0, lambda: self._log_message(f"[设备信息] 错误: {error_msg}"))
+                self.app.root.after(0, lambda: messagebox.showerror("错误", error_msg))
 
         # 启动后台线程
         thread = threading.Thread(target=get_info_worker, daemon=True)
         thread.start()
-
-    def _update_info_display(self, parent_frame, device_info):
-        """更新信息显示"""
-        # 清空原有内容
-        for widget in parent_frame.winfo_children():
-            widget.destroy()
-
-        # 创建滚动容器
-        canvas = tk.Canvas(parent_frame, highlightthickness=0)
-        scrollbar = ttk.Scrollbar(parent_frame, orient="vertical", command=canvas.yview)
-        scrollable_frame = ttk.Frame(canvas)
-
-        scrollable_frame.bind(
-            "<Configure>",
-            lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
-        )
-
-        canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
-        canvas.configure(yscrollcommand=scrollbar.set)
-
-        # 布局
-        canvas.pack(side="left", fill="both", expand=True)
-        scrollbar.pack(side="right", fill="y")
-
-        # 设备基本信息
-        basic_frame = ttk.LabelFrame(scrollable_frame, text="设备基本信息", padding="10")
-        basic_frame.pack(fill="x", padx=5, pady=5)
-
-        basic_info = [
-            ("设备型号", device_info.get("device_model", "未知")),
-            ("设备品牌", device_info.get("device_brand", "未知")),
-            ("Android版本", device_info.get("android_version", "未知")),
-            ("API级别", device_info.get("api_level", "未知")),
-            ("设备序列号", device_info.get("serial", "未知")),
-        ]
-
-        for i, (label, value) in enumerate(basic_info):
-            ttk.Label(basic_frame, text=f"{label}:", font=('Arial', 10, 'bold')).grid(row=i, column=0, sticky="w", padx=(0, 10))
-            ttk.Label(basic_frame, text=str(value), font=('Arial', 10)).grid(row=i, column=1, sticky="w")
-
-        # 详细订阅信息（按图片格式）
-        subscriptions = device_info.get("subscriptions", [])
-        if subscriptions and len(subscriptions) > 0:
-            detail_frame = ttk.LabelFrame(scrollable_frame, text="详细订阅信息", padding="10")
-            detail_frame.pack(fill="x", padx=5, pady=5)
-
-            for i, sub in enumerate(subscriptions):
-                slot_name = f"订阅 {sub.get('subId', 'N/A')} (卡槽 {sub.get('slotIndex', i)})"
-                
-                sub_frame = ttk.Frame(detail_frame)
-                sub_frame.pack(fill="x", padx=5, pady=2)
-
-                ttk.Label(sub_frame, text=f"{slot_name}:", font=('Arial', 10, 'bold')).pack(anchor="w")
-                
-                sub_info = [
-                    ("IMEI", sub.get("imei", "")),
-                    ("MSISDN", sub.get("msisdn", "")),
-                    ("IMSI", sub.get("imsi", "")),
-                    ("ICCID", sub.get("iccid", "")),
-                ]
-
-                for j, (label, value) in enumerate(sub_info):
-                    info_frame = ttk.Frame(sub_frame)
-                    info_frame.pack(fill="x", padx=(20, 0), pady=1)
-                    ttk.Label(info_frame, text=f"  {label}:", font=('Arial', 9, 'bold')).pack(side="left")
-                    # 使用Text widget来支持复制
-                    text_widget = tk.Text(info_frame, height=1, width=30, wrap=tk.NONE, font=('Arial', 9))
-                    text_widget.insert(tk.END, str(value))
-                    text_widget.config(state=tk.DISABLED)
-                    text_widget.pack(side="left", padx=(5, 0))
-
-        # 绑定鼠标滚轮事件
-        def on_mousewheel(event):
-            canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
-        
-        canvas.bind("<MouseWheel>", on_mousewheel)
     
-    def _on_dialog_focus_out(self, dialog):
-        """对话框失去焦点时的处理"""
+    def _log_message(self, message):
+        """记录日志消息到主界面日志窗口"""
         try:
-            # 检查对话框是否仍然存在
-            if dialog.winfo_exists():
-                # 延迟检查，如果对话框仍然可见，尝试重新获得焦点
-                dialog.after(100, lambda: self._check_dialog_focus(dialog))
+            # 确保在主线程中更新UI
+            self.app.root.after(0, lambda: self._update_log_display(message))
         except Exception as e:
-            print(f"对话框焦点处理失败: {e}")
+            print(f"记录日志消息失败: {e}")
     
-    def _on_dialog_map(self, dialog):
-        """对话框显示时的处理"""
+    def _update_log_display(self, message):
+        """更新日志显示"""
         try:
-            # 确保对话框获得焦点
-            dialog.focus_force()
+            if hasattr(self.app, 'ui') and hasattr(self.app.ui, 'log_text'):
+                # 确保控件可编辑
+                self.app.ui.log_text.config(state=tk.NORMAL)
+                self.app.ui.log_text.insert(tk.END, f"{message}\n")
+                self.app.ui.log_text.see(tk.END)
+                # 保持原有状态（如果正在过滤则保持DISABLED）
+                if hasattr(self.app, 'is_running') and self.app.is_running:
+                    self.app.ui.log_text.config(state=tk.DISABLED)
         except Exception as e:
-            print(f"对话框显示处理失败: {e}")
+            print(f"更新日志显示失败: {e}")
     
-    def _check_dialog_focus(self, dialog):
-        """检查对话框焦点状态"""
+    def _display_device_info(self, device_info):
+        """显示设备信息到主界面日志窗口"""
         try:
-            if dialog.winfo_exists() and dialog.winfo_viewable():
-                # 如果对话框可见但没有焦点，尝试重新获得焦点
-                if not dialog.focus_get():
-                    dialog.focus_force()
+            # 清空日志窗口
+            if hasattr(self.app, 'ui') and hasattr(self.app.ui, 'log_text'):
+                self.app.ui.log_text.delete(1.0, tk.END)
+            
+            # 显示设备基本信息
+            self._log_message("=" * 60)
+            self._log_message("设备信息")
+            self._log_message("=" * 60)
+            
+            # 设备基本信息
+            self._log_message("设备基本信息:")
+            self._log_message(f"  设备型号: {device_info.get('device_model', '未知')}")
+            self._log_message(f"  设备品牌: {device_info.get('device_brand', '未知')}")
+            self._log_message(f"  Android版本: {device_info.get('android_version', '未知')}")
+            self._log_message(f"  API级别: {device_info.get('api_level', '未知')}")
+            self._log_message(f"  设备序列号: {device_info.get('serial', '未知')}")
+            self._log_message("")
+            
+            # 详细订阅信息
+            subscriptions = device_info.get("subscriptions", [])
+            if subscriptions and len(subscriptions) > 0:
+                self._log_message("详细信息:")
+                for i, sub in enumerate(subscriptions):
+                    # slot_name = f"订阅 {sub.get('subId', 'N/A')} (卡槽 {sub.get('slotIndex', i)})"
+                    slot_name = f"卡槽 {sub.get('slotIndex', i)}"
+                    self._log_message(f"  {slot_name}:")
+                    self._log_message(f"    IMEI: {sub.get('imei', '')}")
+                    self._log_message(f"    MSISDN: {sub.get('msisdn', '')}")
+                    self._log_message(f"    IMSI: {sub.get('imsi', '')}")
+                    self._log_message(f"    ICCID: {sub.get('iccid', '')}")
+                    self._log_message("")
+            
+            self._log_message("=" * 60)
+            self._log_message("[设备信息] 设备信息获取完成!")
+            
         except Exception as e:
-            print(f"检查对话框焦点失败: {e}")
-    
-    def _on_dialog_unmap(self, dialog):
-        """对话框隐藏时的处理"""
-        try:
-            # 释放模态锁定
-            dialog.grab_release()
-            # 恢复主窗口焦点
-            if hasattr(self.app, 'ui') and hasattr(self.app.ui, 'restore_focus_after_dialog'):
-                self.app.ui.restore_focus_after_dialog()
-        except Exception as e:
-            print(f"对话框隐藏处理失败: {e}")
+            self._log_message(f"[设备信息] 显示设备信息失败: {str(e)}")
+
