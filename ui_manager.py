@@ -154,6 +154,7 @@ class UIManager:
         self.setup_tmo_cc_tab()
         self.setup_tmo_echolocate_tab()
         self.setup_background_data_tab()
+        self.setup_app_operations_tab()
         self.setup_other_tab()
         
         # 创建日志显示容器作为第二个面板
@@ -630,6 +631,68 @@ class UIManager:
         self.background_scrollbar = scrollbar
         self.background_scrollable_frame = scrollable_frame
     
+    def setup_app_operations_tab(self):
+        """设置APP操作Tab页面"""
+        # 创建APP操作Tab
+        app_operations_tab = ttk.Frame(self.notebook)
+        self.notebook.add(app_operations_tab, text="APP操作")
+        
+        # 创建滚动容器
+        app_operations_container = ttk.Frame(app_operations_tab)
+        app_operations_container.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
+        app_operations_container.columnconfigure(0, weight=1)
+        
+        # 创建水平滚动的Canvas
+        canvas = tk.Canvas(app_operations_container, height=30, highlightthickness=0)
+        scrollbar = ttk.Scrollbar(app_operations_container, orient="horizontal", command=canvas.xview)
+        scrollable_frame = ttk.Frame(canvas)
+        
+        # 配置滚动
+        def update_scroll_region(event):
+            canvas.configure(scrollregion=canvas.bbox("all"))
+            # 检查是否需要滚动条
+            self.update_scrollbar_visibility(canvas, scrollbar, scrollable_frame)
+        
+        scrollable_frame.bind("<Configure>", update_scroll_region)
+        
+        canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
+        canvas.configure(xscrollcommand=scrollbar.set)
+        
+        # 布局Canvas和Scrollbar
+        canvas.grid(row=0, column=0, sticky=(tk.W, tk.E), padx=(0, 0), pady=(2, 0))
+        scrollbar.grid(row=1, column=0, sticky=(tk.W, tk.E), padx=(0, 0), pady=(1, 2))
+        
+        # 绑定鼠标滚轮事件
+        canvas.bind("<MouseWheel>", lambda e: canvas.xview_scroll(int(-1 * (e.delta / 120)), "units"))
+        
+        # APP操作控制行
+        app_operations_row = scrollable_frame
+        
+        # 设备选择
+        ttk.Label(app_operations_row, text="设备:").pack(side=tk.LEFT, padx=(0, 5))
+        device_combo_app_ops = ttk.Combobox(app_operations_row, textvariable=self.app.selected_device, width=18, state="readonly")
+        device_combo_app_ops.pack(side=tk.LEFT, padx=(0, 10))
+        
+        ttk.Button(app_operations_row, text="刷新设备", command=self.app.refresh_devices).pack(side=tk.LEFT, padx=(0, 10))
+        
+        # APP操作按钮
+        ttk.Button(app_operations_row, text="查询package", command=self.app.app_operations_manager.query_package).pack(side=tk.LEFT, padx=(0, 5))
+        ttk.Button(app_operations_row, text="查询包名", command=self.app.app_operations_manager.query_package_name).pack(side=tk.LEFT, padx=(0, 5))
+        ttk.Button(app_operations_row, text="查询安装路径", command=self.app.app_operations_manager.query_install_path).pack(side=tk.LEFT, padx=(0, 5))
+        ttk.Button(app_operations_row, text="pull apk", command=self.app.app_operations_manager.pull_apk).pack(side=tk.LEFT, padx=(0, 5))
+        ttk.Button(app_operations_row, text="push apk", command=self.app.app_operations_manager.push_apk).pack(side=tk.LEFT, padx=(0, 5))
+        ttk.Button(app_operations_row, text="安装APK", command=self.app.app_operations_manager.install_apk).pack(side=tk.LEFT, padx=(0, 5))
+        ttk.Button(app_operations_row, text="查看进程", command=self.app.app_operations_manager.view_processes).pack(side=tk.LEFT, padx=(0, 5))
+        ttk.Button(app_operations_row, text="dump app", command=self.app.app_operations_manager.dump_app).pack(side=tk.LEFT, padx=(0, 5))
+        ttk.Button(app_operations_row, text="启用app", command=self.app.app_operations_manager.enable_app).pack(side=tk.LEFT, padx=(0, 5))
+        ttk.Button(app_operations_row, text="禁用app", command=self.app.app_operations_manager.disable_app).pack(side=tk.LEFT, padx=(0, 5))
+        ttk.Button(app_operations_row, text="清空日志", command=self.app.clear_logs).pack(side=tk.LEFT)
+        
+        # 存储Canvas和滚动条引用，用于后续检查
+        self.app_operations_canvas = canvas
+        self.app_operations_scrollbar = scrollbar
+        self.app_operations_scrollable_frame = scrollable_frame
+    
     def setup_other_tab(self):
         """设置其他Tab页面"""
         # 创建其他Tab
@@ -991,6 +1054,8 @@ class UIManager:
                 self.update_scrollbar_visibility(self.echolocate_canvas, self.echolocate_scrollbar, self.echolocate_scrollable_frame)
             elif tab_text == "24小时背景数据" and hasattr(self, 'background_canvas'):
                 self.update_scrollbar_visibility(self.background_canvas, self.background_scrollbar, self.background_scrollable_frame)
+            elif tab_text == "APP操作" and hasattr(self, 'app_operations_canvas'):
+                self.update_scrollbar_visibility(self.app_operations_canvas, self.app_operations_scrollbar, self.app_operations_scrollable_frame)
             elif tab_text == "其他" and hasattr(self, 'other_canvas'):
                 self.update_scrollbar_visibility(self.other_canvas, self.other_scrollbar, self.other_scrollable_frame)
         except Exception as e:

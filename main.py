@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Android ADB Logcat 关键字过滤工具 v0.2
+Android ADB Logcat 关键字过滤工具 v0.3
 支持正则表达式、大小写敏感、彩色显示和保存功能
 重构版本 - 模块化设计
 """
@@ -19,11 +19,12 @@ from Echolocate.echolocate_manager import EcholocateManager
 from Background_Data import BackgroundConfigManager, LogAnalysisManager
 from Device_Settings import DeviceSettingsManager, HeraConfigManager
 from Device_Settings.device_info_manager import DeviceInfoManager
+from App_Operations.app_operations_manager import AppOperationsManager
 
 class LogcatFilterApp:
     def __init__(self, root):
         self.root = root
-        self.root.title("手机测试辅助工具 v0.2")
+        self.root.title("手机测试辅助工具 v0.3")
         self.root.geometry("1200x800")
         self.root.minsize(800, 600)
         
@@ -72,6 +73,7 @@ class LogcatFilterApp:
         self.tcpdump_manager = TCPDumpManager(self)
         self.device_info_manager = DeviceInfoManager(self)
         self.aee_log_manager = AEELogManager(self)
+        self.app_operations_manager = AppOperationsManager(self)
         
         # 初始化UI管理器（必须在所有管理器初始化之后）
         self.ui = UIManager(self.root, self)
