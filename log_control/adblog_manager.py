@@ -14,6 +14,96 @@ import datetime
 class ADBLogManager:
     def __init__(self, app_instance):
         self.app = app_instance
+        # 连线adb log相关属性
+        self._online_logcat_process = None
+        self._online_log_file_path = None
+    
+    def _show_mode_selection_dialog(self):
+        """显示模式选择对话框"""
+        dialog = tk.Toplevel(self.app.root)
+        dialog.title("选择ADB Log模式")
+        dialog.geometry("500x300")
+        dialog.resizable(False, False)
+        
+        # 使对话框模态
+        dialog.transient(self.app.root)
+        dialog.grab_set()
+        
+        # 居中显示
+        dialog.update_idletasks()
+        x = (dialog.winfo_screenwidth() // 2) - (500 // 2)
+        y = (dialog.winfo_screenheight() // 2) - (300 // 2)
+        dialog.geometry(f"500x300+{x}+{y}")
+        
+        # 主框架
+        main_frame = tk.Frame(dialog, padx=20, pady=20)
+        main_frame.pack(fill=tk.BOTH, expand=True)
+        
+        # 标题
+        title_label = tk.Label(main_frame, text="请选择ADB Log抓取模式", 
+                              font=("微软雅黑", 14, "bold"))
+        title_label.pack(pady=(0, 20))
+        
+        # 按钮框架
+        button_frame = tk.Frame(main_frame)
+        button_frame.pack(fill=tk.X, pady=10)
+        
+        # 结果变量
+        result = {"choice": None}
+        
+        # 离线模式按钮和说明
+        offline_frame = tk.Frame(button_frame)
+        offline_frame.pack(fill=tk.X, pady=5)
+        
+        offline_btn = tk.Button(offline_frame, text="离线模式", 
+                               font=("微软雅黑", 12, "bold"),
+                               bg="#4CAF50", fg="white", 
+                               width=12, height=2,
+                               command=lambda: self._select_mode(dialog, result, True))
+        offline_btn.pack(side=tk.LEFT, padx=(0, 10))
+        
+        offline_desc = tk.Label(offline_frame, 
+                               text="手机可以断开USB连接\n使用nohup在设备上抓取log",
+                               font=("微软雅黑", 10),
+                               justify=tk.LEFT)
+        offline_desc.pack(side=tk.LEFT, anchor=tk.W)
+        
+        # 连线模式按钮和说明
+        online_frame = tk.Frame(button_frame)
+        online_frame.pack(fill=tk.X, pady=5)
+        
+        online_btn = tk.Button(online_frame, text="连线模式", 
+                              font=("微软雅黑", 12, "bold"),
+                              bg="#2196F3", fg="white", 
+                              width=12, height=2,
+                              command=lambda: self._select_mode(dialog, result, False))
+        online_btn.pack(side=tk.LEFT, padx=(0, 10))
+        
+        online_desc = tk.Label(online_frame, 
+                              text="手机必须保持USB连接\n直接输出到PC本地文件",
+                              font=("微软雅黑", 10),
+                              justify=tk.LEFT)
+        online_desc.pack(side=tk.LEFT, anchor=tk.W)
+        
+        # 取消按钮框架
+        cancel_frame = tk.Frame(main_frame)
+        cancel_frame.pack(fill=tk.X, pady=(20, 0))
+        
+        cancel_btn = tk.Button(cancel_frame, text="取消", 
+                              font=("微软雅黑", 10),
+                              width=10, height=1,
+                              command=lambda: self._select_mode(dialog, result, None))
+        cancel_btn.pack()
+        
+        # 等待对话框关闭
+        dialog.wait_window()
+        
+        return result["choice"]
+    
+    def _select_mode(self, dialog, result, choice):
+        """选择模式并关闭对话框"""
+        result["choice"] = choice
+        dialog.destroy()
     
     def start_adblog(self):
         """开启adb log"""
@@ -21,6 +111,29 @@ class ADBLogManager:
         if not device:
             return
         
+        # 让用户选择log抓取模式
+        choice = self._show_mode_selection_dialog()
+        
+        if choice is None:  # 用户点击取消
+            return
+        
+        # 获取log名称
+        log_name = simpledialog.askstring("输入log名称", 
+            "请输入log名称:\n\n注意: 名称中不能包含空格，空格将被替换为下划线", 
+            parent=self.app.root)
+        if not log_name:
+            return
+        
+        # 处理log名称：替换空格为下划线
+        log_name = log_name.replace(" ", "_")
+        
+        if choice:  # True = 离线adb log
+            self._start_offline_adblog(device, log_name)
+        else:  # False = 连线adb log
+            self._start_online_adblog(device, log_name)
+    
+    def _start_offline_adblog(self, device, log_name):
+        """开启离线adb log（原有逻辑）"""
         # 检查/data/local/tmp是否有txt文件
         try:
             ls_cmd = ["adb", "-s", device, "shell", "ls", "/data/local/tmp/*.txt"]
@@ -65,16 +178,6 @@ class ADBLogManager:
         except Exception as e:
             print(f"检查旧log文件时发生错误: {e}")
             # 继续执行，不中断流程
-        
-        # 获取log名称
-        log_name = simpledialog.askstring("输入log名称", 
-            "请输入log名称:\n\n注意: 名称中不能包含空格，空格将被替换为下划线", 
-            parent=self.app.root)
-        if not log_name:
-            return
-        
-        # 处理log名称：替换空格为下划线
-        log_name = log_name.replace(" ", "_")
         
         # 定义后台工作函数
         def adblog_start_worker(progress_var, status_label, progress_dialog, stop_flag):
@@ -122,7 +225,7 @@ class ADBLogManager:
             progress_var.set(100)
             progress_dialog.update()
             
-            return {"device": device, "log_filename": log_filename, "log_path": log_path}
+            return {"device": device, "log_filename": log_filename, "log_path": log_path, "mode": "offline"}
         
         # 定义完成回调
         def on_adblog_start_done(result):
@@ -130,15 +233,116 @@ class ADBLogManager:
                 self.app.ui.status_var.set("操作已取消")
             else:
                 # 更新状态
-                self.app.ui.status_var.set(f"ADB log已开启 - {result['device']} - {result['log_filename']}")
+                self.app.ui.status_var.set(f"离线ADB log已开启 - {result['device']} - {result['log_filename']}")
         
         # 定义错误回调
         def on_adblog_start_error(error):
-            messagebox.showerror("错误", f"开启ADB log时发生错误: {error}")
-            self.app.ui.status_var.set("开启ADB log失败")
+            messagebox.showerror("错误", f"开启离线ADB log时发生错误: {error}")
+            self.app.ui.status_var.set("开启离线ADB log失败")
         
         # 使用模态执行器
-        self.app.ui.run_with_modal("开启ADB Log", adblog_start_worker, on_adblog_start_done, on_adblog_start_error)
+        self.app.ui.run_with_modal("开启离线ADB Log", adblog_start_worker, on_adblog_start_done, on_adblog_start_error)
+    
+    def _start_online_adblog(self, device, log_name):
+        """开启连线adb log（新功能）"""
+        # 定义后台工作函数
+        def online_adblog_worker(progress_var, status_label, progress_dialog, stop_flag):
+            # 检查是否被要求停止
+            if stop_flag and stop_flag.is_set():
+                return {"success": False, "message": "操作已取消"}
+            
+            # 1. 创建日志目录
+            status_label.config(text="创建日志目录...")
+            progress_var.set(20)
+            progress_dialog.update()
+            
+            curredate = datetime.datetime.now().strftime("%Y%m%d")
+            log_dir = f"c:\\log\\{curredate}"
+            if not os.path.exists(log_dir):
+                os.makedirs(log_dir)
+            
+            # 创建adblog目录
+            adblog_dir = os.path.join(log_dir, "adblog")
+            if not os.path.exists(adblog_dir):
+                os.makedirs(adblog_dir)
+            
+            # 2. 生成带时间的log文件名
+            status_label.config(text="生成log文件名...")
+            progress_var.set(40)
+            progress_dialog.update()
+            
+            current_time = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+            log_filename = f"{log_name}_{current_time}.txt"
+            log_file_path = os.path.join(adblog_dir, log_filename)
+            
+            # 3. 启动连线logcat进程（使用nohup在设备上运行，但直接输出到PC文件）
+            status_label.config(text="启动连线logcat进程...")
+            progress_var.set(60)
+            progress_dialog.update()
+            
+            # 使用adb logcat命令直接输出到PC文件，同时在设备上启动nohup进程
+            cmd = ["adb", "-s", device, "shell", "nohup", "logcat", "-b", "all", "-v", "time", ">", "/data/local/tmp/online_logcat.txt", "2>&1", "&"]
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=30, 
+                                  creationflags=subprocess.CREATE_NO_WINDOW)
+            if result.returncode != 0:
+                raise Exception(f"启动连线logcat失败: {result.stderr.strip()}")
+            
+            # 4. 同时启动PC端进程将设备上的log输出到PC文件
+            status_label.config(text="启动PC端log输出进程...")
+            progress_var.set(70)
+            progress_dialog.update()
+            
+            # 启动PC端进程，将设备log实时输出到PC文件
+            pc_cmd = ["adb", "-s", device, "logcat", "-b", "all", "-v", "time"]
+            try:
+                with open(log_file_path, 'w', encoding='utf-8') as log_file:
+                    process = subprocess.Popen(pc_cmd, stdout=log_file, stderr=subprocess.PIPE, 
+                                            creationflags=subprocess.CREATE_NO_WINDOW)
+                
+                # 存储进程对象以供后续停止使用
+                self._online_logcat_process = process
+                self._online_log_file_path = log_file_path
+                
+            except Exception as e:
+                raise Exception(f"启动PC端log输出进程失败: {str(e)}")
+            
+            # 5. 验证logcat进程是否存在
+            status_label.config(text="验证logcat进程...")
+            progress_var.set(80)
+            progress_dialog.update()
+            
+            cmd3 = ["adb", "-s", device, "shell", "ps", "-A"]
+            result = subprocess.run(cmd3, capture_output=True, text=True, timeout=30, 
+                                  creationflags=subprocess.CREATE_NO_WINDOW)
+            if result.returncode != 0:
+                raise Exception(f"检查进程失败: {result.stderr.strip()}")
+            
+            # 检查输出中是否包含logcat
+            if "logcat" not in result.stdout:
+                raise Exception("logcat进程不存在，启动失败")
+            
+            # 6. 完成
+            status_label.config(text="完成!")
+            progress_var.set(100)
+            progress_dialog.update()
+            
+            return {"device": device, "log_filename": log_filename, "log_file_path": log_file_path, "mode": "online"}
+        
+        # 定义完成回调
+        def on_online_adblog_done(result):
+            if result.get("success") == False and result.get("message") == "操作已取消":
+                self.app.ui.status_var.set("操作已取消")
+            else:
+                # 更新状态
+                self.app.ui.status_var.set(f"连线ADB log已开启 - {result['device']} - {result['log_filename']}")
+        
+        # 定义错误回调
+        def on_online_adblog_error(error):
+            messagebox.showerror("错误", f"开启连线ADB log时发生错误: {error}")
+            self.app.ui.status_var.set("开启连线ADB log失败")
+        
+        # 使用模态执行器
+        self.app.ui.run_with_modal("开启连线ADB Log", online_adblog_worker, on_online_adblog_done, on_online_adblog_error)
     
     def export_adblog(self):
         """停止adb log并导出"""
@@ -146,6 +350,80 @@ class ADBLogManager:
         if not device:
             return
         
+        # 检查是否有连线adb log进程正在运行
+        if hasattr(self, '_online_logcat_process') and self._online_logcat_process and self._online_logcat_process.poll() is None:
+            # 有连线adb log进程，直接停止它
+            self._stop_online_adblog()
+            return
+        
+        # 没有连线进程，按原有逻辑处理离线adb log
+        self._export_offline_adblog(device)
+    
+    def _stop_online_adblog(self):
+        """停止连线adb log"""
+        try:
+            device = self.app.device_manager.validate_device_selection()
+            if not device:
+                return
+            
+            # 1. 终止PC端logcat进程
+            if hasattr(self, '_online_logcat_process') and self._online_logcat_process:
+                self._online_logcat_process.terminate()
+                try:
+                    self._online_logcat_process.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    self._online_logcat_process.kill()
+                    self._online_logcat_process.wait()
+                self._online_logcat_process = None
+            
+            # 2. 终止设备上的logcat进程
+            # 查找并杀掉设备上的logcat进程
+            ps_cmd = ["adb", "-s", device, "shell", "ps", "-ef"]
+            result = subprocess.run(ps_cmd, capture_output=True, text=True, timeout=30, 
+                                  creationflags=subprocess.CREATE_NO_WINDOW)
+            
+            if result.returncode == 0:
+                lines = result.stdout.strip().split('\n')
+                logcat_pids = []
+                
+                for line in lines:
+                    if 'logcat' in line:
+                        parts = line.split()
+                        if len(parts) >= 2:
+                            try:
+                                pid = int(parts[1])
+                                logcat_pids.append(pid)
+                                print(f"找到logcat进程 PID: {pid}")
+                            except ValueError:
+                                continue
+                
+                # 杀掉找到的logcat进程
+                if logcat_pids:
+                    for pid in logcat_pids:
+                        kill_cmd = ["adb", "-s", device, "shell", "kill", str(pid)]
+                        kill_result = subprocess.run(kill_cmd, capture_output=True, text=True, timeout=30, 
+                                                  creationflags=subprocess.CREATE_NO_WINDOW)
+                        if kill_result.returncode == 0:
+                            print(f"成功停止logcat进程 PID: {pid}")
+                        else:
+                            print(f"停止进程 PID {pid} 失败: {kill_result.stderr.strip()}")
+            
+            # 3. 打开日志文件所在目录
+            if hasattr(self, '_online_log_file_path') and self._online_log_file_path:
+                log_dir = os.path.dirname(self._online_log_file_path)
+                os.startfile(log_dir)
+                self.app.ui.status_var.set("连线ADB log已停止并保存")
+            else:
+                self.app.ui.status_var.set("连线ADB log已停止")
+            
+            print("连线ADB log进程已成功停止")
+                
+        except Exception as e:
+            messagebox.showerror("错误", f"停止连线ADB log时发生错误: {str(e)}")
+            self.app.ui.status_var.set("停止连线ADB log失败")
+    
+    def _export_offline_adblog(self, device):
+        """导出离线adb log（原有逻辑）"""
         # 定义后台工作函数
         def adblog_worker(progress_var, status_label, progress_dialog, stop_flag):
             # 检查是否被要求停止
@@ -286,7 +564,7 @@ class ADBLogManager:
             progress_var.set(100)
             progress_dialog.update()
             
-            return {"log_folder": logcat_dir, "device": device, "operation_type": "adb_export"}
+            return {"log_folder": logcat_dir, "device": device, "operation_type": "offline_adb_export"}
         
         # 定义完成回调
         def on_adblog_done(result):
@@ -297,7 +575,7 @@ class ADBLogManager:
                 if result["log_folder"]:
                     os.startfile(result["log_folder"])
                 # 更新状态
-                self.app.ui.status_var.set(f"ADB log已导出 - {result['device']}")
+                self.app.ui.status_var.set(f"离线ADB log已导出 - {result['device']}")
         
         # 定义错误回调
         def on_adblog_error(error):
@@ -305,11 +583,11 @@ class ADBLogManager:
                 messagebox.showerror("错误", "logcat进程不存在，log抓取异常")
                 self.app.ui.status_var.set("logcat进程不存在")
             else:
-                messagebox.showerror("错误", f"停止并导出ADB log时发生错误: {error}")
-                self.app.ui.status_var.set("停止并导出ADB log失败")
+                messagebox.showerror("错误", f"停止并导出离线ADB log时发生错误: {error}")
+                self.app.ui.status_var.set("停止并导出离线ADB log失败")
         
         # 使用模态执行器
-        self.app.ui.run_with_modal("停止并导出ADB Log", adblog_worker, on_adblog_done, on_adblog_error)
+        self.app.ui.run_with_modal("停止并导出离线ADB Log", adblog_worker, on_adblog_done, on_adblog_error)
     
     def start_google_adblog(self, device, log_name, target_folder):
         """为Google日志启动ADB log"""
