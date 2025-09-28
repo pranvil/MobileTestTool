@@ -61,8 +61,8 @@ class AppOperationsManager:
         if not device:
             return
         
-        # 直接显示文件选择对话框（无参数安装）
-        self.show_apk_selection_dialog(device, [])
+        # 显示APK安装参数选择对话框
+        self.show_install_apk_dialog(device)
     
     def view_processes(self):
         """查看进程"""
@@ -555,7 +555,7 @@ class AppOperationsManager:
             return []
     
     def show_pull_apk_dialog(self, device):
-        """显示pull APK路径输入对话框"""
+        """显示pull APK包名输入对话框"""
         dialog = tk.Toplevel(self.app.root)
         dialog.title("拉取APK文件")
         dialog.geometry("500x300")
@@ -578,23 +578,23 @@ class AppOperationsManager:
         title_label.pack(pady=(0, 20))
         
         # 说明信息
-        info_label = ttk.Label(main_frame, text="请输入设备上的APK文件路径：", 
+        info_label = ttk.Label(main_frame, text="请输入应用包名：", 
                               font=('Arial', 10))
         info_label.pack(pady=(0, 10))
         
-        # 路径输入框
-        path_var = tk.StringVar()
-        path_entry = ttk.Entry(main_frame, textvariable=path_var, width=60, font=('Arial', 10))
-        path_entry.pack(pady=(0, 10))
-        path_entry.focus()  # 设置焦点
+        # 包名输入框
+        package_var = tk.StringVar()
+        package_entry = ttk.Entry(main_frame, textvariable=package_var, width=60, font=('Arial', 10))
+        package_entry.pack(pady=(0, 10))
+        package_entry.focus()  # 设置焦点
         
         # 示例标签
-        example_label = ttk.Label(main_frame, text="例如: /data/app/com.example.app-1/base.apk", 
+        example_label = ttk.Label(main_frame, text="例如: com.example.app", 
                                  font=('Arial', 9), foreground="gray")
         example_label.pack(pady=(0, 10))
         
         # 保存路径信息
-        save_info_label = ttk.Label(main_frame, text="文件将保存到: c:\\log\\yyyymmdd\\ 文件夹", 
+        save_info_label = ttk.Label(main_frame, text="文件将保存到: c:\\log\\yyyymmdd\\<包名>", 
                                    font=('Arial', 9), foreground="blue")
         save_info_label.pack(pady=(0, 20))
         
@@ -604,13 +604,13 @@ class AppOperationsManager:
         
         # 确认按钮
         def on_confirm():
-            device_path = path_var.get().strip()
-            if not device_path:
-                messagebox.showwarning("输入错误", "请输入APK文件路径")
+            package_name = package_var.get().strip()
+            if not package_name:
+                messagebox.showwarning("输入错误", "请输入应用包名")
                 return
             
             dialog.destroy()
-            self.execute_pull_apk(device, device_path)
+            self.execute_pull_apk_by_package(device, package_name)
         
         # 取消按钮
         def on_cancel():
@@ -620,17 +620,77 @@ class AppOperationsManager:
         def on_enter(event):
             on_confirm()
         
-        path_entry.bind('<Return>', on_enter)
+        package_entry.bind('<Return>', on_enter)
         
         ttk.Button(button_frame, text="开始拉取", command=on_confirm).pack(side=tk.LEFT, padx=(0, 10))
         ttk.Button(button_frame, text="取消", command=on_cancel).pack(side=tk.LEFT)
     
-    def execute_pull_apk(self, device, device_path):
+    def execute_pull_apk_by_package(self, device, package_name):
+        """通过包名执行APK拉取命令"""
+        self._log_message(f"[APP操作] 开始通过包名拉取APK: {package_name}")
+        
+        # 在后台线程中执行命令
+        def run_command():
+            try:
+                # 第一步：获取APK路径
+                self._log_message(f"[APP操作] 正在获取包 {package_name} 的APK路径...")
+                
+                # 构建获取路径的命令
+                cmd_parts = ["adb", "-s", device, "shell", "pm", "path", package_name]
+                
+                # 执行命令获取路径
+                process = subprocess.Popen(
+                    cmd_parts,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True
+                )
+                
+                stdout, stderr = process.communicate()
+                
+                if process.returncode != 0:
+                    error_msg = f"获取APK路径失败: {stderr.strip()}"
+                    self.app.root.after(0, lambda: self.handle_query_error(error_msg))
+                    return
+                
+                # 解析输出获取APK路径
+                apk_path = None
+                for line in stdout.strip().split('\n'):
+                    if line.startswith('package:'):
+                        apk_path = line.replace('package:', '').strip()
+                        break
+                
+                if not apk_path:
+                    error_msg = f"未找到包 {package_name} 的APK路径"
+                    self.app.root.after(0, lambda: self.handle_query_error(error_msg))
+                    return
+                
+                self._log_message(f"[APP操作] 找到APK路径: {apk_path}")
+                
+                # 第二步：执行pull操作
+                self._log_message(f"[APP操作] 开始拉取APK文件...")
+                self.app.root.after(0, lambda: self.execute_pull_apk(device, apk_path, package_name))
+                
+            except Exception as e:
+                error_msg = f"执行命令失败: {str(e)}"
+                self.app.root.after(0, lambda: self.handle_query_error(error_msg))
+        
+        # 启动后台线程
+        thread = threading.Thread(target=run_command, daemon=True)
+        thread.start()
+    
+    def execute_pull_apk(self, device, device_path, package_name=None):
         """执行APK拉取命令"""
         # 创建保存目录
         from datetime import datetime
         date_str = datetime.now().strftime("%Y%m%d")
-        save_dir = f"c:\\log\\{date_str}"
+        
+        if package_name:
+            # 如果有包名，创建以包名命名的子文件夹
+            save_dir = f"c:\\log\\{date_str}\\{package_name}"
+        else:
+            # 兼容旧版本，没有包名时使用原路径
+            save_dir = f"c:\\log\\{date_str}"
         
         try:
             os.makedirs(save_dir, exist_ok=True)
