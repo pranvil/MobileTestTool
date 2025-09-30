@@ -903,9 +903,10 @@ class HeraConfigManager:
             output_dir = self._ensure_output_directory()
             output_file = os.path.join(output_dir, f'bugreport_{timestamp}.txt')
             
-            with open(output_file, 'w', encoding='utf-8') as f:
-                result = run_adb_command(['adb', 'bugreport'], 
-                                       stdout=f, stderr=subprocess.PIPE, text=True)
+            # 直接运行adb bugreport命令并指定输出文件
+            selected_device = self.app.selected_device.get()
+            cmd = f"adb -s {selected_device} bugreport \"{output_file}\""
+            result = run_adb_command(cmd, capture_output=True, text=True, timeout=300)
             
             if result.returncode == 0:
                 self._log_message(f"✅ bugreport收集完成，保存到: {output_file}")
