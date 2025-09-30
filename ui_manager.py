@@ -298,7 +298,11 @@ class UIManager:
         self.google_log_button = ttk.Button(buttons_frame, text="Google日志", command=self.toggle_google_log)
         self.google_log_button.grid(row=row, column=col, sticky=tk.W, padx=(0, 10))
         col += 1
-        
+
+        # bugreport按钮
+        ttk.Button(buttons_frame, text="Bugreport", command=self.show_bugreport_options).grid(row=row, column=col, sticky=tk.W, padx=(0, 10))
+        col += 1
+
         # 删除bugreport按钮
         ttk.Button(buttons_frame, text="删除bugreport", command=self.app.delete_bugreport).grid(row=row, column=col, sticky=tk.W, padx=(0, 10))
         col += 1
@@ -359,8 +363,8 @@ class UIManager:
         
         # 设备选择
         ttk.Label(filter_row, text="设备:").pack(side=tk.LEFT, padx=(0, 5))
-        device_combo_filter = ttk.Combobox(filter_row, textvariable=self.app.selected_device, width=18, state="readonly")
-        device_combo_filter.pack(side=tk.LEFT, padx=(0, 10))
+        self.device_combo_filter = ttk.Combobox(filter_row, textvariable=self.app.selected_device, width=18, state="readonly")
+        self.device_combo_filter.pack(side=tk.LEFT, padx=(0, 10))
         
         ttk.Button(filter_row, text="刷新设备", command=self.app.refresh_devices).pack(side=tk.LEFT, padx=(0, 10))
         
@@ -486,8 +490,8 @@ class UIManager:
         
         # 设备选择
         ttk.Label(tmo_row, text="设备:").pack(side=tk.LEFT, padx=(0, 5))
-        device_combo_tmo = ttk.Combobox(tmo_row, textvariable=self.app.selected_device, width=18, state="readonly")
-        device_combo_tmo.pack(side=tk.LEFT, padx=(0, 10))
+        self.device_combo_tmo = ttk.Combobox(tmo_row, textvariable=self.app.selected_device, width=18, state="readonly")
+        self.device_combo_tmo.pack(side=tk.LEFT, padx=(0, 10))
         
         ttk.Button(tmo_row, text="刷新设备", command=self.app.refresh_devices).pack(side=tk.LEFT, padx=(0, 10))
         
@@ -552,8 +556,8 @@ class UIManager:
         
         # 设备选择
         ttk.Label(echolocate_row, text="设备:").pack(side=tk.LEFT, padx=(0, 5))
-        device_combo_echolocate = ttk.Combobox(echolocate_row, textvariable=self.app.selected_device, width=18, state="readonly")
-        device_combo_echolocate.pack(side=tk.LEFT, padx=(0, 10))
+        self.device_combo_echolocate = ttk.Combobox(echolocate_row, textvariable=self.app.selected_device, width=18, state="readonly")
+        self.device_combo_echolocate.pack(side=tk.LEFT, padx=(0, 10))
         
         ttk.Button(echolocate_row, text="刷新设备", command=self.app.refresh_devices).pack(side=tk.LEFT, padx=(0, 10))
         
@@ -616,8 +620,8 @@ class UIManager:
         
         # 设备选择
         ttk.Label(background_row, text="设备:").pack(side=tk.LEFT, padx=(0, 5))
-        device_combo_background = ttk.Combobox(background_row, textvariable=self.app.selected_device, width=18, state="readonly")
-        device_combo_background.pack(side=tk.LEFT, padx=(0, 10))
+        self.device_combo_background = ttk.Combobox(background_row, textvariable=self.app.selected_device, width=18, state="readonly")
+        self.device_combo_background.pack(side=tk.LEFT, padx=(0, 10))
         
         ttk.Button(background_row, text="刷新设备", command=self.app.refresh_devices).pack(side=tk.LEFT, padx=(0, 10))
         
@@ -670,8 +674,8 @@ class UIManager:
         
         # 设备选择
         ttk.Label(app_operations_row, text="设备:").pack(side=tk.LEFT, padx=(0, 5))
-        device_combo_app_ops = ttk.Combobox(app_operations_row, textvariable=self.app.selected_device, width=18, state="readonly")
-        device_combo_app_ops.pack(side=tk.LEFT, padx=(0, 10))
+        self.device_combo_app_ops = ttk.Combobox(app_operations_row, textvariable=self.app.selected_device, width=18, state="readonly")
+        self.device_combo_app_ops.pack(side=tk.LEFT, padx=(0, 10))
         
         ttk.Button(app_operations_row, text="刷新设备", command=self.app.refresh_devices).pack(side=tk.LEFT, padx=(0, 10))
         
@@ -732,8 +736,8 @@ class UIManager:
         
         # 设备选择
         ttk.Label(other_row, text="设备:").pack(side=tk.LEFT, padx=(0, 5))
-        device_combo_other = ttk.Combobox(other_row, textvariable=self.app.selected_device, width=18, state="readonly")
-        device_combo_other.pack(side=tk.LEFT, padx=(0, 10))
+        self.device_combo_other = ttk.Combobox(other_row, textvariable=self.app.selected_device, width=18, state="readonly")
+        self.device_combo_other.pack(side=tk.LEFT, padx=(0, 10))
         
         ttk.Button(other_row, text="刷新设备", command=self.app.refresh_devices).pack(side=tk.LEFT, padx=(0, 10))
         
@@ -745,6 +749,7 @@ class UIManager:
         ttk.Button(other_row, text="合并PCAP", command=self.app.device_settings_manager.merge_pcap).pack(side=tk.LEFT, padx=(0, 10))
         ttk.Button(other_row, text="高通log提取pcap", command=self.app.device_settings_manager.extract_pcap_from_qualcomm_log).pack(side=tk.LEFT, padx=(0, 10))
         ttk.Button(other_row, text="赫拉配置", command=self.app.hera_config_manager.configure_hera).pack(side=tk.LEFT, padx=(0, 10))
+        ttk.Button(other_row, text="赫拉测试数据收集", command=self.app.hera_config_manager.configure_collect_data).pack(side=tk.LEFT, padx=(0, 10))
         ttk.Button(other_row, text="输入文本", command=self.app.device_settings_manager.show_input_text_dialog).pack(side=tk.LEFT, padx=(0, 10))
         
         # 存储Canvas和滚动条引用，用于后续检查
@@ -1387,7 +1392,7 @@ class UIManager:
         if self.app.google_log_manager.is_running():
             self.stop_google_log()
         else:
-            self.show_google_log_options()
+            self.start_full_google_log()
     
     def start_google_log(self):
         """开始Google日志收集"""
@@ -1438,6 +1443,46 @@ class UIManager:
         # 取消按钮
         ttk.Button(main_frame, text="取消", command=dialog.destroy).pack()
     
+    def show_bugreport_options(self):
+        """显示bugreport选项对话框"""
+        # 创建设备选择对话框
+        dialog = tk.Toplevel(self.root)
+        dialog.title("Bugreport选项")
+        dialog.geometry("400x200")
+        dialog.resizable(False, False)
+        dialog.transient(self.root)
+        dialog.grab_set()  # 模态对话框
+        
+        # 居中显示
+        dialog.geometry("+%d+%d" % (
+            self.root.winfo_rootx() + (self.root.winfo_width() - 400) // 2,
+            self.root.winfo_rooty() + (self.root.winfo_height() - 200) // 2
+        ))
+        
+        # 主框架
+        main_frame = ttk.Frame(dialog, padding="20")
+        main_frame.pack(fill=tk.BOTH, expand=True)
+        
+        # 标题
+        title_label = ttk.Label(main_frame, text="选择Bugreport操作", font=('Arial', 12, 'bold'))
+        title_label.pack(pady=(0, 20))
+        
+        # 选项框架
+        options_frame = ttk.Frame(main_frame)
+        options_frame.pack(pady=(0, 20))
+
+        # 同一行里放两个按钮
+        btn1 = ttk.Button(options_frame, text="生成bugreport",
+                        command=lambda: self.start_bugreport_only(dialog))
+        btn1.pack(side=tk.LEFT, padx=5)
+
+        btn2 = ttk.Button(options_frame, text="Pull bugreport",
+                        command=lambda: self.start_pull_bugreport(dialog))
+        btn2.pack(side=tk.LEFT, padx=5)
+        
+        # 取消按钮
+        ttk.Button(main_frame, text="取消", command=dialog.destroy).pack()
+    
     def start_bugreport_only(self, dialog):
         """仅执行bugreport"""
         dialog.destroy()  # 关闭选择对话框
@@ -1449,9 +1494,19 @@ class UIManager:
         # 调用GoogleLogManager执行仅bugreport
         self.app.google_log_manager.start_bugreport_only(device, self)
     
-    def start_full_google_log(self, dialog):
-        """启动完整的Google日志收集"""
+    def start_pull_bugreport(self, dialog):
+        """Pull bugreport"""
         dialog.destroy()  # 关闭选择对话框
+        
+        device = self.app.device_manager.validate_device_selection()
+        if not device:
+            return
+        
+        # 调用GoogleLogManager执行pull bugreport
+        self.app.google_log_manager.start_pull_bugreport(device, self)
+    
+    def start_full_google_log(self):
+        """启动完整的Google日志收集"""
         self.start_google_log()
     
     def stop_google_log(self):

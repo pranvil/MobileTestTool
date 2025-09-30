@@ -653,23 +653,26 @@ class AppOperationsManager:
                     self.app.root.after(0, lambda: self.handle_query_error(error_msg))
                     return
                 
-                # 解析输出获取APK路径
-                apk_path = None
+                # 解析输出获取所有APK路径
+                apk_paths = []
                 for line in stdout.strip().split('\n'):
                     if line.startswith('package:'):
                         apk_path = line.replace('package:', '').strip()
-                        break
+                        apk_paths.append(apk_path)
                 
-                if not apk_path:
+                if not apk_paths:
                     error_msg = f"未找到包 {package_name} 的APK路径"
                     self.app.root.after(0, lambda: self.handle_query_error(error_msg))
                     return
                 
-                self._log_message(f"[APP操作] 找到APK路径: {apk_path}")
+                self._log_message(f"[APP操作] 找到 {len(apk_paths)} 个APK文件:")
+                for i, path in enumerate(apk_paths, 1):
+                    filename = os.path.basename(path)
+                    self._log_message(f"[APP操作]   {i}. {filename}")
                 
-                # 第二步：执行pull操作
-                self._log_message(f"[APP操作] 开始拉取APK文件...")
-                self.app.root.after(0, lambda: self.execute_pull_apk(device, apk_path, package_name))
+                # 第二步：执行pull操作（拉取所有APK文件）
+                self._log_message(f"[APP操作] 开始拉取所有APK文件...")
+                self.app.root.after(0, lambda: self.execute_pull_multiple_apks(device, apk_paths, package_name))
                 
             except Exception as e:
                 error_msg = f"执行命令失败: {str(e)}"
@@ -678,6 +681,95 @@ class AppOperationsManager:
         # 启动后台线程
         thread = threading.Thread(target=run_command, daemon=True)
         thread.start()
+    
+    def execute_pull_multiple_apks(self, device, apk_paths, package_name):
+        """执行多个APK文件的拉取"""
+        # 创建保存目录
+        from datetime import datetime
+        date_str = datetime.now().strftime("%Y%m%d")
+        save_dir = f"c:\\log\\{date_str}\\{package_name}"
+        
+        try:
+            os.makedirs(save_dir, exist_ok=True)
+        except Exception as e:
+            self._log_message(f"[APP操作] 创建保存目录失败: {str(e)}")
+            messagebox.showerror("错误", f"创建保存目录失败: {str(e)}")
+            return
+        
+        # 在后台线程中执行所有APK的拉取
+        def run_multiple_pulls():
+            success_count = 0
+            failed_files = []
+            
+            for i, apk_path in enumerate(apk_paths, 1):
+                try:
+                    filename = os.path.basename(apk_path)
+                    local_path = os.path.join(save_dir, filename)
+                    
+                    self._log_message(f"[APP操作] 正在拉取 {i}/{len(apk_paths)}: {filename}")
+                    
+                    # 构建命令参数
+                    cmd_parts = ["adb", "-s", device, "pull", apk_path, local_path]
+                    
+                    # 执行命令
+                    process = subprocess.Popen(
+                        cmd_parts,
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.PIPE,
+                        text=True
+                    )
+                    
+                    stdout, stderr = process.communicate()
+                    
+                    if process.returncode == 0 and os.path.exists(local_path):
+                        file_size = os.path.getsize(local_path)
+                        self._log_message(f"[APP操作] ✓ {filename} 拉取成功 ({file_size} 字节)")
+                        success_count += 1
+                    else:
+                        self._log_message(f"[APP操作] ✗ {filename} 拉取失败: {stderr.strip()}")
+                        failed_files.append(filename)
+                        
+                except Exception as e:
+                    self._log_message(f"[APP操作] ✗ {filename} 拉取异常: {str(e)}")
+                    failed_files.append(filename)
+            
+            # 在主线程中显示结果
+            self.app.root.after(0, lambda: self.handle_multiple_pull_result(
+                success_count, len(apk_paths), failed_files, save_dir))
+        
+        # 启动后台线程
+        thread = threading.Thread(target=run_multiple_pulls, daemon=True)
+        thread.start()
+    
+    def handle_multiple_pull_result(self, success_count, total_count, failed_files, save_dir):
+        """处理多个APK拉取结果"""
+        if success_count == total_count:
+            # 全部成功
+            message = f"所有APK文件拉取成功！\n\n成功拉取: {success_count}/{total_count} 个文件\n保存位置: {save_dir}\n\n是否打开文件夹?"
+            result = messagebox.askyesno("拉取成功", message)
+            
+            if result:
+                self.open_folder_with_selection(save_dir)
+        elif success_count > 0:
+            # 部分成功
+            failed_list = "\n".join(failed_files) if failed_files else "无"
+            message = f"APK文件拉取完成（部分成功）\n\n成功: {success_count}/{total_count} 个文件\n失败: {len(failed_files)} 个文件\n\n失败的文件:\n{failed_list}\n\n保存位置: {save_dir}\n\n是否打开文件夹?"
+            result = messagebox.askyesno("拉取完成", message)
+            
+            if result:
+                self.open_folder_with_selection(save_dir)
+        else:
+            # 全部失败
+            message = f"所有APK文件拉取失败！\n\n失败的文件数: {total_count}\n\n可能的原因:\n- 设备路径不存在\n- 权限不足\n- 网络连接问题"
+            messagebox.showerror("拉取失败", message)
+    
+    def open_folder_with_selection(self, folder_path):
+        """打开文件夹"""
+        try:
+            os.startfile(folder_path)
+        except Exception as e:
+            self._log_message(f"[APP操作] 打开文件夹失败: {str(e)}")
+            messagebox.showerror("错误", f"打开文件夹失败: {str(e)}")
     
     def execute_pull_apk(self, device, device_path, package_name=None):
         """执行APK拉取命令"""
@@ -755,16 +847,15 @@ class AppOperationsManager:
             # 询问是否打开文件夹
             def open_folder():
                 try:
-                    # 打开文件夹并选中文件
-                    os.startfile(os.path.dirname(local_path))
-                    # 在Windows上尝试选中文件
+                    # 在Windows上打开文件夹并选中文件（一步完成）
+                    subprocess.run(['explorer', '/select,', local_path], check=True)
+                except:
+                    # 如果选中文件失败，则只打开文件夹
                     try:
-                        subprocess.run(['explorer', '/select,', local_path], check=True)
-                    except:
-                        pass  # 如果选中文件失败，至少已经打开了文件夹
-                except Exception as e:
-                    self._log_message(f"[APP操作] 打开文件夹失败: {str(e)}")
-                    messagebox.showerror("错误", f"打开文件夹失败: {str(e)}")
+                        os.startfile(os.path.dirname(local_path))
+                    except Exception as e:
+                        self._log_message(f"[APP操作] 打开文件夹失败: {str(e)}")
+                        messagebox.showerror("错误", f"打开文件夹失败: {str(e)}")
             
             # 显示成功对话框并询问是否打开
             result = messagebox.askyesno("拉取成功", 
@@ -814,7 +905,7 @@ class AppOperationsManager:
             ("-t", "安装测试版，即便签名不同"),
             ("-g", "自动授予运行时权限"),
             ("--bypass-low-target-sdk-block", "忽略低 targetSdk 限制"),
-            ("--full", "强制安装完整版本，针对 split APK")
+            ("install-multiple", "安装多个APK文件，针对 split APK")
         ]
         
         # 创建复选框
@@ -869,12 +960,12 @@ class AppOperationsManager:
         title_label = ttk.Label(main_frame, text="选择APK文件", font=('Arial', 12, 'bold'))
         title_label.pack(pady=(0, 20))
         
-        # 检查是否选择了--full参数
-        is_full_install = "--full" in selected_params
+        # 检查是否选择了install-multiple参数
+        is_multiple_install = "install-multiple" in selected_params
         
         # 提示信息
-        if is_full_install:
-            info_text = "选择了 --full 参数，可以选择多个APK文件（split APK）"
+        if is_multiple_install:
+            info_text = "选择了 install-multiple 参数，可以选择多个APK文件（split APK）"
             filetypes = [("APK files", "*.apk"), ("All files", "*.*")]
             selection_mode = "multiple"
         else:
@@ -887,7 +978,7 @@ class AppOperationsManager:
         
         # 文件选择按钮
         def select_apk_files():
-            if is_full_install:
+            if is_multiple_install:
                 # 多选模式
                 files = filedialog.askopenfilenames(
                     title="选择APK文件（可多选）",
@@ -919,15 +1010,31 @@ class AppOperationsManager:
         if not apk_files:
             return
         
-        # 构建命令
-        cmd_parts = ["adb", "-s", device, "install"]
-        cmd_parts.extend(selected_params)
-        cmd_parts.extend(apk_files)
+        # 检查是否使用install-multiple命令
+        is_multiple_install = "install-multiple" in selected_params
         
-        cmd = f"adb -s {device} install {' '.join(selected_params)} {' '.join(apk_files)}"
-        self._log_message(f"[APP操作] 执行命令: {cmd}")
-        self._log_message(f"[APP操作] 安装文件: {', '.join(apk_files)}")
-        self._log_message(f"[APP操作] 安装参数: {', '.join(selected_params) if selected_params else '无'}")
+        if is_multiple_install:
+            # 使用install-multiple命令
+            cmd_parts = ["adb", "-s", device, "install-multiple"]
+            # 移除install-multiple参数，因为它不是adb install的参数
+            other_params = [p for p in selected_params if p != "install-multiple"]
+            cmd_parts.extend(other_params)
+            cmd_parts.extend(apk_files)
+            
+            cmd = f"adb -s {device} install-multiple {' '.join(other_params)} {' '.join(apk_files)}"
+            self._log_message(f"[APP操作] 执行命令: {cmd}")
+            self._log_message(f"[APP操作] 安装文件: {', '.join(apk_files)}")
+            self._log_message(f"[APP操作] 安装参数: {', '.join(other_params) if other_params else '无'}")
+        else:
+            # 使用普通install命令
+            cmd_parts = ["adb", "-s", device, "install"]
+            cmd_parts.extend(selected_params)
+            cmd_parts.extend(apk_files)
+            
+            cmd = f"adb -s {device} install {' '.join(selected_params)} {' '.join(apk_files)}"
+            self._log_message(f"[APP操作] 执行命令: {cmd}")
+            self._log_message(f"[APP操作] 安装文件: {', '.join(apk_files)}")
+            self._log_message(f"[APP操作] 安装参数: {', '.join(selected_params) if selected_params else '无'}")
         
         # 在后台线程中执行命令
         def run_command():
@@ -961,17 +1068,17 @@ class AppOperationsManager:
         if stdout:
             self._log_message(f"[APP操作] 安装输出: {stdout}")
             
-            # 检查安装是否成功
-            if "Success" in stdout or "success" in stdout:
+            # 检查安装是否成功 - 严格按照"Success"判断
+            if "Success" in stdout:
                 self._log_message(f"[APP操作] APK安装成功!")
                 messagebox.showinfo("安装成功", "APK文件安装成功!")
-            elif "Failure" in stdout or "failure" in stdout or "Error" in stdout or "error" in stdout:
-                self._log_message(f"[APP操作] APK安装失败!")
-                messagebox.showerror("安装失败", "APK文件安装失败!")
             else:
-                # 其他情况，显示完整输出
-                self._log_message(f"[APP操作] 安装完成，请检查输出信息")
-                messagebox.showinfo("安装完成", "APK安装完成，请查看日志了解详细信息")
+                # 没有"Success"就判定为安装失败
+                self._log_message(f"[APP操作] APK安装失败!")
+                error_msg = f"APK文件安装失败!\n\n输出信息:\n{stdout}"
+                if stderr:
+                    error_msg += f"\n\n错误信息:\n{stderr}"
+                messagebox.showerror("安装失败", error_msg)
         else:
             self._log_message(f"[APP操作] 未获取到输出信息")
             messagebox.showerror("安装失败", "未获取到安装输出信息")
@@ -1420,31 +1527,38 @@ class AppOperationsManager:
         filter_frame = ttk.LabelFrame(main_frame, text="过滤选项（可选）", padding="10")
         filter_frame.pack(fill=tk.BOTH, expand=True, pady=(0, 20))
         
-        # 预定义过滤选项
-        predefined_vars = {}
+        # 预定义过滤选项（单选）
+        predefined_var = tk.StringVar()
         predefined_options = [
             ("permission", "权限"),
             ("versionName", "版本号"),
             ("path", "安装路径")
         ]
         
-        # 创建预定义过滤复选框
-        for keyword, description in predefined_options:
-            var = tk.BooleanVar()
-            predefined_vars[keyword] = var
-            cb = ttk.Checkbutton(filter_frame, text=f"{keyword}: {description}", variable=var)
-            cb.pack(anchor=tk.W, pady=2)
+        # 创建预定义过滤单选按钮
+        predefined_label = ttk.Label(filter_frame, text="预定义过滤选项:", font=('Arial', 10, 'bold'))
+        predefined_label.pack(anchor=tk.W, pady=(0, 5))
         
-        # 自定义过滤选项
+        for keyword, description in predefined_options:
+            rb = ttk.Radiobutton(filter_frame, text=f"{keyword}: {description}", 
+                               variable=predefined_var, value=keyword)
+            rb.pack(anchor=tk.W, pady=1)
+        
+        # 自定义过滤选项（单选）
         custom_filter_frame = ttk.Frame(filter_frame)
         custom_filter_frame.pack(fill=tk.X, pady=(10, 0))
         
-        custom_var = tk.BooleanVar()
-        custom_cb = ttk.Checkbutton(custom_filter_frame, text="自定义过滤:", variable=custom_var)
-        custom_cb.pack(side=tk.LEFT, padx=(0, 10))
+        custom_var = tk.StringVar()
+        custom_rb = ttk.Radiobutton(custom_filter_frame, text="自定义过滤:", variable=custom_var, value="custom")
+        custom_rb.pack(side=tk.LEFT, padx=(0, 10))
         
         custom_entry = ttk.Entry(custom_filter_frame, width=30)
         custom_entry.pack(side=tk.LEFT, fill=tk.X, expand=True)
+        
+        # 正则表达式控制选项
+        regex_var = tk.BooleanVar(value=True)  # 默认启用正则表达式
+        regex_cb = ttk.Checkbutton(custom_filter_frame, text="启用正则表达式", variable=regex_var)
+        regex_cb.pack(side=tk.LEFT, padx=(10, 0))
         
         # 按钮框架
         button_frame = ttk.Frame(main_frame)
@@ -1457,23 +1571,27 @@ class AppOperationsManager:
                 messagebox.showwarning("输入错误", "请输入应用包名")
                 return
             
-            # 收集选中的过滤选项
-            selected_filters = []
-            for keyword, var in predefined_vars.items():
-                if var.get():
-                    selected_filters.append(keyword)
+            # 收集选中的过滤选项（单选）
+            selected_filter = None
+            selected_regex_enabled = False
             
-            # 获取自定义过滤
-            custom_filter = ""
-            if custom_var.get():
-                custom_filter = custom_entry.get().strip()
-                if custom_filter:
-                    selected_filters.append(custom_filter)
+            # 检查预定义选项
+            predefined_value = predefined_var.get()
+            if predefined_value:
+                selected_filter = predefined_value
+            
+            # 检查自定义过滤
+            custom_value = custom_var.get()
+            if custom_value == "custom":
+                custom_text = custom_entry.get().strip()
+                if custom_text:
+                    selected_filter = custom_text
+                    selected_regex_enabled = regex_var.get()
             
             dialog.destroy()
             
             # 执行dump命令
-            self.execute_dump_app(device, package_name, selected_filters)
+            self.execute_dump_app(device, package_name, selected_filter, selected_regex_enabled)
         
         # 取消按钮
         def on_cancel():
@@ -1488,29 +1606,28 @@ class AppOperationsManager:
         ttk.Button(button_frame, text="开始Dump", command=on_confirm).pack(side=tk.LEFT, padx=(0, 10))
         ttk.Button(button_frame, text="取消", command=on_cancel).pack(side=tk.LEFT)
     
-    def execute_dump_app(self, device, package_name, selected_filters):
+    def execute_dump_app(self, device, package_name, selected_filter, regex_enabled=False):
         """执行dump应用命令"""
         # 构建基础命令
         base_cmd = f"adb -s {device} shell dumpsys package {package_name}"
         
         # 构建完整命令（包含过滤）
-        if selected_filters:
-            # 如果有多个过滤条件，使用正则表达式
-            if len(selected_filters) > 1:
-                # 构建正则表达式：permission|versionName|path
-                regex_pattern = "|".join(selected_filters)
-                cmd = f"{base_cmd} | findstr /R \"{regex_pattern}\""
+        if selected_filter:
+            if regex_enabled:
+                # 使用正则表达式过滤
+                cmd = f"{base_cmd} | findstr /R \"{selected_filter}\""
             else:
-                # 单个过滤条件
-                cmd = f"{base_cmd} | findstr \"{selected_filters[0]}\""
+                # 使用普通字符串过滤
+                cmd = f"{base_cmd} | findstr \"{selected_filter}\""
         else:
             # 无过滤
             cmd = base_cmd
         
         self._log_message(f"[APP操作] 执行命令: {cmd}")
         self._log_message(f"[APP操作] 应用包名: {package_name}")
-        if selected_filters:
-            self._log_message(f"[APP操作] 过滤条件: {', '.join(selected_filters)}")
+        if selected_filter:
+            filter_type = "正则表达式" if regex_enabled else "普通字符串"
+            self._log_message(f"[APP操作] 过滤条件: {selected_filter} ({filter_type})")
         
         # 在后台线程中执行命令
         def run_command():
@@ -1529,13 +1646,23 @@ class AppOperationsManager:
                 stdout, stderr = process.communicate()
                 
                 # 如果有过滤条件，在Python中过滤结果
-                if selected_filters and stdout:
+                if selected_filter and stdout:
+                    import re
                     filtered_lines = []
                     for line in stdout.split('\n'):
-                        line_lower = line.lower()
-                        # 检查是否包含任何过滤关键字
-                        if any(keyword.lower() in line_lower for keyword in selected_filters):
-                            filtered_lines.append(line)
+                        if regex_enabled:
+                            # 使用正则表达式匹配
+                            try:
+                                if re.search(selected_filter, line, re.IGNORECASE):
+                                    filtered_lines.append(line)
+                            except re.error:
+                                # 正则表达式错误，回退到普通字符串匹配
+                                if selected_filter.lower() in line.lower():
+                                    filtered_lines.append(line)
+                        else:
+                            # 使用普通字符串匹配
+                            if selected_filter.lower() in line.lower():
+                                filtered_lines.append(line)
                     stdout = '\n'.join(filtered_lines)
                 
                 # 在主线程中更新UI

@@ -33,48 +33,100 @@ class DeviceManager:
                 self.app.available_devices = []
                 
                 for line in lines:
-                    if line.strip() and '\tdevice' in line:
-                        device_id = line.split('\t')[0].strip()
-                        self.app.available_devices.append(device_id)
+                    line = line.strip()
+                    if line and ('device' in line or 'unauthorized' in line or 'offline' in line):
+                        # 使用更灵活的解析方法
+                        parts = line.split()
+                        if len(parts) >= 2:
+                            device_id = parts[0]
+                            status = parts[1]
+                            if status == 'device':
+                                self.app.available_devices.append(device_id)
                 
-                # 更新下拉框
-                if self.app.ui.device_combo:
-                    self.app.ui.device_combo['values'] = self.app.available_devices
-                    
-                    # 如果只有一个设备，自动选择
-                    if len(self.app.available_devices) == 1:
-                        self.app.selected_device.set(self.app.available_devices[0])
-                    elif len(self.app.available_devices) > 1:
-                        # 多个设备时，清空选择
-                        self.app.selected_device.set("")
-                    else:
-                        # 没有设备
-                        self.app.selected_device.set("无设备")
+                # 更新所有下拉框
+                self._update_all_device_combos()
+                
+                # 如果只有一个设备，自动选择
+                if len(self.app.available_devices) == 1:
+                    self.app.selected_device.set(self.app.available_devices[0])
+                elif len(self.app.available_devices) > 1:
+                    # 多个设备时，清空选择
+                    self.app.selected_device.set("")
+                else:
+                    # 没有设备
+                    self.app.selected_device.set("无设备")
                         
                 self.app.ui.status_var.set(f"检测到 {len(self.app.available_devices)} 个设备")
                 
             else:
                 error_msg = result.stderr.strip() if result.stderr else "未知错误"
                 self.app.ui.status_var.set(f"设备检测失败: {error_msg}")
-                if self.app.ui.device_combo:
-                    self.app.ui.device_combo['values'] = ["检测失败"]
-                    self.app.selected_device.set("检测失败")
+                self._set_all_device_combos_error("检测失败")
                 
         except subprocess.TimeoutExpired:
             self.app.ui.status_var.set("设备检测超时")
-            if self.app.ui.device_combo:
-                self.app.ui.device_combo['values'] = ["检测超时"]
-                self.app.selected_device.set("检测超时")
+            self._set_all_device_combos_error("检测超时")
         except FileNotFoundError:
             self.app.ui.status_var.set("未找到adb命令")
-            if self.app.ui.device_combo:
-                self.app.ui.device_combo['values'] = ["adb未安装"]
-                self.app.selected_device.set("adb未安装")
+            self._set_all_device_combos_error("adb未安装")
         except Exception as e:
             self.app.ui.status_var.set(f"设备检测错误: {e}")
-            if self.app.ui.device_combo:
-                self.app.ui.device_combo['values'] = ["检测错误"]
-                self.app.selected_device.set("检测错误")
+            self._set_all_device_combos_error("检测错误")
+    
+    def _update_all_device_combos(self):
+        """更新所有设备下拉框"""
+        try:
+            # 更新主设备下拉框
+            if hasattr(self.app.ui, 'device_combo') and self.app.ui.device_combo:
+                self.app.ui.device_combo['values'] = self.app.available_devices
+            
+            # 更新其他选项卡的设备下拉框
+            device_combos = [
+                'device_combo_filter',
+                'device_combo_tmo', 
+                'device_combo_echolocate',
+                'device_combo_background',
+                'device_combo_app_ops',
+                'device_combo_other'
+            ]
+            
+            for combo_name in device_combos:
+                if hasattr(self.app.ui, combo_name):
+                    combo = getattr(self.app.ui, combo_name)
+                    if combo:
+                        combo['values'] = self.app.available_devices
+                        
+        except Exception as e:
+            pass  # 静默处理错误
+    
+    def _set_all_device_combos_error(self, error_text):
+        """设置所有设备下拉框的错误状态"""
+        try:
+            # 设置主设备下拉框
+            if hasattr(self.app.ui, 'device_combo') and self.app.ui.device_combo:
+                self.app.ui.device_combo['values'] = [error_text]
+            
+            # 设置其他选项卡的设备下拉框
+            device_combos = [
+                'device_combo_filter',
+                'device_combo_tmo', 
+                'device_combo_echolocate',
+                'device_combo_background',
+                'device_combo_app_ops',
+                'device_combo_other'
+            ]
+            
+            for combo_name in device_combos:
+                if hasattr(self.app.ui, combo_name):
+                    combo = getattr(self.app.ui, combo_name)
+                    if combo:
+                        combo['values'] = [error_text]
+            
+            # 设置选中的设备
+            self.app.selected_device.set(error_text)
+                        
+        except Exception as e:
+            pass  # 静默处理错误
     
     def check_device_connection(self, device):
         """检查设备连接状态"""

@@ -31,7 +31,8 @@ class GoogleLogManager:
             progress_dialog.update()
             
             current_time = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-            self.google_log_folder = f"C:\\log\\Google_log_{current_time}"
+            current_date = datetime.datetime.now().strftime("%Y%m%d")
+            self.google_log_folder = f"C:\\log\\{current_date}\\Google_log_{current_time}"
             
             if not os.path.exists(self.google_log_folder):
                 os.makedirs(self.google_log_folder)
@@ -156,7 +157,8 @@ class GoogleLogManager:
             progress_dialog.update()
             
             current_time = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-            self.google_log_folder = f"C:\\log\\Google_log_{current_time}"
+            current_date = datetime.datetime.now().strftime("%Y%m%d")
+            self.google_log_folder = f"C:\\log\\{current_date}\\Bugreport_{current_time}"
             
             if not os.path.exists(self.google_log_folder):
                 os.makedirs(self.google_log_folder)
@@ -200,6 +202,64 @@ class GoogleLogManager:
         
         # 使用模态执行器
         ui_manager.run_with_modal("生成bugreport", bugreport_only_worker, on_bugreport_done, on_bugreport_error)
+    
+    def start_pull_bugreport(self, device, ui_manager):
+        """Pull bugreport"""
+        # 定义后台工作函数
+        def pull_bugreport_worker(progress_var, status_label, progress_dialog, stop_flag):
+            # 检查是否被要求停止
+            if stop_flag and stop_flag.is_set():
+                return {"success": False, "message": "操作已取消"}
+            
+            # 1. 创建日志目录
+            status_label.config(text="创建bugreport目录...")
+            progress_var.set(20)
+            progress_dialog.update()
+            
+            current_time = datetime.datetime.now().strftime("%Y%m%d")
+            bugreport_folder = f"C:\\log\\{current_time}\\bugreport"
+            
+            if not os.path.exists(bugreport_folder):
+                os.makedirs(bugreport_folder)
+            
+            # 2. 执行pull命令
+            status_label.config(text="正在pull bugreport...")
+            progress_var.set(50)
+            progress_dialog.update()
+            
+            pull_cmd = f"adb -s {device} pull /data/user_de/0/com.android.shell/files/bugreports {bugreport_folder}"
+            result = subprocess.run(pull_cmd, shell=True, capture_output=True, text=True, timeout=300, 
+                                  creationflags=subprocess.CREATE_NO_WINDOW)
+            
+            if result.returncode != 0:
+                raise Exception(f"pull bugreport失败: {result.stderr.strip()}")
+            
+            # 3. 完成
+            status_label.config(text="pull bugreport完成!")
+            progress_var.set(100)
+            progress_dialog.update()
+            
+            return {"folder": bugreport_folder, "device": device}
+        
+        # 定义完成回调
+        def on_pull_bugreport_done(result):
+            if result.get("success") == False and result.get("message") == "操作已取消":
+                self.app.ui.status_var.set("操作已取消")
+            else:
+                self.app.ui.status_var.set(f"pull bugreport完成 - {result['folder']}")
+                
+                # 打开日志文件夹
+                if result["folder"]:
+                    os.startfile(result["folder"])
+        
+        # 定义错误回调
+        def on_pull_bugreport_error(error):
+            from tkinter import messagebox
+            messagebox.showerror("错误", f"pull bugreport时发生错误: {error}")
+            self.app.ui.status_var.set("pull bugreport失败")
+        
+        # 使用模态执行器
+        ui_manager.run_with_modal("Pull bugreport", pull_bugreport_worker, on_pull_bugreport_done, on_pull_bugreport_error)
     
     def stop_google_log(self, device, ui_manager):
         """停止Google日志收集"""
