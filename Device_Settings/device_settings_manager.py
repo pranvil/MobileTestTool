@@ -57,6 +57,53 @@ class DeviceSettingsManager:
             print(f"[DEBUG] 保存工具配置失败: {str(e)}")
             return False
     
+    def _log_message(self, message, color_tag="info"):
+        """添加日志消息到日志显示区域"""
+        try:
+            # 获取当前时间
+            current_time = datetime.now().strftime("%H:%M:%S")
+            log_message = f"[{current_time}] {message}\n"
+            
+            # 使用after(0)确保立即在主线程中执行
+            self.app.root.after(0, lambda: self._update_log_display(log_message, color_tag))
+            
+        except Exception as e:
+            print(f"记录日志消息失败: {e}")
+    
+    def _update_log_display(self, message, color_tag="info"):
+        """更新日志显示"""
+        try:
+            if hasattr(self.app, 'ui') and hasattr(self.app.ui, 'log_text'):
+                # 确保控件可编辑
+                self.app.ui.log_text.config(state=tk.NORMAL)
+                
+                # 插入消息
+                start_index = self.app.ui.log_text.index(tk.END + "-1c")
+                self.app.ui.log_text.insert(tk.END, message)
+                end_index = self.app.ui.log_text.index(tk.END + "-1c")
+                
+                # 应用颜色标签
+                if color_tag == "success":
+                    self.app.ui.log_text.tag_add("success", start_index, end_index)
+                    self.app.ui.log_text.tag_config("success", foreground="#00AA00")  # 绿色
+                elif color_tag == "error":
+                    self.app.ui.log_text.tag_add("error", start_index, end_index)
+                    self.app.ui.log_text.tag_config("error", foreground="#FF4444")  # 红色
+                elif color_tag == "info":
+                    self.app.ui.log_text.tag_add("info", start_index, end_index)
+                    self.app.ui.log_text.tag_config("info", foreground="#0088FF")  # 蓝色
+                
+                self.app.ui.log_text.see(tk.END)
+                
+                # 保持原有状态（如果正在过滤则保持DISABLED）
+                if hasattr(self.app, 'is_running') and self.app.is_running:
+                    self.app.ui.log_text.config(state=tk.DISABLED)
+                else:
+                    self.app.ui.log_text.config(state=tk.NORMAL)
+                    
+        except Exception as e:
+            print(f"更新日志显示失败: {e}")
+    
     def configure_tools(self):
         """配置MTK工具和Wireshark路径"""
         try:
@@ -634,18 +681,15 @@ class DeviceSettingsManager:
                 if result and result.get('success', False):
                     merge_file = result.get('merge_file', '')
                     file_count = result.get('file_count', 0)
-                    messagebox.showinfo("合并完成", 
-                        f"MTKlog合并完成！\n\n"
-                        f"合并文件: {merge_file}\n"
-                        f"处理文件: {file_count} 个muxz文件\n\n"
-                        f"文件夹已自动打开。")
+                    # 显示成功消息到日志区域
+                    self._log_message(f"MTKlog合并完成！合并文件: {merge_file}，处理文件: {file_count} 个muxz文件，文件夹已自动打开。", "success")
                 else:
                     error_msg = result.get('error', '未知错误') if result else '合并失败'
-                    messagebox.showerror("合并失败", f"MTKlog合并失败: {error_msg}")
+                    self._log_message(f"MTKlog合并失败: {error_msg}", "error")
             
             # 定义错误回调
             def on_merge_error(error):
-                messagebox.showerror("错误", f"执行MTKlog合并时发生错误: {str(error)}")
+                self._log_message(f"执行MTKlog合并时发生错误: {str(error)}", "error")
             
             # 使用模态执行器
             self.app.ui.run_with_modal(
@@ -698,18 +742,15 @@ class DeviceSettingsManager:
                     merge_file = result.get('merge_file', '')
                     success_count = result.get('success_count', 0)
                     total_files = result.get('total_files', 0)
-                    messagebox.showinfo("提取完成", 
-                        f"MTK pcap提取完成！\n\n"
-                        f"成功提取: {success_count}/{total_files} 个文件\n"
-                        f"合并文件: {merge_file}\n\n"
-                        f"文件已自动打开。")
+                    # 显示成功消息到日志区域
+                    self._log_message(f"MTK pcap提取完成！成功提取: {success_count}/{total_files} 个文件，合并文件: {merge_file}，文件已自动打开。", "success")
                 else:
                     error_msg = result.get('error', '未知错误') if result else '提取失败'
-                    messagebox.showerror("提取失败", f"MTK pcap提取失败: {error_msg}")
+                    self._log_message(f"MTK pcap提取失败: {error_msg}", "error")
             
             # 定义错误回调
             def on_extraction_error(error):
-                messagebox.showerror("错误", f"执行MTK pcap提取时发生错误: {str(error)}")
+                self._log_message(f"执行MTK pcap提取时发生错误: {str(error)}", "error")
             
             # 使用模态执行器
             self.app.ui.run_with_modal(
@@ -921,71 +962,6 @@ class DeviceSettingsManager:
             return []
     
     
-    def _execute_qualcomm_pcap_extraction(self, log_folder, hdf_files, qualcomm_tool):
-        """执行高通pcap提取"""
-        try:
-            # 显示进度对话框
-            progress_dialog = self._show_extraction_progress_dialog()
-            
-            # 获取PCAP_Gen_2.0.exe路径
-            pcap_gen_exe = qualcomm_tool["pcap_gen_exe"]
-            
-            if not os.path.exists(pcap_gen_exe):
-                progress_dialog.destroy()
-                messagebox.showerror("错误", f"找不到PCAP_Gen_2.0.exe: {pcap_gen_exe}")
-                return False
-            
-            # 更新进度
-            self._update_extraction_progress(progress_dialog, "准备提取环境...", 0)
-            
-            # 对每个hdf文件执行提取
-            total_files = len(hdf_files)
-            success_count = 0
-            
-            for i, hdf_file in enumerate(hdf_files):
-                progress_text = f"正在提取: {hdf_file} ({i+1}/{total_files})"
-                progress_value = (i / total_files) * 80
-                self._update_extraction_progress(progress_dialog, progress_text, progress_value)
-                
-                # 执行提取命令
-                hdf_path = os.path.join(log_folder, hdf_file)
-                cmd = [pcap_gen_exe, hdf_path, log_folder]
-                
-                try:
-                    result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
-                    if result.returncode == 0:
-                        success_count += 1
-                        print(f"[INFO] 成功提取: {hdf_file}")
-                    else:
-                        print(f"[WARNING] 提取失败: {hdf_file} - {result.stderr}")
-                except subprocess.TimeoutExpired:
-                    print(f"[WARNING] 提取超时: {hdf_file}")
-                except Exception as e:
-                    print(f"[WARNING] 提取异常: {hdf_file} - {str(e)}")
-            
-            # 合并pcap文件
-            self._update_extraction_progress(progress_dialog, "合并pcap文件...", 80)
-            progress_dialog.destroy()
-            
-            # 使用通用的合并函数
-            merge_success = self._execute_pcap_merge(log_folder)
-            
-            if merge_success:
-                messagebox.showinfo("提取完成", 
-                    f"高通pcap提取完成！\n\n"
-                    f"成功提取: {success_count}/{total_files} 个文件\n"
-                    f"合并文件: {os.path.join(log_folder, 'merge.pcap')}\n\n"
-                    f"文件已自动打开。")
-                return True
-            else:
-                messagebox.showerror("合并失败", "pcap文件合并失败")
-                return False
-                
-        except Exception as e:
-            if 'progress_dialog' in locals():
-                progress_dialog.destroy()
-            messagebox.showerror("错误", f"执行高通pcap提取失败: {str(e)}")
-            return False
     
     def _execute_qualcomm_pcap_extraction_worker(self, log_folder, hdf_files, qualcomm_tool, progress_var, status_label, progress_dialog):
         """执行高通pcap提取的后台工作函数"""
@@ -1145,77 +1121,6 @@ class DeviceSettingsManager:
                 'error': f"执行MTKlog合并失败: {str(e)}"
             }
     
-    def _execute_mtklog_merge(self, log_folder, muxz_files, mtk_tool):
-        """执行MTKlog合并"""
-        try:
-            # 显示进度对话框
-            progress_dialog = self._show_merge_progress_dialog("正在合并MTKlog")
-            
-            # 获取MDLogMan.exe路径
-            utilities_path = os.path.join(mtk_tool["base_path"], "Utilities")
-            mdlogman_exe = os.path.join(utilities_path, "MDLogMan.exe")
-            
-            if not os.path.exists(mdlogman_exe):
-                progress_dialog.destroy()
-                messagebox.showerror("错误", f"找不到MDLogMan.exe: {mdlogman_exe}")
-                return False
-            
-            # 更新进度
-            self._update_merge_progress(progress_dialog, "准备合并环境...", 10)
-            
-            # 创建输出文件路径
-            merge_elg_path = os.path.join(log_folder, "merge.elg")
-            
-            # 更新进度
-            self._update_merge_progress(progress_dialog, f"正在合并 {len(muxz_files)} 个muxz文件...", 50)
-            
-            # 执行合并命令
-            # MDLogMan -i *.muxz -o merge.elg
-            cmd = [
-                mdlogman_exe,
-                "-i", "*.muxz",
-                "-o", "merge.elg"
-            ]
-            
-            try:
-                result = subprocess.run(cmd, cwd=log_folder, capture_output=True, text=True, timeout=300)
-                
-                if result.returncode == 0:
-                    # 合并成功
-                    self._update_merge_progress(progress_dialog, "合并完成!", 100)
-                    progress_dialog.destroy()
-                    
-                    # 检查输出文件是否存在
-                    if os.path.exists(merge_elg_path):
-                        # 打开合并后的elg文件所在文件夹
-                        os.startfile(log_folder)
-                        
-                        messagebox.showinfo("合并完成", 
-                            f"MTKlog合并完成！\n\n"
-                            f"合并文件: {merge_elg_path}\n"
-                            f"处理文件: {len(muxz_files)} 个muxz文件\n\n"
-                            f"文件夹已自动打开。")
-                        return True
-                    else:
-                        messagebox.showerror("合并失败", "合并完成但未找到输出文件")
-                        return False
-                else:
-                    raise Exception(f"MDLogMan执行失败: {result.stderr}")
-                    
-            except subprocess.TimeoutExpired:
-                progress_dialog.destroy()
-                messagebox.showerror("错误", "合并超时，请检查文件大小")
-                return False
-            except Exception as e:
-                progress_dialog.destroy()
-                messagebox.showerror("错误", f"合并失败: {str(e)}")
-                return False
-                
-        except Exception as e:
-            if 'progress_dialog' in locals():
-                progress_dialog.destroy()
-            messagebox.showerror("错误", f"执行MTKlog合并失败: {str(e)}")
-            return False
     
     def _execute_pcap_extraction_worker(self, log_folder, muxz_files, mtk_tool, progress_var, status_label, progress_dialog):
         """执行pcap提取的后台工作函数"""
@@ -1297,210 +1202,7 @@ class DeviceSettingsManager:
                 'error': f"执行pcap提取失败: {str(e)}"
             }
     
-    def _execute_pcap_extraction(self, log_folder, muxz_files, mtk_tool):
-        """执行pcap提取"""
-        try:
-            # 显示进度对话框
-            progress_dialog = self._show_extraction_progress_dialog()
-            
-            # 切换到elgcap目录
-            elgcap_path = mtk_tool["elgcap_path"]
-            python_path = mtk_tool["python_path"]
-            embedded_python = os.path.join(python_path, "EmbeddedPython.exe")
-            
-            # 更新进度
-            self._update_extraction_progress(progress_dialog, "准备提取环境...", 0)
-            
-            # 对每个muxz文件执行提取
-            total_files = len(muxz_files)
-            success_count = 0
-            
-            for i, muxz_file in enumerate(muxz_files):
-                progress_text = f"正在提取: {muxz_file} ({i+1}/{total_files})"
-                progress_value = (i / total_files) * 80
-                self._update_extraction_progress(progress_dialog, progress_text, progress_value)
-                
-                # 执行提取命令
-                muxz_path = os.path.join(log_folder, muxz_file)
-                cmd = [
-                    embedded_python,
-                    "main.py",
-                    "-sap", "sap_6291",
-                    "-pcapng",
-                    "-all_payload",
-                    muxz_path
-                ]
-                
-                try:
-                    result = subprocess.run(cmd, cwd=elgcap_path, capture_output=True, text=True, timeout=300)
-                    if result.returncode == 0:
-                        success_count += 1
-                        print(f"[INFO] 成功提取: {muxz_file}")
-                    else:
-                        print(f"[WARNING] 提取失败: {muxz_file} - {result.stderr}")
-                except subprocess.TimeoutExpired:
-                    print(f"[WARNING] 提取超时: {muxz_file}")
-                except Exception as e:
-                    print(f"[WARNING] 提取异常: {muxz_file} - {str(e)}")
-            
-            # 合并pcap文件
-            self._update_extraction_progress(progress_dialog, "合并pcap文件...", 80)
-            progress_dialog.destroy()
-            
-            # 使用通用的合并函数
-            merge_success = self._execute_pcap_merge(log_folder)
-            
-            if merge_success:
-                messagebox.showinfo("提取完成", 
-                    f"pcap提取完成！\n\n"
-                    f"成功提取: {success_count}/{total_files} 个文件\n"
-                    f"合并文件: {os.path.join(log_folder, 'merge.pcap')}\n\n"
-                    f"文件已自动打开。")
-                return True
-            else:
-                messagebox.showerror("合并失败", "pcap文件合并失败")
-                return False
-                
-        except Exception as e:
-            if 'progress_dialog' in locals():
-                progress_dialog.destroy()
-            messagebox.showerror("错误", f"执行pcap提取失败: {str(e)}")
-            return False
     
-    def _show_extraction_progress_dialog(self):
-        """显示提取进度对话框"""
-        try:
-            progress_dialog = tk.Toplevel(self.app.root)
-            progress_dialog.title("正在提取pcap")
-            progress_dialog.geometry("400x150")
-            progress_dialog.resizable(False, False)
-            progress_dialog.transient(self.app.root)
-            progress_dialog.grab_set()
-            
-            # 居中显示
-            progress_dialog.geometry("+%d+%d" % (
-                self.app.root.winfo_rootx() + (self.app.root.winfo_width() - 400) // 2,
-                self.app.root.winfo_rooty() + (self.app.root.winfo_height() - 150) // 2
-            ))
-            
-            # 主框架
-            main_frame = ttk.Frame(progress_dialog, padding="20")
-            main_frame.pack(fill=tk.BOTH, expand=True)
-            
-            # 标题
-            title_label = ttk.Label(main_frame, text="正在提取pcap文件...", font=('Arial', 12, 'bold'))
-            title_label.pack(pady=(0, 15))
-            
-            # 进度条
-            progress_var = tk.DoubleVar()
-            progress_bar = ttk.Progressbar(main_frame, variable=progress_var, maximum=100, length=300)
-            progress_bar.pack(pady=(0, 15))
-            
-            # 状态标签
-            status_label = ttk.Label(main_frame, text="准备中...", font=('Arial', 10))
-            status_label.pack()
-            
-            # 存储引用
-            progress_dialog.progress_var = progress_var
-            progress_dialog.status_label = status_label
-            
-            progress_dialog.update()
-            return progress_dialog
-            
-        except Exception as e:
-            print(f"[DEBUG] 创建进度对话框失败: {str(e)}")
-            return None
-    
-    def _update_extraction_progress(self, progress_dialog, status_text, progress_value):
-        """更新提取进度"""
-        try:
-            if progress_dialog and progress_dialog.winfo_exists():
-                if hasattr(progress_dialog, 'status_label'):
-                    progress_dialog.status_label.config(text=status_text)
-                if hasattr(progress_dialog, 'progress_var'):
-                    progress_dialog.progress_var.set(progress_value)
-                progress_dialog.update()
-        except Exception as e:
-            print(f"[DEBUG] 更新进度失败: {str(e)}")
-    
-    def _find_mtklog_files(self, directory):
-        """查找MTKlog文件"""
-        mtklog_files = []
-        
-        # 查找常见的MTKlog文件模式
-        patterns = [
-            "*.txt",
-            "*mtklog*",
-            "*log*",
-            "*.log"
-        ]
-        
-        for pattern in patterns:
-            files = glob.glob(os.path.join(directory, pattern))
-            mtklog_files.extend(files)
-        
-        # 去重并排序
-        mtklog_files = sorted(list(set(mtklog_files)))
-        
-        # 过滤掉太小的文件（可能是空文件）
-        mtklog_files = [f for f in mtklog_files if os.path.getsize(f) > 100]
-        
-        return mtklog_files
-    
-    def _extract_pcap_data(self, mtklog_file, output_dir):
-        """从MTKlog中提取pcap数据"""
-        pcap_files = []
-        
-        try:
-            with open(mtklog_file, 'r', encoding='utf-8', errors='ignore') as f:
-                lines = f.readlines()
-            
-            # 查找包含网络数据包信息的行
-            packet_lines = []
-            for line_num, line in enumerate(lines):
-                # 查找包含IP地址、端口等网络信息的行
-                if any(keyword in line.lower() for keyword in ['ip', 'tcp', 'udp', 'packet', 'frame']):
-                    packet_lines.append((line_num, line.strip()))
-            
-            if not packet_lines:
-                return []
-            
-            # 创建pcap文件
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            pcap_file = os.path.join(output_dir, f"extracted_packets_{timestamp}.pcap")
-            
-            # 这里应该实现真正的pcap格式写入
-            # 由于pcap格式比较复杂，这里先创建一个包含网络数据的文本文件
-            with open(pcap_file.replace('.pcap', '.txt'), 'w', encoding='utf-8') as f:
-                f.write("=== 从MTKlog提取的网络数据包信息 ===\n\n")
-                f.write(f"源文件: {mtklog_file}\n")
-                f.write(f"提取时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
-                f.write(f"找到的网络数据包行数: {len(packet_lines)}\n\n")
-                
-                for line_num, line in packet_lines[:100]:  # 显示前100条
-                    f.write(f"行 {line_num}: {line}\n")
-            
-            pcap_files.append(pcap_file.replace('.pcap', '.txt'))
-            
-            # 如果有更多数据，可以创建多个文件
-            if len(packet_lines) > 100:
-                batch_size = 100
-                for i in range(100, len(packet_lines), batch_size):
-                    batch_num = i // batch_size + 1
-                    batch_file = os.path.join(output_dir, f"extracted_packets_{timestamp}_batch{batch_num}.txt")
-                    
-                    with open(batch_file, 'w', encoding='utf-8') as f:
-                        f.write(f"=== 网络数据包批次 {batch_num} ===\n\n")
-                        for line_num, line in packet_lines[i:i+batch_size]:
-                            f.write(f"行 {line_num}: {line}\n")
-                    
-                    pcap_files.append(batch_file)
-            
-            return pcap_files
-            
-        except Exception as e:
-            print(f"[DEBUG] 提取pcap数据失败: {str(e)}")
-            return []
     
     def merge_pcap(self):
         """合并PCAP文件"""
@@ -1795,18 +1497,15 @@ class DeviceSettingsManager:
                     merge_file = result.get('merge_file', '')
                     success_count = result.get('success_count', 0)
                     total_files = result.get('total_files', 0)
-                    messagebox.showinfo("提取完成", 
-                        f"高通pcap提取完成！\n\n"
-                        f"成功提取: {success_count}/{total_files} 个文件\n"
-                        f"合并文件: {merge_file}\n\n"
-                        f"文件已自动打开。")
+                    # 显示成功消息到日志区域
+                    self._log_message(f"高通pcap提取完成！成功提取: {success_count}/{total_files} 个文件，合并文件: {merge_file}，文件已自动打开。", "success")
                 else:
                     error_msg = result.get('error', '未知错误') if result else '提取失败'
-                    messagebox.showerror("提取失败", f"高通pcap提取失败: {error_msg}")
+                    self._log_message(f"高通pcap提取失败: {error_msg}", "error")
             
             # 定义错误回调
             def on_extraction_error(error):
-                messagebox.showerror("错误", f"执行高通pcap提取时发生错误: {str(error)}")
+                self._log_message(f"执行高通pcap提取时发生错误: {str(error)}", "error")
             
             # 使用模态执行器
             self.app.ui.run_with_modal(
@@ -1935,17 +1634,15 @@ class DeviceSettingsManager:
             def on_delete_done(result):
                 if result and result.get('success', False):
                     deleted_count = result.get('deleted_count', 0)
-                    messagebox.showinfo("删除完成", 
-                        f"bugreport文件删除完成！\n\n"
-                        f"已删除: {deleted_count} 个文件/文件夹\n"
-                        f"目标路径: /data/user_de/0/com.android.shell/files/bugreports")
+                    # 显示成功消息到日志区域
+                    self._log_message(f"bugreport文件删除完成！已删除: {deleted_count} 个文件/文件夹，目标路径: /data/user_de/0/com.android.shell/files/bugreports", "success")
                 else:
                     error_msg = result.get('error', '未知错误') if result else '删除失败'
-                    messagebox.showerror("删除失败", f"删除bugreport文件失败: {error_msg}")
+                    self._log_message(f"删除bugreport文件失败: {error_msg}", "error")
             
             # 定义错误回调
             def on_delete_error(error):
-                messagebox.showerror("错误", f"执行删除bugreport时发生错误: {str(error)}")
+                self._log_message(f"执行删除bugreport时发生错误: {str(error)}", "error")
             
             # 使用模态执行器
             self.app.ui.run_with_modal(
