@@ -113,7 +113,7 @@ class DeviceSettingsManager:
             dialog.geometry("600x600")
             dialog.resizable(False, False)
             dialog.transient(self.app.root)
-            dialog.grab_set()
+            # dialog.grab_set()  # 注释掉以允许在程序和桌面之间自由切换
             
             # 居中显示
             dialog.geometry("+%d+%d" % (
@@ -328,7 +328,7 @@ class DeviceSettingsManager:
             # 获取用户输入的路径
             base_path = filedialog.askdirectory(
                 title="选择MTK工具根目录",
-                parent=dialog
+                parent=self.app.root
             )
             
             # 恢复主窗口焦点
@@ -497,7 +497,7 @@ class DeviceSettingsManager:
             # 获取用户输入的路径
             base_path = filedialog.askdirectory(
                 title="选择高通工具目录",
-                parent=dialog
+                parent=self.app.root
             )
             
             if not base_path:
@@ -809,7 +809,7 @@ class DeviceSettingsManager:
             dialog.geometry("500x300")
             dialog.resizable(False, False)
             dialog.transient(self.app.root)
-            dialog.grab_set()
+            # dialog.grab_set()  # 注释掉以允许在程序和桌面之间自由切换
             
             # 居中显示
             dialog.geometry("+%d+%d" % (
@@ -879,7 +879,7 @@ class DeviceSettingsManager:
             dialog.geometry("500x300")
             dialog.resizable(False, False)
             dialog.transient(self.app.root)
-            dialog.grab_set()
+            # dialog.grab_set()  # 注释掉以允许在程序和桌面之间自由切换
             
             # 居中显示
             dialog.geometry("+%d+%d" % (
@@ -1328,7 +1328,7 @@ class DeviceSettingsManager:
             dialog.geometry("500x200")
             dialog.resizable(False, False)
             dialog.transient(self.app.root)
-            dialog.grab_set()
+            # dialog.grab_set()  # 注释掉以允许在程序和桌面之间自由切换
             
             # 居中显示
             dialog.geometry("+%d+%d" % (
@@ -1357,7 +1357,7 @@ class DeviceSettingsManager:
             def browse_folder():
                 folder = filedialog.askdirectory(
                     title="选择PCAP文件夹",
-                    parent=dialog
+                    parent=self.app.root
                 )
                 if folder:
                     path_var.set(folder)
@@ -1408,7 +1408,7 @@ class DeviceSettingsManager:
             progress_dialog.geometry("400x150")
             progress_dialog.resizable(False, False)
             progress_dialog.transient(self.app.root)
-            progress_dialog.grab_set()
+            # progress_dialog.grab_set()  # 注释掉以允许在程序和桌面之间自由切换
             
             # 居中显示
             progress_dialog.geometry("+%d+%d" % (
@@ -1672,7 +1672,7 @@ class DeviceSettingsManager:
             dialog.geometry("500x400")
             dialog.resizable(True, True)
             dialog.transient(self.app.root)
-            dialog.grab_set()  # 模态对话框
+            # dialog.grab_set()  # 注释掉以允许在程序和桌面之间自由切换
             
             # 绑定对话框的焦点事件
             dialog.bind("<FocusOut>", lambda e: self._on_dialog_focus_out(dialog))

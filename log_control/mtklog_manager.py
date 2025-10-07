@@ -11,10 +11,20 @@ from tkinter import messagebox, simpledialog, filedialog
 import os
 import datetime
 import time
+import re
+
+# 尝试导入uiautomator2
+try:
+    import uiautomator2 as u2
+    U2_AVAILABLE = True
+except ImportError:
+    u2 = None
+    U2_AVAILABLE = False
 
 class MTKLogManager:
     def __init__(self, app_instance):
         self.app = app_instance
+    
     
     def start_mtklog(self):
         """开启MTKLOG"""
@@ -31,62 +41,165 @@ class MTKLogManager:
             if stop_flag and stop_flag.is_set():
                 return {"success": False, "message": "操作已取消"}
             
-            # 命令序列：停止logger -> 清除旧日志 -> 设置缓存大小 -> 开启logger
-            commands = [
-                # 1. 停止logger,加5s时间保护
-                ["adb", "-s", device, "shell", "am", "broadcast", "-a", "com.debug.loggerui.ADB_CMD", 
-                 "-e", "cmd_name", "stop", "--ei", "cmd_target", "-1", "-n", "com.debug.loggerui/.framework.LogReceiver"],
-                
-                # 2. 清除旧日志,加2s时间保护
-                ["adb", "-s", device, "shell", "am", "broadcast", "-a", "com.debug.loggerui.ADB_CMD", 
-                 "-e", "cmd_name", "clear_logs_all", "--ei", "cmd_target", "0", "-n", "com.debug.loggerui/.framework.LogReceiver"],
-                
-                # 3. 设置MD log缓存大小20GB,加1s时间保护
-                ["adb", "-s", device, "shell", "am", "broadcast", "-a", "com.debug.loggerui.ADB_CMD", 
-                 "-e", "cmd_name", "set_log_size_20000", "--ei", "cmd_target", "2", "-n", "com.debug.loggerui/.framework.LogReceiver"],
-                
-                # 4. 开启MTK LOGGER
-                ["adb", "-s", device, "shell", "am", "broadcast", "-a", "com.debug.loggerui.ADB_CMD", 
-                 "-e", "cmd_name", "start", "--ei", "cmd_target", "-1", "-n", "com.debug.loggerui/.framework.LogReceiver"]
-            ]
+            # 1. 检查logger状态
+            status_label.config(text="检查logger状态...")
+            progress_var.set(5)
+            progress_dialog.update()
             
-            step_names = ["停止logger", "清除旧日志", "设置缓存大小", "开启logger"]
+            logger_is_running = False
+            if U2_AVAILABLE:
+                try:
+                    d = u2.connect(device)
+                    button = d(resourceId="com.debug.loggerui:id/startStopToggleButton")
+                    if button.exists:
+                        is_checked = button.info.get('checked', False)
+                        logger_is_running = is_checked
+                except Exception as e:
+                    print(f"[DEBUG] UIAutomator2检查失败: {e}")
+                    logger_is_running = False
             
-            # 执行命令序列
-            for i, cmd in enumerate(commands, 1):
-                # 检查是否被要求停止
+            # 2. 如果logger正在运行，先停止
+            if logger_is_running:
+                status_label.config(text="停止logger...")
+                progress_var.set(10)
+                progress_dialog.update()
+                
+                stop_cmd = ["adb", "-s", device, "shell", "am", "broadcast", "-a", "com.debug.loggerui.ADB_CMD", 
+                           "-e", "cmd_name", "stop", "--ei", "cmd_target", "-1", "-n", "com.debug.loggerui/.framework.LogReceiver"]
+                
+                result = subprocess.run(stop_cmd, capture_output=True, text=True, timeout=15, 
+                                      creationflags=subprocess.CREATE_NO_WINDOW)
+                if result.returncode != 0:
+                    raise Exception(f"停止logger失败: {result.stderr.strip()}")
+                
+                # 3. 等待2秒后检查按钮状态
+                status_label.config(text="等待logger停止...")
+                progress_var.set(15)
+                progress_dialog.update()
+                
+                time.sleep(2)  # 等待2秒
+                
+                # 4. 检查按钮checked是否为false
+                status_label.config(text="确认logger已完全停止...")
+                progress_var.set(20)
+                progress_dialog.update()
+                
+                max_wait_time = 120
+                start_time = time.time()
+                while time.time() - start_time < max_wait_time:
+                    if stop_flag and stop_flag.is_set():
+                        return {"success": False, "message": "操作已取消"}
+                    
+                    if U2_AVAILABLE:
+                        try:
+                            d = u2.connect(device)
+                            button = d(resourceId="com.debug.loggerui:id/startStopToggleButton")
+                            if button.exists:
+                                is_checked = button.info.get('checked', False)
+                                if not is_checked:
+                                    break
+                        except Exception as e:
+                            break
+                    time.sleep(1)
+            
+            # 检查是否被要求停止
+            if stop_flag and stop_flag.is_set():
+                return {"success": False, "message": "操作已取消"}
+            
+            # 3. 清除旧日志
+            status_label.config(text="清除旧日志...")
+            progress_var.set(30)
+            progress_dialog.update()
+            
+            clear_cmd = ["adb", "-s", device, "shell", "am", "broadcast", "-a", "com.debug.loggerui.ADB_CMD", 
+                        "-e", "cmd_name", "clear_logs_all", "--ei", "cmd_target", "0", "-n", "com.debug.loggerui/.framework.LogReceiver"]
+            
+            result = subprocess.run(clear_cmd, capture_output=True, text=True, timeout=15, 
+                                  creationflags=subprocess.CREATE_NO_WINDOW)
+            if result.returncode != 0:
+                raise Exception(f"清除旧日志失败: {result.stderr.strip()}")
+            
+            # 4. 设置MD log缓存大小20GB
+            status_label.config(text="设置缓存大小...")
+            progress_var.set(40)
+            progress_dialog.update()
+            
+            size_cmd = ["adb", "-s", device, "shell", "am", "broadcast", "-a", "com.debug.loggerui.ADB_CMD", 
+                       "-e", "cmd_name", "set_log_size_20000", "--ei", "cmd_target", "2", "-n", "com.debug.loggerui/.framework.LogReceiver"]
+            
+            result = subprocess.run(size_cmd, capture_output=True, text=True, timeout=15, 
+                                  creationflags=subprocess.CREATE_NO_WINDOW)
+            if result.returncode != 0:
+                raise Exception(f"设置缓存大小失败: {result.stderr.strip()}")
+            
+            # 检查是否被要求停止
+            if stop_flag and stop_flag.is_set():
+                return {"success": False, "message": "操作已取消"}
+            
+            # 5. 开启MTK LOGGER
+            status_label.config(text="开启logger...")
+            progress_var.set(50)
+            progress_dialog.update()
+            
+            start_cmd = ["adb", "-s", device, "shell", "am", "broadcast", "-a", "com.debug.loggerui.ADB_CMD", 
+                        "-e", "cmd_name", "start", "--ei", "cmd_target", "-1", "-n", "com.debug.loggerui/.framework.LogReceiver"]
+            
+            result = subprocess.run(start_cmd, capture_output=True, text=True, timeout=15, 
+                                  creationflags=subprocess.CREATE_NO_WINDOW)
+            if result.returncode != 0:
+                raise Exception(f"开启logger失败: {result.stderr.strip()}")
+            
+            # 8. 等待"Starting logs"对话框消失
+            status_label.config(text="等待logger启动...")
+            progress_var.set(60)
+            progress_dialog.update()
+            
+            max_wait_time = 120  # 最多等待2分钟
+            start_time = time.time()
+            dialog_appeared = False
+            initial_wait_time = 5  # 给对话框5秒时间出现
+            
+            while time.time() - start_time < max_wait_time:
                 if stop_flag and stop_flag.is_set():
                     return {"success": False, "message": "操作已取消"}
                 
-                # 更新状态
-                status_label.config(text=f"步骤 {i}/4: {step_names[i-1]}")
-                progress_var.set((i-1) * 25)
-                progress_dialog.update()
+                if U2_AVAILABLE:
+                    try:
+                        d = u2.connect(device)
+                        alert_title = d(resourceId="android:id/alertTitle", text="Starting logs")
+                        if alert_title.exists:
+                            if not dialog_appeared:
+                                dialog_appeared = True
+                        elif dialog_appeared and not alert_title.exists:
+                            break
+                        elif not dialog_appeared and (time.time() - start_time) > initial_wait_time:
+                            break
+                    except Exception as e:
+                        break
+                time.sleep(1)
+            
+            # 9. 检查按钮checked是否为true
+            status_label.config(text="确认logger已完全启动...")
+            progress_var.set(80)
+            progress_dialog.update()
+            
+            start_time = time.time()
+            while time.time() - start_time < max_wait_time:
+                if stop_flag and stop_flag.is_set():
+                    return {"success": False, "message": "操作已取消"}
                 
-                result = subprocess.run(cmd, capture_output=True, text=True, timeout=15, 
-                                      creationflags=subprocess.CREATE_NO_WINDOW)
-                if result.returncode != 0:
-                    error_msg = result.stderr.strip() if result.stderr else "未知错误"
-                    raise Exception(f"开启MTKLOG失败 (步骤{i}): {error_msg}")
-                
-                # 更新进度
-                progress_var.set(i * 25)
-                progress_dialog.update()
-                
-                # 添加时间保护
-                if i == 1:  # 停止logger后等待5秒
-                    status_label.config(text="等待5秒...")
-                    progress_dialog.update()
-                    time.sleep(5)
-                elif i == 2:  # 清除日志后等待2秒
-                    status_label.config(text="等待2秒...")
-                    progress_dialog.update()
-                    time.sleep(2)
-                elif i == 3:  # 设置缓存大小后等待1秒
-                    status_label.config(text="等待1秒...")
-                    progress_dialog.update()
-                    time.sleep(1)
-            time.sleep(5)   # 加5s时间保护等待开启完成
+                if U2_AVAILABLE:
+                    try:
+                        d = u2.connect(device)
+                        button = d(resourceId="com.debug.loggerui:id/startStopToggleButton")
+                        if button.exists:
+                            is_checked = button.info.get('checked', False)
+                            if is_checked:
+                                break
+                    except Exception as e:
+                        break
+                time.sleep(1)
+            
             # 完成
             status_label.config(text="完成!")
             progress_var.set(100)
@@ -137,23 +250,66 @@ class MTKLogManager:
             if stop_flag and stop_flag.is_set():
                 return {"success": False, "message": "操作已取消"}
             
-            # 1. 停止logger命令,加5s时间保护
-            status_label.config(text="停止logger...")
-            progress_var.set(20)
+            # 1. 检查logger状态
+            status_label.config(text="检查logger状态...")
+            progress_var.set(10)
             progress_dialog.update()
             
-            stop_cmd = ["adb", "-s", device, "shell", "am", "broadcast", "-a", "com.debug.loggerui.ADB_CMD", 
-                       "-e", "cmd_name", "stop", "--ei", "cmd_target", "-1", "-n", "com.debug.loggerui/.framework.LogReceiver"]
+            logger_is_running = False
+            if U2_AVAILABLE:
+                try:
+                    d = u2.connect(device)
+                    button = d(resourceId="com.debug.loggerui:id/startStopToggleButton")
+                    if button.exists:
+                        is_checked = button.info.get('checked', False)
+                        logger_is_running = is_checked
+                except Exception as e:
+                    print(f"[DEBUG] UIAutomator2检查失败: {e}")
+                    logger_is_running = False
             
-            result = subprocess.run(stop_cmd, capture_output=True, text=True, timeout=15, 
-                                  creationflags=subprocess.CREATE_NO_WINDOW)
-            if result.returncode != 0:
-                raise Exception(f"停止logger失败: {result.stderr.strip()}")
-            
-            # 添加5秒时间保护
-            status_label.config(text="等待5秒保护时间...")
-            progress_dialog.update()
-            time.sleep(5)
+            # 2. 如果logger正在运行，执行停止命令
+            if logger_is_running:
+                status_label.config(text="停止logger...")
+                progress_var.set(20)
+                progress_dialog.update()
+                
+                stop_cmd = ["adb", "-s", device, "shell", "am", "broadcast", "-a", "com.debug.loggerui.ADB_CMD", 
+                           "-e", "cmd_name", "stop", "--ei", "cmd_target", "-1", "-n", "com.debug.loggerui/.framework.LogReceiver"]
+                
+                result = subprocess.run(stop_cmd, capture_output=True, text=True, timeout=15, 
+                                      creationflags=subprocess.CREATE_NO_WINDOW)
+                if result.returncode != 0:
+                    raise Exception(f"停止logger失败: {result.stderr.strip()}")
+                
+                # 3. 等待2秒后检查按钮状态
+                status_label.config(text="等待logger停止...")
+                progress_var.set(30)
+                progress_dialog.update()
+                
+                time.sleep(2)  # 等待2秒
+                
+                # 4. 检查按钮checked是否为false
+                status_label.config(text="确认logger已完全停止...")
+                progress_var.set(40)
+                progress_dialog.update()
+                
+                max_wait_time = 120
+                start_time = time.time()
+                while time.time() - start_time < max_wait_time:
+                    if stop_flag and stop_flag.is_set():
+                        return {"success": False, "message": "操作已取消"}
+                    
+                    if U2_AVAILABLE:
+                        try:
+                            d = u2.connect(device)
+                            button = d(resourceId="com.debug.loggerui:id/startStopToggleButton")
+                            if button.exists:
+                                is_checked = button.info.get('checked', False)
+                                if not is_checked:
+                                    break
+                        except Exception as e:
+                            break
+                    time.sleep(1)
             
             # 检查是否被要求停止
             if stop_flag and stop_flag.is_set():
@@ -201,9 +357,9 @@ class MTKLogManager:
                 progress_var.set(50 + (i * 5))
                 progress_dialog.update()
                 
-                # 执行adb pull
+                # 执行adb pull，timeout设置为10分钟（600秒）
                 cmd = ["adb", "-s", device, "pull", source_path, log_folder]
-                result = subprocess.run(cmd, capture_output=True, text=True, timeout=3600, 
+                result = subprocess.run(cmd, capture_output=True, text=True, timeout=600, 
                                       creationflags=subprocess.CREATE_NO_WINDOW)
                 
                 if result.returncode != 0:
@@ -221,30 +377,15 @@ class MTKLogManager:
             if result.get("success") == False and result.get("message") == "操作已取消":
                 self.app.ui.status_var.set("操作已取消")
             else:
-                # 打开日志文件夹
+                # 打开日志文件夹，不显示确认弹框
                 if result["log_folder"]:
                     os.startfile(result["log_folder"])
                 
-                # 更新状态和显示完成信息
+                # 更新状态
                 if result["export_media"]:
                     self.app.ui.status_var.set(f"MTKLOG已停止并导出(含媒体文件) - {result['device']}")
-                    messagebox.showinfo("导出完成", 
-                        f"MTKLOG导出完成！\n\n"
-                        f"导出目录: {result['log_folder']}\n"
-                        f"设备: {result['device']}\n\n"
-                        f"已导出内容:\n"
-                        f"• MTKLOG日志文件\n"
-                        f"• 屏幕录制视频\n"
-                        f"• 截图文件\n\n"
-                        f"文件夹已自动打开。")
                 else:
                     self.app.ui.status_var.set(f"MTKLOG已停止并导出 - {result['device']}")
-                    messagebox.showinfo("导出完成", 
-                        f"MTKLOG导出完成！\n\n"
-                        f"导出目录: {result['log_folder']}\n"
-                        f"设备: {result['device']}\n\n"
-                        f"已导出MTKLOG日志文件。\n\n"
-                        f"文件夹已自动打开。")
         
         # 定义错误回调
         def on_mtklog_error(error):
