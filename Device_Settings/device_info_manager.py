@@ -30,7 +30,8 @@ class DeviceInfoManager:
                 cmd.split(), 
                 capture_output=True, 
                 text=True, 
-                timeout=timeout
+                timeout=timeout,
+                creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0
             )
             return result.returncode, result.stdout, result.stderr
         except subprocess.TimeoutExpired:
@@ -282,6 +283,7 @@ class DeviceInfoManager:
         
         result = {
             "serial": serial,
+            "fingerprint": self.getprop(serial, "ro.build.fingerprint"),
             "device_model": self.getprop(serial, "ro.product.model"),
             "device_brand": self.getprop(serial, "ro.product.brand"),
             "android_version": self.getprop(serial, "ro.build.version.release"),
@@ -390,6 +392,12 @@ class DeviceInfoManager:
             self._log_message("=" * 60)
             self._log_message("设备信息")
             self._log_message("=" * 60)
+            
+            # 首先显示 Fingerprint
+            fingerprint = device_info.get('fingerprint', '未知')
+            self._log_message("Fingerprint:")
+            self._log_message(f"  {fingerprint}")
+            self._log_message("")
             
             # 设备基本信息
             self._log_message("设备基本信息:")
