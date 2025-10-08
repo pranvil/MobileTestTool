@@ -284,6 +284,8 @@ class DeviceInfoManager:
         result = {
             "serial": serial,
             "fingerprint": self.getprop(serial, "ro.build.fingerprint"),
+            "antirollback": self.getprop(serial, "ro.boot.antirollback"),
+            "build_date": self.getprop(serial, "ro.build.date"),
             "device_model": self.getprop(serial, "ro.product.model"),
             "device_brand": self.getprop(serial, "ro.product.brand"),
             "android_version": self.getprop(serial, "ro.build.version.release"),
@@ -393,12 +395,7 @@ class DeviceInfoManager:
             self._log_message("设备信息")
             self._log_message("=" * 60)
             
-            # 首先显示 Fingerprint
-            fingerprint = device_info.get('fingerprint', '未知')
-            self._log_message("Fingerprint:")
-            self._log_message(f"  {fingerprint}")
-            self._log_message("")
-            
+
             # 设备基本信息
             self._log_message("设备基本信息:")
             self._log_message(f"  设备型号: {device_info.get('device_model', '未知')}")
@@ -421,7 +418,19 @@ class DeviceInfoManager:
                     self._log_message(f"    IMSI: {sub.get('imsi', '')}")
                     self._log_message(f"    ICCID: {sub.get('iccid', '')}")
                     self._log_message("")
+
+            # 显示 Fingerprint
+            fingerprint = device_info.get('fingerprint', '未知')
+            self._log_message(f"Fingerprint: {fingerprint}")
             
+            # 显示 Antirollback
+            antirollback = device_info.get('antirollback', '未知')
+            self._log_message(f"Antirollback: {antirollback}")
+            
+            # 显示编译时间
+            build_date = device_info.get('build_date', '未知')
+            self._log_message(f"编译时间: {build_date}")
+                        
             self._log_message("=" * 60)
             self._log_message("[设备信息] 设备信息获取完成!")
             
