@@ -2,71 +2,6 @@
 
 一个功能强大的Android设备日志管理和MTKLOG操作工具，支持实时日志过滤、MTKLOG管理、ADB Log操作和多设备支持。
 
----
-
-## PyQt5 版本
-
-**当前版本**：v1.0-PyQt5 ✅ **已完成**
-
-基于PyQt5的现代化版本，具有更美观的UI和更好的用户体验。
-
-### ✨ 新特性
-
-- 🎨 **双主题支持**：暗色/亮色主题，一键切换
-- 🚀 **现代化UI**：统一的视觉风格，流畅的交互体验
-- 💡 **完整功能**：所有核心功能已实现并可用
-- 🔧 **易于扩展**：模块化设计，易于添加新功能
-- 🎯 **图标系统**：统一的图标风格，提升视觉效果
-- ✨ **动画效果**：流畅的交互体验，提升用户体验
-- 📦 **打包配置**：完整的打包配置，一键打包
-
-### 快速开始
-
-```bash
-# 运行程序
-python main_pyqt.py
-
-# 或使用测试脚本
-python test_pyqt.py
-```
-
-### 打包程序
-
-```bash
-# 使用打包脚本
-build_pyqt.bat
-
-# 或手动打包
-pyinstaller --clean MobileTestTool_pyqt.spec
-```
-
-### 文档
-
-- [代码结构说明](./CODE_STRUCTURE.md) - 详细代码结构
-- [代码Review报告](./CODE_REVIEW_REPORT.md) - 代码审查报告
-- [重构完成报告](./REFACTORING_COMPLETE.md) - 重构完成总结
-- [最终总结](./FINAL_SUMMARY.md) - 项目最终状态
-
-### 已实现功能
-
-- ✅ 设备管理
-- ✅ MTKLOG控制
-- ✅ ADB Log控制
-- ✅ Log过滤
-- ✅ 网络信息
-- ✅ 截图/录制
-- ✅ 主题切换
-- ✅ 其他Log控制功能
-- ✅ TMO CC功能
-- ✅ Echolocate功能
-- ✅ 背景数据功能
-- ✅ APP操作功能
-- ✅ 设备信息功能
-- ✅ 赫拉配置功能
-- ✅ 其他操作功能
-
----
-
 ## 📋 目录
 
 - [功能概述](#-功能概述)
@@ -125,128 +60,88 @@ pyinstaller --clean MobileTestTool_pyqt.spec
 ## 🏗️ 代码结构
 
 ### 目录结构
-
 ```
-MobileTestTool/
-├── main_pyqt.py                    # PyQt5主程序入口
-├── requirements_pyqt.txt           # 依赖包列表
-├── build_pyqt.bat                  # 打包脚本
-├── MobileTestTool_pyqt.spec        # PyInstaller配置
-│
-├── core/                           # 核心管理器
+adb_filter_key_words/
+├── main.py                          # 主程序入口
+├── ui_manager.py                    # UI界面管理
+├── requirements.txt                 # 依赖包列表
+├── build_onedir.bat                # 打包脚本
+├── MobileTestTool.spec             # PyInstaller配置
+├── log_control/                 # log控制模块
 │   ├── __init__.py
 │   ├── device_manager.py           # 设备管理
 │   ├── mtklog_manager.py           # MTKLOG管理
-│   ├── adblog_manager.py           # ADB Log管理
-│   ├── log_processor.py            # 日志过滤处理
 │   ├── screenshot_manager.py       # 截图管理
-│   ├── video_manager.py            # 录制管理
-│   ├── network_info_manager.py     # 网络信息管理
-│   ├── tmo_cc_manager.py           # TMO CC管理
-│   ├── echolocate_manager.py       # Echolocate管理
-│   ├── log_utilities.py            # 日志工具（TCPDump, Telephony等）
-│   ├── device_operations.py        # 设备操作（背景数据、APP操作等）
-│   ├── hera_config_manager.py      # 赫拉配置管理
-│   ├── app_operations_manager.py   # APP操作管理
-│   └── theme_manager.py            # 主题管理
-│
-├── ui/                             # PyQt5 UI组件 ⭐
+│   └── video_manager.py            # 录制管理
+├── Log_Filter/                     # 日志过滤模块
 │   ├── __init__.py
-│   ├── main_window.py              # 主窗口
-│   ├── menu_bar.py                 # 菜单栏
-│   ├── toolbar.py                  # 工具栏
-│   ├── input_text_dialog.py        # 输入文本对话框
-│   ├── tools_config_dialog.py      # 工具配置对话框
-│   ├── tabs/                       # Tab页面
-│   │   ├── __init__.py
-│   │   ├── log_control_tab.py      # 日志控制Tab
-│   │   ├── log_filter_tab.py       # 日志过滤Tab
-│   │   ├── network_info_tab.py     # 网络信息Tab
-│   │   ├── tmo_cc_tab.py           # TMO CC Tab
-│   │   ├── tmo_echolocate_tab.py   # TMO Echolocate Tab
-│   │   ├── background_data_tab.py  # 背景数据Tab
-│   │   ├── app_operations_tab.py   # APP操作Tab
-│   │   └── other_tab.py            # 其他Tab
-│   ├── widgets/                    # 自定义控件
-│   │   ├── __init__.py
-│   │   ├── log_viewer.py           # 日志查看器
-│   │   └── animations.py           # 动画效果
-│   └── resources/                  # 资源文件
-│       ├── icons/                  # 图标
-│       └── themes/                 # 主题样式
-│           ├── dark.qss            # 暗色主题
-│           └── light.qss           # 亮色主题
-│
-├── resources/                      # 资源文件
-│   ├── apk/                        # APK文件
-│   │   ├── app-uiautomator.apk
-│   │   ├── app-uiautomator-test.apk
-│   │   └── Heratest-trigger-com.example.test.apk
-│   ├── icons/                      # 图标文件
-│   └── themes/                     # 主题文件
-└── Network_info/                   # 网络信息模块
-    ├── __init__.py
-    ├── telephony_parser.py
-    ├── utilities_ping.py
-    └── utilities_wifi_info.py
+│   ├── log_processor.py            # 日志处理
+│   ├── search_manager.py           # 搜索管理
+│   ├── adblog_manager.py           # ADB Log管理
+│   └── google_log.py               # Google日志处理
+├── Device_Settings/                # 设备设置模块
+│   ├── __init__.py
+│   ├── device_settings_manager.py  # 设备设置管理
+│   ├── hera_config_manager.py      # 赫拉配置管理
+│   └── tcpdump_capture.py          # TCPDump抓包
+├── Network_info/                   # 网络信息模块
+│   ├── __init__.py
+│   ├── network_info_manager.py     # 网络信息管理
+│   ├── telephony_parser.py         # 电话解析器
+│   ├── utilities_ping.py           # Ping工具
+│   └── utilities_wifi_info.py      # WiFi信息工具
+├── Background_Data/                # 后台数据模块
+│   ├── __init__.py
+│   ├── background_config_manager.py # 后台配置管理
+│   └── log_analysis_manager.py     # 日志分析管理
+├── Echolocate/                     # Echolocate模块
+│   ├── __init__.py
+│   └── echolocate_manager.py       # Echolocate管理
+├── TMO_CC/                         # TMO CC模块
+│   ├── __init__.py
+│   ├── pull_cc.py                  # 拉CC文件
+│   ├── push_cc.py                  # 推CC文件
+│   └── server_manager.py           # 服务器管理
+└── build/                          # 构建输出目录
+    └── MobileTestTool/             # 打包后的可执行文件
 ```
 
 ### 模块功能划分
 
-#### 1. PyQt5核心管理器 (core/)
+#### 1. log控制模块 (log_control)
 - **device_manager.py**: 设备连接、验证、选择管理
 - **mtklog_manager.py**: MTKLOG开启、停止、导出、删除操作
-- **adblog_manager.py**: ADB Log开启、导出操作
-- **log_processor.py**: 日志过滤、处理、性能优化
 - **screenshot_manager.py**: 设备截图功能
 - **video_manager.py**: 屏幕录制功能
+
+#### 2. 日志过滤模块 (Log_Filter)
+- **log_processor.py**: 日志过滤、处理、性能优化
+- **search_manager.py**: 搜索对话框、关键字高亮
+- **adblog_manager.py**: ADB Log开启、导出操作
+- **google_log.py**: Google日志特殊处理
+
+#### 3. 设备设置模块 (Device_Settings)
+- **device_settings_manager.py**: 设备设置、工具配置
+- **hera_config_manager.py**: 赫拉配置管理
+- **tcpdump_capture.py**: 网络抓包功能
+
+#### 4. 网络信息模块 (Network_info)
 - **network_info_manager.py**: 网络信息获取和管理
-- **tmo_cc_manager.py**: TMO CC文件操作
-- **echolocate_manager.py**: Echolocate文件拉取和管理
-- **log_utilities.py**: 日志工具（TCPDump、Telephony、Google Log、AEE Log、Bugreport）
-- **device_operations.py**: 设备操作（背景数据、APP操作、设备信息、赫拉配置、其他操作）
-- **hera_config_manager.py**: 赫拉配置管理（独立文件）
-- **app_operations_manager.py**: APP操作管理（独立文件）
-- **device_info_manager.py**: 设备信息查询（IMEI、ICCID、IMSI、MSISDN等）
-- **theme_manager.py**: 主题管理（暗色/亮色切换）
+- **telephony_parser.py**: 电话信息解析
+- **utilities_ping.py**: Ping工具
+- **utilities_wifi_info.py**: WiFi信息工具
 
-#### 2. UI组件 (ui/)
-- **main_window.py**: 主窗口，整合所有Tab和日志查看器
-- **menu_bar.py**: 菜单栏（文件、编辑、工具、帮助）
-- **toolbar.py**: 工具栏（设备选择、刷新、截图、录制、主题切换）
-- **tabs/**: 8个Tab页面，每个对应一个功能模块
-- **widgets/log_viewer.py**: 日志查看器（日志显示、搜索、高亮）
-- **resources/**: 图标和主题样式文件
-
-#### 3. 业务模块（工具类）
-
-**resources/apk/**
-- **app-uiautomator.apk**: uiautomator APK文件
-- **app-uiautomator-test.apk**: uiautomator测试APK文件
-- **Heratest-trigger-com.example.test.apk**: 赫拉测试触发APK文件
-- **APK文件**: 用于自动化测试的APK文件
-
-**Network_info/**
-- **telephony_parser.py**: 电话信息解析工具（被PyQt5调用）
-- **utilities_ping.py**: Ping工具（被PyQt5调用）
-- **utilities_wifi_info.py**: WiFi信息工具（被PyQt5调用）
-
-**Background_Data/**
+#### 5. 后台数据模块 (Background_Data)
 - **background_config_manager.py**: 后台数据配置和导出
 - **log_analysis_manager.py**: 日志分析功能
 
-**Echolocate/**
+#### 6. Echolocate模块 (Echolocate)
 - **echolocate_manager.py**: Echolocate文件拉取和管理
 
-**TMO_CC/**
+#### 7. TMO CC模块 (TMO_CC)
 - **pull_cc.py**: 拉取CC文件
 - **push_cc.py**: 推送CC文件
 - **server_manager.py**: 服务器管理
-
-**App_Operations/**
-- **app_operations_manager.py**: APP操作（查询、安装、卸载等）
-
-**说明**：业务模块提供工具类和业务逻辑，被PyQt5管理器调用。PyQt5管理器负责UI交互和信号槽通信，业务模块负责具体的业务逻辑实现。
 
 ### 文件存储结构
 所有文件按以下统一格式保存：
@@ -277,26 +172,23 @@ c:\log\yyyymmdd\
 # 下载并安装 Android SDK: https://developer.android.com/studio
 # 将adb命令添加到系统PATH环境变量
 
-# 安装依赖
-pip install -r requirements_pyqt.txt
+# 安装Python依赖
+pip install -r requirements.txt
 ```
 
 ### 2. 运行程序
 ```bash
-# 运行程序
-python main_pyqt.py
+# 直接运行Python脚本
+python main.py
 
-# 或使用测试脚本
-python test_pyqt.py
+# 或使用打包好的可执行文件
+.\build\MobileTestTool\MobileTestTool.exe
 ```
 
 ### 3. 打包程序
 ```bash
 # 使用批处理文件打包
-.\build_pyqt.bat
-
-# 或手动打包
-pyinstaller --clean MobileTestTool_pyqt.spec
+.\build_onedir.bat
 ```
 
 #### APK文件打包说明
@@ -788,10 +680,11 @@ def test_module_functionality(self):
 
 ## ⌨️ 快捷键
 
-- **Ctrl+F**: 聚焦搜索框
+- **Ctrl+F**: 打开搜索对话框
 - **F3**: 查找下一个匹配项
 - **Shift+F3**: 查找上一个匹配项
-- **Ctrl+G**: 查找下一个匹配项（备用）
+- **Ctrl+Shift+L**: 显示主窗口
+- **Escape**: 关闭搜索对话框
 - **Enter**: 在关键字输入框中按Enter键快速开始过滤
 
 ## 🎛️ 界面布局
@@ -845,17 +738,14 @@ def test_module_functionality(self):
 
 ## 📝 更新日志
 
-### v1.0-PyQt5 (当前版本)
-- ✨ 完成PyQt5重构，提供现代化UI
-- 🎨 新增双主题支持（暗色/亮色）
-- 🚀 模块化架构，代码更清晰
-- 💡 所有核心功能完整实现
-- 🔧 补充LogProcessor缺失功能（保存、清空、设置等）
-- ⌨️ 完整的快捷键支持
-- 📦 完整的打包配置
-- 🧹 移除Tkinter代码，仅保留PyQt5版本
-- 🗑️ 清理29个重构相关文档
-- 📚 更新README文档结构
+### v0.6 (当前版本)
+- 🧹 代码清理和优化
+- 🗑️ 删除重复的函数定义
+- 🗑️ 删除未使用的测试文件
+- 🗑️ 清理未使用的导入语句
+- 🔧 简化日志分析管理器
+- 📚 更新文档结构
+- 🎯 提高代码可维护性
 
 ### v0.3
 - ✨ 新增MTKLOG管理功能

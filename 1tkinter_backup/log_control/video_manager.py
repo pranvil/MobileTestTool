@@ -174,7 +174,7 @@ class VideoManager:
                 self.recorded_files.append(video_path)
                 
                 # 开始录制（限制3分钟，避免某些设备限制）
-                record_cmd = ["adb", "-s", device, "shell", "screenrecord", "--time-limit", "180", video_path]
+                record_cmd = ["adb", "-s", device, "shell", "screenrecord", "--time-limit", "0", video_path]
                 
                 print(f"开始录制: {filename}")
                 self.recording_process = subprocess.Popen(record_cmd, 
@@ -405,7 +405,7 @@ class VideoManager:
                 time.sleep(2)
         
         # 开始录制
-        cmd = ["adb", "-s", device, "shell", "screenrecord", "--time-limit", "3600", "--bit-rate", "8000000", video_path]
+        cmd = ["adb", "-s", device, "shell", "screenrecord", "--time-limit", "0", "--bit-rate", "8000000", video_path]
         
         try:
             self.recording_process = subprocess.Popen(

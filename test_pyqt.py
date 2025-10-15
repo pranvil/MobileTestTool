@@ -1,22 +1,13 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-手机测试辅助工具 - PyQt5 版本
-主程序入口
+PyQt5版本测试脚本
 """
 
 import sys
-import os
-
-# 必须在导入PyQt5之前设置高DPI支持
-os.environ['QT_ENABLE_HIGHDPI_SCALING'] = '1'
-os.environ['QT_SCALE_FACTOR_ROUNDING_POLICY'] = 'PassThrough'
-
 from PyQt5.QtWidgets import QApplication
 from PyQt5.QtCore import Qt
-
 from ui.main_window import MainWindow
-
 
 def main():
     """主函数"""
@@ -24,12 +15,13 @@ def main():
     app = QApplication(sys.argv)
     
     # 设置应用程序属性
-    app.setApplicationName("手机测试辅助工具")
-    app.setApplicationVersion("0.7-PyQt5")
+    app.setApplicationName("MobileTestTool PyQt5")
+    app.setApplicationVersion("1.0")
     app.setOrganizationName("MobileTestTool")
     
-    # 启用高DPI支持（已在导入前通过环境变量设置）
-    app.setAttribute(Qt.AA_UseHighDpiPixmaps)
+    # 启用高DPI支持
+    app.setAttribute(Qt.AA_EnableHighDpiScaling, True)
+    app.setAttribute(Qt.AA_UseHighDpiPixmaps, True)
     
     # 创建主窗口
     window = MainWindow()
@@ -38,7 +30,6 @@ def main():
     # 运行应用程序
     sys.exit(app.exec_())
 
-
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()
 
