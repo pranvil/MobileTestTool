@@ -271,8 +271,6 @@ class MTKLogWorker(QThread):
             self.progress.emit(15, "检查logger状态...")
             
             logger_is_running = False
-            u2_available = False
-            
             if U2_AVAILABLE:
                 try:
                     d = u2.connect(self.device)
@@ -280,24 +278,10 @@ class MTKLogWorker(QThread):
                     if button.exists:
                         is_checked = button.info.get('checked', False)
                         logger_is_running = is_checked
-                        u2_available = True
                 except Exception as e:
+                    print(f"警告: UIAutomator2不可用 - {str(e)}")
+                    print("提示: 如果频繁出现此问题，建议重启手机后重试")
                     logger_is_running = False
-                    u2_available = False
-            
-            # 如果UIAutomator2不可用，使用备用检测方案
-            if not u2_available:
-                self.progress.emit(16, "UIAutomator2不可用，使用备用检测方案...")
-                # 通过检查MTKlogger进程来判断是否在运行
-                try:
-                    ps_cmd = ["adb", "-s", self.device, "shell", "ps", "|", "grep", "mtklog"]
-                    result = subprocess.run(ps_cmd, shell=True, capture_output=True, text=True, timeout=10,
-                                          creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0)
-                    # 如果找到mtklog相关进程，认为logger可能在运行
-                    logger_is_running = "mtklog" in result.stdout.lower()
-                except:
-                    # 备用方案也失败时，假设logger在运行，执行停止命令
-                    logger_is_running = True
             
             # 4. 如果logger正在运行，执行停止命令
             if logger_is_running:
@@ -414,8 +398,6 @@ class MTKLogWorker(QThread):
             self.progress.emit(15, "检查logger状态...")
             
             logger_is_running = False
-            u2_available = False
-            
             if U2_AVAILABLE:
                 try:
                     d = u2.connect(self.device)
@@ -423,24 +405,10 @@ class MTKLogWorker(QThread):
                     if button.exists:
                         is_checked = button.info.get('checked', False)
                         logger_is_running = is_checked
-                        u2_available = True
                 except Exception as e:
+                    print(f"警告: UIAutomator2不可用 - {str(e)}")
+                    print("提示: 如果频繁出现此问题，建议重启手机后重试")
                     logger_is_running = False
-                    u2_available = False
-            
-            # 如果UIAutomator2不可用，使用备用检测方案
-            if not u2_available:
-                self.progress.emit(16, "UIAutomator2不可用，使用备用检测方案...")
-                # 通过检查MTKlogger进程来判断是否在运行
-                try:
-                    ps_cmd = ["adb", "-s", self.device, "shell", "ps", "|", "grep", "mtklog"]
-                    result = subprocess.run(ps_cmd, shell=True, capture_output=True, text=True, timeout=10,
-                                          creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0)
-                    # 如果找到mtklog相关进程，认为logger可能在运行
-                    logger_is_running = "mtklog" in result.stdout.lower()
-                except:
-                    # 备用方案也失败时，假设logger在运行，执行停止命令
-                    logger_is_running = True
             
             # 4. 如果logger正在运行，执行停止命令
             if logger_is_running:

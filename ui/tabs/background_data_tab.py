@@ -7,6 +7,7 @@
 from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QPushButton, 
                              QGroupBox, QScrollArea, QLabel, QFrame)
 from PyQt5.QtCore import pyqtSignal, Qt
+from ui.widgets.shadow_utils import add_card_shadow
 
 
 class BackgroundDataTab(QWidget):
@@ -52,8 +53,6 @@ class BackgroundDataTab(QWidget):
         
     def create_bg_ops_group(self):
         """创建背景数据操作组（现代结构：QLabel + QFrame）"""
-        from ui.widgets.shadow_utils import add_card_shadow
-        
         # 容器
         container = QWidget()
         v = QVBoxLayout(container)

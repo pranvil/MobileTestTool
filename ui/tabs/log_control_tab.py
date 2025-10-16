@@ -7,6 +7,7 @@ Log控制 Tab
 from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QGroupBox,
                               QPushButton, QLabel, QScrollArea, QFrame)
 from PyQt5.QtCore import pyqtSignal, Qt
+from ui.widgets.shadow_utils import add_card_shadow
 
 
 class LogControlTab(QWidget):
@@ -81,8 +82,6 @@ class LogControlTab(QWidget):
         
     def create_mtklog_group(self):
         """创建 MTKLOG 控制组（现代结构：QLabel + QFrame）"""
-        from ui.widgets.shadow_utils import add_card_shadow
-        
         # 容器
         container = QWidget()
         v = QVBoxLayout(container)
@@ -155,8 +154,6 @@ class LogControlTab(QWidget):
         
     def create_adblog_group(self):
         """创建 ADB Log 控制组（现代结构：QLabel + QFrame）"""
-        from ui.widgets.shadow_utils import add_card_shadow
-        
         # 容器
         container = QWidget()
         v = QVBoxLayout(container)

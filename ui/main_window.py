@@ -10,6 +10,7 @@ from PyQt5.QtWidgets import (QMainWindow, QWidget, QVBoxLayout,
 from PyQt5.QtCore import Qt, pyqtSignal
 from ui.menu_bar import DisplayLinesDialog
 from ui.tools_config_dialog import ToolsConfigDialog
+from core.debug_logger import logger
 
 from ui.toolbar import DeviceToolBar
 from ui.widgets.log_viewer import LogViewer
@@ -141,7 +142,7 @@ class MainWindow(QMainWindow):
     def setup_ui(self):
         """设置用户界面"""
         # 设置窗口属性
-        self.setWindowTitle("手机测试辅助工具 v0.7")
+        self.setWindowTitle("手机测试辅助工具 v0.9")
         self.setGeometry(100, 100, 900, 600)
         self.showMaximized()
         
@@ -379,37 +380,62 @@ class MainWindow(QMainWindow):
         
     def setup_tabs(self):
         """设置Tab页面"""
-        # Log控制 Tab
-        self.log_control_tab = LogControlTab()
-        self.tab_widget.addTab(self.log_control_tab, "Log控制")
+        logger.info("开始初始化所有Tab页面...")
         
-        # Log过滤 Tab
-        self.log_filter_tab = LogFilterTab()
-        self.tab_widget.addTab(self.log_filter_tab, "Log过滤")
-        
-        # 网络信息 Tab
-        self.network_info_tab = NetworkInfoTab()
-        self.tab_widget.addTab(self.network_info_tab, "网络信息")
-        
-        # TMO CC Tab
-        self.tmo_cc_tab = TMOCCTab()
-        self.tab_widget.addTab(self.tmo_cc_tab, "TMO CC")
-        
-        # TMO Echolocate Tab
-        self.tmo_echolocate_tab = TMOEcholocateTab()
-        self.tab_widget.addTab(self.tmo_echolocate_tab, "TMO Echolocate")
-        
-        # 24小时背景数据 Tab
-        self.background_data_tab = BackgroundDataTab()
-        self.tab_widget.addTab(self.background_data_tab, "24小时背景数据")
-        
-        # APP操作 Tab
-        self.app_operations_tab = AppOperationsTab()
-        self.tab_widget.addTab(self.app_operations_tab, "APP操作")
-        
-        # 其他 Tab
-        self.other_tab = OtherTab()
-        self.tab_widget.addTab(self.other_tab, "其他")
+        try:
+            # Log控制 Tab
+            logger.debug("初始化 Log控制 Tab...")
+            self.log_control_tab = LogControlTab()
+            self.tab_widget.addTab(self.log_control_tab, "Log控制")
+            logger.debug("Log控制 Tab 初始化成功")
+            
+            # Log过滤 Tab
+            logger.debug("初始化 Log过滤 Tab...")
+            self.log_filter_tab = LogFilterTab()
+            self.tab_widget.addTab(self.log_filter_tab, "Log过滤")
+            logger.debug("Log过滤 Tab 初始化成功")
+            
+            # 网络信息 Tab
+            logger.debug("初始化 网络信息 Tab...")
+            self.network_info_tab = NetworkInfoTab()
+            self.tab_widget.addTab(self.network_info_tab, "网络信息")
+            logger.debug("网络信息 Tab 初始化成功")
+            
+            # TMO CC Tab
+            logger.debug("初始化 TMO CC Tab...")
+            self.tmo_cc_tab = TMOCCTab()
+            self.tab_widget.addTab(self.tmo_cc_tab, "TMO CC")
+            logger.debug("TMO CC Tab 初始化成功")
+            
+            # TMO Echolocate Tab
+            logger.debug("初始化 TMO Echolocate Tab...")
+            self.tmo_echolocate_tab = TMOEcholocateTab()
+            self.tab_widget.addTab(self.tmo_echolocate_tab, "TMO Echolocate")
+            logger.debug("TMO Echolocate Tab 初始化成功")
+            
+            # 24小时背景数据 Tab
+            logger.debug("初始化 24小时背景数据 Tab...")
+            self.background_data_tab = BackgroundDataTab()
+            self.tab_widget.addTab(self.background_data_tab, "24小时背景数据")
+            logger.debug("24小时背景数据 Tab 初始化成功")
+            
+            # APP操作 Tab
+            logger.debug("初始化 APP操作 Tab...")
+            self.app_operations_tab = AppOperationsTab()
+            self.tab_widget.addTab(self.app_operations_tab, "APP操作")
+            logger.debug("APP操作 Tab 初始化成功")
+            
+            # 其他 Tab
+            logger.debug("初始化 其他 Tab...")
+            self.other_tab = OtherTab()
+            self.tab_widget.addTab(self.other_tab, "其他")
+            logger.debug("其他 Tab 初始化成功")
+            
+            logger.info("所有Tab页面初始化完成")
+            
+        except Exception as e:
+            logger.exception("Tab页面初始化失败")
+            raise
         
     def _append_log_handler(self, text, color=None):
         """日志追加处理"""
@@ -1229,8 +1255,14 @@ class MainWindow(QMainWindow):
     
     def _on_show_tools_config_dialog(self):
         """显示工具配置对话框"""
-        dialog = ToolsConfigDialog(parent=self)
-        dialog.exec_()
+        try:
+            logger.debug("打开工具配置对话框...")
+            dialog = ToolsConfigDialog(self.other_operations_manager.tool_config, parent=self)
+            dialog.exec_()
+            logger.debug("工具配置对话框已关闭")
+        except Exception as e:
+            logger.exception("打开工具配置对话框失败")
+            QMessageBox.critical(self, "错误", f"打开工具配置对话框失败：{str(e)}")
     
     def _setup_shortcuts(self):
         """设置快捷键"""

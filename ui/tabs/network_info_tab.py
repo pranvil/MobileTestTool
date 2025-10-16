@@ -8,6 +8,7 @@ from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel,
                              QPushButton, QGroupBox, QTableWidget, 
                              QTableWidgetItem, QHeaderView, QFrame)
 from PyQt5.QtCore import pyqtSignal, Qt
+from ui.widgets.shadow_utils import add_card_shadow
 
 
 class NetworkInfoTab(QWidget):
@@ -50,8 +51,6 @@ class NetworkInfoTab(QWidget):
         
     def create_control_panel(self):
         """创建控制面板（现代结构：QLabel + QFrame）"""
-        from ui.widgets.shadow_utils import add_card_shadow
-        
         # 容器
         container = QWidget()
         v = QVBoxLayout(container)
@@ -103,8 +102,6 @@ class NetworkInfoTab(QWidget):
         
     def create_info_panel(self):
         """创建信息显示面板（现代结构：QLabel + QFrame）"""
-        from ui.widgets.shadow_utils import add_card_shadow
-        
         # 容器
         container = QWidget()
         v = QVBoxLayout(container)

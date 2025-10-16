@@ -7,6 +7,7 @@ APP操作 Tab
 from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QPushButton, 
                              QGroupBox, QScrollArea, QLabel, QFrame)
 from PyQt5.QtCore import pyqtSignal, Qt
+from ui.widgets.shadow_utils import add_card_shadow
 
 
 class AppOperationsTab(QWidget):
@@ -89,8 +90,6 @@ class AppOperationsTab(QWidget):
         
     def create_query_ops_group(self):
         """创建查询操作组（现代结构：QLabel + QFrame）"""
-        from ui.widgets.shadow_utils import add_card_shadow
-        
         # 容器
         container = QWidget()
         v = QVBoxLayout(container)
@@ -131,8 +130,6 @@ class AppOperationsTab(QWidget):
         
     def create_apk_ops_group(self):
         """创建APK操作组（现代结构：QLabel + QFrame）"""
-        from ui.widgets.shadow_utils import add_card_shadow
-        
         # 容器
         container = QWidget()
         v = QVBoxLayout(container)
@@ -173,8 +170,6 @@ class AppOperationsTab(QWidget):
         
     def create_process_ops_group(self):
         """创建进程操作组（现代结构：QLabel + QFrame）"""
-        from ui.widgets.shadow_utils import add_card_shadow
-        
         # 容器
         container = QWidget()
         v = QVBoxLayout(container)
@@ -211,8 +206,6 @@ class AppOperationsTab(QWidget):
         
     def create_app_status_ops_group(self):
         """创建APP状态操作组（现代结构：QLabel + QFrame）"""
-        from ui.widgets.shadow_utils import add_card_shadow
-        
         # 容器
         container = QWidget()
         v = QVBoxLayout(container)

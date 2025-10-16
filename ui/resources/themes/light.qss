@@ -204,20 +204,44 @@ QLabel {
     color: #000000;
 }
 
+/* 分区标题标签 */
+QLabel.section-title {
+    color: #0078d4;
+    font-weight: 600;
+    padding: 2px 6px;
+    margin: 4px 2px 4px 2px;
+    background: transparent;
+    border: none;
+}
+
 /* 分组框 */
 QGroupBox {
+    background-color: #ffffff;
     border: 1px solid #d0d0d0;
-    border-radius: 4px;
-    margin-top: 10px;
-    padding-top: 10px;
+    border-radius: 8px;
+    padding: 22px 12px 12px 12px;  /* 足够的 padding-top，给标题下方留空间 */
+    margin: 12px 6px 10px 6px;  /* 给阴影留空间 */
     color: #000000;
 }
 
+QGroupBox:hover {
+    background-color: #f8f8f8;
+    border-color: #b0b0b0;
+}
+
 QGroupBox::title {
+    color: #0078d4;
+    font-weight: bold;
+    background: #ffffff;
+    padding: 2px 8px;
+    margin-left: 10px;
     subcontrol-origin: margin;
     subcontrol-position: top left;
-    padding: 0 5px;
-    color: #0078d4;
+}
+
+QGroupBox:hover::title {
+    background-color: #f8f8f8;
+    color: #005a9e;
 }
 
 /* 滚动条 */
@@ -429,5 +453,19 @@ QTreeWidget::item:selected {
 
 QTreeWidget::item:hover {
     background-color: #f0f0f0;
+}
+
+/* 卡片容器样式（真立体 - 配合阴影使用） */
+QFrame#card {
+    background: #ffffff;
+    border: 1px solid #e0e0e0;
+    border-radius: 10px;
+    padding: 12px;
+    margin: 2px 6px 10px 6px;  /* 紧凑的间距 */
+}
+
+QFrame#card:hover {
+    background: #f8f8f8;
+    border-color: #d0d0d0;
 }
 

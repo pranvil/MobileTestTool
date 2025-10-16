@@ -8,6 +8,7 @@ from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel,
                              QLineEdit, QCheckBox, QPushButton, QGroupBox,
                              QScrollArea, QFrame)
 from PyQt5.QtCore import pyqtSignal, Qt
+from ui.widgets.shadow_utils import add_card_shadow
 
 
 class LogFilterTab(QWidget):
@@ -67,8 +68,6 @@ class LogFilterTab(QWidget):
         
     def create_filter_control_group(self):
         """创建过滤控制组（现代结构：QLabel + QFrame）"""
-        from ui.widgets.shadow_utils import add_card_shadow
-        
         # 容器
         container = QWidget()
         v = QVBoxLayout(container)

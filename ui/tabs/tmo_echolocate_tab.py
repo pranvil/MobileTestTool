@@ -7,6 +7,7 @@ TMO Echolocate Tab
 from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QPushButton, 
                              QGroupBox, QScrollArea, QLabel, QFrame)
 from PyQt5.QtCore import pyqtSignal, Qt
+from ui.widgets.shadow_utils import add_card_shadow
 
 
 class TMOEcholocateTab(QWidget):
@@ -67,8 +68,6 @@ class TMOEcholocateTab(QWidget):
         
     def create_echolocate_ops_group(self):
         """创建Echolocate操作组（现代结构：QLabel + QFrame）"""
-        from ui.widgets.shadow_utils import add_card_shadow
-        
         # 容器
         container = QWidget()
         v = QVBoxLayout(container)
@@ -117,8 +116,6 @@ class TMOEcholocateTab(QWidget):
         
     def create_filter_ops_group(self):
         """创建过滤操作组（现代结构：QLabel + QFrame）"""
-        from ui.widgets.shadow_utils import add_card_shadow
-        
         # 容器
         container = QWidget()
         v = QVBoxLayout(container)
