@@ -33,8 +33,7 @@ class ThemeManager:
             # 应用样式表
             QApplication.instance().setStyleSheet(style_sheet)
             
-            self.current_theme = theme_name
-            print(f"Theme loaded: {theme_name}")
+            self.current_theme = theme_name            
             return True
             
         except Exception as e:

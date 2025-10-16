@@ -14,62 +14,28 @@ from PyQt5.QtWidgets import QMessageBox, QFileDialog, QInputDialog, QDialog
 
 
 class PyQtBackgroundDataManager(QObject):
-    """背景数据管理器"""
+    """背景数据管理器 - 使用完整实现"""
     
     status_message = pyqtSignal(str)
+    log_message = pyqtSignal(str, str)  # text, color
     
     def __init__(self, device_manager, parent=None):
         super().__init__(parent)
         self.device_manager = device_manager
+        # 导入完整的背景数据配置管理器
+        from core.background_config_manager import BackgroundConfigManager
+        self.bg_config_manager = BackgroundConfigManager(device_manager, parent)
+        # 连接信号
+        self.bg_config_manager.status_message.connect(self.status_message.emit)
+        self.bg_config_manager.log_message.connect(self.log_message.emit)
         
     def configure_phone(self):
         """配置手机"""
-        device = self.device_manager.validate_device_selection()
-        if not device:
-            return
-        
-        try:
-            self.status_message.emit("配置手机...")
-            
-            # 配置手机参数
-            subprocess.run(
-                ["adb", "-s", device, "shell", "settings", "put", "global", "background_data", "1"],
-                timeout=10,
-                creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0
-            )
-            
-            self.status_message.emit("手机配置完成")
-            
-        except Exception as e:
-            self.status_message.emit(f"配置手机失败: {str(e)}")
+        self.bg_config_manager.configure_phone()
     
     def export_background_logs(self):
         """导出背景日志"""
-        device = self.device_manager.validate_device_selection()
-        if not device:
-            return
-        
-        try:
-            self.status_message.emit("导出背景日志...")
-            
-            # 创建保存目录
-            current_time = datetime.datetime.now()
-            date_str = current_time.strftime("%Y%m%d")
-            target_dir = f"C:\\log\\{date_str}\\background"
-            os.makedirs(target_dir, exist_ok=True)
-            
-            # 导出日志
-            pull_cmd = ["adb", "-s", device, "pull", "/sdcard/background_logs", target_dir]
-            subprocess.run(
-                pull_cmd,
-                timeout=60,
-                creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0
-            )
-            
-            self.status_message.emit(f"背景日志已导出到: {target_dir}")
-            
-        except Exception as e:
-            self.status_message.emit(f"导出背景日志失败: {str(e)}")
+        self.bg_config_manager.export_background_logs()
     
     def analyze_logs(self):
         """分析日志"""

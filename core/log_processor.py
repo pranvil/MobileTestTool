@@ -172,6 +172,7 @@ class PyQtLogProcessor(QObject):
     status_message = pyqtSignal(str)
     performance_update = pyqtSignal(str)  # 性能统计更新
     keyword_loaded = pyqtSignal(str)  # 关键字已加载
+    filter_state_changed = pyqtSignal(bool, str)  # is_running, current_keyword - 用于更新按钮状态
     
     def __init__(self, device_manager, parent=None):
         super().__init__(parent)
@@ -273,6 +274,9 @@ class PyQtLogProcessor(QObject):
             self.filtering_started.emit()
             self.status_message.emit("日志过滤已启动")
             
+            # 发出过滤状态变化信号
+            self.filter_state_changed.emit(True, keyword)
+            
         except Exception as e:
             self.status_message.emit(f"启动日志过滤失败: {str(e)}")
     
@@ -294,6 +298,9 @@ class PyQtLogProcessor(QObject):
             
             # 重置性能统计
             self.performance_update.emit("")
+            
+            # 发出过滤状态变化信号
+            self.filter_state_changed.emit(False, "")
             
         except Exception as e:
             self.status_message.emit(f"停止日志过滤失败: {str(e)}")
@@ -392,15 +399,79 @@ class PyQtLogProcessor(QObject):
             )
     
     def simple_filter(self):
-        """简单过滤 - TMO CC"""
-        keyword = "new cc version|old cc version|doDeviceActivation:Successful|mDeviceGroup|getUserAgent"
-        self.start_filtering(keyword, True, False, True)
+        """简单过滤 - TMO CC，支持智能切换"""
+        # 定义简单过滤和完全过滤的关键字
+        simple_keywords = "new cc version|old cc version|doDeviceActivation:Successful|mDeviceGroup|getUserAgent"
+        complete_keywords = "EntitlementServerApi|new cc version|old cc version|doDeviceActivation:Successful|mDeviceGroup|Entitlement-EapAka|EntitlementHandling|UpdateProvider|EntitlementService"
+        
+        # 如果正在过滤，检查当前过滤类型
+        if self.is_running:
+            current_keyword = self.filter_keyword
+            
+            # 如果当前是完全过滤，直接切换到简单过滤
+            if current_keyword == complete_keywords:
+                # 停止当前过滤
+                self.stop_filtering()
+                # 等待停止完成
+                import time
+                time.sleep(0.1)
+                # 启动简单过滤
+                self.filter_keyword = simple_keywords
+                self.use_regex = True
+                self.case_sensitive = False
+                self.color_highlight = True
+                self.start_filtering(simple_keywords, True, False, True)
+                self.status_message.emit("已切换到简单过滤")
+                return
+            # 如果当前是简单过滤，则停止过滤
+            elif current_keyword == simple_keywords:
+                self.stop_filtering()
+                self.status_message.emit("已停止简单过滤")
+                return
+            # 其他情况停止当前过滤
+            else:
+                self.stop_filtering()
+        
+        # 启动简单过滤
+        self.start_filtering(simple_keywords, True, False, True)
         self.status_message.emit("已启动简单过滤")
     
     def complete_filter(self):
-        """完全过滤 - TMO CC"""
-        keyword = "EntitlementServerApi|new cc version|old cc version|doDeviceActivation:Successful|mDeviceGroup|Entitlement-EapAka|EntitlementHandling|UpdateProvider|EntitlementService"
-        self.start_filtering(keyword, True, False, True)
+        """完全过滤 - TMO CC，支持智能切换"""
+        # 定义简单过滤和完全过滤的关键字
+        simple_keywords = "new cc version|old cc version|doDeviceActivation:Successful|mDeviceGroup|getUserAgent"
+        complete_keywords = "EntitlementServerApi|new cc version|old cc version|doDeviceActivation:Successful|mDeviceGroup|Entitlement-EapAka|EntitlementHandling|UpdateProvider|EntitlementService"
+        
+        # 如果正在过滤，检查当前过滤类型
+        if self.is_running:
+            current_keyword = self.filter_keyword
+            
+            # 如果当前是简单过滤，直接切换到完全过滤
+            if current_keyword == simple_keywords:
+                # 停止当前过滤
+                self.stop_filtering()
+                # 等待停止完成
+                import time
+                time.sleep(0.1)
+                # 启动完全过滤
+                self.filter_keyword = complete_keywords
+                self.use_regex = True
+                self.case_sensitive = False
+                self.color_highlight = True
+                self.start_filtering(complete_keywords, True, False, True)
+                self.status_message.emit("已切换到完全过滤")
+                return
+            # 如果当前是完全过滤，则停止过滤
+            elif current_keyword == complete_keywords:
+                self.stop_filtering()
+                self.status_message.emit("已停止完全过滤")
+                return
+            # 其他情况停止当前过滤
+            else:
+                self.stop_filtering()
+        
+        # 启动完全过滤
+        self.start_filtering(complete_keywords, True, False, True)
         self.status_message.emit("已启动完全过滤")
     
     def load_log_keywords(self):

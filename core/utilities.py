@@ -7,8 +7,44 @@
 
 import subprocess
 import time
-from PyQt5.QtCore import QObject, pyqtSignal
+from PyQt5.QtCore import QObject, pyqtSignal, QThread
 from PyQt5.QtWidgets import QMessageBox
+
+
+class RebootDeviceWorker(QThread):
+    """异步重启设备Worker"""
+    
+    finished = pyqtSignal(bool, str)  # success, message
+    
+    def __init__(self, device):
+        super().__init__()
+        self.device = device
+    
+    def run(self):
+        """执行重启命令"""
+        try:
+            result = subprocess.run(
+                ["adb", "-s", self.device, "reboot"],
+                capture_output=True,
+                text=True,
+                encoding='utf-8',
+                errors='replace',
+                timeout=30,
+                creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0
+            )
+            
+            if result.returncode == 0:
+                self.finished.emit(True, f"设备 {self.device} 重启命令已执行")
+            else:
+                error_msg = result.stderr.strip() if result.stderr else "未知错误"
+                self.finished.emit(False, f"重启设备失败: {error_msg}")
+                
+        except subprocess.TimeoutExpired:
+            self.finished.emit(False, "重启设备超时，请检查设备连接")
+        except FileNotFoundError:
+            self.finished.emit(False, "未找到adb命令，请确保Android SDK已安装并配置PATH")
+        except Exception as e:
+            self.finished.emit(False, f"重启设备时发生错误: {e}")
 
 
 class DeviceUtilities(QObject):
@@ -16,13 +52,15 @@ class DeviceUtilities(QObject):
     
     # 信号定义
     status_message = pyqtSignal(str)
+    reboot_started = pyqtSignal(str)  # device
+    reboot_finished = pyqtSignal(bool, str)  # success, message
     
     def __init__(self, device_manager, parent=None):
         super().__init__(parent)
         self.device_manager = device_manager
     
     def reboot_device(self, parent_widget=None):
-        """重启设备"""
+        """重启设备（异步执行）"""
         device = self.device_manager.validate_device_selection()
         if not device:
             return False
@@ -38,38 +76,31 @@ class DeviceUtilities(QObject):
         if reply != QMessageBox.Yes:
             return False
         
-        try:
-            result = subprocess.run(
-                ["adb", "-s", device, "reboot"],
-                capture_output=True,
-                text=True,
-                encoding='utf-8',
-                errors='replace',
-                timeout=30,
-                creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0
-            )
-            
-            if result.returncode == 0:
-                self.status_message.emit(f"设备 {device} 重启命令已执行")
-                return True
-            else:
-                error_msg = result.stderr.strip() if result.stderr else "未知错误"
-                QMessageBox.critical(parent_widget, "错误", f"重启设备失败:\n{error_msg}")
-                self.status_message.emit(f"重启设备失败: {error_msg}")
-                return False
-                
-        except subprocess.TimeoutExpired:
-            QMessageBox.critical(parent_widget, "错误", "重启设备超时，请检查设备连接")
-            self.status_message.emit("重启设备超时")
-            return False
-        except FileNotFoundError:
-            QMessageBox.critical(parent_widget, "错误", "未找到adb命令，请确保Android SDK已安装并配置PATH")
-            self.status_message.emit("未找到adb命令")
-            return False
-        except Exception as e:
-            QMessageBox.critical(parent_widget, "错误", f"重启设备时发生错误: {e}")
-            self.status_message.emit(f"重启设备时发生错误: {e}")
-            return False
+        # 创建并启动异步Worker
+        self.reboot_worker = RebootDeviceWorker(device)
+        self.reboot_worker.finished.connect(self._on_reboot_finished)
+        
+        # 发送开始信号
+        self.reboot_started.emit(device)
+        self.status_message.emit(f"正在重启设备 {device}...")
+        
+        # 启动Worker线程
+        self.reboot_worker.start()
+        
+        return True  # 立即返回，表示重启命令已开始
+    
+    def _on_reboot_finished(self, success, message):
+        """重启完成回调"""
+        self.reboot_finished.emit(success, message)
+        if success:
+            self.status_message.emit(message)
+        else:
+            self.status_message.emit(f"重启失败: {message}")
+        
+        # 清理Worker
+        if hasattr(self, 'reboot_worker'):
+            self.reboot_worker.deleteLater()
+            delattr(self, 'reboot_worker')
     
     def clear_device_logs(self, parent_widget=None):
         """清除设备日志缓存"""

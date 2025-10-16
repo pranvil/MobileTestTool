@@ -86,44 +86,44 @@ class LogFilterTab(QWidget):
         add_card_shadow(card)
         
         layout = QVBoxLayout(card)
-        layout.setContentsMargins(10, 10, 10, 10)
+        layout.setContentsMargins(10, 1, 10, 1)
         layout.setSpacing(8)
         
-        # 第一行：关键字输入
-        keyword_layout = QHBoxLayout()
-        keyword_layout.addWidget(QLabel("关键字:"))
+        # 第一行：关键字输入和选项在同一行
+        first_row_layout = QHBoxLayout()
+        
+        # 关键字输入（占三分之一宽度）
+        keyword_label = QLabel("关键字:")
+        first_row_layout.addWidget(keyword_label)
         
         self.keyword_entry = QLineEdit()
         self.keyword_entry.setPlaceholderText("输入过滤关键字")
+        self.keyword_entry.setFixedWidth(400)
         self.keyword_entry.returnPressed.connect(self._on_start_stop_filtering)
         self.keyword_entry.textChanged.connect(self.keyword_changed.emit)
-        keyword_layout.addWidget(self.keyword_entry)
-        
-        layout.addLayout(keyword_layout)
-        
-        # 第二行：选项
-        options_layout = QHBoxLayout()
-        
+        first_row_layout.addWidget(self.keyword_entry)
+  
+        # 选项复选框（放在输入框右侧）
         self.use_regex_check = QCheckBox("正则表达式")
         self.use_regex_check.setChecked(True)
         self.use_regex_check.toggled.connect(self.use_regex_changed.emit)
-        options_layout.addWidget(self.use_regex_check)
+        first_row_layout.addWidget(self.use_regex_check)
         
         self.case_sensitive_check = QCheckBox("区分大小写")
         self.case_sensitive_check.setChecked(False)
         self.case_sensitive_check.toggled.connect(self.case_sensitive_changed.emit)
-        options_layout.addWidget(self.case_sensitive_check)
+        first_row_layout.addWidget(self.case_sensitive_check)
         
         self.color_highlight_check = QCheckBox("彩色高亮")
         self.color_highlight_check.setChecked(True)
         self.color_highlight_check.toggled.connect(self.color_highlight_changed.emit)
-        options_layout.addWidget(self.color_highlight_check)
+        first_row_layout.addWidget(self.color_highlight_check)
         
-        options_layout.addStretch()
+        first_row_layout.addStretch()
         
-        layout.addLayout(options_layout)
+        layout.addLayout(first_row_layout)
         
-        # 第三行：开始/停止按钮和其他操作按钮
+        # 第二行：开始/停止按钮和其他操作按钮
         button_layout = QHBoxLayout()
         
         self.filter_button = QPushButton("开始过滤")

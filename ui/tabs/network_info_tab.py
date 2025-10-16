@@ -102,9 +102,28 @@ class NetworkInfoTab(QWidget):
         return container
         
     def create_info_panel(self):
-        """创建信息显示面板"""
-        group = QGroupBox("网络信息")
-        layout = QVBoxLayout(group)
+        """创建信息显示面板（现代结构：QLabel + QFrame）"""
+        from ui.widgets.shadow_utils import add_card_shadow
+        
+        # 容器
+        container = QWidget()
+        v = QVBoxLayout(container)
+        v.setContentsMargins(0, 0, 0, 0)
+        v.setSpacing(4)
+        
+        # 标题
+        title = QLabel("网络信息")
+        title.setProperty("class", "section-title")
+        v.addWidget(title)
+        
+        # 卡片
+        card = QFrame()
+        card.setObjectName("card")
+        add_card_shadow(card)
+        
+        layout = QVBoxLayout(card)
+        layout.setContentsMargins(10, 10, 10, 10)
+        layout.setSpacing(8)
         
         # 创建表格
         self.network_table = QTableWidget()
@@ -235,7 +254,9 @@ class NetworkInfoTab(QWidget):
         
         layout.addWidget(self.network_table)
         
-        return group
+        v.addWidget(card)
+        
+        return container
         
     def _show_initial_message(self):
         """显示初始提示信息"""

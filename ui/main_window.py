@@ -66,6 +66,8 @@ class MainWindow(QMainWindow):
         from core.utilities import DeviceUtilities
         self.device_utilities = DeviceUtilities(self.device_manager)
         self.device_utilities.status_message.connect(self._on_device_status_message)
+        self.device_utilities.reboot_started.connect(self._on_reboot_started)
+        self.device_utilities.reboot_finished.connect(self._on_reboot_finished)
         
         # 初始化MTKLOG管理器
         self.mtklog_manager = PyQtMTKLogManager(self.device_manager, self)
@@ -139,8 +141,9 @@ class MainWindow(QMainWindow):
     def setup_ui(self):
         """设置用户界面"""
         # 设置窗口属性
-        self.setWindowTitle("手机测试辅助工具 v0.7 - PyQt5")
-        self.setGeometry(100, 100, 1400, 900)
+        self.setWindowTitle("手机测试辅助工具 v0.7")
+        self.setGeometry(100, 100, 900, 600)
+        self.showMaximized()
         
         # 创建顶部工具栏
         self.toolbar = DeviceToolBar()
@@ -223,6 +226,7 @@ class MainWindow(QMainWindow):
         self.toolbar.screenshot_clicked.connect(self._on_screenshot)
         self.toolbar.record_toggled.connect(self._on_record_toggled)
         self.toolbar.reboot_clicked.connect(self._on_reboot_device)
+        self.toolbar.root_remount_clicked.connect(self._on_root_remount)
         self.toolbar.theme_toggled.connect(self._on_theme_toggled)
         self.toolbar.adb_command_executed.connect(self._on_adb_command_executed)
         
@@ -264,6 +268,7 @@ class MainWindow(QMainWindow):
         
         # 连接背景数据管理器信号
         self.background_data_manager.status_message.connect(self._on_background_data_status)
+        self.background_data_manager.log_message.connect(self._on_background_data_log)
         
         # 连接APP操作管理器信号
         self.app_operations_manager.status_message.connect(self._on_app_operations_status)
@@ -306,6 +311,7 @@ class MainWindow(QMainWindow):
         
         # Log处理器信号连接
         self.log_processor.keyword_loaded.connect(self._on_keyword_loaded)
+        self.log_processor.filter_state_changed.connect(self._on_filter_state_changed)
         
         # 连接 网络信息 Tab 信号
         self.network_info_tab.start_network_info.connect(self._on_start_network_info)
@@ -321,12 +327,14 @@ class MainWindow(QMainWindow):
         self.tmo_cc_tab.prod_server.connect(self._on_prod_server)
         self.tmo_cc_tab.stg_server.connect(self._on_stg_server)
         self.tmo_cc_tab.clear_logs.connect(self._on_clear_logs)
+        self.tmo_cc_tab.clear_device_logs.connect(self._on_clear_device_logs)
         
         # 连接 TMO Echolocate Tab 信号
         self.tmo_echolocate_tab.install_echolocate.connect(self._on_install_echolocate)
         self.tmo_echolocate_tab.trigger_echolocate.connect(self._on_trigger_echolocate)
         self.tmo_echolocate_tab.pull_echolocate_file.connect(self._on_pull_echolocate_file)
         self.tmo_echolocate_tab.delete_echolocate_file.connect(self._on_delete_echolocate_file)
+        self.tmo_echolocate_tab.get_echolocate_version.connect(self._on_get_echolocate_version)
         self.tmo_echolocate_tab.filter_callid.connect(self._on_filter_callid)
         self.tmo_echolocate_tab.filter_callstate.connect(self._on_filter_callstate)
         self.tmo_echolocate_tab.filter_uicallstate.connect(self._on_filter_uicallstate)
@@ -351,7 +359,6 @@ class MainWindow(QMainWindow):
         self.app_operations_tab.dump_app.connect(self._on_dump_app)
         self.app_operations_tab.enable_app.connect(self._on_enable_app)
         self.app_operations_tab.disable_app.connect(self._on_disable_app)
-        self.app_operations_tab.clear_logs.connect(self._on_clear_logs)
         
         # 连接 其他 Tab 信号
         self.other_tab.show_device_info_dialog.connect(self._on_show_device_info_dialog)
@@ -441,15 +448,116 @@ class MainWindow(QMainWindow):
             self.video_manager.stop_recording()
     
     def _on_reboot_device(self):
-        """重启设备处理"""
-        success = self.device_utilities.reboot_device(self)
+        """重启设备处理（异步）"""
+        self.device_utilities.reboot_device(self)
+    
+    def _on_reboot_started(self, device):
+        """重启开始回调"""
+        self.append_log.emit(f"正在重启设备 {device}...\n", "#FFA500")
+        self.statusBar().showMessage(f"正在重启设备 {device}...")
+    
+    def _on_reboot_finished(self, success, message):
+        """重启完成回调"""
         if success:
-            device = self.device_manager.selected_device
-            self.append_log.emit(f"设备 {device} 重启命令已执行\n", None)
+            self.append_log.emit(f"✅ {message}\n", "#00FF00")
             self.statusBar().showMessage("设备重启命令已执行")
         else:
-            # 错误信息已经通过信号处理了
-            pass
+            self.append_log.emit(f"❌ {message}\n", "#FF0000")
+            self.statusBar().showMessage("设备重启失败")
+    
+    def _on_root_remount(self):
+        """Root&remount处理"""
+        import subprocess
+        
+        device = self.device_manager.selected_device
+        if not device:
+            self.append_log.emit("未选择设备\n", "#FFA500")
+            return
+        
+        # 步骤1: 执行 adb root
+        self.append_log.emit("执行 adb root...\n", None)
+        try:
+            result = subprocess.run(
+                ["adb", "-s", device, "root"],
+                shell=True,
+                capture_output=True,
+                text=True,
+                encoding='utf-8',
+                errors='replace',
+                timeout=10,
+                creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0
+            )
+            
+            if result.stdout:
+                self.append_log.emit(result.stdout, None)
+            if result.stderr:
+                self.append_log.emit(result.stderr, None)
+                
+        except subprocess.TimeoutExpired:
+            self.append_log.emit("⚠️ adb root 执行超时\n", "#FFA500")
+            return
+        except Exception as e:
+            self.append_log.emit(f"执行 adb root 失败: {str(e)}\n", "#FF0000")
+            return
+        
+        # 步骤2: 执行 adb remount
+        self.append_log.emit("执行 adb remount...\n", None)
+        try:
+            result = subprocess.run(
+                ["adb", "-s", device, "remount"],
+                shell=True,
+                capture_output=True,
+                text=True,
+                encoding='utf-8',
+                errors='replace',
+                timeout=10,
+                creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0
+            )
+            
+            remount_output = ""
+            if result.stdout:
+                remount_output += result.stdout
+                self.append_log.emit(result.stdout, None)
+            if result.stderr:
+                remount_output += result.stderr
+                self.append_log.emit(result.stderr, None)
+            
+            # 步骤3: 检查输出是否包含"reboot"
+            if "reboot" in remount_output.lower():
+                # 弹出提示询问用户是否要重启
+                reply = QMessageBox.question(
+                    self,
+                    '需要重启设备',
+                    '检测到需要重启设备才能使设置生效。\n\n是否立即重启设备？',
+                    QMessageBox.Yes | QMessageBox.No,
+                    QMessageBox.Yes
+                )
+                
+                if reply == QMessageBox.Yes:
+                    self.append_log.emit("执行 adb reboot...\n", None)
+                    try:
+                        subprocess.run(
+                            ["adb", "-s", device, "reboot"],
+                            shell=True,
+                            capture_output=True,
+                            text=True,
+                            encoding='utf-8',
+                            errors='replace',
+                            timeout=5,
+                            creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0
+                        )
+                        self.append_log.emit(f"设备 {device} 重启命令已执行\n", None)
+                    except Exception as e:
+                        self.append_log.emit(f"执行 adb reboot 失败: {str(e)}\n", "#FF0000")
+                else:
+                    self.append_log.emit("用户取消重启\n", None)
+            else:
+                self.append_log.emit("Root&remount 完成\n", None)
+                    
+        except subprocess.TimeoutExpired:
+            self.append_log.emit("⚠️ adb remount 执行超时\n", "#FFA500")
+        except Exception as e:
+            self.append_log.emit(f"执行 adb remount 失败: {str(e)}\n", "#FF0000")
     
     def _on_theme_toggled(self):
         """主题切换处理"""
@@ -821,6 +929,10 @@ class MainWindow(QMainWindow):
     def _on_keyword_loaded(self, keyword):
         """关键字已加载，更新输入框"""
         self.log_filter_tab.set_keyword(keyword)
+    
+    def _on_filter_state_changed(self, is_running, current_keyword):
+        """过滤状态改变，更新TMO CC Tab的按钮状态"""
+        self.tmo_cc_tab.update_filter_buttons(is_running, current_keyword)
         
     def _on_clear_logs(self):
         """清空日志"""
@@ -830,7 +942,10 @@ class MainWindow(QMainWindow):
     def _on_clear_device_logs(self):
         """清除设备日志缓存"""
         self.append_log.emit("清除设备日志缓存...\n", None)
-        self.log_processor.clear_device_logs()
+        if hasattr(self, 'log_processor') and self.log_processor:
+            self.log_processor.clear_device_logs()
+        else:
+            self.statusBar().showMessage("日志处理器未初始化")
         
     def _on_show_display_lines_dialog(self):
         """显示设置行数对话框"""
@@ -920,11 +1035,11 @@ class MainWindow(QMainWindow):
         
     def _on_simple_filter(self):
         """简单过滤"""
-        self.append_log.emit("简单过滤...\n", None)
+        self.log_processor.simple_filter()
         
     def _on_complete_filter(self):
         """完全过滤"""
-        self.append_log.emit("完全过滤...\n", None)
+        self.log_processor.complete_filter()
         
     def _on_prod_server(self):
         """PROD服务器"""
@@ -950,6 +1065,10 @@ class MainWindow(QMainWindow):
     def _on_delete_echolocate_file(self):
         """删除Echolocate文件"""
         self.echolocate_manager.delete_echolocate_file()
+        
+    def _on_get_echolocate_version(self):
+        """获取Echolocate版本号"""
+        self.echolocate_manager.get_echolocate_version()
         
     def _on_filter_callid(self):
         """过滤CallID"""
@@ -1207,6 +1326,10 @@ class MainWindow(QMainWindow):
     def _on_background_data_status(self, message):
         """背景数据状态消息"""
         self.append_log.emit(f"{message}\n", None)
+    
+    def _on_background_data_log(self, message, color):
+        """背景数据日志消息（带颜色）"""
+        self.append_log.emit(f"{message}\n", color)
     
     # APP操作管理器信号处理
     def _on_app_operations_status(self, message):

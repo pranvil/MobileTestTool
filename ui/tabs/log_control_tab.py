@@ -63,7 +63,7 @@ class LogControlTab(QWidget):
         scroll_content = QWidget()
         scroll_layout = QVBoxLayout(scroll_content)
         scroll_layout.setContentsMargins(0, 0, 0, 0)
-        scroll_layout.setSpacing(10)
+        scroll_layout.setSpacing(1)
         
         # 1. MTKLOG 控制组
         mtklog_group = self.create_mtklog_group()
@@ -100,7 +100,7 @@ class LogControlTab(QWidget):
         add_card_shadow(card)
         
         card_layout = QVBoxLayout(card)
-        card_layout.setContentsMargins(10, 10, 10, 10)
+        card_layout.setContentsMargins(10, 1, 10, 1)
         card_layout.setSpacing(8)
         
         # 第一行：主要操作
@@ -174,7 +174,7 @@ class LogControlTab(QWidget):
         add_card_shadow(card)
         
         card_layout = QVBoxLayout(card)
-        card_layout.setContentsMargins(10, 10, 10, 10)
+        card_layout.setContentsMargins(10, 1, 10, 1)
         card_layout.setSpacing(8)
         
         # 第一行：ADB Log

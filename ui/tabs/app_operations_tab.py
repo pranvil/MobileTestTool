@@ -31,9 +31,6 @@ class AppOperationsTab(QWidget):
     enable_app = pyqtSignal()
     disable_app = pyqtSignal()
     
-    # 其他操作
-    clear_logs = pyqtSignal()
-    
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setup_ui()
@@ -54,23 +51,35 @@ class AppOperationsTab(QWidget):
         scroll_content = QWidget()
         scroll_layout = QVBoxLayout(scroll_content)
         scroll_layout.setContentsMargins(0, 0, 0, 0)
-        scroll_layout.setSpacing(10)
+        scroll_layout.setSpacing(1)
         
-        # 1. 查询操作组
+        # 1. 查询操作和APK操作组（同一行）
+        query_apk_container = QWidget()
+        query_apk_layout = QHBoxLayout(query_apk_container)
+        query_apk_layout.setContentsMargins(0, 0, 0, 0)
+        query_apk_layout.setSpacing(10)
+        
         query_ops_group = self.create_query_ops_group()
-        scroll_layout.addWidget(query_ops_group)
+        query_apk_layout.addWidget(query_ops_group)
         
-        # 2. APK操作组
         apk_ops_group = self.create_apk_ops_group()
-        scroll_layout.addWidget(apk_ops_group)
+        query_apk_layout.addWidget(apk_ops_group)
         
-        # 3. 进程操作组
+        scroll_layout.addWidget(query_apk_container)
+        
+        # 2. 进程操作和APP状态操作组（同一行）
+        process_status_container = QWidget()
+        process_status_layout = QHBoxLayout(process_status_container)
+        process_status_layout.setContentsMargins(0, 0, 0, 0)
+        process_status_layout.setSpacing(10)
+        
         process_ops_group = self.create_process_ops_group()
-        scroll_layout.addWidget(process_ops_group)
+        process_status_layout.addWidget(process_ops_group)
         
-        # 4. APP状态操作组
         app_status_ops_group = self.create_app_status_ops_group()
-        scroll_layout.addWidget(app_status_ops_group)
+        process_status_layout.addWidget(app_status_ops_group)
+        
+        scroll_layout.addWidget(process_status_container)
         
         # 添加弹性空间
         scroll_layout.addStretch()
@@ -99,7 +108,7 @@ class AppOperationsTab(QWidget):
         add_card_shadow(card)
         
         card_layout = QHBoxLayout(card)
-        card_layout.setContentsMargins(10, 10, 10, 10)
+        card_layout.setContentsMargins(10, 1, 10, 1)
         card_layout.setSpacing(8)
         
         self.query_package_btn = QPushButton("查询package")
@@ -141,7 +150,7 @@ class AppOperationsTab(QWidget):
         add_card_shadow(card)
         
         card_layout = QHBoxLayout(card)
-        card_layout.setContentsMargins(10, 10, 10, 10)
+        card_layout.setContentsMargins(10, 1, 10, 1)
         card_layout.setSpacing(8)
         
         self.pull_apk_btn = QPushButton("pull apk")
@@ -183,7 +192,7 @@ class AppOperationsTab(QWidget):
         add_card_shadow(card)
         
         card_layout = QHBoxLayout(card)
-        card_layout.setContentsMargins(10, 10, 10, 10)
+        card_layout.setContentsMargins(10, 1, 10, 1)
         card_layout.setSpacing(8)
         
         self.view_processes_btn = QPushButton("查看进程")
@@ -221,7 +230,7 @@ class AppOperationsTab(QWidget):
         add_card_shadow(card)
         
         card_layout = QHBoxLayout(card)
-        card_layout.setContentsMargins(10, 10, 10, 10)
+        card_layout.setContentsMargins(10, 1, 1, 10)
         card_layout.setSpacing(8)
         
         self.enable_app_btn = QPushButton("启用app")
@@ -231,10 +240,6 @@ class AppOperationsTab(QWidget):
         self.disable_app_btn = QPushButton("禁用app")
         self.disable_app_btn.clicked.connect(self.disable_app.emit)
         card_layout.addWidget(self.disable_app_btn)
-        
-        self.clear_logs_btn = QPushButton("清空日志")
-        self.clear_logs_btn.clicked.connect(self.clear_logs.emit)
-        card_layout.addWidget(self.clear_logs_btn)
         
         card_layout.addStretch()
         

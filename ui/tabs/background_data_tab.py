@@ -71,7 +71,7 @@ class BackgroundDataTab(QWidget):
         add_card_shadow(card)
         
         card_layout = QHBoxLayout(card)
-        card_layout.setContentsMargins(10, 10, 10, 10)
+        card_layout.setContentsMargins(10, 1, 10, 1)
         card_layout.setSpacing(8)
         
         self.configure_phone_btn = QPushButton("配置手机")

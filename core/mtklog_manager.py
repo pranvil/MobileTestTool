@@ -102,6 +102,8 @@ class MTKLogWorker(QThread):
                 self._start_mtklog()
             elif self.operation == 'stop_export':
                 self._stop_and_export_mtklog(self.log_name, self.export_media)
+            elif self.operation == 'stop':
+                self._stop_mtklog()
             elif self.operation == 'delete':
                 self._delete_mtklog()
         except Exception as e:
@@ -154,7 +156,7 @@ class MTKLogWorker(QThread):
                 time.sleep(2)
                 
                 # 6. 检查按钮checked是否为false
-                self.progress.emit(30, "确认logger已完全停止...")
+                self.progress.emit(30, "正在确认logger已完全停止...")
                 max_wait_time = 120
                 start_time = time.time()
                 while time.time() - start_time < max_wait_time:
@@ -227,7 +229,7 @@ class MTKLogWorker(QThread):
                 time.sleep(1)
             
             # 11. 检查按钮checked是否为true
-            self.progress.emit(90, "确认logger已完全启动...")
+            self.progress.emit(90, "正在确认logger已完全启动...")
             start_time = time.time()
             while time.time() - start_time < max_wait_time:
                 if U2_AVAILABLE:
@@ -269,6 +271,8 @@ class MTKLogWorker(QThread):
             self.progress.emit(15, "检查logger状态...")
             
             logger_is_running = False
+            u2_available = False
+            
             if U2_AVAILABLE:
                 try:
                     d = u2.connect(self.device)
@@ -276,8 +280,24 @@ class MTKLogWorker(QThread):
                     if button.exists:
                         is_checked = button.info.get('checked', False)
                         logger_is_running = is_checked
+                        u2_available = True
                 except Exception as e:
                     logger_is_running = False
+                    u2_available = False
+            
+            # 如果UIAutomator2不可用，使用备用检测方案
+            if not u2_available:
+                self.progress.emit(16, "UIAutomator2不可用，使用备用检测方案...")
+                # 通过检查MTKlogger进程来判断是否在运行
+                try:
+                    ps_cmd = ["adb", "-s", self.device, "shell", "ps", "|", "grep", "mtklog"]
+                    result = subprocess.run(ps_cmd, shell=True, capture_output=True, text=True, timeout=10,
+                                          creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0)
+                    # 如果找到mtklog相关进程，认为logger可能在运行
+                    logger_is_running = "mtklog" in result.stdout.lower()
+                except:
+                    # 备用方案也失败时，假设logger在运行，执行停止命令
+                    logger_is_running = True
             
             # 4. 如果logger正在运行，执行停止命令
             if logger_is_running:
@@ -295,7 +315,7 @@ class MTKLogWorker(QThread):
                 time.sleep(2)
                 
                 # 6. 检查按钮checked是否为false
-                self.progress.emit(30, "确认logger已完全停止...")
+                self.progress.emit(30, "正在确认logger已完全停止...")
                 max_wait_time = 180
                 start_time = time.time()
                 while time.time() - start_time < max_wait_time:
@@ -329,7 +349,8 @@ class MTKLogWorker(QThread):
                 ("/data/debuglogger", "data_debuglogger"),
                 ("/sdcard/BugReport", "BugReport"),
                 ("/data/media/logmanager", "data_logmanager"),
-                ("/data/user_de/0/com.android.shell/files/bugreports/", "bugreports")
+                ("/data/user_de/0/com.android.shell/files/bugreports/", "bugreports"),
+                ("/sdcard/Android/data/com.tmobile.echolocate/cache/dia_debug", "echolocate_dia_debug")
             ]
             
             # 如果用户选择导出媒体文件，添加额外的命令
@@ -371,6 +392,95 @@ class MTKLogWorker(QThread):
             
         except Exception as e:
             self.finished.emit(False, f"导出MTKLOG失败: {str(e)}")
+    
+    def _stop_mtklog(self):
+        """停止MTKLOG（不导出）"""
+        try:
+            # 1. 确保屏幕亮屏且解锁
+            self.progress.emit(5, "检查屏幕状态...")
+            if not self.device_manager.ensure_screen_unlocked(self.device):
+                raise Exception("无法确保屏幕状态")
+            
+            # 2. 启动logger应用
+            self.progress.emit(10, "启动logger应用...")
+            start_app_cmd = ["adb", "-s", self.device, "shell", "am", "start", "-n", "com.debug.loggerui/.MainActivity"]
+            result = subprocess.run(start_app_cmd, capture_output=True, text=True, timeout=30,
+                                  creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0)
+            if result.returncode != 0:
+                print(f"警告: 启动logger应用失败: {result.stderr.strip()}")
+            time.sleep(2)
+            
+            # 3. 检查logger状态
+            self.progress.emit(15, "检查logger状态...")
+            
+            logger_is_running = False
+            u2_available = False
+            
+            if U2_AVAILABLE:
+                try:
+                    d = u2.connect(self.device)
+                    button = d(resourceId="com.debug.loggerui:id/startStopToggleButton")
+                    if button.exists:
+                        is_checked = button.info.get('checked', False)
+                        logger_is_running = is_checked
+                        u2_available = True
+                except Exception as e:
+                    logger_is_running = False
+                    u2_available = False
+            
+            # 如果UIAutomator2不可用，使用备用检测方案
+            if not u2_available:
+                self.progress.emit(16, "UIAutomator2不可用，使用备用检测方案...")
+                # 通过检查MTKlogger进程来判断是否在运行
+                try:
+                    ps_cmd = ["adb", "-s", self.device, "shell", "ps", "|", "grep", "mtklog"]
+                    result = subprocess.run(ps_cmd, shell=True, capture_output=True, text=True, timeout=10,
+                                          creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0)
+                    # 如果找到mtklog相关进程，认为logger可能在运行
+                    logger_is_running = "mtklog" in result.stdout.lower()
+                except:
+                    # 备用方案也失败时，假设logger在运行，执行停止命令
+                    logger_is_running = True
+            
+            # 4. 如果logger正在运行，执行停止命令
+            if logger_is_running:
+                self.progress.emit(20, "停止logger...")
+                stop_cmd = ["adb", "-s", self.device, "shell", "am", "broadcast", "-a", "com.debug.loggerui.ADB_CMD", 
+                           "-e", "cmd_name", "stop", "--ei", "cmd_target", "-1", "-n", "com.debug.loggerui/.framework.LogReceiver"]
+                
+                result = subprocess.run(stop_cmd, capture_output=True, text=True, timeout=15,
+                                      creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0)
+                if result.returncode != 0:
+                    raise Exception(f"停止logger失败: {result.stderr.strip()}")
+                
+                # 5. 等待2秒后检查按钮状态
+                self.progress.emit(25, "等待logger停止...")
+                time.sleep(2)
+                
+                # 6. 检查按钮checked是否为false
+                self.progress.emit(30, "正在确认logger已完全停止...")
+                max_wait_time = 180
+                start_time = time.time()
+                while time.time() - start_time < max_wait_time:
+                    if U2_AVAILABLE:
+                        try:
+                            d = u2.connect(self.device)
+                            button = d(resourceId="com.debug.loggerui:id/startStopToggleButton")
+                            if button.exists:
+                                is_checked = button.info.get('checked', False)
+                                if not is_checked:
+                                    break
+                        except Exception as e:
+                            break
+                    time.sleep(1)
+            else:
+                self.progress.emit(50, "Logger已处于停止状态...")
+            
+            self.progress.emit(100, "完成!")
+            self.finished.emit(True, "MTKLOG已停止")
+            
+        except Exception as e:
+            self.finished.emit(False, f"停止MTKLOG失败: {str(e)}")
     
     def _delete_mtklog(self):
         """删除MTKLOG"""
@@ -457,6 +567,19 @@ class PyQtMTKLogManager(QObject):
         
         # 创建工作线程
         self.worker = MTKLogWorker(device, 'stop_export', self.device_manager, log_name=log_name, export_media=export_media)
+        self.worker.progress.connect(self.progress_updated.emit)
+        self.worker.finished.connect(self._on_mtklog_stopped)
+        self.is_running = True
+        self.worker.start()
+        
+    def stop_mtklog(self):
+        """停止MTKLOG（不导出）"""
+        device = self.device_manager.validate_device_selection()
+        if not device:
+            return
+        
+        # 创建工作线程
+        self.worker = MTKLogWorker(device, 'stop', self.device_manager)
         self.worker.progress.connect(self.progress_updated.emit)
         self.worker.finished.connect(self._on_mtklog_stopped)
         self.is_running = True

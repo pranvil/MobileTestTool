@@ -18,6 +18,7 @@ class TMOEcholocateTab(QWidget):
     trigger_echolocate = pyqtSignal()
     pull_echolocate_file = pyqtSignal()
     delete_echolocate_file = pyqtSignal()
+    get_echolocate_version = pyqtSignal()
     
     # 过滤操作
     filter_callid = pyqtSignal()
@@ -48,7 +49,7 @@ class TMOEcholocateTab(QWidget):
         scroll_content = QWidget()
         scroll_layout = QVBoxLayout(scroll_content)
         scroll_layout.setContentsMargins(0, 0, 0, 0)
-        scroll_layout.setSpacing(10)
+        scroll_layout.setSpacing(1)
         
         # 1. Echolocate 操作组
         echolocate_ops_group = self.create_echolocate_ops_group()
@@ -85,7 +86,7 @@ class TMOEcholocateTab(QWidget):
         add_card_shadow(card)
         
         card_layout = QHBoxLayout(card)
-        card_layout.setContentsMargins(10, 10, 10, 10)
+        card_layout.setContentsMargins(10, 1, 10, 1)
         card_layout.setSpacing(8)
         
         self.install_btn = QPushButton("安装")
@@ -103,6 +104,10 @@ class TMOEcholocateTab(QWidget):
         self.delete_file_btn = QPushButton("删除手机文件")
         self.delete_file_btn.clicked.connect(self.delete_echolocate_file.emit)
         card_layout.addWidget(self.delete_file_btn)
+        
+        self.version_btn = QPushButton("EchoVersion")
+        self.version_btn.clicked.connect(self.get_echolocate_version.emit)
+        card_layout.addWidget(self.version_btn)
         
         card_layout.addStretch()
         
@@ -131,7 +136,7 @@ class TMOEcholocateTab(QWidget):
         add_card_shadow(card)
         
         card_layout = QVBoxLayout(card)
-        card_layout.setContentsMargins(10, 10, 10, 10)
+        card_layout.setContentsMargins(10, 1, 10, 1)
         card_layout.setSpacing(8)
         
         # 第一行
@@ -152,30 +157,23 @@ class TMOEcholocateTab(QWidget):
         
         self.filter_allcallstate_btn = QPushButton("AllCallState")
         self.filter_allcallstate_btn.clicked.connect(self.filter_allcallstate.emit)
-        row1_layout.addWidget(self.filter_allcallstate_btn)
+        row1_layout.addWidget(self.filter_allcallstate_btn)      
+        
+        self.filter_ims_signalling_btn = QPushButton("IMSSignallingMessageLine1")
+        self.filter_ims_signalling_btn.clicked.connect(self.filter_ims_signalling.emit)
+        row1_layout.addWidget(self.filter_ims_signalling_btn)
+        
+        self.filter_allcallflow_btn = QPushButton("AllCallFlow")
+        self.filter_allcallflow_btn.clicked.connect(self.filter_allcallflow.emit)
+        row1_layout.addWidget(self.filter_allcallflow_btn)
+        
+        self.filter_voice_intent_btn = QPushButton("voice_intent测试")
+        self.filter_voice_intent_btn.clicked.connect(self.filter_voice_intent.emit)
+        row1_layout.addWidget(self.filter_voice_intent_btn)
         
         row1_layout.addStretch()
         
         card_layout.addLayout(row1_layout)
-        
-        # 第二行
-        row2_layout = QHBoxLayout()
-        
-        self.filter_ims_signalling_btn = QPushButton("IMSSignallingMessageLine1")
-        self.filter_ims_signalling_btn.clicked.connect(self.filter_ims_signalling.emit)
-        row2_layout.addWidget(self.filter_ims_signalling_btn)
-        
-        self.filter_allcallflow_btn = QPushButton("AllCallFlow")
-        self.filter_allcallflow_btn.clicked.connect(self.filter_allcallflow.emit)
-        row2_layout.addWidget(self.filter_allcallflow_btn)
-        
-        self.filter_voice_intent_btn = QPushButton("voice_intent测试")
-        self.filter_voice_intent_btn.clicked.connect(self.filter_voice_intent.emit)
-        row2_layout.addWidget(self.filter_voice_intent_btn)
-        
-        row2_layout.addStretch()
-        
-        card_layout.addLayout(row2_layout)
         
         v.addWidget(card)
         

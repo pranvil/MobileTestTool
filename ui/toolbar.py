@@ -20,6 +20,7 @@ class DeviceToolBar(QToolBar):
     screenshot_clicked = pyqtSignal()
     record_toggled = pyqtSignal(bool)
     reboot_clicked = pyqtSignal()
+    root_remount_clicked = pyqtSignal()
     theme_toggled = pyqtSignal()
     adb_command_executed = pyqtSignal(str)  # 执行adb命令
     
@@ -97,6 +98,11 @@ class DeviceToolBar(QToolBar):
         self.reboot_btn = QPushButton("重启手机")
         self.reboot_btn.clicked.connect(self.reboot_clicked.emit)
         quick_layout.addWidget(self.reboot_btn)
+        
+        # Root&remount按钮
+        self.root_remount_btn = QPushButton("Root&&Remount")
+        self.root_remount_btn.clicked.connect(self.root_remount_clicked.emit)
+        quick_layout.addWidget(self.root_remount_btn)
         
         self.addWidget(quick_widget)
         

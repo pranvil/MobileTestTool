@@ -80,7 +80,7 @@ class MTKLogManager:
                 time.sleep(2)  # 等待2秒
                 
                 # 4. 检查按钮checked是否为false
-                status_label.config(text="确认logger已完全停止...")
+                status_label.config(text="正在确认logger已完全停止...")
                 progress_var.set(20)
                 progress_dialog.update()
                 
@@ -179,7 +179,7 @@ class MTKLogManager:
                 time.sleep(1)
             
             # 9. 检查按钮checked是否为true
-            status_label.config(text="确认logger已完全启动...")
+            status_label.config(text="正在确认logger已完全启动...")
             progress_var.set(80)
             progress_dialog.update()
             
@@ -289,7 +289,7 @@ class MTKLogManager:
                 time.sleep(2)  # 等待2秒
                 
                 # 4. 检查按钮checked是否为false
-                status_label.config(text="确认logger已完全停止...")
+                status_label.config(text="正在确认logger已完全停止...")
                 progress_var.set(40)
                 progress_dialog.update()
                 
