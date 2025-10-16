@@ -1,9 +1,0 @@
-# ADB Logcat 过滤工具依赖
-# 本工具主要使用Python标准库，无需额外依赖
-# 但需要确保系统已安装Android SDK并配置adb命令
-
-# 打包依赖
-pyinstaller>=5.0
-
-# 可选：如果需要更好的GUI体验，可以安装以下包
-# tkinter  # Python标准库，通常已包含

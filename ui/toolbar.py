@@ -8,7 +8,7 @@ from PyQt5.QtWidgets import (QToolBar, QWidget, QHBoxLayout, QLabel,
                               QComboBox, QPushButton, QFrame, QLineEdit)
 from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtGui import QIcon
-import os
+from core.resource_utils import get_icon_path
 
 
 class DeviceToolBar(QToolBar):
@@ -31,14 +31,12 @@ class DeviceToolBar(QToolBar):
     
     def setup_icons(self):
         """设置图标"""
-        icon_dir = os.path.join(os.path.dirname(__file__), 'resources', 'icons')
-        
         # 工具栏图标
-        self.refresh_icon = QIcon(os.path.join(icon_dir, 'refresh.png'))
-        self.screenshot_icon = QIcon(os.path.join(icon_dir, 'screenshot.png'))
-        self.record_icon = QIcon(os.path.join(icon_dir, 'record.png'))
-        self.theme_dark_icon = QIcon(os.path.join(icon_dir, 'theme_dark.png'))
-        self.theme_light_icon = QIcon(os.path.join(icon_dir, 'theme_light.png'))
+        self.refresh_icon = QIcon(get_icon_path('refresh.png'))
+        self.screenshot_icon = QIcon(get_icon_path('screenshot.png'))
+        self.record_icon = QIcon(get_icon_path('record.png'))
+        self.theme_dark_icon = QIcon(get_icon_path('theme_dark.png'))
+        self.theme_light_icon = QIcon(get_icon_path('theme_light.png'))
         
     def setup_toolbar(self):
         """设置工具栏"""

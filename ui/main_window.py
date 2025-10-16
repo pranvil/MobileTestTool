@@ -219,6 +219,10 @@ class MainWindow(QMainWindow):
         self.network_info_manager.network_info_updated.connect(self._on_network_info_updated)
         self.network_info_manager.ping_result.connect(self._on_ping_result)
         self.network_info_manager.status_message.connect(self._on_network_status)
+        self.network_info_manager.network_info_started.connect(self._on_network_info_started)
+        self.network_info_manager.network_info_start_failed.connect(self._on_network_info_start_failed)
+        self.network_info_manager.ping_started.connect(self._on_ping_started)
+        self.network_info_manager.ping_start_failed.connect(self._on_ping_start_failed)
         
         # 连接工具栏信号
         self.toolbar.device_changed.connect(self._on_device_changed)
@@ -1023,6 +1027,28 @@ class MainWindow(QMainWindow):
     def _on_network_status(self, message):
         """网络信息状态消息"""
         self.append_log.emit(f"{message}\n", None)
+    
+    def _on_network_info_started(self):
+        """网络信息获取启动成功"""
+        # 更新Tab按钮状态
+        if hasattr(self, 'network_info_tab'):
+            self.network_info_tab.set_network_state(True)
+    
+    def _on_network_info_start_failed(self):
+        """网络信息获取启动失败"""
+        # 不改变Tab按钮状态，保持原样
+        pass
+    
+    def _on_ping_started(self):
+        """Ping启动成功"""
+        # 更新Tab按钮状态
+        if hasattr(self, 'network_info_tab'):
+            self.network_info_tab.set_ping_state(True)
+    
+    def _on_ping_start_failed(self):
+        """Ping启动失败"""
+        # 不改变Tab按钮状态，保持原样
+        pass
         
     # TMO CC Tab 信号处理
     def _on_push_cc_file(self):

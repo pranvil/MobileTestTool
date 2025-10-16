@@ -273,6 +273,7 @@ class NetworkInfoTab(QWidget):
     def _on_toggle_network_info(self):
         """切换网络信息获取状态"""
         if self.is_network_running:
+            # 停止时立即改变状态
             self.stop_network_info.emit()
             self.is_network_running = False
             self.network_button.setText("开始")
@@ -280,28 +281,21 @@ class NetworkInfoTab(QWidget):
             self.network_status_label.setText("已停止")
             self.network_status_label.setStyleSheet("color: gray; font-size: 9pt;")
         else:
+            # 开始时只发送信号，等待成功回调再改变状态
             self.start_network_info.emit()
-            self.is_network_running = True
-            self.network_button.setText("停止")
-            self.network_button.setStyleSheet("background-color: #f44336; color: white;")
-            self.network_status_label.setText("运行中...")
-            self.network_status_label.setStyleSheet("color: green; font-size: 9pt;")
             
     def _on_toggle_ping(self):
         """切换 Ping 状态"""
         if self.is_ping_running:
+            # 停止时立即改变状态
             self.stop_ping.emit()
             self.is_ping_running = False
             self.ping_button.setText("Ping")
             self.ping_button.setStyleSheet("")
             self.ping_status_label.setText("")
         else:
+            # 开始时只发送信号，等待成功回调再改变状态
             self.start_ping.emit()
-            self.is_ping_running = True
-            self.ping_button.setText("停止")
-            self.ping_button.setStyleSheet("background-color: #f44336; color: white;")
-            self.ping_status_label.setText("Ping中...")
-            self.ping_status_label.setStyleSheet("color: blue; font-size: 9pt;")
             
     def set_network_state(self, is_running):
         """设置网络信息状态"""

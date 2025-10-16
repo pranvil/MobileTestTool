@@ -157,7 +157,7 @@ class AppOperationsTab(QWidget):
         self.pull_apk_btn.clicked.connect(self.pull_apk.emit)
         card_layout.addWidget(self.pull_apk_btn)
         
-        self.push_apk_btn = QPushButton("push apk")
+        self.push_apk_btn = QPushButton("push 文件")
         self.push_apk_btn.clicked.connect(self.push_apk.emit)
         card_layout.addWidget(self.push_apk_btn)
         

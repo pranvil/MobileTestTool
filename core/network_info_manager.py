@@ -479,6 +479,10 @@ class PyQtNetworkInfoManager(QObject):
     ping_result = pyqtSignal(str)  # ping_result
     ping_stopped = pyqtSignal()  # ping 已停止
     status_message = pyqtSignal(str)
+    network_info_started = pyqtSignal()  # 网络信息获取已启动
+    network_info_start_failed = pyqtSignal()  # 网络信息获取启动失败
+    ping_started = pyqtSignal()  # Ping已启动
+    ping_start_failed = pyqtSignal()  # Ping启动失败
     
     def __init__(self, device_manager, parent=None):
         super().__init__(parent)
@@ -493,10 +497,12 @@ class PyQtNetworkInfoManager(QObject):
         """开始获取网络信息"""
         device = self.device_manager.validate_device_selection()
         if not device:
+            self.network_info_start_failed.emit()
             return
         
         if self.is_running:
             self.status_message.emit("网络信息获取已经在运行中")
+            self.network_info_start_failed.emit()
             return
         
         try:
@@ -513,9 +519,11 @@ class PyQtNetworkInfoManager(QObject):
             
             self.is_running = True
             self.status_message.emit("网络信息获取已启动")
+            self.network_info_started.emit()
             
         except Exception as e:
             self.status_message.emit(f"启动网络信息获取失败: {str(e)}")
+            self.network_info_start_failed.emit()
     
     def stop_network_info(self):
         """停止获取网络信息"""
@@ -552,12 +560,14 @@ class PyQtNetworkInfoManager(QObject):
         if self.ping_worker and self.ping_worker.is_alive():
             try:
                 self.status_message.emit("Ping测试已经在运行中")
+                self.ping_start_failed.emit()
             except RuntimeError:
                 pass
             return
         
         device = self.device_manager.validate_device_selection()
         if not device:
+            self.ping_start_failed.emit()
             return
         
         try:
@@ -574,12 +584,14 @@ class PyQtNetworkInfoManager(QObject):
             
             try:
                 self.status_message.emit("Ping测试已启动")
+                self.ping_started.emit()
             except RuntimeError:
                 pass
             
         except Exception as e:
             try:
                 self.status_message.emit(f"启动Ping测试失败: {str(e)}")
+                self.ping_start_failed.emit()
             except RuntimeError:
                 pass
     

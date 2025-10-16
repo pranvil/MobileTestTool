@@ -8,6 +8,7 @@
 import os
 from PyQt5.QtCore import QFile, QTextStream
 from PyQt5.QtWidgets import QApplication
+from core.resource_utils import get_resource_path
 
 
 class ThemeManager:
@@ -15,7 +16,7 @@ class ThemeManager:
     
     def __init__(self):
         self.current_theme = "dark"
-        self.theme_dir = "ui/resources/themes"
+        self.theme_dir = get_resource_path("ui/resources/themes")
         
     def load_theme(self, theme_name="dark"):
         """加载主题"""

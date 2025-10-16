@@ -1262,20 +1262,23 @@ class InstallApkDialog(QDialog):
         self.device = device
         self.manager = manager
         self.setWindowTitle("安装APK文件")
-        self.setMinimumSize(600, 500)
+        self.setFixedSize(600, 350)
         self.init_ui()
     
     def init_ui(self):
         layout = QVBoxLayout(self)
+        layout.setContentsMargins(20, 20, 20, 20)
+        layout.setSpacing(15)
         
         # 标题
         title = QLabel("安装APK文件")
-        title.setStyleSheet("font-size: 14pt; font-weight: bold;")
+        title.setStyleSheet("font-size: 14pt; font-weight: bold; margin-bottom: 10px;")
         layout.addWidget(title)
         
         # 参数选择组
         params_group = QGroupBox("安装参数（可选）")
         params_layout = QVBoxLayout()
+        params_layout.setSpacing(8)
         
         self.param_checkboxes = {}
         param_options = [
@@ -1295,8 +1298,12 @@ class InstallApkDialog(QDialog):
         params_group.setLayout(params_layout)
         layout.addWidget(params_group)
         
+        # 添加弹性空间
+        layout.addStretch()
+        
         # 按钮
         button_layout = QHBoxLayout()
+        button_layout.addStretch()
         self.next_btn = QPushButton("下一步")
         self.next_btn.clicked.connect(self.on_next)
         self.cancel_btn = QPushButton("取消")
@@ -1412,15 +1419,17 @@ class DumpAppDialog(QDialog):
         self.device = device
         self.manager = manager
         self.setWindowTitle("Dump应用信息")
-        self.setMinimumSize(600, 500)
+        self.setFixedSize(600, 450)
         self.init_ui()
     
     def init_ui(self):
         layout = QVBoxLayout(self)
+        layout.setContentsMargins(20, 20, 20, 20)
+        layout.setSpacing(15)
         
         # 标题
         title = QLabel("Dump应用信息")
-        title.setStyleSheet("font-size: 14pt; font-weight: bold;")
+        title.setStyleSheet("font-size: 14pt; font-weight: bold; margin-bottom: 10px;")
         layout.addWidget(title)
         
         # 包名输入组
@@ -1437,6 +1446,7 @@ class DumpAppDialog(QDialog):
         # 过滤选项组
         filter_group = QGroupBox("过滤选项（可选）")
         filter_layout = QVBoxLayout()
+        filter_layout.setSpacing(8)
         
         # 预定义过滤选项（单选）
         predefined_label = QLabel("预定义过滤选项:")
@@ -1472,8 +1482,12 @@ class DumpAppDialog(QDialog):
         filter_group.setLayout(filter_layout)
         layout.addWidget(filter_group)
         
+        # 添加弹性空间
+        layout.addStretch()
+        
         # 按钮
         button_layout = QHBoxLayout()
+        button_layout.addStretch()
         self.confirm_btn = QPushButton("开始Dump")
         self.confirm_btn.clicked.connect(self.on_confirm)
         self.cancel_btn = QPushButton("取消")

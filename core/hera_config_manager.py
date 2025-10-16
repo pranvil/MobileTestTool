@@ -11,6 +11,7 @@ import subprocess
 from datetime import datetime
 from PyQt5.QtCore import QObject, pyqtSignal, QThread
 from PyQt5.QtWidgets import QMessageBox
+from core.resource_utils import get_apk_path
 
 # 可选依赖
 try:
@@ -181,17 +182,15 @@ class HeraConfigWorker(QThread):
     def _find_apk_file(self):
         """查找APK文件"""
         try:
-            # 在同级目录查找
-            current_dir = os.path.dirname(os.path.abspath(__file__))
-            apk_path = os.path.join(current_dir, "..", "resources", "apk", "Heratest-trigger-com.example.test.apk")
-            apk_path = os.path.abspath(apk_path)
+            # 使用资源路径获取函数
+            apk_path = get_apk_path("Heratest-trigger-com.example.test.apk")
             
             if os.path.exists(apk_path):
                 return apk_path
             
             # 尝试其他常见名称
             for name in ["hera-test.apk", "test-trigger.apk"]:
-                test_path = os.path.join(os.path.dirname(current_dir), "resources", "apk", name)
+                test_path = get_apk_path(name)
                 if os.path.exists(test_path):
                     return test_path
             
@@ -246,10 +245,9 @@ class HeraConfigWorker(QThread):
             
             self.progress.emit("正在安装uiautomator APK...")
             
-            # 查找APK文件
-            current_dir = os.path.dirname(os.path.abspath(__file__))
-            app_path = os.path.join(current_dir, "..", "resources", "apk", 'app-uiautomator.apk')
-            test_path = os.path.join(current_dir, "..", "resources", "apk", 'app-uiautomator-test.apk')
+            # 使用资源路径获取函数
+            app_path = get_apk_path("app-uiautomator.apk")
+            test_path = get_apk_path("app-uiautomator-test.apk")
             
             if os.path.exists(app_path) and os.path.exists(test_path):
                 run_adb_command(['adb', 'install', '-r', app_path], check=True)
