@@ -231,6 +231,7 @@ class MainWindow(QMainWindow):
         self.toolbar.screenshot_clicked.connect(self._on_screenshot)
         self.toolbar.record_toggled.connect(self._on_record_toggled)
         self.toolbar.reboot_clicked.connect(self._on_reboot_device)
+        self.toolbar.screen_timeout_clicked.connect(self._on_screen_timeout)
         self.toolbar.root_remount_clicked.connect(self._on_root_remount)
         self.toolbar.theme_toggled.connect(self._on_theme_toggled)
         self.toolbar.adb_command_executed.connect(self._on_adb_command_executed)
@@ -331,8 +332,9 @@ class MainWindow(QMainWindow):
         self.tmo_cc_tab.complete_filter.connect(self._on_complete_filter)
         self.tmo_cc_tab.prod_server.connect(self._on_prod_server)
         self.tmo_cc_tab.stg_server.connect(self._on_stg_server)
-        self.tmo_cc_tab.clear_logs.connect(self._on_clear_logs)
         self.tmo_cc_tab.clear_device_logs.connect(self._on_clear_device_logs)
+        self.tmo_cc_tab.delete_cc_file.connect(self._on_delete_cc_file)
+        self.tmo_cc_tab.clear_entitlement.connect(self._on_clear_entitlement)
         
         # 连接 TMO Echolocate Tab 信号
         self.tmo_echolocate_tab.install_echolocate.connect(self._on_install_echolocate)
@@ -340,6 +342,8 @@ class MainWindow(QMainWindow):
         self.tmo_echolocate_tab.pull_echolocate_file.connect(self._on_pull_echolocate_file)
         self.tmo_echolocate_tab.delete_echolocate_file.connect(self._on_delete_echolocate_file)
         self.tmo_echolocate_tab.get_echolocate_version.connect(self._on_get_echolocate_version)
+        self.tmo_echolocate_tab.install_gslice1.connect(self._on_install_gslice1)
+        self.tmo_echolocate_tab.install_gslice2.connect(self._on_install_gslice2)
         self.tmo_echolocate_tab.filter_callid.connect(self._on_filter_callid)
         self.tmo_echolocate_tab.filter_callstate.connect(self._on_filter_callstate)
         self.tmo_echolocate_tab.filter_uicallstate.connect(self._on_filter_uicallstate)
@@ -494,6 +498,43 @@ class MainWindow(QMainWindow):
         else:
             self.append_log.emit(f"❌ {message}\n", "#FF0000")
             self.statusBar().showMessage("设备重启失败")
+    
+    def _on_screen_timeout(self):
+        """永不灭屏处理"""
+        import subprocess
+        
+        device = self.device_manager.selected_device
+        if not device:
+            self.append_log.emit("未选择设备\n", "#FFA500")
+            return
+        
+        self.append_log.emit("设置屏幕永不熄灭...\n", None)
+        try:
+            result = subprocess.run(
+                ["adb", "-s", device, "shell", "settings", "put", "system", "screen_off_timeout", "2147483647"],
+                shell=True,
+                capture_output=True,
+                text=True,
+                encoding='utf-8',
+                errors='replace',
+                timeout=10,
+                creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0
+            )
+            
+            if result.returncode == 0:
+                self.append_log.emit("✅ 屏幕永不熄灭设置成功\n", "#00FF00")
+                self.statusBar().showMessage("屏幕永不熄灭设置成功")
+            else:
+                error_msg = result.stderr if result.stderr else "未知错误"
+                self.append_log.emit(f"❌ 设置失败: {error_msg}\n", "#FF0000")
+                self.statusBar().showMessage("屏幕永不熄灭设置失败")
+                
+        except subprocess.TimeoutExpired:
+            self.append_log.emit("⚠️ 命令执行超时\n", "#FFA500")
+            self.statusBar().showMessage("命令执行超时")
+        except Exception as e:
+            self.append_log.emit(f"❌ 执行失败: {str(e)}\n", "#FF0000")
+            self.statusBar().showMessage("命令执行失败")
     
     def _on_root_remount(self):
         """Root&remount处理"""
@@ -976,6 +1017,80 @@ class MainWindow(QMainWindow):
             self.log_processor.clear_device_logs()
         else:
             self.statusBar().showMessage("日志处理器未初始化")
+    
+    def _on_delete_cc_file(self):
+        """删除CC文件"""
+        import subprocess
+        
+        device = self.device_manager.selected_device
+        if not device:
+            self.append_log.emit("未选择设备\n", "#FFA500")
+            return
+        
+        self.append_log.emit("删除CC文件...\n", None)
+        try:
+            result = subprocess.run(
+                ["adb", "-s", device, "shell", "rm", "/data/deviceInfo/*"],
+                shell=True,
+                capture_output=True,
+                text=True,
+                encoding='utf-8',
+                errors='replace',
+                timeout=10,
+                creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0
+            )
+            
+            if result.returncode == 0:
+                self.append_log.emit("✅ CC文件删除成功\n", "#00FF00")
+                self.statusBar().showMessage("CC文件删除成功")
+            else:
+                error_msg = result.stderr if result.stderr else "未知错误"
+                self.append_log.emit(f"❌ 删除失败: {error_msg}\n", "#FF0000")
+                self.statusBar().showMessage("CC文件删除失败")
+                
+        except subprocess.TimeoutExpired:
+            self.append_log.emit("⚠️ 命令执行超时\n", "#FFA500")
+            self.statusBar().showMessage("命令执行超时")
+        except Exception as e:
+            self.append_log.emit(f"❌ 执行失败: {str(e)}\n", "#FF0000")
+            self.statusBar().showMessage("命令执行失败")
+    
+    def _on_clear_entitlement(self):
+        """清除Entitlement"""
+        import subprocess
+        
+        device = self.device_manager.selected_device
+        if not device:
+            self.append_log.emit("未选择设备\n", "#FFA500")
+            return
+        
+        self.append_log.emit("清除Entitlement...\n", None)
+        try:
+            result = subprocess.run(
+                ["adb", "-s", device, "shell", "pm", "clear", "com.tct.entitlement"],
+                shell=True,
+                capture_output=True,
+                text=True,
+                encoding='utf-8',
+                errors='replace',
+                timeout=10,
+                creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0
+            )
+            
+            if result.returncode == 0:
+                self.append_log.emit("✅ Entitlement清除成功\n", "#00FF00")
+                self.statusBar().showMessage("Entitlement清除成功")
+            else:
+                error_msg = result.stderr if result.stderr else "未知错误"
+                self.append_log.emit(f"❌ 清除失败: {error_msg}\n", "#FF0000")
+                self.statusBar().showMessage("Entitlement清除失败")
+                
+        except subprocess.TimeoutExpired:
+            self.append_log.emit("⚠️ 命令执行超时\n", "#FFA500")
+            self.statusBar().showMessage("命令执行超时")
+        except Exception as e:
+            self.append_log.emit(f"❌ 执行失败: {str(e)}\n", "#FF0000")
+            self.statusBar().showMessage("命令执行失败")
         
     def _on_show_display_lines_dialog(self):
         """显示设置行数对话框"""
@@ -1121,6 +1236,14 @@ class MainWindow(QMainWindow):
     def _on_get_echolocate_version(self):
         """获取Echolocate版本号"""
         self.echolocate_manager.get_echolocate_version()
+        
+    def _on_install_gslice1(self):
+        """安装Gslice1"""
+        self.echolocate_manager.install_gslice1()
+        
+    def _on_install_gslice2(self):
+        """安装Gslice2"""
+        self.echolocate_manager.install_gslice2()
         
     def _on_filter_callid(self):
         """过滤CallID"""

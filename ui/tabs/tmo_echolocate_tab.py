@@ -20,6 +20,8 @@ class TMOEcholocateTab(QWidget):
     pull_echolocate_file = pyqtSignal()
     delete_echolocate_file = pyqtSignal()
     get_echolocate_version = pyqtSignal()
+    install_gslice1 = pyqtSignal()
+    install_gslice2 = pyqtSignal()
     
     # 过滤操作
     filter_callid = pyqtSignal()
@@ -88,7 +90,7 @@ class TMOEcholocateTab(QWidget):
         card_layout.setContentsMargins(10, 1, 10, 1)
         card_layout.setSpacing(8)
         
-        self.install_btn = QPushButton("安装")
+        self.install_btn = QPushButton("安装DiagTrace")
         self.install_btn.clicked.connect(self.install_echolocate.emit)
         card_layout.addWidget(self.install_btn)
         
@@ -107,6 +109,14 @@ class TMOEcholocateTab(QWidget):
         self.version_btn = QPushButton("EchoVersion")
         self.version_btn.clicked.connect(self.get_echolocate_version.emit)
         card_layout.addWidget(self.version_btn)
+        
+        self.gslice1_btn = QPushButton("安装Gslice1")
+        self.gslice1_btn.clicked.connect(self.install_gslice1.emit)
+        card_layout.addWidget(self.gslice1_btn)
+        
+        self.gslice2_btn = QPushButton("安装Gslice2")
+        self.gslice2_btn.clicked.connect(self.install_gslice2.emit)
+        card_layout.addWidget(self.gslice2_btn)
         
         card_layout.addStretch()
         

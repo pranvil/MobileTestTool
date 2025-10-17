@@ -214,87 +214,42 @@ class PyQtEcholocateManager(QObject):
         self.is_running = False
         
     def install_echolocate(self):
-        """安装Echolocate"""
+        """安装DiagTrace"""
         device = self.device_manager.validate_device_selection()
         if not device:
             return
         
         try:
-            # 在当前文件夹查找APK文件（1tkinter_backup/Echolocate/）
-            current_dir = os.path.dirname(os.path.abspath(__file__))
-            project_root = os.path.dirname(current_dir)
-            echolocate_dir = os.path.join(project_root, "1tkinter_backup", "Echolocate")
+            # 使用硬编码的DiagTrace APK路径
+            apk_file = r"C:\Users\min.yang.na\OneDrive\01_US_20250725\TMO\Echolocate\Tool\DiagTrace_Testtool\DiagTrace.apk"
             
-            apk_files = []
-            if os.path.exists(echolocate_dir):
-                apk_files = glob.glob(os.path.join(echolocate_dir, "*.apk"))
+            # 检查文件是否存在
+            if not os.path.exists(apk_file):
+                QMessageBox.critical(None, "错误", f"找不到APK文件:\n{apk_file}")
+                return
             
-            if apk_files:
-                # 找到APK文件，安装所有APK
-                QMessageBox.information(None, "安装", f"找到 {len(apk_files)} 个APK文件，开始安装...")
-                self.status_message.emit(f"找到 {len(apk_files)} 个APK文件，开始安装...")
-                
-                for apk_file in apk_files:
-                    try:
-                        # 执行adb install命令
-                        result = subprocess.run(
-                            ["adb", "-s", device, "install", "-r", apk_file],
-                            capture_output=True,
-                            text=True,
-                            timeout=60,
-                            creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0
-                        )
-                        
-                        if result.returncode == 0:
-                            print(f"[DEBUG] APK安装成功: {os.path.basename(apk_file)}")
-                        else:
-                            print(f"[DEBUG] APK安装失败: {os.path.basename(apk_file)}, 错误: {result.stderr}")
-                            QMessageBox.critical(None, "错误", f"APK安装失败: {os.path.basename(apk_file)}\n{result.stderr}")
-                            return
-                            
-                    except subprocess.TimeoutExpired:
-                        QMessageBox.critical(None, "错误", f"APK安装超时: {os.path.basename(apk_file)}")
-                        return
-                    except Exception as e:
-                        QMessageBox.critical(None, "错误", f"APK安装异常: {os.path.basename(apk_file)}\n{str(e)}")
-                        return
-            else:
-                # 没有找到APK文件，让用户选择
-                apk_file, _ = QFileDialog.getOpenFileName(
-                    None,
-                    "选择Echolocate APK文件",
-                    "",
-                    "APK文件 (*.apk);;所有文件 (*.*)"
-                )
-                
-                if not apk_file:
-                    return
-                
-                try:
-                    # 执行adb install命令
-                    result = subprocess.run(
-                        ["adb", "-s", device, "install", "-r", apk_file],
-                        capture_output=True,
-                        text=True,
-                        timeout=60,
-                        creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0
-                    )
-                    
-                    if result.returncode != 0:
-                        QMessageBox.critical(None, "错误", f"APK安装失败\n{result.stderr}")
-                        return
-                        
-                except subprocess.TimeoutExpired:
-                    QMessageBox.critical(None, "错误", "APK安装超时")
-                    return
-                except Exception as e:
-                    QMessageBox.critical(None, "错误", f"APK安装异常\n{str(e)}")
-                    return
+            # 执行adb install命令
+            self.status_message.emit(f"开始安装 DiagTrace.apk...")
+            
+            result = subprocess.run(
+                ["adb", "-s", device, "install", "-r", apk_file],
+                capture_output=True,
+                text=True,
+                timeout=60,
+                creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0
+            )
+            
+            if result.returncode != 0:
+                print(f"[DEBUG] APK安装失败: {os.path.basename(apk_file)}, 错误: {result.stderr}")
+                QMessageBox.critical(None, "错误", f"APK安装失败: {os.path.basename(apk_file)}\n{result.stderr}")
+                return
+            
+            print(f"[DEBUG] APK安装成功: {os.path.basename(apk_file)}")
             
             # 安装完成后启动应用
             try:
                 result = subprocess.run(
-                    ["adb", "-s", device, "shell", "am", "start", "-n", "com.tmobile.echolocate/.playground.activities.OEMToolHomeActivity"],
+                    ["adb", "-s", device, "shell", "am", "start", "com.tmobile.echolocate/.playground.activities.OEMToolHomeActivity"],
                     capture_output=True,
                     text=True,
                     timeout=10,
@@ -304,8 +259,8 @@ class PyQtEcholocateManager(QObject):
                 if result.returncode == 0:
                     self.is_installed = True
                     self.echolocate_installed.emit()
-                    self.status_message.emit("Echolocate安装完成并已启动")
-                    QMessageBox.information(None, "成功", "Echolocate安装完成并已启动")
+                    self.status_message.emit("DiagTrace安装完成并已启动")
+                    QMessageBox.information(None, "成功", "DiagTrace安装完成并已启动")
                 else:
                     # APK安装成功但启动失败，显示警告
                     self.is_installed = True
@@ -319,10 +274,13 @@ class PyQtEcholocateManager(QObject):
                 self.echolocate_installed.emit()
                 self.status_message.emit(f"APK安装成功但启动失败: {str(e)}")
                 QMessageBox.warning(None, "警告", f"APK安装成功但启动失败: {str(e)}")
-            
+                        
+        except subprocess.TimeoutExpired:
+            QMessageBox.critical(None, "错误", "APK安装超时")
+            return
         except Exception as e:
-            self.status_message.emit(f"安装Echolocate失败: {str(e)}")
-            QMessageBox.critical(None, "错误", f"安装Echolocate失败: {str(e)}")
+            QMessageBox.critical(None, "错误", f"APK安装异常\n{str(e)}")
+            return
     
     def trigger_echolocate(self):
         """触发Echolocate"""
@@ -938,3 +896,87 @@ class PyQtEcholocateManager(QObject):
             'running': self.is_running,
             'device': device if device else "未选择"
         }
+    
+    def install_gslice1(self):
+        """安装Gslice1 APK"""
+        device = self.device_manager.validate_device_selection()
+        if not device:
+            return
+        
+        try:
+            # 使用硬编码的Gslice1 APK路径
+            apk_file = r"C:\Users\min.yang.na\OneDrive\01_US_20250725\TMO\Echolocate\Tool\G Slicing test APK\TestNetworkSlicing-debug-v2.1.apk"
+            
+            # 检查文件是否存在
+            if not os.path.exists(apk_file):
+                QMessageBox.critical(None, "错误", f"找不到APK文件:\n{apk_file}")
+                return
+            
+            # 执行adb install命令
+            self.status_message.emit(f"开始安装 Gslice1...")
+            
+            result = subprocess.run(
+                ["adb", "-s", device, "install", "-r", apk_file],
+                capture_output=True,
+                text=True,
+                timeout=60,
+                creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0
+            )
+            
+            if result.returncode != 0:
+                print(f"[DEBUG] Gslice1 APK安装失败: {result.stderr}")
+                QMessageBox.critical(None, "错误", f"Gslice1 APK安装失败\n{result.stderr}")
+                return
+            
+            print(f"[DEBUG] Gslice1 APK安装成功")
+            self.status_message.emit("Gslice1安装完成")
+            QMessageBox.information(None, "成功", "Gslice1安装完成")
+                        
+        except subprocess.TimeoutExpired:
+            QMessageBox.critical(None, "错误", "Gslice1 APK安装超时")
+            return
+        except Exception as e:
+            QMessageBox.critical(None, "错误", f"Gslice1 APK安装异常\n{str(e)}")
+            return
+    
+    def install_gslice2(self):
+        """安装Gslice2 APK"""
+        device = self.device_manager.validate_device_selection()
+        if not device:
+            return
+        
+        try:
+            # 使用硬编码的Gslice2 APK路径
+            apk_file = r"C:\Users\min.yang.na\OneDrive\01_US_20250725\TMO\Echolocate\Tool\G Slicing test APK\TestNetworkSlicing-debugtwin-v2.1.twin.apk"
+            
+            # 检查文件是否存在
+            if not os.path.exists(apk_file):
+                QMessageBox.critical(None, "错误", f"找不到APK文件:\n{apk_file}")
+                return
+            
+            # 执行adb install命令
+            self.status_message.emit(f"开始安装 Gslice2...")
+            
+            result = subprocess.run(
+                ["adb", "-s", device, "install", "-r", apk_file],
+                capture_output=True,
+                text=True,
+                timeout=60,
+                creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0
+            )
+            
+            if result.returncode != 0:
+                print(f"[DEBUG] Gslice2 APK安装失败: {result.stderr}")
+                QMessageBox.critical(None, "错误", f"Gslice2 APK安装失败\n{result.stderr}")
+                return
+            
+            print(f"[DEBUG] Gslice2 APK安装成功")
+            self.status_message.emit("Gslice2安装完成")
+            QMessageBox.information(None, "成功", "Gslice2安装完成")
+                        
+        except subprocess.TimeoutExpired:
+            QMessageBox.critical(None, "错误", "Gslice2 APK安装超时")
+            return
+        except Exception as e:
+            QMessageBox.critical(None, "错误", f"Gslice2 APK安装异常\n{str(e)}")
+            return

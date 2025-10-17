@@ -27,8 +27,9 @@ class TMOCCTab(QWidget):
     stg_server = pyqtSignal()
     
     # 其他操作
-    clear_logs = pyqtSignal()
     clear_device_logs = pyqtSignal()
+    delete_cc_file = pyqtSignal()
+    clear_entitlement = pyqtSignal()
     
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -104,6 +105,14 @@ class TMOCCTab(QWidget):
         self.stg_server_btn.clicked.connect(self.stg_server.emit)
         card_layout.addWidget(self.stg_server_btn)
         
+        self.delete_cc_file_btn = QPushButton("删除 CC 文件")
+        self.delete_cc_file_btn.clicked.connect(self.delete_cc_file.emit)
+        card_layout.addWidget(self.delete_cc_file_btn)
+        
+        self.clear_entitlement_btn = QPushButton("清除 Entitlement")
+        self.clear_entitlement_btn.clicked.connect(self.clear_entitlement.emit)
+        card_layout.addWidget(self.clear_entitlement_btn)
+        
         card_layout.addStretch()
         
         v.addWidget(card)
@@ -139,10 +148,6 @@ class TMOCCTab(QWidget):
         self.complete_filter_btn = QPushButton("完全过滤")
         self.complete_filter_btn.clicked.connect(self.complete_filter.emit)
         card_layout.addWidget(self.complete_filter_btn)
-        
-        self.clear_logs_btn = QPushButton("清空日志")
-        self.clear_logs_btn.clicked.connect(self.clear_logs.emit)
-        card_layout.addWidget(self.clear_logs_btn)
         
         self.clear_device_logs_btn = QPushButton("清除手机缓存日志")
         self.clear_device_logs_btn.clicked.connect(self.clear_device_logs.emit)
