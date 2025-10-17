@@ -2,12 +2,14 @@
 # -*- coding: utf-8 -*-
 """
 自定义按钮配置管理器
-支持用户自定义ADB命令按钮
+支持用户自定义多种类型的按钮：ADB命令、Python脚本、文件操作等
 """
 
 import os
 import json
 import datetime
+import subprocess
+import sys
 from PyQt5.QtCore import QObject, pyqtSignal
 from core.debug_logger import logger
 
@@ -17,6 +19,15 @@ class CustomButtonManager(QObject):
     
     # 信号定义
     buttons_updated = pyqtSignal()  # 按钮配置更新
+    
+    # 按钮类型
+    BUTTON_TYPES = {
+        'adb': 'ADB命令',
+        'python': 'Python脚本',
+        'file': '打开文件',
+        'program': '运行程序',
+        'system': '系统命令'
+    }
     
     # 命令黑名单：不允许的持续输出命令
     BLOCKED_COMMANDS = {
@@ -82,6 +93,7 @@ class CustomButtonManager(QObject):
             {
                 'id': 'default_001',
                 'name': '查看设备属性',
+                'type': 'adb',
                 'command': 'shell getprop',
                 'tab': '其他',
                 'card': '其他操作',
@@ -91,6 +103,7 @@ class CustomButtonManager(QObject):
             {
                 'id': 'default_002',
                 'name': '查看存储空间',
+                'type': 'adb',
                 'command': 'shell df -h',
                 'tab': '其他',
                 'card': '设备信息',
@@ -147,13 +160,19 @@ class CustomButtonManager(QObject):
                 button_data['id'] = f"custom_{len(self.buttons) + 1:03d}"
             
             # 验证必填字段
-            if not button_data.get('name') or not button_data.get('command'):
-                logger.error("按钮名称和命令不能为空")
+            if not button_data.get('name'):
+                logger.error("按钮名称不能为空")
                 return False
             
-            # 验证命令安全性
-            if not self.validate_command(button_data['command']):
-                logger.error("命令包含不允许的内容")
+            # 对于非Python脚本类型，验证命令字段
+            button_type = button_data.get('type', 'adb')
+            if button_type != 'python' and not button_data.get('command'):
+                logger.error("命令不能为空")
+                return False
+            
+            # 验证命令安全性（仅对ADB命令类型）
+            if button_type == 'adb' and not self.validate_command(button_data.get('command', '')):
+                logger.error("ADB命令包含不允许的内容")
                 return False
             
             self.buttons.append(button_data)
@@ -168,9 +187,12 @@ class CustomButtonManager(QObject):
         try:
             for i, btn in enumerate(self.buttons):
                 if btn['id'] == button_id:
-                    # 验证命令安全性
-                    if not self.validate_command(button_data['command']):
-                        logger.error("命令包含不允许的内容")
+                    # 根据按钮类型进行不同的验证
+                    button_type = button_data.get('type', 'adb')
+                    
+                    # 验证命令安全性（仅对ADB命令类型）
+                    if button_type == 'adb' and not self.validate_command(button_data.get('command', '')):
+                        logger.error("ADB命令包含不允许的内容")
                         return False
                     
                     # 保留ID
@@ -358,4 +380,191 @@ class CustomButtonManager(QObject):
                 for btn in self.buttons
             ]
         }
+    
+    def execute_button_command(self, button_data, device_id=None):
+        """执行按钮命令（支持多种类型）"""
+        try:
+            button_type = button_data.get('type', 'adb')
+            command = button_data.get('command', '')
+            
+            if button_type == 'adb':
+                return self._execute_adb_command(command, device_id)
+            elif button_type == 'python':
+                # Python脚本使用script字段，而不是command字段
+                script_code = button_data.get('script', '')
+                if not script_code:
+                    return False, "Python脚本内容为空"
+                return self._execute_python_script(script_code)
+            elif button_type == 'file':
+                return self._open_file(command)
+            elif button_type == 'program':
+                return self._run_program(command)
+            elif button_type == 'system':
+                return self._execute_system_command(command)
+            else:
+                logger.error(f"不支持的按钮类型: {button_type}")
+                return False, f"不支持的按钮类型: {button_type}"
+                
+        except Exception as e:
+            logger.exception(f"执行按钮命令失败: {e}")
+            return False, str(e)
+    
+    def _execute_adb_command(self, command, device_id):
+        """执行ADB命令"""
+        if not device_id:
+            return False, "未选择设备"
+        
+        # 清理命令格式
+        clean_command = command.strip()
+        if clean_command.lower().startswith('adb '):
+            clean_command = clean_command[4:].strip()
+        
+        # 构建完整命令
+        full_command = f"adb -s {device_id} {clean_command}"
+        
+        try:
+            result = subprocess.run(
+                full_command, 
+                shell=True, 
+                capture_output=True, 
+                text=True, 
+                timeout=30
+            )
+            
+            output = result.stdout if result.stdout else result.stderr
+            success = result.returncode == 0
+            
+            return success, output
+            
+        except subprocess.TimeoutExpired:
+            return False, "命令执行超时"
+        except Exception as e:
+            return False, f"执行失败: {str(e)}"
+    
+    def _execute_python_script(self, script_code):
+        """执行Python脚本"""
+        try:
+            import io
+            import sys
+            from contextlib import redirect_stdout, redirect_stderr
+            
+            # 创建安全的执行环境
+            safe_globals = {
+                '__builtins__': {
+                    'print': print,
+                    'len': len,
+                    'str': str,
+                    'int': int,
+                    'float': float,
+                    'list': list,
+                    'dict': dict,
+                    'range': range,
+                    'enumerate': enumerate,
+                    'zip': zip,
+                    'sorted': sorted,
+                    'min': min,
+                    'max': max,
+                    'sum': sum,
+                    'abs': abs,
+                    'round': round,
+                    'type': type,
+                    'isinstance': isinstance,
+                    'hasattr': hasattr,
+                    'getattr': getattr,
+                    'setattr': setattr,
+                    'dir': dir,
+                    'help': help,
+                    'datetime': __import__('datetime'),
+                    'platform': __import__('platform'),
+                    'os': __import__('os'),
+                    'json': __import__('json'),
+                    'math': __import__('math'),
+                    'random': __import__('random'),
+                    'time': __import__('time'),
+                }
+            }
+            
+            safe_locals = {}
+            
+            # 捕获输出
+            output_buffer = io.StringIO()
+            error_buffer = io.StringIO()
+            
+            try:
+                with redirect_stdout(output_buffer), redirect_stderr(error_buffer):
+                    # 执行脚本
+                    exec(script_code, safe_globals, safe_locals)
+                
+                # 获取输出结果
+                stdout_output = output_buffer.getvalue()
+                stderr_output = error_buffer.getvalue()
+                
+                # 组合输出结果
+                result_output = ""
+                if stdout_output:
+                    result_output += f"输出:\n{stdout_output}"
+                if stderr_output:
+                    result_output += f"\n错误:\n{stderr_output}"
+                
+                if result_output:
+                    return True, result_output
+                else:
+                    return True, "Python脚本执行完成（无输出）"
+                    
+            except Exception as exec_error:
+                # 如果执行过程中出错，返回错误信息
+                return False, f"Python脚本执行错误: {str(exec_error)}"
+            
+        except Exception as e:
+            return False, f"Python脚本执行失败: {str(e)}"
+    
+    def _open_file(self, file_path):
+        """打开文件或文件夹"""
+        try:
+            import platform
+            
+            if platform.system() == 'Windows':
+                os.startfile(file_path)
+            elif platform.system() == 'Darwin':  # macOS
+                subprocess.run(['open', file_path])
+            else:  # Linux
+                subprocess.run(['xdg-open', file_path])
+            
+            return True, f"已打开: {file_path}"
+            
+        except Exception as e:
+            return False, f"打开文件失败: {str(e)}"
+    
+    def _run_program(self, program_path):
+        """运行程序"""
+        try:
+            if os.path.exists(program_path):
+                subprocess.Popen([program_path])
+                return True, f"已启动程序: {program_path}"
+            else:
+                return False, f"程序不存在: {program_path}"
+                
+        except Exception as e:
+            return False, f"运行程序失败: {str(e)}"
+    
+    def _execute_system_command(self, command):
+        """执行系统命令"""
+        try:
+            result = subprocess.run(
+                command, 
+                shell=True, 
+                capture_output=True, 
+                text=True, 
+                timeout=30
+            )
+            
+            output = result.stdout if result.stdout else result.stderr
+            success = result.returncode == 0
+            
+            return success, output
+            
+        except subprocess.TimeoutExpired:
+            return False, "命令执行超时"
+        except Exception as e:
+            return False, f"执行失败: {str(e)}"
 

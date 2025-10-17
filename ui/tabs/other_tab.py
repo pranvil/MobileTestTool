@@ -87,15 +87,16 @@ class OtherTab(QWidget):
             hera_config_group = self.create_hera_config_group()
             first_row_layout.addWidget(hera_config_group)
             
-            other_ops_group = self.create_other_ops_group()
-            first_row_layout.addWidget(other_ops_group)
+            log_ops_group = self.create_log_ops_group()
+            first_row_layout.addWidget(log_ops_group)
             
             scroll_layout.addWidget(first_row_container)
             
             # 2. log操作组（合并PCAP和MTKlog操作）
-            log_ops_group = self.create_log_ops_group()
-            scroll_layout.addWidget(log_ops_group)
-            
+
+
+            other_ops_group = self.create_other_ops_group()
+            scroll_layout.addWidget(other_ops_group)            
             # 添加弹性空间
             scroll_layout.addStretch()
             

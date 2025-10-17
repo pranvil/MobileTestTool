@@ -22,20 +22,16 @@ class PyQtBackgroundDataManager(QObject):
     def __init__(self, device_manager, parent=None):
         super().__init__(parent)
         self.device_manager = device_manager
-        # 导入完整的背景数据配置管理器
-        from core.background_config_manager import BackgroundConfigManager
-        self.bg_config_manager = BackgroundConfigManager(device_manager, parent)
-        # 连接信号
-        self.bg_config_manager.status_message.connect(self.status_message.emit)
-        self.bg_config_manager.log_message.connect(self.log_message.emit)
         
     def configure_phone(self):
         """配置手机"""
-        self.bg_config_manager.configure_phone()
+        self.status_message.emit("配置手机...")
+        # TODO: 实现配置手机逻辑
     
     def export_background_logs(self):
         """导出背景日志"""
-        self.bg_config_manager.export_background_logs()
+        self.status_message.emit("导出背景日志...")
+        # TODO: 实现导出背景日志逻辑
     
     def analyze_logs(self):
         """分析日志"""

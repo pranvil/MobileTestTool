@@ -8,7 +8,7 @@ from PyQt5.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QPushButton,
                              QTableWidget, QTableWidgetItem, QHeaderView,
                              QMessageBox, QLabel, QLineEdit, QComboBox,
                              QTextEdit, QCheckBox, QFileDialog, QGroupBox,
-                             QFormLayout)
+                             QFormLayout, QScrollArea, QWidget, QTextBrowser)
 from PyQt5.QtCore import Qt
 from core.debug_logger import logger
 
@@ -32,8 +32,8 @@ class CustomButtonDialog(QDialog):
         
         # 顶部说明
         info_label = QLabel(
-            "💡 在此配置自定义ADB命令按钮，按钮将显示在指定的Tab和卡片中。"
-            "命令会自动加上 'adb -s {device}' 前缀。"
+            "💡 在此配置自定义命令按钮，按钮将显示在指定的Tab和卡片中。"
+            "adb命令会自动加上 'adb -s {device}' 前缀。"
         )
         info_label.setWordWrap(True)
         info_label.setStyleSheet("color: #17a2b8; padding: 10px; background: #d1ecf1; border-radius: 4px;")
@@ -41,17 +41,18 @@ class CustomButtonDialog(QDialog):
         
         # 按钮列表表格
         self.table = QTableWidget()
-        self.table.setColumnCount(6)
-        self.table.setHorizontalHeaderLabels(['名称', '命令', '所在Tab', '所在卡片', '启用', '描述'])
+        self.table.setColumnCount(7)
+        self.table.setHorizontalHeaderLabels(['名称', '类型', '命令', '所在Tab', '所在卡片', '启用', '描述'])
         
         # 设置列宽
         header = self.table.horizontalHeader()
         header.setSectionResizeMode(0, QHeaderView.ResizeToContents)
-        header.setSectionResizeMode(1, QHeaderView.Stretch)
-        header.setSectionResizeMode(2, QHeaderView.ResizeToContents)
+        header.setSectionResizeMode(1, QHeaderView.ResizeToContents)
+        header.setSectionResizeMode(2, QHeaderView.Stretch)
         header.setSectionResizeMode(3, QHeaderView.ResizeToContents)
         header.setSectionResizeMode(4, QHeaderView.ResizeToContents)
-        header.setSectionResizeMode(5, QHeaderView.Stretch)
+        header.setSectionResizeMode(5, QHeaderView.ResizeToContents)
+        header.setSectionResizeMode(6, QHeaderView.Stretch)
         
         self.table.setSelectionBehavior(QTableWidget.SelectRows)
         self.table.setSelectionMode(QTableWidget.SingleSelection)
@@ -86,6 +87,10 @@ class CustomButtonDialog(QDialog):
         
         button_layout.addStretch()
         
+        self.help_btn = QPushButton("❓ 帮助")
+        self.help_btn.clicked.connect(self.show_help)
+        button_layout.addWidget(self.help_btn)
+        
         self.close_btn = QPushButton("关闭")
         self.close_btn.clicked.connect(self.accept)
         button_layout.addWidget(self.close_btn)
@@ -101,12 +106,24 @@ class CustomButtonDialog(QDialog):
             row = self.table.rowCount()
             self.table.insertRow(row)
             
+            # 获取按钮类型显示名称
+            button_type = btn.get('type', 'adb')
+            type_map = {
+                'adb': 'ADB命令',
+                'python': 'Python脚本',
+                'file': '打开文件',
+                'program': '运行程序',
+                'system': '系统命令'
+            }
+            type_display = type_map.get(button_type, 'ADB命令')
+            
             self.table.setItem(row, 0, QTableWidgetItem(btn.get('name', '')))
-            self.table.setItem(row, 1, QTableWidgetItem(btn.get('command', '')))
-            self.table.setItem(row, 2, QTableWidgetItem(btn.get('tab', '')))
-            self.table.setItem(row, 3, QTableWidgetItem(btn.get('card', '')))
-            self.table.setItem(row, 4, QTableWidgetItem('✓' if btn.get('enabled', True) else '✗'))
-            self.table.setItem(row, 5, QTableWidgetItem(btn.get('description', '')))
+            self.table.setItem(row, 1, QTableWidgetItem(type_display))
+            self.table.setItem(row, 2, QTableWidgetItem(btn.get('command', '')))
+            self.table.setItem(row, 3, QTableWidgetItem(btn.get('tab', '')))
+            self.table.setItem(row, 4, QTableWidgetItem(btn.get('card', '')))
+            self.table.setItem(row, 5, QTableWidgetItem('✓' if btn.get('enabled', True) else '✗'))
+            self.table.setItem(row, 6, QTableWidgetItem(btn.get('description', '')))
             
             # 存储按钮ID
             self.table.item(row, 0).setData(Qt.UserRole, btn.get('id'))
@@ -161,7 +178,7 @@ class CustomButtonDialog(QDialog):
             button_id = self.table.item(current_row, 0).data(Qt.UserRole)
             if self.button_manager.delete_button(button_id):
                 self.load_buttons()
-                QMessageBox.information(self, "成功", "按钮删除成功！")
+
             else:
                 QMessageBox.warning(self, "失败", "按钮删除失败，请检查日志")
     
@@ -192,6 +209,210 @@ class CustomButtonDialog(QDialog):
             else:
                 QMessageBox.warning(self, "导出失败", "按钮配置导出失败，请检查日志")
     
+    def show_help(self):
+        """显示帮助对话框"""
+        help_dialog = QDialog(self)
+        help_dialog.setWindowTitle("📖 自定义按钮使用帮助")
+        help_dialog.resize(800, 600)
+        
+        layout = QVBoxLayout(help_dialog)
+        
+        # 创建文本浏览器
+        browser = QTextBrowser()
+        browser.setOpenExternalLinks(True)
+        
+        # 帮助文档内容（与ButtonEditDialog中的相同）
+        help_text = """
+        <html>
+        <head>
+            <style>
+                body { font-family: "Microsoft YaHei", Arial, sans-serif; line-height: 1.6; }
+                h1 { color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 10px; }
+                h2 { color: #34495e; margin-top: 20px; }
+                h3 { 
+                    color: #3498db; 
+                    background-color: #2c3e50; 
+                    margin-top: 15px; 
+                    margin-bottom: 10px;
+                    padding: 8px 15px; 
+                    border-radius: 5px; 
+                    font-weight: bold;
+                    font-size: 1.1em;
+                }
+                .type-section { 
+                    background: #ecf0f1; 
+                    padding: 15px; 
+                    margin: 10px 0; 
+                    border-radius: 5px;
+                    border-left: 4px solid #3498db;
+                }
+                .example { 
+                    background: #f8f9fa; 
+                    color: #2c3e50;
+                    padding: 10px; 
+                    margin: 10px 0; 
+                    border-radius: 3px;
+                    border: 1px solid #dee2e6;
+                    font-family: "Consolas", monospace;
+                    font-weight: normal;
+                }
+                .warning { 
+                    background: #f8d7da; 
+                    color: #721c24;
+                    padding: 10px; 
+                    margin: 10px 0; 
+                    border-radius: 3px;
+                    border-left: 4px solid #dc3545;
+                }
+                .tip { 
+                    background: #d1ecf1; 
+                    color: #0c5460;
+                    padding: 10px; 
+                    margin: 10px 0; 
+                    border-radius: 3px;
+                    border-left: 4px solid #17a2b8;
+                }
+                ul { margin-left: 20px; }
+                li { margin: 5px 0; }
+            </style>
+        </head>
+        <body>
+            <h1>🔧 自定义按钮使用指南</h1>
+            
+            <div class="tip">
+                <strong>💡 提示：</strong>自定义按钮功能允许您创建各种类型的快捷操作按钮，支持ADB命令、Python脚本、打开文件等多种功能。
+            </div>
+            
+            <h2>📋 按钮类型说明</h2>
+            
+            <div class="type-section">
+                <h3>① ADB命令</h3>
+                <p><strong>用途：</strong>执行ADB命令来操作Android设备</p>
+                <p><strong>输入格式：</strong>直接输入ADB命令内容，<strong>不需要</strong>加 "adb -s {device}" 前缀</p>
+                <p><strong>示例：</strong></p>
+                <div class="example">
+                    命令/路径: shell reboot<br>
+                    说明: 重启设备<br><br>
+                    
+                    命令/路径: shell dumpsys battery<br>
+                    说明: 查看电池信息<br><br>
+                    
+                    命令/路径: logcat -c<br>
+                    说明: 清除logcat缓存
+                </div>
+                <div class="warning">
+                    <strong>⚠️ 注意：</strong>某些危险命令（如 push、pull、install、uninstall）被禁止使用，以确保系统安全。
+                </div>
+            </div>
+            
+            <div class="type-section">
+                <h3>② Python脚本</h3>
+                <p><strong>用途：</strong>执行自定义Python代码片段</p>
+                <p><strong>输入格式：</strong></p>
+                <ul>
+                    <li><strong>命令/路径：</strong>可选，用于描述脚本功能</li>
+                    <li><strong>Python脚本区域：</strong>必填，输入要执行的Python代码</li>
+                </ul>
+                <p><strong>可用模块：</strong>datetime、platform、os、json、math、random、time</p>
+                <p><strong>示例：</strong></p>
+                <div class="example">
+                    # 获取系统信息<br>
+                    import platform<br>
+                    print(f"系统: {platform.system()}")<br>
+                    print(f"版本: {platform.version()}")<br><br>
+                    
+                    # 生成随机数<br>
+                    import random<br>
+                    print(f"随机数: {random.randint(1, 100)}")<br><br>
+                    
+                    # 获取当前时间<br>
+                    import datetime<br>
+                    print(f"当前时间: {datetime.datetime.now()}")
+                </div>
+                <div class="tip">
+                    <strong>💡 提示：</strong>Python脚本在沙箱环境中执行，输出会显示在日志区域。
+                </div>
+            </div>
+            
+            <div class="type-section">
+                <h3>③ 打开文件</h3>
+                <p><strong>用途：</strong>使用默认程序打开指定文件或文件夹</p>
+                <p><strong>输入格式：</strong>输入完整的文件路径，或点击"浏览文件"按钮选择</p>
+                <p><strong>示例：</strong></p>
+                <div class="example">
+                    C:\\Users\\用户名\\Desktop\\测试报告.docx<br>
+                    C:\\Users\\用户名\\Documents\\项目文档.pdf<br>
+                    D:\\工作文件夹
+                </div>
+            </div>
+            
+            <div class="type-section">
+                <h3>④ 运行程序</h3>
+                <p><strong>用途：</strong>启动指定的可执行程序</p>
+                <p><strong>输入格式：</strong>输入完整的程序路径，或点击"浏览文件"按钮选择</p>
+                <p><strong>示例：</strong></p>
+                <div class="example">
+                    C:\\Program Files\\Notepad++\\notepad++.exe<br>
+                    C:\\Windows\\System32\\calc.exe<br>
+                    D:\\Tools\\adb工具\\adb.exe
+                </div>
+            </div>
+            
+            <div class="type-section">
+                <h3>⑤ 系统命令</h3>
+                <p><strong>用途：</strong>执行Windows/Linux/Mac系统命令</p>
+                <p><strong>输入格式：</strong>直接输入系统命令</p>
+                <p><strong>示例：</strong></p>
+                <div class="example">
+                    ipconfig /all<br>
+                    dir C:\\<br>
+                    ping 8.8.8.8 -n 4
+                </div>
+                <div class="warning">
+                    <strong>⚠️ 注意：</strong>系统命令会在30秒后超时，请避免使用长时间运行的命令。
+                </div>
+            </div>
+            
+            <h2>🎯 按钮配置说明</h2>
+            
+            <ul>
+                <li><strong>按钮名称：</strong>显示在界面上的按钮文字（必填）</li>
+                <li><strong>按钮类型：</strong>选择按钮执行的操作类型（必选）</li>
+                <li><strong>命令/路径：</strong>根据按钮类型填写相应内容（部分类型必填）</li>
+                <li><strong>描述：</strong>按钮的详细说明，鼠标悬停时显示（可选）</li>
+                <li><strong>所在Tab：</strong>按钮将显示在哪个选项卡（必选）</li>
+                <li><strong>所在卡片：</strong>按钮将显示在哪个功能卡片中（必选）</li>
+                <li><strong>启用此按钮：</strong>是否立即启用该按钮（可选）</li>
+            </ul>
+            
+            <h2>✨ 使用技巧</h2>
+            
+            <ul>
+                <li>为按钮起一个简洁明了的名称，方便快速识别</li>
+                <li>合理使用描述字段，提供更多操作说明</li>
+                <li>将相关功能的按钮放在同一个卡片中，便于管理</li>
+                <li>对于常用操作，可以创建多个快捷按钮</li>
+                <li>使用"导出"功能可以备份您的按钮配置</li>
+                <li>使用"导入"功能可以在不同设备间共享配置</li>
+            </ul>
+            
+            <div class="tip">
+                <strong>💡 小贴士：</strong>如果不确定按钮是否正确配置，可以先测试一次，查看日志区域的输出结果。
+            </div>
+            
+        </body>
+        </html>
+        """
+        
+        browser.setHtml(help_text)
+        layout.addWidget(browser)
+        
+        # 关闭按钮
+        close_btn = QPushButton("关闭")
+        close_btn.clicked.connect(help_dialog.accept)
+        layout.addWidget(close_btn)
+        
+        help_dialog.exec_()
 
 
 class ButtonEditDialog(QDialog):
@@ -205,35 +426,288 @@ class ButtonEditDialog(QDialog):
         
         self.setWindowTitle("编辑按钮" if self.is_edit else "添加按钮")
         self.setModal(True)
-        self.resize(600, 500)
+        self.resize(700, 600)  # 增加宽度和高度
+        
+        # 设置窗口标志，显示帮助按钮
+        self.setWindowFlags(self.windowFlags() | Qt.WindowContextHelpButtonHint)
         
         self.setup_ui()
         
         if self.is_edit:
             self.load_data()
     
+    def event(self, event):
+        """处理事件，包括帮助按钮点击"""
+        if event.type() == event.EnterWhatsThisMode:
+            # 点击帮助按钮时显示帮助对话框
+            self.show_help_dialog()
+            return True
+        return super().event(event)
+    
+    def show_help_dialog(self):
+        """显示帮助对话框"""
+        help_dialog = QDialog(self)
+        help_dialog.setWindowTitle("📖 自定义按钮使用帮助")
+        help_dialog.resize(800, 600)
+        
+        layout = QVBoxLayout(help_dialog)
+        
+        # 创建文本浏览器
+        browser = QTextBrowser()
+        browser.setOpenExternalLinks(True)
+        
+        # 帮助文档内容
+        help_text = """
+        <html>
+        <head>
+            <style>
+                body { font-family: "Microsoft YaHei", Arial, sans-serif; line-height: 1.6; }
+                h1 { color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 10px; }
+                h2 { color: #34495e; margin-top: 20px; }
+                h3 { 
+                    color: #3498db; 
+                    background-color: #2c3e50; 
+                    margin-top: 15px; 
+                    margin-bottom: 10px;
+                    padding: 8px 15px; 
+                    border-radius: 5px; 
+                    font-weight: bold;
+                    font-size: 1.1em;
+                }
+                .type-section { 
+                    background: #ecf0f1; 
+                    padding: 15px; 
+                    margin: 10px 0; 
+                    border-radius: 5px;
+                    border-left: 4px solid #3498db;
+                }
+                .example { 
+                    background: #f8f9fa; 
+                    color: #2c3e50;
+                    padding: 10px; 
+                    margin: 10px 0; 
+                    border-radius: 3px;
+                    border: 1px solid #dee2e6;
+                    font-family: "Consolas", monospace;
+                    font-weight: normal;
+                }
+                .warning { 
+                    background: #f8d7da; 
+                    color: #721c24;
+                    padding: 10px; 
+                    margin: 10px 0; 
+                    border-radius: 3px;
+                    border-left: 4px solid #dc3545;
+                }
+                .tip { 
+                    background: #d1ecf1; 
+                    color: #0c5460;
+                    padding: 10px; 
+                    margin: 10px 0; 
+                    border-radius: 3px;
+                    border-left: 4px solid #17a2b8;
+                }
+                ul { margin-left: 20px; }
+                li { margin: 5px 0; }
+            </style>
+        </head>
+        <body>
+            <h1>🔧 自定义按钮使用指南</h1>
+            
+            <div class="tip">
+                <strong>💡 提示：</strong>自定义按钮功能允许您创建各种类型的快捷操作按钮，支持ADB命令、Python脚本、打开文件等多种功能。
+            </div>
+            
+            <h2>📋 按钮类型说明</h2>
+            
+            <div class="type-section">
+                <h3>① ADB命令</h3>
+                <p><strong>用途：</strong>执行ADB命令来操作Android设备</p>
+                <p><strong>输入格式：</strong>直接输入ADB命令内容，<strong>不需要</strong>加 "adb -s {device}" 前缀</p>
+                <p><strong>示例：</strong></p>
+                <div class="example">
+                    命令/路径: shell reboot<br>
+                    说明: 重启设备<br><br>
+                    
+                    命令/路径: shell dumpsys battery<br>
+                    说明: 查看电池信息<br><br>
+                    
+                    命令/路径: logcat -c<br>
+                    说明: 清除logcat缓存
+                </div>
+                <div class="warning">
+                    <strong>⚠️ 注意：</strong>某些危险命令（如 push、pull、install、uninstall）被禁止使用，以确保系统安全。
+                </div>
+            </div>
+            
+            <div class="type-section">
+                <h3>② Python脚本</h3>
+                <p><strong>用途：</strong>执行自定义Python代码片段</p>
+                <p><strong>输入格式：</strong></p>
+                <ul>
+                    <li><strong>命令/路径：</strong>可选，用于描述脚本功能</li>
+                    <li><strong>Python脚本区域：</strong>必填，输入要执行的Python代码</li>
+                </ul>
+                <p><strong>可用模块：</strong>datetime、platform、os、json、math、random、time</p>
+                <p><strong>示例：</strong></p>
+                <div class="example">
+                    # 获取系统信息<br>
+                    import platform<br>
+                    print(f"系统: {platform.system()}")<br>
+                    print(f"版本: {platform.version()}")<br><br>
+                    
+                    # 生成随机数<br>
+                    import random<br>
+                    print(f"随机数: {random.randint(1, 100)}")<br><br>
+                    
+                    # 获取当前时间<br>
+                    import datetime<br>
+                    print(f"当前时间: {datetime.datetime.now()}")
+                </div>
+                <div class="tip">
+                    <strong>💡 提示：</strong>Python脚本在沙箱环境中执行，输出会显示在日志区域。
+                </div>
+            </div>
+            
+            <div class="type-section">
+                <h3>③ 打开文件</h3>
+                <p><strong>用途：</strong>使用默认程序打开指定文件或文件夹</p>
+                <p><strong>输入格式：</strong>输入完整的文件路径，或点击"浏览文件"按钮选择</p>
+                <p><strong>示例：</strong></p>
+                <div class="example">
+                    C:\\Users\\用户名\\Desktop\\测试报告.docx<br>
+                    C:\\Users\\用户名\\Documents\\项目文档.pdf<br>
+                    D:\\工作文件夹
+                </div>
+            </div>
+            
+            <div class="type-section">
+                <h3>④ 运行程序</h3>
+                <p><strong>用途：</strong>启动指定的可执行程序</p>
+                <p><strong>输入格式：</strong>输入完整的程序路径，或点击"浏览文件"按钮选择</p>
+                <p><strong>示例：</strong></p>
+                <div class="example">
+                    C:\\Program Files\\Notepad++\\notepad++.exe<br>
+                    C:\\Windows\\System32\\calc.exe<br>
+                    D:\\Tools\\adb工具\\adb.exe
+                </div>
+            </div>
+            
+            <div class="type-section">
+                <h3>⑤ 系统命令</h3>
+                <p><strong>用途：</strong>执行Windows/Linux/Mac系统命令</p>
+                <p><strong>输入格式：</strong>直接输入系统命令</p>
+                <p><strong>示例：</strong></p>
+                <div class="example">
+                    ipconfig /all<br>
+                    dir C:\\<br>
+                    ping 8.8.8.8 -n 4
+                </div>
+                <div class="warning">
+                    <strong>⚠️ 注意：</strong>系统命令会在30秒后超时，请避免使用长时间运行的命令。
+                </div>
+            </div>
+            
+            <h2>🎯 按钮配置说明</h2>
+            
+            <ul>
+                <li><strong>按钮名称：</strong>显示在界面上的按钮文字（必填）</li>
+                <li><strong>按钮类型：</strong>选择按钮执行的操作类型（必选）</li>
+                <li><strong>命令/路径：</strong>根据按钮类型填写相应内容（部分类型必填）</li>
+                <li><strong>描述：</strong>按钮的详细说明，鼠标悬停时显示（可选）</li>
+                <li><strong>所在Tab：</strong>按钮将显示在哪个选项卡（必选）</li>
+                <li><strong>所在卡片：</strong>按钮将显示在哪个功能卡片中（必选）</li>
+                <li><strong>启用此按钮：</strong>是否立即启用该按钮（可选）</li>
+            </ul>
+            
+            <h2>✨ 使用技巧</h2>
+            
+            <ul>
+                <li>为按钮起一个简洁明了的名称，方便快速识别</li>
+                <li>合理使用描述字段，提供更多操作说明</li>
+                <li>将相关功能的按钮放在同一个卡片中，便于管理</li>
+                <li>对于常用操作，可以创建多个快捷按钮</li>
+                <li>使用"导出"功能可以备份您的按钮配置</li>
+                <li>使用"导入"功能可以在不同设备间共享配置</li>
+            </ul>
+            
+            <div class="tip">
+                <strong>💡 小贴士：</strong>如果不确定按钮是否正确配置，可以先测试一次，查看日志区域的输出结果。
+            </div>
+            
+        </body>
+        </html>
+        """
+        
+        browser.setHtml(help_text)
+        layout.addWidget(browser)
+        
+        # 关闭按钮
+        close_btn = QPushButton("关闭")
+        close_btn.clicked.connect(help_dialog.accept)
+        layout.addWidget(close_btn)
+        
+        help_dialog.exec_()
+    
     def setup_ui(self):
         """设置UI"""
         layout = QVBoxLayout(self)
+        
+        # 创建滚动区域
+        scroll_area = QScrollArea()
+        scroll_area.setWidgetResizable(True)
+        scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        
+        # 创建滚动内容容器
+        scroll_content = QWidget()
+        scroll_layout = QVBoxLayout(scroll_content)
+        scroll_layout.setContentsMargins(5, 5, 5, 5)
         
         # 基本信息组
         basic_group = QGroupBox("基本信息")
         basic_layout = QFormLayout(basic_group)
         
         self.name_edit = QLineEdit()
-        self.name_edit.setPlaceholderText("例如：重启ADB")
+        self.name_edit.setPlaceholderText("例如：重启设备")
         basic_layout.addRow("按钮名称*:", self.name_edit)
         
+        # 按钮类型选择
+        self.type_combo = QComboBox()
+        self.type_combo.addItems([
+            "ADB命令", "Python脚本", "打开文件", "运行程序", "系统命令"
+        ])
+        self.type_combo.currentTextChanged.connect(self.on_type_changed)
+        basic_layout.addRow("按钮类型*:", self.type_combo)
+        
         self.command_edit = QLineEdit()
-        self.command_edit.setPlaceholderText("例如：shell reboot（不需要加 'adb -s {device}'）")
-        basic_layout.addRow("ADB命令*:", self.command_edit)
+        self.command_edit.setPlaceholderText("例如：shell reboot")
+        basic_layout.addRow("命令/路径*:", self.command_edit)
         
         self.description_edit = QTextEdit()
         self.description_edit.setPlaceholderText("描述按钮的功能...")
         self.description_edit.setMaximumHeight(80)
         basic_layout.addRow("描述:", self.description_edit)
         
-        layout.addWidget(basic_group)
+        scroll_layout.addWidget(basic_group)
+        
+        # 高级设置组（用于Python脚本等）
+        self.advanced_group = QGroupBox("高级设置")
+        advanced_layout = QVBoxLayout(self.advanced_group)
+        
+        self.script_edit = QTextEdit()
+        self.script_edit.setPlaceholderText("输入Python脚本代码...")
+        self.script_edit.setMaximumHeight(200)  # 增加高度
+        self.script_edit.setVisible(False)
+        self.script_edit.textChanged.connect(self.update_preview)
+        advanced_layout.addWidget(self.script_edit)
+        
+        self.file_browse_btn = QPushButton("浏览文件")
+        self.file_browse_btn.clicked.connect(self.browse_file)
+        self.file_browse_btn.setVisible(False)
+        advanced_layout.addWidget(self.file_browse_btn)
+        
+        scroll_layout.addWidget(self.advanced_group)
         
         # 位置设置组
         position_group = QGroupBox("显示位置")
@@ -251,7 +725,7 @@ class ButtonEditDialog(QDialog):
         self.enabled_check.setChecked(True)
         position_layout.addRow("", self.enabled_check)
         
-        layout.addWidget(position_group)
+        scroll_layout.addWidget(position_group)
         
         # 命令预览
         preview_group = QGroupBox("命令预览")
@@ -268,7 +742,11 @@ class ButtonEditDialog(QDialog):
         
         self.command_edit.textChanged.connect(self.update_preview)
         
-        layout.addWidget(preview_group)
+        scroll_layout.addWidget(preview_group)
+        
+        # 设置滚动区域的内容
+        scroll_area.setWidget(scroll_content)
+        layout.addWidget(scroll_area)
         
         # 初始化Card列表
         self.on_tab_changed(self.tab_combo.currentText())
@@ -296,49 +774,164 @@ class ButtonEditDialog(QDialog):
         cards = self.button_manager.get_available_cards(tab_name)
         self.card_combo.addItems(cards)
     
+    def on_type_changed(self, type_text):
+        """按钮类型改变时的处理"""
+        type_map = {
+            "ADB命令": "adb",
+            "Python脚本": "python", 
+            "打开文件": "file",
+            "运行程序": "program",
+            "系统命令": "system"
+        }
+        
+        button_type = type_map.get(type_text, "adb")
+        
+        # 更新输入框的占位符
+        placeholders = {
+            "adb": "例如：shell reboot（不需要加 'adb -s {device}'）",
+            "python": "可选：脚本描述或文件名（如：系统信息收集）",
+            "file": "例如：C:\\Users\\用户名\\Desktop\\文件.txt",
+            "program": "例如：C:\\Program Files\\Notepad++\\notepad++.exe",
+            "system": "例如：dir 或 ls"
+        }
+        
+        self.command_edit.setPlaceholderText(placeholders.get(button_type, ""))
+        
+        # 显示/隐藏高级设置
+        if button_type == "python":
+            self.script_edit.setVisible(True)
+            self.script_edit.setMaximumHeight(300)  # 增加Python脚本编辑区域高度
+            self.file_browse_btn.setVisible(False)
+            self.advanced_group.setTitle("Python脚本")
+            self.advanced_group.setVisible(True)
+        elif button_type in ["file", "program"]:
+            self.script_edit.setVisible(False)
+            self.file_browse_btn.setVisible(True)
+            self.advanced_group.setTitle("文件选择")
+            self.advanced_group.setVisible(True)
+        else:
+            self.script_edit.setVisible(False)
+            self.file_browse_btn.setVisible(False)
+            self.advanced_group.setVisible(False)
+    
+    def browse_file(self):
+        """浏览文件"""
+        from PyQt5.QtWidgets import QFileDialog
+        
+        type_text = self.type_combo.currentText()
+        
+        if type_text == "打开文件":
+            file_path, _ = QFileDialog.getOpenFileName(
+                self, "选择要打开的文件", "",
+                "所有文件 (*.*)"
+            )
+        elif type_text == "运行程序":
+            file_path, _ = QFileDialog.getOpenFileName(
+                self, "选择要运行的程序", "",
+                "可执行文件 (*.exe);;所有文件 (*.*)"
+            )
+        else:
+            file_path, _ = QFileDialog.getOpenFileName(
+                self, "选择文件", "",
+                "所有文件 (*.*)"
+            )
+        
+        if file_path:
+            self.command_edit.setText(file_path)
+    
     def update_preview(self):
         """更新命令预览"""
         command = self.command_edit.text().strip()
+        button_type = self.type_combo.currentText()
+        
         if command:
-            # 处理命令格式：如果用户输入了"adb"开头，需要去掉
-            clean_command = command
-            if clean_command.lower().startswith('adb '):
-                clean_command = clean_command[4:].strip()
-            
-            preview = f"adb -s {{设备ID}} {clean_command}"
-            self.preview_label.setText(preview)
-            
-            # 检查命令是否被阻止
-            if not self.button_manager.validate_command(command):
-                reason = self.button_manager.get_blocked_reason(command)
-                if reason:
-                    self.preview_label.setStyleSheet(
-                        "background: #f8d7da; padding: 10px; "
-                        "border: 1px solid #f5c6cb; border-radius: 4px; "
-                        "color: #721c24; font-family: 'Consolas', 'Monaco', monospace;"
-                    )
-                    self.preview_label.setText(f"⚠️ 不支持的命令\n{reason}")
+            if button_type == "ADB命令":
+                # ADB命令预览
+                clean_command = command
+                if clean_command.lower().startswith('adb '):
+                    clean_command = clean_command[4:].strip()
+                
+                preview = f"adb -s {{设备ID}} {clean_command}"
+                self.preview_label.setText(preview)
+                
+                # 检查ADB命令是否被阻止
+                if not self.button_manager.validate_command(command):
+                    reason = self.button_manager.get_blocked_reason(command)
+                    if reason:
+                        self.preview_label.setStyleSheet(
+                            "background: #f8d7da; padding: 10px; "
+                            "border: 1px solid #f5c6cb; border-radius: 4px; "
+                            "color: #721c24; font-family: 'Consolas', 'Monaco', monospace;"
+                        )
+                        self.preview_label.setText(f"⚠️ 不支持的命令\n{reason}")
+                        return
+                    else:
+                        self.preview_label.setStyleSheet(
+                            "background: #f8d7da; padding: 10px; "
+                            "border: 1px solid #f5c6cb; border-radius: 4px; "
+                            "color: #721c24; font-family: 'Consolas', 'Monaco', monospace;"
+                        )
+                        self.preview_label.setText(f"⚠️ 命令验证失败")
+                        return
+            elif button_type == "Python脚本":
+                # Python脚本预览
+                script = self.script_edit.toPlainText().strip()
+                if script:
+                    preview = f"执行Python脚本:\n{script[:100]}{'...' if len(script) > 100 else ''}"
                 else:
-                    self.preview_label.setStyleSheet(
-                        "background: #f8d7da; padding: 10px; "
-                        "border: 1px solid #f5c6cb; border-radius: 4px; "
-                        "color: #721c24; font-family: 'Consolas', 'Monaco', monospace;"
-                    )
-                    self.preview_label.setText(f"⚠️ 命令验证失败")
-            else:
-                self.preview_label.setStyleSheet(
-                    "background: #f8f9fa; padding: 10px; "
-                    "border: 1px solid #dee2e6; border-radius: 4px; "
-                    "font-family: 'Consolas', 'Monaco', monospace;"
-                )
+                    preview = "Python脚本为空"
+            elif button_type == "打开文件":
+                # 文件预览
+                import os
+                if os.path.exists(command):
+                    preview = f"✅ 将打开文件:\n{command}"
+                else:
+                    preview = f"⚠️ 文件不存在:\n{command}"
+            elif button_type == "运行程序":
+                # 程序预览
+                import os
+                if os.path.exists(command):
+                    preview = f"✅ 将运行程序:\n{command}"
+                else:
+                    preview = f"⚠️ 程序不存在:\n{command}"
+            elif button_type == "系统命令":
+                # 系统命令预览
+                preview = f"将执行系统命令:\n{command}"
+            
+            # 设置正常样式
+            self.preview_label.setStyleSheet(
+                "background: #f8f9fa; padding: 10px; "
+                "border: 1px solid #dee2e6; border-radius: 4px; "
+                "font-family: 'Consolas', 'Monaco', monospace;"
+            )
+            self.preview_label.setText(preview)
         else:
-            self.preview_label.setText("请输入ADB命令...")
+            self.preview_label.setText(f"请输入{button_type}内容...")
     
     def load_data(self):
         """加载按钮数据"""
         self.name_edit.setText(self.button_data.get('name', ''))
         self.command_edit.setText(self.button_data.get('command', ''))
         self.description_edit.setPlainText(self.button_data.get('description', ''))
+        
+        # 加载按钮类型
+        button_type = self.button_data.get('type', 'adb')
+        type_map = {
+            'adb': 'ADB命令',
+            'python': 'Python脚本',
+            'file': '打开文件',
+            'program': '运行程序',
+            'system': '系统命令'
+        }
+        type_text = type_map.get(button_type, 'ADB命令')
+        index = self.type_combo.findText(type_text)
+        if index >= 0:
+            self.type_combo.setCurrentIndex(index)
+        
+        # 加载Python脚本
+        if button_type == 'python':
+            script = self.button_data.get('script', '')
+            self.script_edit.setPlainText(script)
         
         tab = self.button_data.get('tab', '')
         if tab:
@@ -358,33 +951,71 @@ class ButtonEditDialog(QDialog):
         """保存按钮"""
         name = self.name_edit.text().strip()
         command = self.command_edit.text().strip()
+        button_type = self.type_combo.currentText()
         
         if not name:
             QMessageBox.warning(self, "验证失败", "请输入按钮名称")
             return
         
-        if not command:
-            QMessageBox.warning(self, "验证失败", "请输入ADB命令")
+        # 对于Python脚本，命令/路径字段是可选的（用作描述）
+        if button_type != "Python脚本" and not command:
+            QMessageBox.warning(self, "验证失败", f"请输入{button_type}内容")
             return
         
-        if not self.button_manager.validate_command(command):
-            reason = self.button_manager.get_blocked_reason(command)
-            QMessageBox.warning(
-                self, "验证失败",
-                f"命令验证失败\n{reason if reason else '请检查命令是否正确'}"
-            )
-            return
+        # 根据按钮类型进行不同的验证
+        if button_type == "ADB命令":
+            # 验证ADB命令
+            if not self.button_manager.validate_command(command):
+                reason = self.button_manager.get_blocked_reason(command)
+                QMessageBox.warning(
+                    self, "验证失败",
+                    f"ADB命令验证失败\n{reason if reason else '请检查命令是否正确'}"
+                )
+                return
+        elif button_type == "Python脚本":
+            # 验证Python脚本 - 主要检查脚本区域，命令/路径作为描述
+            script = self.script_edit.toPlainText().strip()
+            if not script:
+                QMessageBox.warning(self, "验证失败", "请在Python脚本区域输入代码")
+                return
+            # 命令/路径字段可以为空或用作描述
+        elif button_type in ["打开文件", "运行程序"]:
+            # 验证文件路径
+            import os
+            if not os.path.exists(command):
+                QMessageBox.warning(
+                    self, "验证失败", 
+                    f"文件/程序不存在:\n{command}\n\n请检查路径是否正确"
+                )
+                return
         
         self.accept()
     
     def get_button_data(self):
         """获取按钮数据"""
-        return {
+        # 获取按钮类型
+        type_map = {
+            "ADB命令": "adb",
+            "Python脚本": "python", 
+            "打开文件": "file",
+            "运行程序": "program",
+            "系统命令": "system"
+        }
+        button_type = type_map.get(self.type_combo.currentText(), "adb")
+        
+        data = {
             'name': self.name_edit.text().strip(),
+            'type': button_type,
             'command': self.command_edit.text().strip(),
             'tab': self.tab_combo.currentText(),
             'card': self.card_combo.currentText(),
             'enabled': self.enabled_check.isChecked(),
             'description': self.description_edit.toPlainText().strip()
         }
+        
+        # 如果是Python脚本，添加脚本内容
+        if button_type == 'python':
+            data['script'] = self.script_edit.toPlainText().strip()
+        
+        return data
 

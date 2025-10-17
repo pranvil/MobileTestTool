@@ -1541,9 +1541,8 @@ class MainWindow(QMainWindow):
                                             custom_btn.setToolTip(btn_data.get('description', btn_data['command']))
                                             custom_btn.setProperty('custom_button', True)
                                             
-                                            command = btn_data['command']
                                             custom_btn.clicked.connect(
-                                                lambda checked=False, cmd=command: self.execute_custom_button_command(cmd)
+                                                lambda checked=False, data=btn_data: self.execute_custom_button_command(data)
                                             )
                                             
                                             # 在stretch之前插入
@@ -1557,6 +1556,138 @@ class MainWindow(QMainWindow):
                                             logger.debug(f"添加自定义按钮 '{btn_data['name']}' 到 '{card_name}' 的水平布局")
                                     else:
                                         logger.warning("未找到Log过滤选项卡的按钮布局")
+                                # 特殊处理Log控制选项卡的"MTKLOG 控制"卡片
+                                elif card_name == "MTKLOG 控制" and isinstance(layout, QVBoxLayout):
+                                    # 查找最后一个按钮布局（QHBoxLayout），通常是第二行
+                                    button_layout = None
+                                    for i in range(layout.count() - 1, -1, -1):  # 从后往前查找
+                                        item = layout.itemAt(i)
+                                        if item and item.layout() and isinstance(item.layout(), QHBoxLayout):
+                                            button_layout = item.layout()
+                                            break
+                                    
+                                    if button_layout:
+                                        logger.debug("找到Log控制选项卡的按钮布局，使用水平布局")
+                                        # 在按钮布局中添加自定义按钮
+                                        for btn_data in buttons:
+                                            custom_btn = QPushButton(btn_data['name'])
+                                            custom_btn.setToolTip(btn_data.get('description', btn_data['command']))
+                                            custom_btn.setProperty('custom_button', True)
+                                            
+                                            custom_btn.clicked.connect(
+                                                lambda checked=False, data=btn_data: self.execute_custom_button_command(data)
+                                            )
+                                            
+                                            # 在stretch之前插入
+                                            count = button_layout.count()
+                                            if count > 0:
+                                                insert_pos = count - 1 if button_layout.itemAt(count - 1).spacerItem() else count
+                                                button_layout.insertWidget(insert_pos, custom_btn)
+                                            else:
+                                                button_layout.addWidget(custom_btn)
+                                            
+                                            logger.debug(f"添加自定义按钮 '{btn_data['name']}' 到 '{card_name}' 的水平布局")
+                                    else:
+                                        logger.warning("未找到Log控制选项卡的按钮布局")
+                                # 特殊处理网络信息选项卡的"控制"卡片
+                                elif card_name == "控制" and isinstance(layout, QVBoxLayout):
+                                    # 查找按钮布局（QHBoxLayout）
+                                    button_layout = None
+                                    for i in range(layout.count()):
+                                        item = layout.itemAt(i)
+                                        if item and item.layout() and isinstance(item.layout(), QHBoxLayout):
+                                            button_layout = item.layout()
+                                            break
+                                    
+                                    if button_layout:
+                                        logger.debug("找到网络信息选项卡的按钮布局，使用水平布局")
+                                        # 在按钮布局中添加自定义按钮
+                                        for btn_data in buttons:
+                                            custom_btn = QPushButton(btn_data['name'])
+                                            custom_btn.setToolTip(btn_data.get('description', btn_data['command']))
+                                            custom_btn.setProperty('custom_button', True)
+                                            
+                                            custom_btn.clicked.connect(
+                                                lambda checked=False, data=btn_data: self.execute_custom_button_command(data)
+                                            )
+                                            
+                                            # 在stretch之前插入
+                                            count = button_layout.count()
+                                            if count > 0:
+                                                insert_pos = count - 1 if button_layout.itemAt(count - 1).spacerItem() else count
+                                                button_layout.insertWidget(insert_pos, custom_btn)
+                                            else:
+                                                button_layout.addWidget(custom_btn)
+                                            
+                                            logger.debug(f"添加自定义按钮 '{btn_data['name']}' 到 '{card_name}' 的水平布局")
+                                    else:
+                                        logger.warning("未找到网络信息选项卡的按钮布局")
+                                # 特殊处理TMO Echolocate选项卡的"过滤操作"卡片
+                                elif card_name == "过滤操作" and isinstance(layout, QVBoxLayout):
+                                    # 查找最后一个按钮布局（QHBoxLayout），通常是最后一行
+                                    button_layout = None
+                                    for i in range(layout.count() - 1, -1, -1):  # 从后往前查找
+                                        item = layout.itemAt(i)
+                                        if item and item.layout() and isinstance(item.layout(), QHBoxLayout):
+                                            button_layout = item.layout()
+                                            break
+                                    
+                                    if button_layout:
+                                        logger.debug("找到TMO Echolocate选项卡的按钮布局，使用水平布局")
+                                        # 在按钮布局中添加自定义按钮
+                                        for btn_data in buttons:
+                                            custom_btn = QPushButton(btn_data['name'])
+                                            custom_btn.setToolTip(btn_data.get('description', btn_data['command']))
+                                            custom_btn.setProperty('custom_button', True)
+                                            
+                                            custom_btn.clicked.connect(
+                                                lambda checked=False, data=btn_data: self.execute_custom_button_command(data)
+                                            )
+                                            
+                                            # 在stretch之前插入
+                                            count = button_layout.count()
+                                            if count > 0:
+                                                insert_pos = count - 1 if button_layout.itemAt(count - 1).spacerItem() else count
+                                                button_layout.insertWidget(insert_pos, custom_btn)
+                                            else:
+                                                button_layout.addWidget(custom_btn)
+                                            
+                                            logger.debug(f"添加自定义按钮 '{btn_data['name']}' 到 '{card_name}' 的水平布局")
+                                    else:
+                                        logger.warning("未找到TMO Echolocate选项卡的按钮布局")
+                                # 特殊处理Log控制选项卡的"ADB Log 控制"卡片
+                                elif card_name == "ADB Log 控制" and isinstance(layout, QVBoxLayout):
+                                    # 查找最后一个按钮布局（QHBoxLayout），通常是第二行
+                                    button_layout = None
+                                    for i in range(layout.count() - 1, -1, -1):  # 从后往前查找
+                                        item = layout.itemAt(i)
+                                        if item and item.layout() and isinstance(item.layout(), QHBoxLayout):
+                                            button_layout = item.layout()
+                                            break
+                                    
+                                    if button_layout:
+                                        logger.debug("找到Log控制选项卡的ADB Log按钮布局，使用水平布局")
+                                        # 在按钮布局中添加自定义按钮
+                                        for btn_data in buttons:
+                                            custom_btn = QPushButton(btn_data['name'])
+                                            custom_btn.setToolTip(btn_data.get('description', btn_data['command']))
+                                            custom_btn.setProperty('custom_button', True)
+                                            
+                                            custom_btn.clicked.connect(
+                                                lambda checked=False, data=btn_data: self.execute_custom_button_command(data)
+                                            )
+                                            
+                                            # 在stretch之前插入
+                                            count = button_layout.count()
+                                            if count > 0:
+                                                insert_pos = count - 1 if button_layout.itemAt(count - 1).spacerItem() else count
+                                                button_layout.insertWidget(insert_pos, custom_btn)
+                                            else:
+                                                button_layout.addWidget(custom_btn)
+                                            
+                                            logger.debug(f"添加自定义按钮 '{btn_data['name']}' 到 '{card_name}' 的水平布局")
+                                    else:
+                                        logger.warning("未找到Log控制选项卡的ADB Log按钮布局")
                                 else:
                                     # 其他卡片的处理方式
                                     for btn_data in buttons:
@@ -1564,9 +1695,8 @@ class MainWindow(QMainWindow):
                                         custom_btn.setToolTip(btn_data.get('description', btn_data['command']))
                                         custom_btn.setProperty('custom_button', True)
                                         
-                                        command = btn_data['command']
                                         custom_btn.clicked.connect(
-                                            lambda checked=False, cmd=command: self.execute_custom_button_command(cmd)
+                                            lambda checked=False, data=btn_data: self.execute_custom_button_command(data)
                                         )
                                         
                                         # 插入到布局中（在stretch之前）
@@ -1590,39 +1720,31 @@ class MainWindow(QMainWindow):
         except Exception as e:
             logger.exception(f"向卡片 '{card_name}' 注入自定义按钮失败: {e}")
     
-    def execute_custom_button_command(self, command):
+    def execute_custom_button_command(self, button_data):
         """执行自定义按钮命令"""
         try:
-            device = self.device_manager.selected_device
-            if not device:
-                self.append_log.emit("⚠️ 未选择设备\n", "#FFA500")
-                return
+            button_type = button_data.get('type', 'adb')
+            command = button_data.get('command', '')
+            name = button_data.get('name', '自定义按钮')
             
-            # 验证命令
-            if not self.custom_button_manager.validate_command(command):
-                reason = self.custom_button_manager.get_blocked_reason(command)
-                self.append_log.emit(f"⚠️ 不支持的命令: {command}\n", "#FFA500")
-                if reason:
-                    self.append_log.emit(f"💡 提示: {reason}\n", "#17a2b8")
-                return
+            self.append_log.emit(f"🔧 执行自定义按钮: {name}\n", "#17a2b8")
             
-            # 处理命令格式：如果用户输入了"adb"开头，需要去掉
-            clean_command = command.strip()
-            if clean_command.lower().startswith('adb '):
-                clean_command = clean_command[4:].strip()  # 去掉开头的"adb "
-                self.append_log.emit(f"🔧 执行自定义命令: {clean_command}\n", "#17a2b8")
+            # 使用新的统一执行方法
+            success, output = self.custom_button_manager.execute_button_command(
+                button_data, 
+                self.device_manager.selected_device
+            )
+            
+            if success:
+                self.append_log.emit(f"✅ 执行成功\n", "#28a745")
+                if output:
+                    self.append_log.emit(f"{output}\n", "#6c757d")
             else:
-                self.append_log.emit(f"🔧 执行自定义命令: {clean_command}\n", "#17a2b8")
-            
-            # 构建完整命令
-            full_command = f"adb -s {device} {clean_command}"
-            
-            # 复用现有的ADB命令执行方法
-            self._on_adb_command_executed(full_command)
+                self.append_log.emit(f"❌ 执行失败: {output}\n", "#dc3545")
             
         except Exception as e:
             logger.exception(f"执行自定义按钮命令失败: {e}")
-            self.append_log.emit(f"❌ 执行失败: {str(e)}\n", "#FF0000")
+            self.append_log.emit(f"❌ 执行失败: {str(e)}\n", "#dc3545")
     
     def on_custom_buttons_updated(self):
         """自定义按钮配置更新时的处理"""
