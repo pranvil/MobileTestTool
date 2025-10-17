@@ -40,6 +40,9 @@ class OtherTab(QWidget):
     # 设置显示行数
     show_display_lines_dialog = pyqtSignal()
     
+    # 自定义按钮管理
+    show_custom_button_manager = pyqtSignal()
+    
     def __init__(self, parent=None):
         try:
             logger.debug("OtherTab.__init__ 开始")
@@ -217,6 +220,20 @@ class OtherTab(QWidget):
         self.show_display_lines_btn = QPushButton("设置显示行数")
         self.show_display_lines_btn.clicked.connect(self.show_display_lines_dialog.emit)
         card_layout.addWidget(self.show_display_lines_btn)
+        
+        self.custom_button_manager_btn = QPushButton("🔧 管理自定义按钮")
+        self.custom_button_manager_btn.clicked.connect(self.show_custom_button_manager.emit)
+        self.custom_button_manager_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #28a745;
+                color: white;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #218838;
+            }
+        """)
+        card_layout.addWidget(self.custom_button_manager_btn)
         
         card_layout.addStretch()
         

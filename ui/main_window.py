@@ -44,6 +44,8 @@ from core.device_operations import (
     PyQtOtherOperationsManager
 )
 from core.theme_manager import ThemeManager
+from core.custom_button_manager import CustomButtonManager
+from core.log_keyword_manager import LogKeywordManager
 
 
 class MainWindow(QMainWindow):
@@ -124,6 +126,12 @@ class MainWindow(QMainWindow):
         # 初始化主题管理器
         self.theme_manager = ThemeManager()
         
+        # 初始化自定义按钮管理器
+        self.custom_button_manager = CustomButtonManager(self)
+        
+        # 初始化log关键字管理器
+        self.log_keyword_manager = LogKeywordManager(self)
+        
         # 设置UI
         self.setup_ui()
         
@@ -135,6 +143,12 @@ class MainWindow(QMainWindow):
         
         # 设置log_processor的log_viewer引用
         self.log_processor.set_log_viewer(self.log_viewer)
+        
+        # 加载所有Tab的自定义按钮
+        self.load_custom_buttons_for_all_tabs()
+        
+        # 连接自定义按钮管理器信号
+        self.custom_button_manager.buttons_updated.connect(self.on_custom_buttons_updated)
         
         # 初始化完成后刷新设备列表
         self.device_manager.refresh_devices()
@@ -308,7 +322,7 @@ class MainWindow(QMainWindow):
         # 连接 Log过滤 Tab 信号
         self.log_filter_tab.start_filtering.connect(self._on_start_filtering)
         self.log_filter_tab.stop_filtering.connect(self._on_stop_filtering)
-        self.log_filter_tab.load_log_keywords.connect(self._on_load_log_keywords)
+        self.log_filter_tab.manage_log_keywords.connect(self._on_manage_log_keywords)
         self.log_filter_tab.clear_logs.connect(self._on_clear_logs)
         self.log_filter_tab.clear_device_logs.connect(self._on_clear_device_logs)
         self.log_filter_tab.show_display_lines_dialog.connect(self._on_show_display_lines_dialog)
@@ -377,6 +391,7 @@ class MainWindow(QMainWindow):
         self.other_tab.show_input_text_dialog.connect(self._on_show_input_text_dialog)
         self.other_tab.show_tools_config_dialog.connect(self._on_show_tools_config_dialog)
         self.other_tab.show_display_lines_dialog.connect(self._on_show_display_lines_dialog)
+        self.other_tab.show_custom_button_manager.connect(self.show_custom_button_manager_dialog)
         
     def setup_tabs(self):
         """设置Tab页面"""
@@ -949,12 +964,26 @@ class MainWindow(QMainWindow):
         self.append_log.emit("停止过滤...\n", None)
         self.log_processor.stop_filtering()
         
-    def _on_load_log_keywords(self):
-        """加载log关键字"""
-        if hasattr(self, 'log_processor') and self.log_processor:
-            self.log_processor.load_log_keywords()
-        else:
-            self.statusBar().showMessage("日志处理器未初始化")
+    def _on_manage_log_keywords(self):
+        """打开log关键字管理对话框"""
+        try:
+            from ui.log_keyword_dialog import LogKeywordDialog
+            
+            dialog = LogKeywordDialog(self.log_keyword_manager, parent=self)
+            dialog.exec_()
+            
+            # 如果用户选择了关键字并点击了"加载到过滤"按钮
+            selected_keyword = dialog.get_selected_keyword()
+            if selected_keyword:
+                self.log_filter_tab.set_keyword(selected_keyword)
+                self.append_log.emit(f"✅ 已加载关键字: {selected_keyword}\n", "#00FF00")
+                
+                # 自动开始过滤
+                self._on_start_filtering()
+            
+        except Exception as e:
+            logger.exception(f"打开log关键字管理对话框失败: {e}")
+            QMessageBox.critical(self, "错误", f"打开log关键字管理失败：{str(e)}")
     
     def _on_keyword_loaded(self, keyword):
         """关键字已加载，更新输入框"""
@@ -1408,6 +1437,249 @@ class MainWindow(QMainWindow):
     def _on_other_operations_status(self, message):
         """其他操作状态消息"""
         self.append_log.emit(f"{message}\n", None)
+    
+    # 自定义按钮相关方法
+    def load_custom_buttons_for_all_tabs(self):
+        """为所有Tab加载自定义按钮"""
+        try:
+            logger.info("开始为所有Tab加载自定义按钮...")
+            
+            # 获取所有Tab对应的实例
+            tabs = {
+                'Log控制': self.log_control_tab,
+                'Log过滤': self.log_filter_tab,
+                '网络信息': self.network_info_tab,
+                'TMO CC': self.tmo_cc_tab,
+                'TMO Echolocate': self.tmo_echolocate_tab,
+                '24小时背景数据': self.background_data_tab,
+                'APP操作': self.app_operations_tab,
+                '其他': self.other_tab
+            }
+            
+            for tab_name, tab_instance in tabs.items():
+                self.load_custom_buttons_for_tab(tab_name, tab_instance)
+            
+            logger.info("所有Tab的自定义按钮加载完成")
+            
+        except Exception as e:
+            logger.exception(f"加载自定义按钮失败: {e}")
+    
+    def load_custom_buttons_for_tab(self, tab_name, tab_instance):
+        """为指定Tab加载自定义按钮"""
+        try:
+            # 检查Tab实例是否有custom_buttons_container属性（用于存储自定义按钮）
+            if not hasattr(tab_instance, 'custom_buttons_containers'):
+                tab_instance.custom_buttons_containers = {}
+            
+            # 获取该Tab的所有卡片（GroupBox或Frame）
+            # 遍历Tab中的所有子部件，找到卡片
+            self._add_custom_buttons_to_tab(tab_name, tab_instance)
+            
+        except Exception as e:
+            logger.exception(f"为Tab '{tab_name}' 加载自定义按钮失败: {e}")
+    
+    def _add_custom_buttons_to_tab(self, tab_name, tab_instance):
+        """为Tab添加自定义按钮"""
+        # 获取Tab下所有可用的卡片名称
+        cards = self.custom_button_manager.get_available_cards(tab_name)
+        
+        for card_name in cards:
+            # 获取该位置的自定义按钮
+            buttons = self.custom_button_manager.get_buttons_by_location(tab_name, card_name)
+            
+            if buttons:
+                # 尝试找到对应的卡片容器并添加按钮
+                self._inject_custom_buttons_to_card(tab_instance, card_name, buttons)
+    
+    def _inject_custom_buttons_to_card(self, tab_instance, card_name, buttons):
+        """向指定卡片注入自定义按钮"""
+        try:
+            from PyQt5.QtWidgets import QFrame, QPushButton, QHBoxLayout, QVBoxLayout, QWidget, QLabel
+            from PyQt5.QtCore import Qt
+            
+            logger.debug(f"尝试向卡片 '{card_name}' 注入 {len(buttons)} 个按钮")
+            
+            # 搜索Tab中的所有Frame/卡片
+            frames = tab_instance.findChildren(QFrame)
+            logger.debug(f"找到 {len(frames)} 个Frame")
+            
+            found_card = False
+            for frame in frames:
+                # 检查Frame上方是否有对应的标题Label
+                parent_widget = frame.parent()
+                if parent_widget:
+                    labels = parent_widget.findChildren(QLabel)
+                    logger.debug(f"在Frame的父控件中找到 {len(labels)} 个Label")
+                    
+                    for label in labels:
+                        label_text = label.text()
+                        label_class = label.property("class")
+                        logger.debug(f"检查Label: '{label_text}', class: '{label_class}'")
+                        
+                        if label_text == card_name and label_class == "section-title":
+                            logger.debug(f"找到匹配的卡片: '{card_name}'")
+                            found_card = True
+                            
+                            # 找到了对应的卡片
+                            layout = frame.layout()
+                            if layout:
+                                # 特殊处理Log过滤选项卡的"过滤控制"卡片
+                                if card_name == "过滤控制" and isinstance(layout, QVBoxLayout):
+                                    # 查找按钮布局（QHBoxLayout）
+                                    button_layout = None
+                                    for i in range(layout.count()):
+                                        item = layout.itemAt(i)
+                                        if item and item.layout() and isinstance(item.layout(), QHBoxLayout):
+                                            button_layout = item.layout()
+                                            break
+                                    
+                                    if button_layout:
+                                        logger.debug("找到Log过滤选项卡的按钮布局，使用水平布局")
+                                        # 在按钮布局中添加自定义按钮
+                                        for btn_data in buttons:
+                                            custom_btn = QPushButton(btn_data['name'])
+                                            custom_btn.setToolTip(btn_data.get('description', btn_data['command']))
+                                            custom_btn.setProperty('custom_button', True)
+                                            
+                                            command = btn_data['command']
+                                            custom_btn.clicked.connect(
+                                                lambda checked=False, cmd=command: self.execute_custom_button_command(cmd)
+                                            )
+                                            
+                                            # 在stretch之前插入
+                                            count = button_layout.count()
+                                            if count > 0:
+                                                insert_pos = count - 1 if button_layout.itemAt(count - 1).spacerItem() else count
+                                                button_layout.insertWidget(insert_pos, custom_btn)
+                                            else:
+                                                button_layout.addWidget(custom_btn)
+                                            
+                                            logger.debug(f"添加自定义按钮 '{btn_data['name']}' 到 '{card_name}' 的水平布局")
+                                    else:
+                                        logger.warning("未找到Log过滤选项卡的按钮布局")
+                                else:
+                                    # 其他卡片的处理方式
+                                    for btn_data in buttons:
+                                        custom_btn = QPushButton(btn_data['name'])
+                                        custom_btn.setToolTip(btn_data.get('description', btn_data['command']))
+                                        custom_btn.setProperty('custom_button', True)
+                                        
+                                        command = btn_data['command']
+                                        custom_btn.clicked.connect(
+                                            lambda checked=False, cmd=command: self.execute_custom_button_command(cmd)
+                                        )
+                                        
+                                        # 插入到布局中（在stretch之前）
+                                        count = layout.count()
+                                        if count > 0:
+                                            # 在最后一个stretch或widget之前插入
+                                            insert_pos = count - 1 if layout.itemAt(count - 1).spacerItem() else count
+                                            if isinstance(layout, QHBoxLayout):
+                                                layout.insertWidget(insert_pos, custom_btn)
+                                            else:
+                                                layout.addWidget(custom_btn)
+                                        else:
+                                            layout.addWidget(custom_btn)
+                                        
+                                        logger.debug(f"添加自定义按钮 '{btn_data['name']}' 到 '{card_name}'")
+                            break
+            
+            if not found_card:
+                logger.warning(f"未找到卡片 '{card_name}'，可能卡片名称不匹配")
+            
+        except Exception as e:
+            logger.exception(f"向卡片 '{card_name}' 注入自定义按钮失败: {e}")
+    
+    def execute_custom_button_command(self, command):
+        """执行自定义按钮命令"""
+        try:
+            device = self.device_manager.selected_device
+            if not device:
+                self.append_log.emit("⚠️ 未选择设备\n", "#FFA500")
+                return
+            
+            # 验证命令
+            if not self.custom_button_manager.validate_command(command):
+                reason = self.custom_button_manager.get_blocked_reason(command)
+                self.append_log.emit(f"⚠️ 不支持的命令: {command}\n", "#FFA500")
+                if reason:
+                    self.append_log.emit(f"💡 提示: {reason}\n", "#17a2b8")
+                return
+            
+            # 处理命令格式：如果用户输入了"adb"开头，需要去掉
+            clean_command = command.strip()
+            if clean_command.lower().startswith('adb '):
+                clean_command = clean_command[4:].strip()  # 去掉开头的"adb "
+                self.append_log.emit(f"🔧 执行自定义命令: {clean_command}\n", "#17a2b8")
+            else:
+                self.append_log.emit(f"🔧 执行自定义命令: {clean_command}\n", "#17a2b8")
+            
+            # 构建完整命令
+            full_command = f"adb -s {device} {clean_command}"
+            
+            # 复用现有的ADB命令执行方法
+            self._on_adb_command_executed(full_command)
+            
+        except Exception as e:
+            logger.exception(f"执行自定义按钮命令失败: {e}")
+            self.append_log.emit(f"❌ 执行失败: {str(e)}\n", "#FF0000")
+    
+    def on_custom_buttons_updated(self):
+        """自定义按钮配置更新时的处理"""
+        try:
+            logger.info("检测到自定义按钮配置更新，重新加载...")
+            
+            # 清除所有Tab中的自定义按钮
+            self._clear_all_custom_buttons()
+            
+            # 重新加载
+            self.load_custom_buttons_for_all_tabs()
+            
+            self.append_log.emit("✅ 自定义按钮已更新\n", "#00FF00")
+            
+        except Exception as e:
+            logger.exception(f"更新自定义按钮失败: {e}")
+    
+    def _clear_all_custom_buttons(self):
+        """清除所有自定义按钮"""
+        try:
+            from PyQt5.QtWidgets import QPushButton
+            
+            tabs = [
+                self.log_control_tab,
+                self.log_filter_tab,
+                self.network_info_tab,
+                self.tmo_cc_tab,
+                self.tmo_echolocate_tab,
+                self.background_data_tab,
+                self.app_operations_tab,
+                self.other_tab
+            ]
+            
+            for tab in tabs:
+                # 找到所有标记为自定义按钮的QPushButton并删除
+                custom_buttons = tab.findChildren(QPushButton)
+                for btn in custom_buttons:
+                    if btn.property('custom_button'):
+                        btn.setParent(None)
+                        btn.deleteLater()
+            
+            logger.debug("已清除所有自定义按钮")
+            
+        except Exception as e:
+            logger.exception(f"清除自定义按钮失败: {e}")
+    
+    def show_custom_button_manager_dialog(self):
+        """显示自定义按钮管理对话框"""
+        try:
+            from ui.custom_button_dialog import CustomButtonDialog
+            
+            dialog = CustomButtonDialog(self.custom_button_manager, parent=self)
+            dialog.exec_()
+            
+        except Exception as e:
+            logger.exception(f"显示自定义按钮管理对话框失败: {e}")
+            QMessageBox.critical(self, "错误", f"打开自定义按钮管理失败：{str(e)}")
     
     def closeEvent(self, event):
         """窗口关闭事件"""
