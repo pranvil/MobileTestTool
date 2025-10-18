@@ -40,6 +40,9 @@ class OtherTab(QWidget):
     # 设置显示行数
     show_display_lines_dialog = pyqtSignal()
     
+    # 自定义按钮管理
+    show_custom_button_manager = pyqtSignal()
+    
     def __init__(self, parent=None):
         try:
             logger.debug("OtherTab.__init__ 开始")
@@ -84,15 +87,16 @@ class OtherTab(QWidget):
             hera_config_group = self.create_hera_config_group()
             first_row_layout.addWidget(hera_config_group)
             
-            other_ops_group = self.create_other_ops_group()
-            first_row_layout.addWidget(other_ops_group)
+            log_ops_group = self.create_log_ops_group()
+            first_row_layout.addWidget(log_ops_group)
             
             scroll_layout.addWidget(first_row_container)
             
             # 2. log操作组（合并PCAP和MTKlog操作）
-            log_ops_group = self.create_log_ops_group()
-            scroll_layout.addWidget(log_ops_group)
-            
+
+
+            other_ops_group = self.create_other_ops_group()
+            scroll_layout.addWidget(other_ops_group)            
             # 添加弹性空间
             scroll_layout.addStretch()
             
@@ -217,6 +221,20 @@ class OtherTab(QWidget):
         self.show_display_lines_btn = QPushButton("设置显示行数")
         self.show_display_lines_btn.clicked.connect(self.show_display_lines_dialog.emit)
         card_layout.addWidget(self.show_display_lines_btn)
+        
+        self.custom_button_manager_btn = QPushButton("🔧 管理自定义按钮")
+        self.custom_button_manager_btn.clicked.connect(self.show_custom_button_manager.emit)
+        self.custom_button_manager_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #28a745;
+                color: white;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #218838;
+            }
+        """)
+        card_layout.addWidget(self.custom_button_manager_btn)
         
         card_layout.addStretch()
         

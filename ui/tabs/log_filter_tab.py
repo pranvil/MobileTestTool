@@ -20,7 +20,7 @@ class LogFilterTab(QWidget):
     stop_filtering = pyqtSignal()
     
     # 常用操作
-    load_log_keywords = pyqtSignal()
+    manage_log_keywords = pyqtSignal()  # 打开关键字管理对话框
     clear_logs = pyqtSignal()
     clear_device_logs = pyqtSignal()
     show_display_lines_dialog = pyqtSignal()
@@ -84,9 +84,10 @@ class LogFilterTab(QWidget):
         card.setObjectName("card")
         add_card_shadow(card)
         
-        layout = QVBoxLayout(card)
-        layout.setContentsMargins(10, 1, 10, 1)
-        layout.setSpacing(8)
+        # 使用垂直布局作为主布局，但按钮区域使用水平布局
+        main_layout = QVBoxLayout(card)
+        main_layout.setContentsMargins(10, 1, 10, 1)
+        main_layout.setSpacing(8)
         
         # 第一行：关键字输入和选项在同一行
         first_row_layout = QHBoxLayout()
@@ -120,7 +121,7 @@ class LogFilterTab(QWidget):
         
         first_row_layout.addStretch()
         
-        layout.addLayout(first_row_layout)
+        main_layout.addLayout(first_row_layout)
         
         # 第二行：开始/停止按钮和其他操作按钮
         button_layout = QHBoxLayout()
@@ -130,9 +131,9 @@ class LogFilterTab(QWidget):
         button_layout.addWidget(self.filter_button)
         
         # 添加其他操作按钮
-        self.load_keywords_btn = QPushButton("加载log关键字")
-        self.load_keywords_btn.clicked.connect(self.load_log_keywords.emit)
-        button_layout.addWidget(self.load_keywords_btn)
+        self.manage_keywords_btn = QPushButton("管理log关键字")
+        self.manage_keywords_btn.clicked.connect(self.manage_log_keywords.emit)
+        button_layout.addWidget(self.manage_keywords_btn)
         
         self.set_lines_btn = QPushButton("设置行数")
         self.set_lines_btn.clicked.connect(self.show_display_lines_dialog.emit)
@@ -148,7 +149,7 @@ class LogFilterTab(QWidget):
         
         button_layout.addStretch()
         
-        layout.addLayout(button_layout)
+        main_layout.addLayout(button_layout)
         
         v.addWidget(card)
         
