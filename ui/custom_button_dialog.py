@@ -291,10 +291,10 @@ class CustomButtonDialog(QDialog):
                 <p><strong>输入格式：</strong>直接输入ADB命令内容，<strong>不需要</strong>加 "adb -s {device}" 前缀</p>
                 <p><strong>示例：</strong></p>
                 <div class="example">
-                    命令/路径: shell reboot<br>
+                    命令/路径: adb reboot<br>
                     说明: 重启设备<br><br>
                     
-                    命令/路径: shell dumpsys battery<br>
+                    命令/路径: adb shell dumpsys battery<br>
                     说明: 查看电池信息<br><br>
                     
                     命令/路径: logcat -c<br>
@@ -526,7 +526,7 @@ class ButtonEditDialog(QDialog):
                 <p><strong>输入格式：</strong>直接输入ADB命令内容，<strong>不需要</strong>加 "adb -s {device}" 前缀</p>
                 <p><strong>示例：</strong></p>
                 <div class="example">
-                    命令/路径: shell reboot<br>
+                    命令/路径: adb reboot<br>
                     说明: 重启设备<br><br>
                     
                     命令/路径: shell dumpsys battery<br>
@@ -681,7 +681,7 @@ class ButtonEditDialog(QDialog):
         basic_layout.addRow("按钮类型*:", self.type_combo)
         
         self.command_edit = QLineEdit()
-        self.command_edit.setPlaceholderText("例如：shell reboot")
+        self.command_edit.setPlaceholderText("adb reboot")
         basic_layout.addRow("命令/路径*:", self.command_edit)
         
         self.description_edit = QTextEdit()
@@ -788,7 +788,7 @@ class ButtonEditDialog(QDialog):
         
         # 更新输入框的占位符
         placeholders = {
-            "adb": "例如：shell reboot（不需要加 'adb -s {device}'）",
+            "adb": "adb reboot（不需要加 'adb -s {device}'）",
             "python": "可选：脚本描述或文件名（如：系统信息收集）",
             "file": "例如：C:\\Users\\用户名\\Desktop\\文件.txt",
             "program": "例如：C:\\Program Files\\Notepad++\\notepad++.exe",

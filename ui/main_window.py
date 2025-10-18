@@ -156,7 +156,7 @@ class MainWindow(QMainWindow):
     def setup_ui(self):
         """设置用户界面"""
         # 设置窗口属性
-        self.setWindowTitle("手机测试辅助工具 v0.9")
+        self.setWindowTitle("手机测试辅助工具 v0.91")
         self.setGeometry(100, 100, 900, 600)
         self.showMaximized()
         
