@@ -1,0 +1,11 @@
+Translation usage suggestions:
+
+Optimization suggestions:
+- Change self.lang_manager.tr(...) to self.tr(...) for simplicity
+- Ensure all classes have tr() method or use self.lang_manager.tr(...)
+- Use lang_manager.tr(...) in standalone functions or pass tr_callback parameter
+
+Statistics:
+- Total translation strings in code: 1526
+- Defined Chinese translations: 620
+- Defined English translations: 902

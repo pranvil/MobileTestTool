@@ -32,6 +32,13 @@ class TMOCCTab(QWidget):
     
     def __init__(self, parent=None):
         super().__init__(parent)
+        # 从父窗口获取语言管理器
+        if parent and hasattr(parent, 'lang_manager'):
+            self.lang_manager = parent.lang_manager
+        else:
+            # 如果没有父窗口或语言管理器，创建一个默认的
+            from core.language_manager import LanguageManager
+            self.lang_manager = LanguageManager()
         self.setup_ui()
         
     def setup_ui(self):
@@ -75,7 +82,7 @@ class TMOCCTab(QWidget):
         v.setSpacing(4)
         
         # 标题
-        title = QLabel("CC配置")
+        title = QLabel(self.lang_manager.tr("CC配置"))
         title.setProperty("class", "section-title")
         v.addWidget(title)
         
@@ -88,19 +95,19 @@ class TMOCCTab(QWidget):
         card_layout.setContentsMargins(10, 1, 10, 1)
         card_layout.setSpacing(8)
         
-        self.push_cc_btn = QPushButton("推CC文件")
+        self.push_cc_btn = QPushButton(self.lang_manager.tr("推CC文件"))
         self.push_cc_btn.clicked.connect(self.push_cc_file.emit)
         card_layout.addWidget(self.push_cc_btn)
         
-        self.pull_cc_btn = QPushButton("拉CC文件")
+        self.pull_cc_btn = QPushButton(self.lang_manager.tr("拉CC文件"))
         self.pull_cc_btn.clicked.connect(self.pull_cc_file.emit)
         card_layout.addWidget(self.pull_cc_btn)
         
-        self.prod_server_btn = QPushButton("PROD服务器")
+        self.prod_server_btn = QPushButton(self.lang_manager.tr("PROD服务器"))
         self.prod_server_btn.clicked.connect(self.prod_server.emit)
         card_layout.addWidget(self.prod_server_btn)
         
-        self.stg_server_btn = QPushButton("STG服务器")
+        self.stg_server_btn = QPushButton(self.lang_manager.tr("STG服务器"))
         self.stg_server_btn.clicked.connect(self.stg_server.emit)
         card_layout.addWidget(self.stg_server_btn)
         
@@ -119,7 +126,7 @@ class TMOCCTab(QWidget):
         v.setSpacing(4)
         
         # 标题
-        title = QLabel("过滤操作")
+        title = QLabel(self.lang_manager.tr("过滤操作"))
         title.setProperty("class", "section-title")
         v.addWidget(title)
         
@@ -132,19 +139,19 @@ class TMOCCTab(QWidget):
         card_layout.setContentsMargins(10, 1, 10, 1)
         card_layout.setSpacing(8)
         
-        self.simple_filter_btn = QPushButton("简单过滤")
+        self.simple_filter_btn = QPushButton(self.lang_manager.tr("简单过滤"))
         self.simple_filter_btn.clicked.connect(self.simple_filter.emit)
         card_layout.addWidget(self.simple_filter_btn)
         
-        self.complete_filter_btn = QPushButton("完全过滤")
+        self.complete_filter_btn = QPushButton(self.lang_manager.tr("完全过滤"))
         self.complete_filter_btn.clicked.connect(self.complete_filter.emit)
         card_layout.addWidget(self.complete_filter_btn)
         
-        self.clear_logs_btn = QPushButton("清空日志")
+        self.clear_logs_btn = QPushButton(self.lang_manager.tr("清空日志"))
         self.clear_logs_btn.clicked.connect(self.clear_logs.emit)
         card_layout.addWidget(self.clear_logs_btn)
         
-        self.clear_device_logs_btn = QPushButton("清除手机缓存日志")
+        self.clear_device_logs_btn = QPushButton(self.lang_manager.tr("清除手机缓存日志"))
         self.clear_device_logs_btn.clicked.connect(self.clear_device_logs.emit)
         card_layout.addWidget(self.clear_device_logs_btn)
         
@@ -169,18 +176,59 @@ class TMOCCTab(QWidget):
             # 正在过滤中，根据当前过滤类型显示停止按钮
             if current_keyword == simple_keywords:
                 # 当前是简单过滤
-                self.simple_filter_btn.setText("停止log过滤")
-                self.complete_filter_btn.setText("完全过滤")
+                self.simple_filter_btn.setText(self.lang_manager.tr("停止log过滤"))
+                self.complete_filter_btn.setText(self.lang_manager.tr("完全过滤"))
             elif current_keyword == complete_keywords:
                 # 当前是完全过滤
-                self.simple_filter_btn.setText("简单过滤")
-                self.complete_filter_btn.setText("停止log过滤")
+                self.simple_filter_btn.setText(self.lang_manager.tr("简单过滤"))
+                self.complete_filter_btn.setText(self.lang_manager.tr("停止log过滤"))
             else:
                 # 其他过滤类型，默认简单过滤按钮显示停止
-                self.simple_filter_btn.setText("停止log过滤")
-                self.complete_filter_btn.setText("完全过滤")
+                self.simple_filter_btn.setText(self.lang_manager.tr("停止log过滤"))
+                self.complete_filter_btn.setText(self.lang_manager.tr("完全过滤"))
         else:
             # 没有过滤，恢复原始状态
-            self.simple_filter_btn.setText("简单过滤")
-            self.complete_filter_btn.setText("完全过滤")
+            self.simple_filter_btn.setText(self.lang_manager.tr("简单过滤"))
+            self.complete_filter_btn.setText(self.lang_manager.tr("完全过滤"))
 
+    def refresh_texts(self, lang_manager=None):
+        """刷新所有文本（用于语言切换）"""
+        if lang_manager:
+            self.lang_manager = lang_manager
+        
+        if not self.lang_manager:
+            return
+        
+        # 刷新组标题标签
+        self._refresh_section_titles()
+        
+        # 刷新CC文件操作组按钮
+        if hasattr(self, 'push_cc_btn'):
+            self.push_cc_btn.setText(self.lang_manager.tr("推CC文件"))
+        if hasattr(self, 'pull_cc_btn'):
+            self.pull_cc_btn.setText(self.lang_manager.tr("拉CC文件"))
+        if hasattr(self, 'prod_server_btn'):
+            self.prod_server_btn.setText(self.lang_manager.tr("PROD服务器"))
+        if hasattr(self, 'stg_server_btn'):
+            self.stg_server_btn.setText(self.lang_manager.tr("STG服务器"))
+        
+        # 刷新日志过滤组按钮
+        if hasattr(self, 'simple_filter_btn'):
+            self.simple_filter_btn.setText(self.lang_manager.tr("简单过滤"))
+        if hasattr(self, 'complete_filter_btn'):
+            self.complete_filter_btn.setText(self.lang_manager.tr("完全过滤"))
+        if hasattr(self, 'clear_logs_btn'):
+            self.clear_logs_btn.setText(self.lang_manager.tr("清空日志"))
+        if hasattr(self, 'clear_device_logs_btn'):
+            self.clear_device_logs_btn.setText(self.lang_manager.tr("清除手机缓存日志"))
+    
+    def _refresh_section_titles(self):
+        """刷新组标题标签"""
+        # 查找所有QLabel并刷新标题
+        for label in self.findChildren(QLabel):
+            current_text = label.text()
+            # 根据当前文本匹配对应的翻译
+            if current_text in ["CC配置", "CC Configuration"]:
+                label.setText(self.lang_manager.tr("CC配置"))
+            elif current_text in ["过滤操作", "Filter Operations"]:
+                label.setText(self.lang_manager.tr("过滤操作"))

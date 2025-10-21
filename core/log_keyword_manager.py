@@ -22,7 +22,18 @@ class LogKeywordManager(QObject):
         super().__init__(parent)
         self.config_file = os.path.expanduser("~/.netui/log_keywords.json")
         self.keywords = []
+        # 从父窗口获取语言管理器
+        if parent and hasattr(parent, 'lang_manager'):
+            self.lang_manager = parent.lang_manager
+        else:
+            # 如果没有父窗口或语言管理器，创建一个默认的
+            from core.language_manager import LanguageManager
+            self.lang_manager = LanguageManager()
         self.load_keywords()
+    
+    def tr(self, text):
+        """安全地获取翻译文本"""
+        return self.lang_manager.tr(text) if self.lang_manager else text
     
     def load_keywords(self):
         """加载关键字配置"""
@@ -32,16 +43,16 @@ class LogKeywordManager(QObject):
                 with open(self.config_file, 'r', encoding='utf-8-sig') as f:
                     data = json.load(f)
                     self.keywords = data.get('log_keywords', [])
-                    logger.info(f"成功加载 {len(self.keywords)} 个log关键字")
+                    logger.info(f"{self.lang_manager.tr('成功加载')} {len(self.keywords)} {self.lang_manager.tr('个log关键字')}")
             else:
                 # 创建默认配置
                 self.keywords = self._create_default_keywords()
                 self.save_keywords()
-                logger.info("创建默认log关键字配置")
+                logger.info(self.lang_manager.tr("创建默认log关键字配置"))
         except Exception as e:
-            logger.exception(f"加载log关键字配置失败: {e}")
+            logger.exception(f"{self.lang_manager.tr('加载log关键字配置失败:')} {e}")
             # 如果配置文件损坏，创建默认配置
-            logger.info("尝试创建默认配置...")
+            logger.info(self.lang_manager.tr("尝试创建默认配置..."))
             self.keywords = self._create_default_keywords()
             self.save_keywords()
     
@@ -58,12 +69,12 @@ class LogKeywordManager(QObject):
             with open(self.config_file, 'w', encoding='utf-8') as f:
                 json.dump(data, f, ensure_ascii=False, indent=2)
             
-            logger.info(f"成功保存 {len(self.keywords)} 个log关键字配置")
+            logger.info(f"{self.lang_manager.tr('成功保存')} {len(self.keywords)} {self.lang_manager.tr('个log关键字配置')}")
             self.keywords_updated.emit()
             return True
             
         except Exception as e:
-            logger.exception(f"保存log关键字配置失败: {e}")
+            logger.exception(f"{self.lang_manager.tr('保存log关键字配置失败:')} {e}")
             return False
     
     def _create_default_keywords(self):
@@ -71,21 +82,21 @@ class LogKeywordManager(QObject):
         return [
             {
                 'id': 'default_001',
-                'name': 'Error日志',
+                'name': self.lang_manager.tr('Error日志'),
                 'keyword': 'Error|Exception|FATAL',
-                'description': '匹配Error、Exception和FATAL关键字'
+                'description': self.lang_manager.tr('匹配Error、Exception和FATAL关键字')
             },
             {
                 'id': 'default_002',
-                'name': 'Warning日志',
+                'name': self.lang_manager.tr('Warning日志'),
                 'keyword': 'Warning|WARN',
-                'description': '匹配Warning和WARN关键字'
+                'description': self.lang_manager.tr('匹配Warning和WARN关键字')
             },
             {
                 'id': 'default_003',
-                'name': '网络相关',
+                'name': self.lang_manager.tr('网络相关'),
                 'keyword': 'Network|Connection|Socket|HTTP',
-                'description': '匹配网络相关日志'
+                'description': self.lang_manager.tr('匹配网络相关日志')
             }
         ]
     
@@ -109,14 +120,14 @@ class LogKeywordManager(QObject):
             
             # 验证必填字段
             if not keyword_data.get('name') or not keyword_data.get('keyword'):
-                logger.error("关键字名称和关键字内容不能为空")
+                logger.error(self.lang_manager.tr("关键字名称和关键字内容不能为空"))
                 return False
             
             self.keywords.append(keyword_data)
             return self.save_keywords()
             
         except Exception as e:
-            logger.exception(f"添加关键字失败: {e}")
+            logger.exception(f"{self.lang_manager.tr('添加关键字失败:')} {e}")
             return False
     
     def update_keyword(self, keyword_id, keyword_data):
@@ -129,11 +140,11 @@ class LogKeywordManager(QObject):
                     self.keywords[i] = keyword_data
                     return self.save_keywords()
             
-            logger.error(f"未找到ID为 {keyword_id} 的关键字")
+            logger.error(f"{self.lang_manager.tr('未找到ID为')} {keyword_id} {self.lang_manager.tr('的关键字')}")
             return False
             
         except Exception as e:
-            logger.exception(f"更新关键字失败: {e}")
+            logger.exception(f"{self.lang_manager.tr('更新关键字失败:')} {e}")
             return False
     
     def delete_keyword(self, keyword_id):
@@ -143,7 +154,7 @@ class LogKeywordManager(QObject):
             return self.save_keywords()
             
         except Exception as e:
-            logger.exception(f"删除关键字失败: {e}")
+            logger.exception(f"{self.lang_manager.tr('删除关键字失败:')} {e}")
             return False
     
     def import_keywords(self, file_path):
@@ -162,7 +173,7 @@ class LogKeywordManager(QObject):
                     continue
             
             if data is None:
-                logger.error(f"无法读取文件 {file_path}，尝试了多种编码")
+                logger.error(f"{self.lang_manager.tr('无法读取文件')} {file_path}，{self.lang_manager.tr('尝试了多种编码')}")
                 return False
             
             imported_keywords = data.get('log_keywords', [])
@@ -178,7 +189,7 @@ class LogKeywordManager(QObject):
             return self.save_keywords()
                 
         except Exception as e:
-            logger.exception(f"导入关键字配置失败: {e}")
+            logger.exception(f"{self.lang_manager.tr('导入关键字配置失败:')} {e}")
             return False
     
     def export_keywords(self, file_path):
@@ -188,17 +199,17 @@ class LogKeywordManager(QObject):
                 'log_keywords': self.keywords,
                 'version': '1.0',
                 'export_time': datetime.datetime.now().isoformat(),
-                'export_note': 'Log关键字配置导出'
+                'export_note': self.lang_manager.tr('Log关键字配置导出')
             }
             
             with open(file_path, 'w', encoding='utf-8') as f:
                 json.dump(data, f, ensure_ascii=False, indent=2)
             
-            logger.info(f"成功导出关键字配置到: {file_path}")
+            logger.info(f"{self.lang_manager.tr('成功导出关键字配置到:')} {file_path}")
             return True
             
         except Exception as e:
-            logger.exception(f"导出关键字配置失败: {e}")
+            logger.exception(f"{self.lang_manager.tr('导出关键字配置失败:')} {e}")
             return False
     
     def get_config_info(self):

@@ -38,7 +38,7 @@ def get_theme_path(theme_name):
     获取主题文件路径
     
     Args:
-        theme_name: 主题名称（如 "dark" 或 "light"）
+        theme_name: 主题名称（如 "darkself.lang_manager.tr(" 或 ")light"）
         
     Returns:
         主题文件的绝对路径

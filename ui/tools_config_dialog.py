@@ -20,10 +20,16 @@ class ToolsConfigDialog(QDialog):
         super().__init__(parent)
         self.tool_config = tool_config
         self.temp_config = tool_config.copy()
-        self.setWindowTitle("工具路径配置")
+        # 从父窗口获取语言管理器
+        self.lang_manager = parent.lang_manager if parent and hasattr(parent, 'lang_manager') else None
+        self.setWindowTitle(self.tr("工具路径配置"))
         self.setModal(True)
         self.setMinimumSize(600, 600)
         self.setup_ui()
+    
+    def tr(self, text):
+        """安全地获取翻译文本"""
+        return self.lang_manager.tr(text) if self.lang_manager else text
         
     def setup_ui(self):
         """设置UI"""
@@ -31,21 +37,21 @@ class ToolsConfigDialog(QDialog):
         layout.setSpacing(15)
         
         # 标题
-        title_label = QLabel("工具路径配置")
+        title_label = QLabel(self.tr("工具路径配置"))
         title_label.setStyleSheet("font-size: 16px; font-weight: bold;")
         layout.addWidget(title_label)
         
         # MTK工具配置框架
-        mtk_group = QGroupBox("ELT路径配置")
+        mtk_group = QGroupBox(self.tr("ELT路径配置"))
         mtk_layout = QVBoxLayout(mtk_group)
         
         # 按钮行
         mtk_button_layout = QHBoxLayout()
-        detect_mtk_btn = QPushButton("自动检测")
+        detect_mtk_btn = QPushButton(self.tr("自动检测"))
         detect_mtk_btn.clicked.connect(self._detect_mtk_tools)
         mtk_button_layout.addWidget(detect_mtk_btn)
         
-        manual_mtk_btn = QPushButton("手动选择")
+        manual_mtk_btn = QPushButton(self.tr("手动选择"))
         manual_mtk_btn.clicked.connect(self._manual_mtk_config)
         mtk_button_layout.addWidget(manual_mtk_btn)
         
@@ -60,20 +66,20 @@ class ToolsConfigDialog(QDialog):
         layout.addWidget(mtk_group)
         
         # Wireshark配置框架
-        wireshark_group = QGroupBox("Wireshark配置")
+        wireshark_group = QGroupBox(self.tr("Wireshark配置"))
         wireshark_layout = QVBoxLayout(wireshark_group)
         
         wireshark_path_layout = QHBoxLayout()
-        wireshark_path_layout.addWidget(QLabel("Wireshark路径:"))
+        wireshark_path_layout.addWidget(QLabel(self.tr("Wireshark路径:")))
         
         self.wireshark_entry = QLineEdit()
         wireshark_path_layout.addWidget(self.wireshark_entry)
         
-        detect_wireshark_btn = QPushButton("自动检测")
+        detect_wireshark_btn = QPushButton(self.tr("自动检测"))
         detect_wireshark_btn.clicked.connect(self._detect_wireshark)
         wireshark_path_layout.addWidget(detect_wireshark_btn)
         
-        browse_wireshark_btn = QPushButton("手动")
+        browse_wireshark_btn = QPushButton(self.tr("手动"))
         browse_wireshark_btn.clicked.connect(self._browse_wireshark)
         wireshark_path_layout.addWidget(browse_wireshark_btn)
         
@@ -82,16 +88,16 @@ class ToolsConfigDialog(QDialog):
         layout.addWidget(wireshark_group)
         
         # 高通工具配置框架
-        qualcomm_group = QGroupBox("高通工具配置")
+        qualcomm_group = QGroupBox(self.tr("高通工具配置"))
         qualcomm_layout = QVBoxLayout(qualcomm_group)
         
         # 按钮行
         qualcomm_button_layout = QHBoxLayout()
-        detect_qualcomm_btn = QPushButton("自动检测")
+        detect_qualcomm_btn = QPushButton(self.tr("自动检测"))
         detect_qualcomm_btn.clicked.connect(self._detect_qualcomm_tools)
         qualcomm_button_layout.addWidget(detect_qualcomm_btn)
         
-        manual_qualcomm_btn = QPushButton("手动选择")
+        manual_qualcomm_btn = QPushButton(self.tr("手动选择"))
         manual_qualcomm_btn.clicked.connect(self._manual_qualcomm_config)
         qualcomm_button_layout.addWidget(manual_qualcomm_btn)
         
@@ -109,11 +115,11 @@ class ToolsConfigDialog(QDialog):
         button_layout = QHBoxLayout()
         button_layout.addStretch()
         
-        ok_btn = QPushButton("确定")
+        ok_btn = QPushButton(self.tr("确定"))
         ok_btn.clicked.connect(self._save_and_close)
         button_layout.addWidget(ok_btn)
         
-        cancel_btn = QPushButton("取消")
+        cancel_btn = QPushButton(self.tr("取消"))
         cancel_btn.clicked.connect(self.reject)
         button_layout.addWidget(cancel_btn)
         
@@ -171,12 +177,12 @@ class ToolsConfigDialog(QDialog):
                         self.temp_config["mtk_tools"].append(tool)
                 
                 self._refresh_mtk_list()
-                QMessageBox.information(self, "检测完成", f"检测到 {len(detected_tools)} 个MTK工具")
+                QMessageBox.information(self, self.tr("检测完成"), f"{self.tr('检测到')} {len(detected_tools)} {self.tr('个MTK工具')}")
             else:
-                QMessageBox.information(self, "检测结果", "未检测到MTK工具，请尝试手动输入")
+                QMessageBox.information(self, self.tr("检测结果"), self.tr("未检测到MTK工具，请尝试手动输入"))
                 
         except Exception as e:
-            QMessageBox.critical(self, "错误", f"检测MTK工具失败: {str(e)}")
+            QMessageBox.critical(self, self.tr("错误"), f"{self.tr('检测MTK工具失败')}: {str(e)}")
     
     def _validate_mtk_tool(self, base_path):
         """验证MTK工具路径"""
@@ -248,18 +254,18 @@ class ToolsConfigDialog(QDialog):
     def _manual_mtk_config(self):
         """手动配置MTK工具"""
         try:
-            base_path = QFileDialog.getExistingDirectory(self, "选择MTK工具根目录")
+            base_path = QFileDialog.getExistingDirectory(self, self.tr("选择MTK工具根目录"))
             
             if not base_path:
                 return
             
             if not self._validate_mtk_tool(base_path):
-                QMessageBox.critical(self, "错误", "选择的路径不是有效的MTK工具目录")
+                QMessageBox.critical(self, self.tr("错误"), self.tr("选择的路径不是有效的MTK工具目录"))
                 return
             
             tool_info = self._get_mtk_tool_info(base_path)
             if not tool_info:
-                QMessageBox.critical(self, "错误", "无法获取MTK工具信息")
+                QMessageBox.critical(self, self.tr("错误"), self.tr("无法获取MTK工具信息"))
                 return
             
             if "mtk_tools" not in self.temp_config:
@@ -270,12 +276,12 @@ class ToolsConfigDialog(QDialog):
             if not exists:
                 self.temp_config["mtk_tools"].append(tool_info)
                 self._refresh_mtk_list()
-                QMessageBox.information(self, "成功", f"已添加MTK工具: {tool_info['name']}")
+                QMessageBox.information(self, self.tr("成功"), f"{self.tr('已添加MTK工具')}: {tool_info['name']}")
             else:
-                QMessageBox.information(self, "提示", "该MTK工具已存在")
+                QMessageBox.information(self, self.tr("提示"), self.tr("该MTK工具已存在"))
                 
         except Exception as e:
-            QMessageBox.critical(self, "错误", f"手动配置失败: {str(e)}")
+            QMessageBox.critical(self, self.tr("错误"), f"{self.tr('手动配置失败')}: {str(e)}")
     
     def _detect_wireshark(self):
         """检测Wireshark"""
@@ -291,28 +297,28 @@ class ToolsConfigDialog(QDialog):
                 mergecap_exe = os.path.join(path, "mergecap.exe")
                 if os.path.exists(mergecap_exe):
                     self.wireshark_entry.setText(path)
-                    QMessageBox.information(self, "检测完成", f"检测到Wireshark: {path}")
+                    QMessageBox.information(self, self.tr("检测完成"), f"{self.tr('检测到Wireshark:')} {path}")
                     return
             
-            QMessageBox.information(self, "检测结果", "未检测到Wireshark，请手动选择")
+            QMessageBox.information(self, self.tr("检测结果"), self.tr("未检测到Wireshark，请手动选择"))
             
         except Exception as e:
-            QMessageBox.critical(self, "错误", f"检测Wireshark失败: {str(e)}")
+            QMessageBox.critical(self, self.tr("错误"), f"{self.tr('检测Wireshark失败')}: {str(e)}")
     
     def _browse_wireshark(self):
         """浏览选择Wireshark路径"""
         try:
-            path = QFileDialog.getExistingDirectory(self, "选择Wireshark安装目录")
+            path = QFileDialog.getExistingDirectory(self, self.tr("选择Wireshark安装目录"))
             
             if path:
                 mergecap_exe = os.path.join(path, "mergecap.exe")
                 if os.path.exists(mergecap_exe):
                     self.wireshark_entry.setText(path)
                 else:
-                    QMessageBox.critical(self, "错误", "选择的目录中没有找到mergecap.exe")
+                    QMessageBox.critical(self, self.tr("错误"), self.tr("选择的目录中没有找到mergecap.exe"))
                     
         except Exception as e:
-            QMessageBox.critical(self, "错误", f"选择Wireshark路径失败: {str(e)}")
+            QMessageBox.critical(self, self.tr("错误"), f"{self.tr('选择Wireshark路径失败')}: {str(e)}")
     
     def _detect_qualcomm_tools(self):
         """检测高通工具"""
@@ -343,17 +349,17 @@ class ToolsConfigDialog(QDialog):
                         self.temp_config["qualcomm_tools"].append(tool)
                 
                 self._refresh_qualcomm_list()
-                QMessageBox.information(self, "检测完成", f"检测到 {len(detected_tools)} 个高通工具")
+                QMessageBox.information(self, self.tr("检测完成"), f"{self.tr('检测到')} {len(detected_tools)} {self.tr('个高通工具')}")
             else:
-                QMessageBox.information(self, "检测结果", 
-                    "未检测到高通工具，请尝试手动输入。\n\n常见路径:\n"
+                QMessageBox.information(self, self.tr("检测结果"), 
+                    self.tr("未检测到高通工具，请尝试手动输入。\n\n常见路径:\n") +
                     "C:\\Program Files (x86)\\Qualcomm\\PCAP_Generator\\PCAP_Gen_2.0\\Release\n"
                     "C:\\Program Files\\Qualcomm\\PCAP_Generator\\PCAP_Gen_2.0\\Release\n"
                     "D:\\Program Files (x86)\\Qualcomm\\PCAP_Generator\\PCAP_Gen_2.0\\Release\n"
                     "D:\\Program Files\\Qualcomm\\PCAP_Generator\\PCAP_Gen_2.0\\Release")
                 
         except Exception as e:
-            QMessageBox.critical(self, "错误", f"检测高通工具失败: {str(e)}")
+            QMessageBox.critical(self, self.tr("错误"), f"{self.tr('检测高通工具失败')}: {str(e)}")
     
     def _validate_qualcomm_tool(self, base_path):
         """验证高通工具路径"""
@@ -381,18 +387,18 @@ class ToolsConfigDialog(QDialog):
     def _manual_qualcomm_config(self):
         """手动配置高通工具"""
         try:
-            base_path = QFileDialog.getExistingDirectory(self, "选择高通工具目录")
+            base_path = QFileDialog.getExistingDirectory(self, self.tr("选择高通工具目录"))
             
             if not base_path:
                 return
             
             if not self._validate_qualcomm_tool(base_path):
-                QMessageBox.critical(self, "错误", "选择的路径不是有效的高通工具目录")
+                QMessageBox.critical(self, self.tr("错误"), self.tr("选择的路径不是有效的高通工具目录"))
                 return
             
             tool_info = self._get_qualcomm_tool_info(base_path)
             if not tool_info:
-                QMessageBox.critical(self, "错误", "无法获取高通工具信息")
+                QMessageBox.critical(self, self.tr("错误"), self.tr("无法获取高通工具信息"))
                 return
             
             if "qualcomm_tools" not in self.temp_config:
@@ -403,12 +409,12 @@ class ToolsConfigDialog(QDialog):
             if not exists:
                 self.temp_config["qualcomm_tools"].append(tool_info)
                 self._refresh_qualcomm_list()
-                QMessageBox.information(self, "成功", f"已添加高通工具: {tool_info['name']}")
+                QMessageBox.information(self, self.tr("成功"), f"{self.tr('已添加高通工具')}: {tool_info['name']}")
             else:
-                QMessageBox.information(self, "提示", "该高通工具已存在")
+                QMessageBox.information(self, self.tr("提示"), self.tr("该高通工具已存在"))
                 
         except Exception as e:
-            QMessageBox.critical(self, "错误", f"手动配置失败: {str(e)}")
+            QMessageBox.critical(self, self.tr("错误"), f"{self.tr('手动配置失败')}: {str(e)}")
     
     def _save_and_close(self):
         """保存配置并关闭"""
@@ -418,7 +424,7 @@ class ToolsConfigDialog(QDialog):
             if wireshark_path:
                 mergecap_exe = os.path.join(wireshark_path, "mergecap.exe")
                 if not os.path.exists(mergecap_exe):
-                    QMessageBox.critical(self, "错误", "Wireshark路径无效，找不到mergecap.exe")
+                    QMessageBox.critical(self, self.tr("错误"), self.tr("Wireshark路径无效，找不到mergecap.exe"))
                     return
                 self.temp_config["wireshark_path"] = wireshark_path
             
@@ -426,8 +432,8 @@ class ToolsConfigDialog(QDialog):
             self.tool_config.clear()
             self.tool_config.update(self.temp_config)
             
-            QMessageBox.information(self, "成功", "工具配置已保存")
+            QMessageBox.information(self, self.tr("成功"), self.tr("工具配置已保存"))
             self.accept()
             
         except Exception as e:
-            QMessageBox.critical(self, "错误", f"保存配置失败: {str(e)}")
+            QMessageBox.critical(self, self.tr("错误"), f"{self.tr('保存配置失败')}: {str(e)}")

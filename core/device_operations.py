@@ -22,20 +22,26 @@ class PyQtBackgroundDataManager(QObject):
     def __init__(self, device_manager, parent=None):
         super().__init__(parent)
         self.device_manager = device_manager
+        # 从父窗口获取语言管理器
+        self.lang_manager = parent.lang_manager if parent and hasattr(parent, 'lang_manager') else None
+    
+    def tr(self, text):
+        """安全地获取翻译文本"""
+        return self.lang_manager.tr(text) if self.lang_manager else text
         
     def configure_phone(self):
         """配置手机"""
-        self.status_message.emit("配置手机...")
+        self.status_message.emit(self.tr("配置手机..."))
         # TODO: 实现配置手机逻辑
     
     def export_background_logs(self):
         """导出背景日志"""
-        self.status_message.emit("导出背景日志...")
+        self.status_message.emit(self.tr("导出背景日志..."))
         # TODO: 实现导出背景日志逻辑
     
     def analyze_logs(self):
         """分析日志"""
-        self.status_message.emit("分析日志...")
+        self.status_message.emit(self.tr("分析日志..."))
         # TODO: 实现日志分析逻辑
 
 
@@ -47,9 +53,20 @@ class PyQtAppOperationsManager(QObject):
     def __init__(self, device_manager, parent=None):
         super().__init__(parent)
         self.device_manager = device_manager
+        # 从父窗口获取语言管理器
+        self.lang_manager = parent.lang_manager if parent and hasattr(parent, 'lang_manager') else None
+        # 初始化APP操作管理器
+        self._init_app_ops_manager()
+    
+    def tr(self, text):
+        """安全地获取翻译文本"""
+        return self.lang_manager.tr(text) if self.lang_manager else text
+        
+    def _init_app_ops_manager(self):
+        """初始化APP操作管理器"""
         # 导入完整的APP操作管理器
         from core.app_operations_manager import AppOperationsManager
-        self.app_ops_manager = AppOperationsManager(device_manager)
+        self.app_ops_manager = AppOperationsManager(self.device_manager, self)
         # 连接信号
         self.app_ops_manager.log_message.connect(self.status_message.emit)
     
@@ -102,6 +119,17 @@ class PyQtDeviceInfoManager(QObject):
     def __init__(self, device_manager, parent=None):
         super().__init__(parent)
         self.device_manager = device_manager
+        # 从父窗口获取语言管理器
+        self.lang_manager = parent.lang_manager if parent and hasattr(parent, 'lang_manager') else None
+        # 初始化设备信息管理器
+        self._init_device_info_manager()
+    
+    def tr(self, text):
+        """安全地获取翻译文本"""
+        return self.lang_manager.tr(text) if self.lang_manager else text
+        
+    def _init_device_info_manager(self):
+        """初始化设备信息管理器"""
         # 导入PyQt5版本的DeviceInfoManager
         from core.device_info_manager import DeviceInfoManager
         self.device_info_manager = DeviceInfoManager()
@@ -113,30 +141,30 @@ class PyQtDeviceInfoManager(QObject):
             return
         
         try:
-            self.status_message.emit("获取手机信息...")
+            self.status_message.emit(self.tr("获取手机信息..."))
             
             # 调用原始的collect_device_info方法
             device_info = self.device_info_manager.collect_device_info(device)
             
             # 格式化显示设备信息
             info_text = "=" * 60 + "\n"
-            info_text += "设备信息\n"
+            info_text += self.tr("设备信息\n")
             info_text += "=" * 60 + "\n\n"
             
             # 设备基本信息
-            info_text += "设备基本信息:\n"
-            info_text += f"  设备型号: {device_info.get('device_model', '未知')}\n"
-            info_text += f"  设备品牌: {device_info.get('device_brand', '未知')}\n"
-            info_text += f"  Android版本: {device_info.get('android_version', '未知')}\n"
-            info_text += f"  API级别: {device_info.get('api_level', '未知')}\n"
-            info_text += f"  设备序列号: {device_info.get('serial', '未知')}\n\n"
+            info_text += self.tr("设备基本信息:\n")
+            info_text += f"  {self.tr('设备型号:')} {device_info.get('device_model', self.tr('未知'))}\n"
+            info_text += f"  {self.tr('设备品牌:')} {device_info.get('device_brand', self.tr('未知'))}\n"
+            info_text += f"  {self.tr('Android版本:')} {device_info.get('android_version', self.tr('未知'))}\n"
+            info_text += f"  {self.tr('API级别:')} {device_info.get('api_level', self.tr('未知'))}\n"
+            info_text += f"  {self.tr('设备序列号:')} {device_info.get('serial', self.tr('未知'))}\n\n"
             
             # 详细订阅信息
             subscriptions = device_info.get("subscriptions", [])
             if subscriptions and len(subscriptions) > 0:
-                info_text += "详细信息:\n"
+                info_text += self.tr("详细信息:\n")
                 for i, sub in enumerate(subscriptions):
-                    slot_name = f"卡槽 {sub.get('slotIndex', i)}"
+                    slot_name = f"{self.tr('卡槽')} {sub.get('slotIndex', i)}"
                     info_text += f"  {slot_name}:\n"
                     info_text += f"    IMEI: {sub.get('imei', '')}\n"
                     info_text += f"    MSISDN: {sub.get('msisdn', '')}\n"
@@ -144,25 +172,25 @@ class PyQtDeviceInfoManager(QObject):
                     info_text += f"    ICCID: {sub.get('iccid', '')}\n\n"
             
             # 显示 Fingerprint
-            fingerprint = device_info.get('fingerprint', '未知')
+            fingerprint = device_info.get('fingerprint', self.tr('未知'))
             info_text += f"Fingerprint: {fingerprint}\n"
             
             # 显示 Antirollback
-            antirollback = device_info.get('antirollback', '未知')
+            antirollback = device_info.get('antirollback', self.tr('未知'))
             info_text += f"Antirollback: {antirollback}\n"
             
             # 显示编译时间
-            build_date = device_info.get('build_date', '未知')
-            info_text += f"编译时间: {build_date}\n"
+            build_date = device_info.get('build_date', self.tr('未知'))
+            info_text += f"{self.tr('编译时间:')} {build_date}\n"
             
             info_text += "=" * 60 + "\n"
-            info_text += "[设备信息] 设备信息获取完成!\n"
+            info_text += self.tr("[设备信息] 设备信息获取完成!\n")
             
             # 显示在日志窗口
             self.status_message.emit(info_text)
             
         except Exception as e:
-            self.status_message.emit(f"获取手机信息失败: {str(e)}")
+            self.status_message.emit("❌ " + self.tr("获取手机信息失败: ") + str(e))
     
     def set_screen_timeout(self):
         """设置灭屏时间"""
@@ -170,7 +198,7 @@ class PyQtDeviceInfoManager(QObject):
         if not device:
             return
         
-        timeout, ok = QInputDialog.getInt(None, "设置灭屏时间", "请输入灭屏时间(秒，0表示永不灭屏):", 300, 0, 3600)
+        timeout, ok = QInputDialog.getInt(None, self.tr("设置灭屏时间"), self.tr("请输入灭屏时间(秒，0表示永不灭屏):"), 300, 0, 3600)
         if not ok:
             return
         
@@ -178,10 +206,10 @@ class PyQtDeviceInfoManager(QObject):
             # 如果输入0，表示永不灭屏，设置为2147483647
             if timeout == 0:
                 timeout_value = 2147483647
-                timeout_display = "永不灭屏"
+                timeout_display = self.tr("永不灭屏")
             else:
                 timeout_value = timeout * 1000
-                timeout_display = f"{timeout}秒"
+                timeout_display = f"{timeout}{self.tr('秒')}"
             
             subprocess.run(
                 ["adb", "-s", device, "shell", "settings", "put", "system", "screen_off_timeout", str(timeout_value)],
@@ -189,10 +217,10 @@ class PyQtDeviceInfoManager(QObject):
                 creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0
             )
             
-            self.status_message.emit(f"灭屏时间已设置为: {timeout_display}")
+            self.status_message.emit(self.tr("灭屏时间已设置为: ") + str(timeout_display))
             
         except Exception as e:
-            self.status_message.emit(f"设置灭屏时间失败: {str(e)}")
+            self.status_message.emit("❌ " + self.tr("设置灭屏时间失败: ") + str(e))
 
 
 class PyQtHeraConfigManager(QObject):
@@ -203,9 +231,11 @@ class PyQtHeraConfigManager(QObject):
     def __init__(self, device_manager, parent=None):
         super().__init__(parent)
         self.device_manager = device_manager
+        # 从父窗口获取语言管理器
+        self.lang_manager = parent.lang_manager if parent and hasattr(parent, 'lang_manager') else None
         # 导入独立的PyQt5赫拉配置管理器
         from core.hera_config_manager import PyQtHeraConfigManager as HeraManager
-        self.hera_manager = HeraManager(device_manager)
+        self.hera_manager = HeraManager(device_manager, parent=self)
         # 连接信号
         self.hera_manager.status_message.connect(self.status_message.emit)
         
@@ -245,7 +275,7 @@ class OtherOperationsWorker(QThread):
             elif self.operation_type == 'extract_pcap_from_qualcomm_log':
                 result = self._extract_pcap_from_qualcomm_log()
             else:
-                result = {'success': False, 'error': '未知操作类型'}
+                result = {'success': False, 'error': self.tr('未知操作类型')}
             
             self.finished.emit(result)
             
@@ -263,15 +293,15 @@ class OtherOperationsWorker(QThread):
             mdlogman_exe = os.path.join(utilities_path, "MDLogMan.exe")
             
             if not os.path.exists(mdlogman_exe):
-                return {'success': False, 'error': f"找不到MDLogMan.exe: {mdlogman_exe}"}
+                return {'success': False, 'error': f"{self.tr('找不到MDLogMan.exe:')} {mdlogman_exe}"}
             
-            self.status_updated.emit("准备合并环境...")
+            self.status_updated.emit(self.tr("准备合并环境..."))
             self.progress_updated.emit(10)
             
             # 创建输出文件路径
             merge_elg_path = os.path.join(log_folder, "merge.elg")
             
-            self.status_updated.emit(f"正在合并 {len(self.kwargs['muxz_files'])} 个muxz文件...")
+            self.status_updated.emit(self.tr("正在合并 ") + str(len(self.kwargs['muxz_files'])) + self.tr(" 个muxz文件..."))
             self.progress_updated.emit(50)
             
             # 执行合并命令
@@ -281,10 +311,10 @@ class OtherOperationsWorker(QThread):
                 "-o", "merge.elg"
             ]
             
-            result = subprocess.run(cmd, cwd=log_folder, capture_output=True, text=True, timeout=300)
+            result = subprocess.run(cmd, cwd=log_folder, capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=300)
             
             if result.returncode == 0:
-                self.status_updated.emit("合并完成!")
+                self.status_updated.emit(self.tr("合并完成!"))
                 self.progress_updated.emit(100)
                 
                 # 检查输出文件是否存在
@@ -298,14 +328,14 @@ class OtherOperationsWorker(QThread):
                         'file_count': len(self.kwargs['muxz_files'])
                     }
                 else:
-                    return {'success': False, 'error': '合并完成但未找到输出文件'}
+                    return {'success': False, 'error': self.tr('合并完成但未找到输出文件')}
             else:
-                return {'success': False, 'error': f"MDLogMan执行失败: {result.stderr}"}
+                return {'success': False, 'error': f"{self.tr('MDLogMan执行失败:')} {result.stderr}"}
                 
         except subprocess.TimeoutExpired:
-            return {'success': False, 'error': 'MDLogMan执行超时'}
+            return {'success': False, 'error': self.tr('MDLogMan执行超时')}
         except Exception as e:
-            return {'success': False, 'error': f"执行MTKlog合并失败: {str(e)}"}
+            return {'success': False, 'error': f"{self.tr('执行MTKlog合并失败:')} {str(e)}"}
     
     def _extract_pcap_from_mtklog(self):
         """从MTKlog中提取pcap文件"""
@@ -319,7 +349,7 @@ class OtherOperationsWorker(QThread):
             python_path = mtk_tool["python_path"]
             embedded_python = os.path.join(python_path, "EmbeddedPython.exe")
             
-            self.status_updated.emit("准备提取环境...")
+            self.status_updated.emit(self.tr("准备提取环境..."))
             self.progress_updated.emit(0)
             
             # 对每个muxz文件执行提取
@@ -328,9 +358,9 @@ class OtherOperationsWorker(QThread):
             
             for i, muxz_file in enumerate(muxz_files):
                 if self.stop_flag:
-                    return {'success': False, 'error': '用户取消操作'}
+                    return {'success': False, 'error': self.tr('用户取消操作')}
                 
-                progress_text = f"正在提取: {muxz_file} ({i+1}/{total_files})"
+                progress_text = f"{self.tr('正在提取:')} {muxz_file} ({i+1}/{total_files})"
                 progress_value = (i / total_files) * 80
                 
                 self.status_updated.emit(progress_text)
@@ -348,7 +378,7 @@ class OtherOperationsWorker(QThread):
                 ]
                 
                 try:
-                    result = subprocess.run(cmd, cwd=elgcap_path, capture_output=True, text=True, timeout=300)
+                    result = subprocess.run(cmd, cwd=elgcap_path, capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=300)
                     if result.returncode == 0:
                         success_count += 1
                 except subprocess.TimeoutExpired:
@@ -357,7 +387,7 @@ class OtherOperationsWorker(QThread):
                     pass
             
             # 合并pcap文件
-            self.status_updated.emit("合并pcap文件...")
+            self.status_updated.emit(self.tr("合并pcap文件..."))
             self.progress_updated.emit(80)
             
             # 使用通用的合并函数
@@ -365,7 +395,7 @@ class OtherOperationsWorker(QThread):
             
             if merge_success:
                 merge_file = os.path.join(log_folder, 'merge.pcap')
-                self.status_updated.emit("提取完成!")
+                self.status_updated.emit(self.tr("提取完成!"))
                 self.progress_updated.emit(100)
                 
                 return {
@@ -375,10 +405,10 @@ class OtherOperationsWorker(QThread):
                     'total_files': total_files
                 }
             else:
-                return {'success': False, 'error': 'pcap文件合并失败'}
+                return {'success': False, 'error': self.tr('pcap文件合并失败')}
                 
         except Exception as e:
-            return {'success': False, 'error': f"执行pcap提取失败: {str(e)}"}
+            return {'success': False, 'error': f"{self.tr('执行pcap提取失败:')} {str(e)}"}
     
     def _merge_pcap(self):
         """合并PCAP文件"""
@@ -387,21 +417,21 @@ class OtherOperationsWorker(QThread):
             
             # 检查文件夹是否存在
             if not os.path.exists(folder_path):
-                return {'success': False, 'error': f"文件夹不存在: {folder_path}"}
+                return {'success': False, 'error': f"{self.tr('文件夹不存在:')} {folder_path}"}
             
             # 查找所有pcap文件
             pcap_files = self._find_pcap_files(folder_path)
             if not pcap_files:
-                return {'success': False, 'error': f"文件夹中没有找到pcap文件: {folder_path}"}
+                return {'success': False, 'error': f"{self.tr('文件夹中没有找到pcap文件:')} {folder_path}"}
             
             # 检查Wireshark路径
             wireshark_path = self.kwargs['wireshark_path']
             mergecap_exe = os.path.join(wireshark_path, "mergecap.exe")
             
             if not os.path.exists(mergecap_exe):
-                return {'success': False, 'error': f"找不到mergecap.exe: {mergecap_exe}"}
+                return {'success': False, 'error': f"{self.tr('找不到mergecap.exe:')} {mergecap_exe}"}
             
-            self.status_updated.emit(f"正在合并 {len(pcap_files)} 个文件...")
+            self.status_updated.emit(self.tr("正在合并 ") + str(len(pcap_files)) + self.tr(" 个文件..."))
             self.progress_updated.emit(50)
             
             # 创建输出文件路径
@@ -410,10 +440,10 @@ class OtherOperationsWorker(QThread):
             # 执行合并命令
             merge_cmd = [mergecap_exe, "-w", merge_pcap_path] + pcap_files
             
-            result = subprocess.run(merge_cmd, capture_output=True, text=True, timeout=120)
+            result = subprocess.run(merge_cmd, capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=120)
             
             if result.returncode == 0:
-                self.status_updated.emit("合并完成!")
+                self.status_updated.emit(self.tr("合并完成!"))
                 self.progress_updated.emit(100)
                 
                 # 打开合并后的pcap文件
@@ -421,12 +451,12 @@ class OtherOperationsWorker(QThread):
                 
                 return {'success': True, 'merge_file': merge_pcap_path}
             else:
-                return {'success': False, 'error': f"mergecap执行失败: {result.stderr}"}
+                return {'success': False, 'error': f"{self.tr('mergecap执行失败:')} {result.stderr}"}
                 
         except subprocess.TimeoutExpired:
-            return {'success': False, 'error': '合并超时，请检查文件大小'}
+            return {'success': False, 'error': self.tr('合并超时，请检查文件大小')}
         except Exception as e:
-            return {'success': False, 'error': f"执行PCAP合并失败: {str(e)}"}
+            return {'success': False, 'error': f"{self.tr('执行PCAP合并失败:')} {str(e)}"}
     
     def _extract_pcap_from_qualcomm_log(self):
         """从高通log提取pcap文件"""
@@ -439,9 +469,9 @@ class OtherOperationsWorker(QThread):
             pcap_gen_exe = qualcomm_tool["pcap_gen_exe"]
             
             if not os.path.exists(pcap_gen_exe):
-                return {'success': False, 'error': f"找不到PCAP_Gen_2.0.exe: {pcap_gen_exe}"}
+                return {'success': False, 'error': f"{self.tr('找不到PCAP_Gen_2.0.exe:')} {pcap_gen_exe}"}
             
-            self.status_updated.emit("准备提取环境...")
+            self.status_updated.emit(self.tr("准备提取环境..."))
             self.progress_updated.emit(0)
             
             # 对每个hdf文件执行提取
@@ -450,9 +480,9 @@ class OtherOperationsWorker(QThread):
             
             for i, hdf_file in enumerate(hdf_files):
                 if self.stop_flag:
-                    return {'success': False, 'error': '用户取消操作'}
+                    return {'success': False, 'error': self.tr('用户取消操作')}
                 
-                progress_text = f"正在提取: {hdf_file} ({i+1}/{total_files})"
+                progress_text = f"{self.tr('正在提取:')} {hdf_file} ({i+1}/{total_files})"
                 progress_value = (i / total_files) * 80
                 
                 self.status_updated.emit(progress_text)
@@ -463,7 +493,7 @@ class OtherOperationsWorker(QThread):
                 cmd = [pcap_gen_exe, hdf_path, log_folder]
                 
                 try:
-                    result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+                    result = subprocess.run(cmd, capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=300)
                     if result.returncode == 0:
                         success_count += 1
                 except subprocess.TimeoutExpired:
@@ -472,7 +502,7 @@ class OtherOperationsWorker(QThread):
                     pass
             
             # 合并pcap文件
-            self.status_updated.emit("合并pcap文件...")
+            self.status_updated.emit(self.tr("合并pcap文件..."))
             self.progress_updated.emit(80)
             
             # 使用通用的合并函数
@@ -480,7 +510,7 @@ class OtherOperationsWorker(QThread):
             
             if merge_success:
                 merge_file = os.path.join(log_folder, 'merge.pcap')
-                self.status_updated.emit("提取完成!")
+                self.status_updated.emit(self.tr("提取完成!"))
                 self.progress_updated.emit(100)
                 
                 return {
@@ -490,10 +520,10 @@ class OtherOperationsWorker(QThread):
                     'total_files': total_files
                 }
             else:
-                return {'success': False, 'error': 'pcap文件合并失败'}
+                return {'success': False, 'error': self.tr('pcap文件合并失败')}
                 
         except Exception as e:
-            return {'success': False, 'error': f"执行高通pcap提取失败: {str(e)}"}
+            return {'success': False, 'error': f"{self.tr('执行高通pcap提取失败:')} {str(e)}"}
     
     def _execute_pcap_merge(self, folder_path):
         """执行PCAP合并的通用函数"""
@@ -519,7 +549,7 @@ class OtherOperationsWorker(QThread):
             # 执行合并命令
             merge_cmd = [mergecap_exe, "-w", merge_pcap_path] + pcap_files
             
-            result = subprocess.run(merge_cmd, capture_output=True, text=True, timeout=120)
+            result = subprocess.run(merge_cmd, capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=120)
             
             return result.returncode == 0
                 
@@ -554,10 +584,16 @@ class PyQtOtherOperationsManager(QObject):
     def __init__(self, device_manager, parent=None):
         super().__init__(parent)
         self.device_manager = device_manager
+        # 从父窗口获取语言管理器
+        self.lang_manager = parent.lang_manager if parent and hasattr(parent, 'lang_manager') else None
         self.config_file = os.path.expanduser("~/.netui/tool_config.json")
         self.tool_config = self._load_tool_config()
         self.worker = None
         self.progress_dialog = None
+    
+    def tr(self, text):
+        """安全地获取翻译文本"""
+        return self.lang_manager.tr(text) if self.lang_manager else text
         
     def _load_tool_config(self):
         """加载工具配置"""
@@ -593,7 +629,7 @@ class PyQtOtherOperationsManager(QObject):
         
         if check_mtk and not self.tool_config.get("mtk_tools"):
             reply = QMessageBox.question(
-                None, "配置缺失", "未配置MTK工具，是否现在配置？",
+                None, self.tr("配置缺失"), self.tr("未配置MTK工具，是否现在配置？"),
                 QMessageBox.Yes | QMessageBox.No
             )
             if reply == QMessageBox.Yes:
@@ -603,7 +639,7 @@ class PyQtOtherOperationsManager(QObject):
         
         if check_qualcomm and not self.tool_config.get("qualcomm_tools"):
             reply = QMessageBox.question(
-                None, "配置缺失", "未配置高通工具，是否现在配置？",
+                None, self.tr("配置缺失"), self.tr("未配置高通工具，是否现在配置？"),
                 QMessageBox.Yes | QMessageBox.No
             )
             if reply == QMessageBox.Yes:
@@ -613,7 +649,7 @@ class PyQtOtherOperationsManager(QObject):
         
         if check_wireshark and not self.tool_config.get("wireshark_path"):
             reply = QMessageBox.question(
-                None, "配置缺失", "未配置Wireshark路径，是否现在配置？",
+                None, self.tr("配置缺失"), self.tr("未配置Wireshark路径，是否现在配置？"),
                 QMessageBox.Yes | QMessageBox.No
             )
             if reply == QMessageBox.Yes:
@@ -655,12 +691,12 @@ class PyQtOtherOperationsManager(QObject):
             from PyQt5.QtWidgets import QDialog, QVBoxLayout, QListWidget, QPushButton, QHBoxLayout, QLabel, QMessageBox
             
             dialog = QDialog()
-            dialog.setWindowTitle("选择MTK工具")
+            dialog.setWindowTitle(self.tr("选择MTK工具"))
             dialog.setModal(True)
             
             layout = QVBoxLayout(dialog)
             
-            label = QLabel("请选择一个MTK工具:")
+            label = QLabel(self.tr("请选择一个MTK工具:"))
             layout.addWidget(label)
             
             list_widget = QListWidget()
@@ -670,8 +706,8 @@ class PyQtOtherOperationsManager(QObject):
             layout.addWidget(list_widget)
             
             button_layout = QHBoxLayout()
-            confirm_btn = QPushButton("确定")
-            cancel_btn = QPushButton("取消")
+            confirm_btn = QPushButton(self.tr("确定"))
+            cancel_btn = QPushButton(self.tr("取消"))
             
             result = [None]
             
@@ -682,7 +718,7 @@ class PyQtOtherOperationsManager(QObject):
                     result[0] = self.tool_config["mtk_tools"][index]
                     dialog.accept()
                 else:
-                    QMessageBox.warning(dialog, "选择错误", "请选择一个MTK工具")
+                    QMessageBox.warning(dialog, self.tr("选择错误"), "请选择一个MTK工具")
             
             def on_cancel():
                 dialog.reject()
@@ -717,12 +753,12 @@ class PyQtOtherOperationsManager(QObject):
             from PyQt5.QtWidgets import QDialog, QVBoxLayout, QListWidget, QPushButton, QHBoxLayout, QLabel, QMessageBox
             
             dialog = QDialog()
-            dialog.setWindowTitle("选择高通工具")
+            dialog.setWindowTitle(self.tr("选择高通工具"))
             dialog.setModal(True)
             
             layout = QVBoxLayout(dialog)
             
-            label = QLabel("请选择一个高通工具:")
+            label = QLabel(self.tr("请选择一个高通工具:"))
             layout.addWidget(label)
             
             list_widget = QListWidget()
@@ -732,8 +768,8 @@ class PyQtOtherOperationsManager(QObject):
             layout.addWidget(list_widget)
             
             button_layout = QHBoxLayout()
-            confirm_btn = QPushButton("确定")
-            cancel_btn = QPushButton("取消")
+            confirm_btn = QPushButton(self.tr("确定"))
+            cancel_btn = QPushButton(self.tr("取消"))
             
             result = [None]
             
@@ -744,7 +780,7 @@ class PyQtOtherOperationsManager(QObject):
                     result[0] = self.tool_config["qualcomm_tools"][index]
                     dialog.accept()
                 else:
-                    QMessageBox.warning(dialog, "选择错误", "请选择一个高通工具")
+                    QMessageBox.warning(dialog, self.tr("选择错误"), "请选择一个高通工具")
             
             def on_cancel():
                 dialog.reject()
@@ -775,14 +811,14 @@ class PyQtOtherOperationsManager(QObject):
                 return
             
             # 选择MTKlog文件夹
-            log_folder = QFileDialog.getExistingDirectory(None, "选择MTKlog文件夹")
+            log_folder = QFileDialog.getExistingDirectory(None, self.tr("选择MTKlog文件夹"))
             if not log_folder:
                 return
             
             # 检查文件夹中是否有muxz文件
             muxz_files = self._find_muxz_files(log_folder)
             if not muxz_files:
-                QMessageBox.critical(None, "错误", "选择的文件夹中没有找到muxz文件")
+                QMessageBox.critical(None, self.tr("错误"), "选择的文件夹中没有找到muxz文件")
                 return
             
             # 选择MTK工具
@@ -797,7 +833,7 @@ class PyQtOtherOperationsManager(QObject):
                              mtk_tool=mtk_tool)
             
         except Exception as e:
-            QMessageBox.critical(None, "错误", f"合并MTKlog失败: {str(e)}")
+            QMessageBox.critical(None, self.tr("错误"), f"合并MTKlog失败: {str(e)}")
     
     def extract_pcap_from_mtklog(self):
         """从MTKlog中提取pcap文件"""
@@ -809,14 +845,14 @@ class PyQtOtherOperationsManager(QObject):
                 return
             
             # 选择MTKlog文件夹
-            log_folder = QFileDialog.getExistingDirectory(None, "选择MTKlog文件夹")
+            log_folder = QFileDialog.getExistingDirectory(None, self.tr("选择MTKlog文件夹"))
             if not log_folder:
                 return
             
             # 检查文件夹中是否有muxz文件
             muxz_files = self._find_muxz_files(log_folder)
             if not muxz_files:
-                QMessageBox.critical(None, "错误", "选择的文件夹中没有找到muxz文件")
+                QMessageBox.critical(None, self.tr("错误"), "选择的文件夹中没有找到muxz文件")
                 return
             
             # 选择MTK工具
@@ -832,7 +868,7 @@ class PyQtOtherOperationsManager(QObject):
                              wireshark_path=self.tool_config.get("wireshark_path"))
             
         except Exception as e:
-            QMessageBox.critical(None, "错误", f"提取pcap失败: {str(e)}")
+            QMessageBox.critical(None, self.tr("错误"), f"提取pcap失败: {str(e)}")
     
     def merge_pcap(self):
         """合并PCAP文件"""
@@ -842,7 +878,7 @@ class PyQtOtherOperationsManager(QObject):
             # 检查Wireshark配置
             if not self.tool_config.get("wireshark_path"):
                 reply = QMessageBox.question(
-                    None, "配置缺失", "未配置Wireshark路径，是否现在配置？",
+                    None, self.tr("配置缺失"), self.tr("未配置Wireshark路径，是否现在配置？"),
                     QMessageBox.Yes | QMessageBox.No
                 )
                 if reply == QMessageBox.Yes:
@@ -853,7 +889,7 @@ class PyQtOtherOperationsManager(QObject):
                     return
             
             # 获取用户输入的文件夹路径
-            folder_path = QFileDialog.getExistingDirectory(None, "选择包含PCAP文件的文件夹")
+            folder_path = QFileDialog.getExistingDirectory(None, self.tr("选择包含PCAP文件的文件夹"))
             if not folder_path:
                 return
             
@@ -863,7 +899,7 @@ class PyQtOtherOperationsManager(QObject):
                              wireshark_path=self.tool_config.get("wireshark_path"))
             
         except Exception as e:
-            QMessageBox.critical(None, "错误", f"合并PCAP失败: {str(e)}")
+            QMessageBox.critical(None, self.tr("错误"), f"合并PCAP失败: {str(e)}")
     
     def extract_pcap_from_qualcomm_log(self):
         """从高通log提取pcap文件"""
@@ -875,14 +911,14 @@ class PyQtOtherOperationsManager(QObject):
                 return
             
             # 选择高通log文件夹
-            log_folder = QFileDialog.getExistingDirectory(None, "选择高通log文件夹")
+            log_folder = QFileDialog.getExistingDirectory(None, self.tr("选择高通log文件夹"))
             if not log_folder:
                 return
             
             # 检查文件夹中是否有hdf文件
             hdf_files = self._find_hdf_files(log_folder)
             if not hdf_files:
-                QMessageBox.critical(None, "错误", "选择的文件夹中没有找到hdf文件")
+                QMessageBox.critical(None, self.tr("错误"), "选择的文件夹中没有找到hdf文件")
                 return
             
             # 选择高通工具
@@ -898,7 +934,7 @@ class PyQtOtherOperationsManager(QObject):
                              wireshark_path=self.tool_config.get("wireshark_path"))
             
         except Exception as e:
-            QMessageBox.critical(None, "错误", f"提取高通pcap失败: {str(e)}")
+            QMessageBox.critical(None, self.tr("错误"), f"提取高通pcap失败: {str(e)}")
     
     def _start_worker(self, operation_type, **kwargs):
         """启动工作线程"""
@@ -907,7 +943,7 @@ class PyQtOtherOperationsManager(QObject):
             
             # 创建进度对话框
             self.progress_dialog = QDialog()
-            self.progress_dialog.setWindowTitle(f"正在执行操作...")
+            self.progress_dialog.setWindowTitle(self.tr("正在执行操作..."))
             self.progress_dialog.setModal(True)
             self.progress_dialog.setMinimumWidth(400)
             
@@ -920,7 +956,7 @@ class PyQtOtherOperationsManager(QObject):
             self.progress_bar.setRange(0, 100)
             layout.addWidget(self.progress_bar)
             
-            cancel_btn = QPushButton("取消")
+            cancel_btn = QPushButton(self.tr("取消"))
             cancel_btn.clicked.connect(self._cancel_worker)
             layout.addWidget(cancel_btn)
             
@@ -938,7 +974,7 @@ class PyQtOtherOperationsManager(QObject):
             self.progress_dialog.exec_()
             
         except Exception as e:
-            QMessageBox.critical(None, "错误", f"启动工作线程失败: {str(e)}")
+            QMessageBox.critical(None, self.tr("错误"), f"启动工作线程失败: {str(e)}")
     
     def _cancel_worker(self):
         """取消工作线程"""
@@ -963,15 +999,15 @@ class PyQtOtherOperationsManager(QObject):
         if result.get('success', False):
             if result.get('merge_file'):
                 QMessageBox.information(
-                    None, "成功", 
-                    f"操作成功完成！\n\n合并文件: {result['merge_file']}\n"
-                    f"处理文件: {result.get('file_count', result.get('total_files', 0))} 个"
+                    None, self.tr("成功"), 
+                    f"{self.tr('操作成功完成！')}\n\n{self.tr('合并文件:')} {result['merge_file']}\n"
+                    f"{self.tr('处理文件:')} {result.get('file_count', result.get('total_files', 0))} {self.tr('个')}"
                 )
             else:
-                QMessageBox.information(None, "成功", "操作成功完成！")
+                QMessageBox.information(None, self.tr("成功"), self.tr("操作成功完成！"))
         else:
-            error_msg = result.get('error', '未知错误')
-            QMessageBox.critical(None, "失败", f"操作失败: {error_msg}")
+            error_msg = result.get('error', self.tr('未知错误'))
+            QMessageBox.critical(None, self.tr("失败"), f"{self.tr('操作失败:')} {error_msg}")
         
         self.worker = None
     
@@ -983,7 +1019,7 @@ class PyQtOtherOperationsManager(QObject):
             self.progress_dialog.reject()
             self.progress_dialog = None
         
-        QMessageBox.critical(None, "错误", f"操作失败: {error_msg}")
+        QMessageBox.critical(None, self.tr("错误"), f"操作失败: {error_msg}")
         self.worker = None
     
     def configure_tools(self):
@@ -995,9 +1031,9 @@ class PyQtOtherOperationsManager(QObject):
             if dialog.exec_() == QDialog.Accepted:
                 # 保存配置
                 self._save_tool_config()
-                QMessageBox.information(None, "成功", "工具配置已保存")
+                QMessageBox.information(None, self.tr("成功"), "工具配置已保存")
         except Exception as e:
-            QMessageBox.critical(None, "错误", f"配置工具失败: {str(e)}")
+            QMessageBox.critical(None, self.tr("错误"), f"配置工具失败: {str(e)}")
     
     def show_input_text_dialog(self):
         """显示输入文本对话框"""
@@ -1005,7 +1041,7 @@ class PyQtOtherOperationsManager(QObject):
         
         device = self.device_manager.validate_device_selection()
         if not device:
-            self.status_message.emit("输入文本失败: 请先选择设备")
+            self.status_message.emit(f"{self.tr('输入文本失败:')} {self.tr('请先选择设备')}")
             return
         
         try:
@@ -1014,7 +1050,7 @@ class PyQtOtherOperationsManager(QObject):
             dialog.exec_()
             
         except Exception as e:
-            self.status_message.emit(f"输入文本失败: {str(e)}")
+            self.status_message.emit("❌ " + self.tr("输入文本失败: ") + str(e))
 
 
 # 导出所有管理器

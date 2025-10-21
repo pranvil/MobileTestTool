@@ -31,9 +31,9 @@ class CustomButtonManager(QObject):
     
     # 命令黑名单：不允许的持续输出命令
     BLOCKED_COMMANDS = {
-        'logcat': '请使用"Log过滤"功能',
-        'tcpdump': '请使用"Log控制"标签页的tcpdump功能',
-        'ping': '请使用"Network信息"标签页的ping功能',
+        'logcat': '请使用Log过滤功能',
+        'tcpdump': '请使用Log控制标签页的tcpdump功能',
+        'ping': '请使用Network信息标签页的ping功能',
         'top': '此命令会持续输出，不支持',
         'getevent': '此命令会持续输出，不支持',
         'monkey': '此命令会持续输出，不支持'
@@ -43,7 +43,18 @@ class CustomButtonManager(QObject):
         super().__init__(parent)
         self.config_file = os.path.expanduser("~/.netui/custom_buttons.json")
         self.buttons = []
+        # 从父窗口获取语言管理器
+        if parent and hasattr(parent, 'lang_manager'):
+            self.lang_manager = parent.lang_manager
+        else:
+            # 如果没有父窗口或语言管理器，创建一个默认的
+            from core.language_manager import LanguageManager
+            self.lang_manager = LanguageManager()
         self.load_buttons()
+    
+    def tr(self, text):
+        """安全地获取翻译文本"""
+        return self.lang_manager.tr(text) if self.lang_manager else text
     
     def load_buttons(self):
         """加载按钮配置"""
@@ -53,16 +64,16 @@ class CustomButtonManager(QObject):
                 with open(self.config_file, 'r', encoding='utf-8-sig') as f:
                     data = json.load(f)
                     self.buttons = data.get('custom_buttons', [])
-                    logger.info(f"成功加载 {len(self.buttons)} 个自定义按钮")
+                    logger.info(f"{self.lang_manager.tr('成功加载')} {len(self.buttons)} {self.lang_manager.tr('个自定义按钮')}")
             else:
                 # 创建默认配置
                 self.buttons = self._create_default_buttons()
                 self.save_buttons()
-                logger.info("创建默认自定义按钮配置")
+                logger.info(self.lang_manager.tr("创建默认自定义按钮配置"))
         except Exception as e:
-            logger.exception(f"加载自定义按钮配置失败: {e}")
+            logger.exception(f"{self.lang_manager.tr('加载自定义按钮配置失败:')} {e}")
             # 如果配置文件损坏，创建默认配置
-            logger.info("尝试创建默认配置...")
+            logger.info(self.lang_manager.tr("尝试创建默认配置..."))
             self.buttons = self._create_default_buttons()
             self.save_buttons()
     
@@ -79,12 +90,12 @@ class CustomButtonManager(QObject):
             with open(self.config_file, 'w', encoding='utf-8') as f:
                 json.dump(data, f, ensure_ascii=False, indent=2)
             
-            logger.info(f"成功保存 {len(self.buttons)} 个自定义按钮配置")
+            logger.info(f"{self.lang_manager.tr('成功保存')} {len(self.buttons)} {self.lang_manager.tr('个自定义按钮配置')}")
             self.buttons_updated.emit()
             return True
             
         except Exception as e:
-            logger.exception(f"保存自定义按钮配置失败: {e}")
+            logger.exception(f"{self.lang_manager.tr('保存自定义按钮配置失败:')} {e}")
             return False
     
     def _create_default_buttons(self):
@@ -92,23 +103,23 @@ class CustomButtonManager(QObject):
         return [
             {
                 'id': 'default_001',
-                'name': '查看设备属性',
+                'name': self.lang_manager.tr('查看设备属性'),
                 'type': 'adb',
                 'command': 'shell getprop',
-                'tab': '其他',
-                'card': '其他操作',
+                'tab': self.lang_manager.tr('其他'),
+                'card': self.lang_manager.tr('其他操作'),
                 'enabled': True,
-                'description': '查看设备的所有系统属性'
+                'description': self.lang_manager.tr('查看设备的所有系统属性')
             },
             {
                 'id': 'default_002',
-                'name': '查看存储空间',
+                'name': self.lang_manager.tr('查看存储空间'),
                 'type': 'adb',
                 'command': 'shell df -h',
-                'tab': '其他',
-                'card': '设备信息',
+                'tab': self.lang_manager.tr('其他'),
+                'card': self.lang_manager.tr('设备信息'),
                 'enabled': True,
-                'description': '查看设备存储空间使用情况'
+                'description': self.lang_manager.tr('查看设备存储空间使用情况')
             }
         ]
     
@@ -128,29 +139,29 @@ class CustomButtonManager(QObject):
     def get_available_tabs(self):
         """获取可用的Tab列表"""
         return [
-            'Log控制',
-            'Log过滤',
-            '网络信息',
+            self.lang_manager.tr('Log控制'),
+            self.lang_manager.tr('Log过滤'),
+            self.lang_manager.tr('网络信息'),
             'TMO CC',
             'TMO Echolocate',
-            '24小时背景数据',
-            'APP操作',
-            '其他'
+            self.lang_manager.tr('24小时背景数据'),
+            self.lang_manager.tr('APP操作'),
+            self.lang_manager.tr('其他')
         ]
     
     def get_available_cards(self, tab_name):
         """获取指定Tab下可用的Card列表"""
         cards_map = {
-            'Log控制': ['MTKLOG 控制', 'ADB Log 控制'],
-            'Log过滤': ['过滤控制'],
-            '网络信息': ['控制', '网络信息'],
-            'TMO CC': ['CC配置', '过滤操作'],
-            'TMO Echolocate': ['Echolocate 操作', '过滤操作'],
-            '24小时背景数据': ['24小时背景数据操作'],
-            'APP操作': ['查询操作', 'APK操作', '进程操作', 'APP状态操作'],
-            '其他': ['设备信息', '赫拉配置', '其他操作', 'log操作']
+            self.lang_manager.tr('Log控制'): [self.lang_manager.tr('MTKLOG 控制'), self.lang_manager.tr('ADB Log 控制')],
+            self.lang_manager.tr('Log过滤'): [self.lang_manager.tr('过滤控制')],
+            self.lang_manager.tr('网络信息'): [self.lang_manager.tr('控制'), self.lang_manager.tr('网络信息')],
+            'TMO CC': [self.lang_manager.tr('CC配置'), self.lang_manager.tr('过滤操作')],
+            'TMO Echolocate': [self.lang_manager.tr('Echolocate 操作'), self.lang_manager.tr('过滤操作')],
+            self.lang_manager.tr('24小时背景数据'): [self.lang_manager.tr('24小时背景数据操作')],
+            self.lang_manager.tr('APP操作'): [self.lang_manager.tr('查询操作'), self.lang_manager.tr('APK操作'), self.lang_manager.tr('进程操作'), self.lang_manager.tr('APP状态操作')],
+            self.lang_manager.tr('其他'): [self.lang_manager.tr('设备信息'), self.lang_manager.tr('赫拉配置'), self.lang_manager.tr('其他操作'), self.lang_manager.tr('log操作')]
         }
-        return cards_map.get(tab_name, ['默认'])
+        return cards_map.get(tab_name, [self.lang_manager.tr('默认')])
     
     def add_button(self, button_data):
         """添加按钮"""
@@ -161,25 +172,25 @@ class CustomButtonManager(QObject):
             
             # 验证必填字段
             if not button_data.get('name'):
-                logger.error("按钮名称不能为空")
+                logger.error(self.lang_manager.tr("按钮名称不能为空"))
                 return False
             
             # 对于非Python脚本类型，验证命令字段
             button_type = button_data.get('type', 'adb')
             if button_type != 'python' and not button_data.get('command'):
-                logger.error("命令不能为空")
+                logger.error(self.lang_manager.tr("命令不能为空"))
                 return False
             
             # 验证命令安全性（仅对ADB命令类型）
             if button_type == 'adb' and not self.validate_command(button_data.get('command', '')):
-                logger.error("ADB命令包含不允许的内容")
+                logger.error(self.lang_manager.tr("ADB命令包含不允许的内容"))
                 return False
             
             self.buttons.append(button_data)
             return self.save_buttons()
             
         except Exception as e:
-            logger.exception(f"添加按钮失败: {e}")
+            logger.exception(f"{self.lang_manager.tr('添加按钮失败:')} {e}")
             return False
     
     def update_button(self, button_id, button_data):
@@ -192,7 +203,7 @@ class CustomButtonManager(QObject):
                     
                     # 验证命令安全性（仅对ADB命令类型）
                     if button_type == 'adb' and not self.validate_command(button_data.get('command', '')):
-                        logger.error("ADB命令包含不允许的内容")
+                        logger.error(self.lang_manager.tr("ADB命令包含不允许的内容"))
                         return False
                     
                     # 保留ID
@@ -200,11 +211,11 @@ class CustomButtonManager(QObject):
                     self.buttons[i] = button_data
                     return self.save_buttons()
             
-            logger.error(f"未找到ID为 {button_id} 的按钮")
+            logger.error(f"{self.lang_manager.tr('未找到ID为')} {button_id} {self.lang_manager.tr('的按钮')}")
             return False
             
         except Exception as e:
-            logger.exception(f"更新按钮失败: {e}")
+            logger.exception(f"{self.lang_manager.tr('更新按钮失败:')} {e}")
             return False
     
     def delete_button(self, button_id):
@@ -214,7 +225,7 @@ class CustomButtonManager(QObject):
             return self.save_buttons()
             
         except Exception as e:
-            logger.exception(f"删除按钮失败: {e}")
+            logger.exception(f"{self.lang_manager.tr('删除按钮失败:')} {e}")
             return False
     
     def validate_command(self, command):
@@ -264,7 +275,7 @@ class CustomButtonManager(QObject):
                     continue
             
             if data is None:
-                logger.error(f"无法读取文件 {file_path}，尝试了多种编码")
+                logger.error(f"{self.lang_manager.tr('无法读取文件')} {file_path}，{self.lang_manager.tr('尝试了多种编码')}")
                 return False
             
             imported_buttons = data.get('custom_buttons', [])
@@ -280,7 +291,7 @@ class CustomButtonManager(QObject):
             return self.save_buttons()
                 
         except Exception as e:
-            logger.exception(f"导入按钮配置失败: {e}")
+            logger.exception(f"{self.lang_manager.tr('导入按钮配置失败:')} {e}")
             return False
     
     def export_buttons(self, file_path):
@@ -290,17 +301,17 @@ class CustomButtonManager(QObject):
                 'custom_buttons': self.buttons,
                 'version': '1.0',
                 'export_time': datetime.datetime.now().isoformat(),
-                'export_note': '用户自定义按钮配置导出'
+                'export_note': self.lang_manager.tr('用户自定义按钮配置导出')
             }
             
             with open(file_path, 'w', encoding='utf-8') as f:
                 json.dump(data, f, ensure_ascii=False, indent=2)
             
-            logger.info(f"成功导出按钮配置到: {file_path}")
+            logger.info(f"{self.lang_manager.tr('成功导出按钮配置到:')} {file_path}")
             return True
             
         except Exception as e:
-            logger.exception(f"导出按钮配置失败: {e}")
+            logger.exception(f"{self.lang_manager.tr('导出按钮配置失败:')} {e}")
             return False
     
     def backup_config(self, backup_path=None):
@@ -313,24 +324,24 @@ class CustomButtonManager(QObject):
                 'custom_buttons': self.buttons,
                 'version': '1.0',
                 'backup_time': datetime.datetime.now().isoformat(),
-                'backup_note': '用户自定义按钮配置备份'
+                'backup_note': self.lang_manager.tr('用户自定义按钮配置备份')
             }
             
             with open(backup_path, 'w', encoding='utf-8') as f:
                 json.dump(data, f, ensure_ascii=False, indent=2)
             
-            logger.info(f"配置已备份到: {backup_path}")
+            logger.info(f"{self.lang_manager.tr('配置已备份到:')} {backup_path}")
             return backup_path
             
         except Exception as e:
-            logger.exception(f"备份配置失败: {e}")
+            logger.exception(f"{self.lang_manager.tr('备份配置失败:')} {e}")
             return None
     
     def restore_config(self, backup_path):
         """从备份文件恢复配置"""
         try:
             if not os.path.exists(backup_path):
-                logger.error(f"备份文件不存在: {backup_path}")
+                logger.error(f"{self.lang_manager.tr('备份文件不存在:')} {backup_path}")
                 return False
             
             # 使用多种编码尝试读取
@@ -346,7 +357,7 @@ class CustomButtonManager(QObject):
                     continue
             
             if data is None:
-                logger.error(f"无法读取备份文件: {backup_path}")
+                logger.error(f"{self.lang_manager.tr('无法读取备份文件:')} {backup_path}")
                 return False
             
             # 恢复按钮配置
@@ -355,13 +366,13 @@ class CustomButtonManager(QObject):
             # 保存到当前配置文件
             success = self.save_buttons()
             if success:
-                logger.info(f"配置已从备份恢复: {backup_path}")
-                logger.info(f"恢复了 {len(self.buttons)} 个自定义按钮")
+                logger.info(f"{self.lang_manager.tr('配置已从备份恢复:')} {backup_path}")
+                logger.info(f"{self.lang_manager.tr('恢复了')} {len(self.buttons)} {self.lang_manager.tr('个自定义按钮')}")
             
             return success
             
         except Exception as e:
-            logger.exception(f"恢复配置失败: {e}")
+            logger.exception(f"{self.lang_manager.tr('恢复配置失败:')} {e}")
             return False
     
     def get_config_info(self):
@@ -393,7 +404,7 @@ class CustomButtonManager(QObject):
                 # Python脚本使用script字段，而不是command字段
                 script_code = button_data.get('script', '')
                 if not script_code:
-                    return False, "Python脚本内容为空"
+                    return False, self.lang_manager.tr("Python脚本内容为空")
                 return self._execute_python_script(script_code)
             elif button_type == 'file':
                 return self._open_file(command)
@@ -402,17 +413,17 @@ class CustomButtonManager(QObject):
             elif button_type == 'system':
                 return self._execute_system_command(command)
             else:
-                logger.error(f"不支持的按钮类型: {button_type}")
-                return False, f"不支持的按钮类型: {button_type}"
+                logger.error(f"{self.lang_manager.tr('不支持的按钮类型:')} {button_type}")
+                return False, f"{self.lang_manager.tr('不支持的按钮类型:')} {button_type}"
                 
         except Exception as e:
-            logger.exception(f"执行按钮命令失败: {e}")
+            logger.exception(f"{self.lang_manager.tr('执行按钮命令失败:')} {e}")
             return False, str(e)
     
     def _execute_adb_command(self, command, device_id):
         """执行ADB命令"""
         if not device_id:
-            return False, "未选择设备"
+            return False, self.lang_manager.tr("未选择设备")
         
         # 清理命令格式
         clean_command = command.strip()
@@ -437,9 +448,9 @@ class CustomButtonManager(QObject):
             return success, output
             
         except subprocess.TimeoutExpired:
-            return False, "命令执行超时"
+            return False, self.lang_manager.tr("命令执行超时")
         except Exception as e:
-            return False, f"执行失败: {str(e)}"
+            return False, f"{self.lang_manager.tr('执行失败:')} {str(e)}"
     
     def _execute_python_script(self, script_code):
         """执行Python脚本"""
@@ -502,21 +513,21 @@ class CustomButtonManager(QObject):
                 # 组合输出结果
                 result_output = ""
                 if stdout_output:
-                    result_output += f"输出:\n{stdout_output}"
+                    result_output += f"{self.lang_manager.tr('输出:')}\n{stdout_output}"
                 if stderr_output:
-                    result_output += f"\n错误:\n{stderr_output}"
+                    result_output += f"\n{self.lang_manager.tr('错误:')}\n{stderr_output}"
                 
                 if result_output:
                     return True, result_output
                 else:
-                    return True, "Python脚本执行完成（无输出）"
+                    return True, self.lang_manager.tr("Python脚本执行完成（无输出）")
                     
             except Exception as exec_error:
                 # 如果执行过程中出错，返回错误信息
-                return False, f"Python脚本执行错误: {str(exec_error)}"
+                return False, f"{self.lang_manager.tr('Python脚本执行错误:')} {str(exec_error)}"
             
         except Exception as e:
-            return False, f"Python脚本执行失败: {str(e)}"
+            return False, f"{self.lang_manager.tr('Python脚本执行失败:')} {str(e)}"
     
     def _open_file(self, file_path):
         """打开文件或文件夹"""
@@ -530,22 +541,22 @@ class CustomButtonManager(QObject):
             else:  # Linux
                 subprocess.run(['xdg-open', file_path])
             
-            return True, f"已打开: {file_path}"
+            return True, f"{self.lang_manager.tr('已打开:')} {file_path}"
             
         except Exception as e:
-            return False, f"打开文件失败: {str(e)}"
+            return False, f"{self.lang_manager.tr('打开文件失败:')} {str(e)}"
     
     def _run_program(self, program_path):
         """运行程序"""
         try:
             if os.path.exists(program_path):
                 subprocess.Popen([program_path])
-                return True, f"已启动程序: {program_path}"
+                return True, f"{self.lang_manager.tr('已启动程序:')} {program_path}"
             else:
-                return False, f"程序不存在: {program_path}"
+                return False, f"{self.lang_manager.tr('程序不存在:')} {program_path}"
                 
         except Exception as e:
-            return False, f"运行程序失败: {str(e)}"
+            return False, f"{self.lang_manager.tr('运行程序失败:')} {str(e)}"
     
     def _execute_system_command(self, command):
         """执行系统命令"""
@@ -564,7 +575,7 @@ class CustomButtonManager(QObject):
             return success, output
             
         except subprocess.TimeoutExpired:
-            return False, "命令执行超时"
+            return False, self.lang_manager.tr("命令执行超时")
         except Exception as e:
-            return False, f"执行失败: {str(e)}"
+            return False, f"{self.lang_manager.tr('执行失败:')} {str(e)}"
 

@@ -8,10 +8,16 @@ PyQt5赫拉配置管理器
 import os
 import time
 import subprocess
+import sys
 from datetime import datetime
 from PyQt5.QtCore import QObject, pyqtSignal, QThread
 from PyQt5.QtWidgets import QMessageBox
 from core.resource_utils import get_apk_path
+
+# 检测是否在PyInstaller打包环境中运行
+def is_pyinstaller():
+    """检测是否在PyInstaller打包环境中运行"""
+    return getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS')
 
 # 可选依赖
 try:
@@ -53,25 +59,31 @@ class HeraConfigWorker(QThread):
         self.output_dir = None
         self.d = None  # uiautomator2设备对象
         self.test_package_name = "com.example.test"
+        # 从父窗口获取语言管理器
+        self.lang_manager = parent.lang_manager if parent and hasattr(parent, 'lang_manager') else None
+    
+    def tr(self, text):
+        """安全地获取翻译文本"""
+        return self.lang_manager.tr(text) if self.lang_manager else text
         
     def run(self):
         """执行配置流程"""
         try:
-            self.progress.emit("开始赫拉配置流程...")
+            self.progress.emit(self.tr("开始赫拉配置流程..."))
             time.sleep(0.5)
             
             # 1. 安装APK
             if self.config_options.get('install_apk', True):
                 if not self._install_apk():
-                    self.progress.emit("❌ 赫拉配置终止：必须安装com.example.test.apk")
-                    self.finished.emit(False, "必须安装com.example.test.apk才能继续配置")
+                    self.progress.emit(f"❌ {self.tr('赫拉配置终止：必须安装com.example.test.apk')}")
+                    self.finished.emit(False, self.tr("必须安装com.example.test.apk才能继续配置"))
                     return
                 time.sleep(0.5)
             
             # 2. 初始化uiautomator2
             uiautomator_available = self._init_uiautomator()
             if not uiautomator_available:
-                self.progress.emit("⚠️ 跳过需要UI自动化的步骤")
+                self.progress.emit(f"⚠️ {self.tr('跳过需要UI自动化的步骤')}")
             time.sleep(0.5)
             
             # 3. 设置屏幕常亮
@@ -96,7 +108,7 @@ class HeraConfigWorker(QThread):
                 if uiautomator_available:
                     self._handle_gdpr_settings()
                 else:
-                    self.progress.emit("⚠️ 跳过GDPR设置 (需要UI自动化)")
+                    self.progress.emit(f"⚠️ {self.tr('跳过GDPR设置 (需要UI自动化)')}")
                 time.sleep(0.5)
             
             # 8. 检查各种状态
@@ -107,27 +119,27 @@ class HeraConfigWorker(QThread):
             # 9. 运行bugreport
             if self.config_options.get('run_bugreport', False):
                 if not self._run_bugreport():
-                    self.failed_items.append("bugreport收集")
+                    self.failed_items.append(self.tr("bugreport收集"))
             
             # 10. 模拟应用崩溃
             if self.config_options.get('simulate_crash', False):
                 if not self._simulate_app_crash():
-                    self.failed_items.append("应用崩溃模拟")
+                    self.failed_items.append(self.tr("应用崩溃模拟"))
             
             # 根据失败项目决定最终结果
             if self.failed_items:
-                self.progress.emit("赫拉配置终止！")
+                self.progress.emit(self.tr("赫拉配置终止！"))
                 failure_reasons = "、".join(self.failed_items)
-                self.finished.emit(False, f"失败项目:\n{failure_reasons}")
+                self.finished.emit(False, f"{self.tr('失败项目:')}\n{failure_reasons}")
             else:
-                self.progress.emit("赫拉配置完成！")
+                self.progress.emit(self.tr("赫拉配置完成！"))
                 self._set_screen_timeout(60000)
                 self._show_completion_tips()
-                self.finished.emit(True, "赫拉配置完成！")
+                self.finished.emit(True, self.tr("赫拉配置完成！"))
                 
         except Exception as e:
-            self.progress.emit(f"❌ 赫拉配置失败: {str(e)}")
-            self.finished.emit(False, f"配置失败: {str(e)}")
+            self.progress.emit(f"❌ {self.tr('赫拉配置失败:')} {str(e)}")
+            self.finished.emit(False, f"{self.tr('配置失败:')} {str(e)}")
     
     def _ensure_output_directory(self):
         """确保输出目录存在"""
@@ -137,7 +149,7 @@ class HeraConfigWorker(QThread):
                 self.output_dir = f"C:\\log\\{today}\\hera"
                 os.makedirs(self.output_dir, exist_ok=True)
             except Exception as e:
-                self.progress.emit(f"⚠️ 创建输出目录失败: {str(e)}")
+                self.progress.emit(f"⚠️ {self.tr('创建输出目录失败:')} {str(e)}")
                 self.output_dir = "."
         return self.output_dir
     
@@ -146,27 +158,27 @@ class HeraConfigWorker(QThread):
         try:
             # 检查APK是否已安装
             if self._check_apk_installed():
-                self.progress.emit("✅ 测试APK已安装，跳过安装步骤")
+                self.progress.emit(f"✅ {self.tr('测试APK已安装，跳过安装步骤')}")
                 return True
             
             # 查找APK文件
             apk_file = self._find_apk_file()
             if not apk_file:
-                self.progress.emit("❌ 找不到APK文件")
+                self.progress.emit(f"❌ {self.tr('找不到APK文件')}")
                 return False
             
-            self.progress.emit(f"正在安装APK: {os.path.basename(apk_file)}")
+            self.progress.emit(self.tr("正在安装APK: ") + os.path.basename(apk_file))
             result = run_adb_command(["adb", "-s", self.device, "install", "-r", apk_file], 
                                    capture_output=True, text=True, timeout=60)
             
             if result.returncode == 0:
-                self.progress.emit("✅ APK安装成功")
+                self.progress.emit(f"✅ {self.tr('APK安装成功')}")
                 return True
             else:
-                self.progress.emit(f"❌ APK安装失败: {result.stderr}")
+                self.progress.emit(f"❌ {self.tr('APK安装失败:')} {result.stderr}")
                 return False
         except Exception as e:
-            self.progress.emit(f"❌ APK安装异常: {str(e)}")
+            self.progress.emit(f"❌ {self.tr('APK安装异常:')} {str(e)}")
             return False
     
     def _check_apk_installed(self):
@@ -176,7 +188,7 @@ class HeraConfigWorker(QThread):
                                    capture_output=True, text=True, timeout=10)
             return self.test_package_name in result.stdout
         except Exception as e:
-            self.progress.emit(f"❌ 检查APK安装状态失败: {str(e)}")
+            self.progress.emit(f"❌ {self.tr('检查APK安装状态失败:')} {str(e)}")
             return False
     
     def _find_apk_file(self):
@@ -196,21 +208,35 @@ class HeraConfigWorker(QThread):
             
             return None
         except Exception as e:
-            self.progress.emit(f"⚠️ 查找APK文件失败: {str(e)}")
+            self.progress.emit(f"⚠️ {self.tr('查找APK文件失败:')} {str(e)}")
             return None
     
     def _init_uiautomator(self):
         """初始化uiautomator2"""
         try:
+            print(f"[DEBUG] {self.tr('开始初始化UIAutomator2，设备:')} {self.device}")
+            print(f"[DEBUG] {self.tr('当前环境:')} {'exe' if is_pyinstaller() else 'python'}")
+            print(f"[DEBUG] {self.tr('UIAutomator2可用性:')} {HAS_UIAUTOMATOR2}")
+            
             if not HAS_UIAUTOMATOR2:
-                self.progress.emit("❌ uiautomator2未安装，跳过UI自动化操作")
+                print(f"[DEBUG] {self.tr('UIAutomator2未安装，跳过UI自动化操作')}")
+                self.progress.emit(f"❌ {self.tr('uiautomator2未安装，跳过UI自动化操作')}")
                 return False
             
-            self.progress.emit("正在初始化uiautomator2...")
+            self.progress.emit(self.tr("正在初始化uiautomator2..."))
+            
+            # 在exe环境下设置特殊的环境变量
+            if is_pyinstaller():
+                print(f"[DEBUG] {self.tr('exe环境，设置UIAutomator2环境变量')}")
+                if hasattr(sys, '_MEIPASS'):
+                    temp_dir = sys._MEIPASS
+                    os.environ['UIAUTOMATOR2_TEMP_DIR'] = temp_dir
+                    print(f"[DEBUG] {self.tr('设置UIAUTOMATOR2_TEMP_DIR:')} {temp_dir}")
             
             # 安装uiautomator APK
             if not self._install_uiautomator_apk():
-                self.progress.emit("❌ uiautomator APK安装失败")
+                print(f"[DEBUG] {self.tr('uiautomator APK安装失败')}")
+                self.progress.emit(f"❌ {self.tr('uiautomator APK安装失败')}")
                 return False
             
             # 确保屏幕开启并解锁
@@ -219,18 +245,22 @@ class HeraConfigWorker(QThread):
             # 连接设备
             self.d = self._connect_device_with_retry(self.device)
             if not self.d:
-                self.progress.emit("❌ 设备连接失败")
+                print(f"[DEBUG] {self.tr('设备连接失败')}")
+                self.progress.emit(f"❌ {self.tr('设备连接失败')}")
                 return False
             
             # 测试连接
             if not self._test_uiautomator_connection():
-                self.progress.emit("❌ uiautomator连接测试失败")
+                print(f"[DEBUG] {self.tr('uiautomator连接测试失败')}")
+                self.progress.emit(f"❌ {self.tr('uiautomator连接测试失败')}")
                 return False
             
-            self.progress.emit("✅ uiautomator2初始化成功")
+            print(f"[DEBUG] {self.tr('uiautomator2初始化成功')}")
+            self.progress.emit(f"✅ {self.tr('uiautomator2初始化成功')}")
             return True
         except Exception as e:
-            self.progress.emit(f"❌ uiautomator2初始化失败: {str(e)}")
+            print(f"[DEBUG] {self.tr('uiautomator2初始化失败:')} {str(e)}")
+            self.progress.emit(f"❌ {self.tr('uiautomator2初始化失败:')} {str(e)}")
             return False
     
     def _install_uiautomator_apk(self):
@@ -240,10 +270,10 @@ class HeraConfigWorker(QThread):
             result = run_adb_command(['adb', 'shell', 'pm', 'list', 'packages', 'com.github.uiautomator'], 
                                    capture_output=True, text=True)
             if 'com.github.uiautomator' in result.stdout:
-                self.progress.emit("✅ uiautomator APK已安装")
+                self.progress.emit(f"✅ {self.tr('uiautomator APK已安装')}")
                 return True
             
-            self.progress.emit("正在安装uiautomator APK...")
+            self.progress.emit(self.tr("正在安装uiautomator APK..."))
             
             # 使用资源路径获取函数
             app_path = get_apk_path("app-uiautomator.apk")
@@ -252,13 +282,13 @@ class HeraConfigWorker(QThread):
             if os.path.exists(app_path) and os.path.exists(test_path):
                 run_adb_command(['adb', 'install', '-r', app_path], check=True)
                 run_adb_command(['adb', 'install', '-r', test_path], check=True)
-                self.progress.emit("✅ uiautomator APK安装成功")
+                self.progress.emit(f"✅ {self.tr('uiautomator APK安装成功')}")
                 return True
             else:
-                self.progress.emit("❌ uiautomator APK文件不存在")
+                self.progress.emit(f"❌ {self.tr('uiautomator APK文件不存在')}")
                 return False
         except Exception as e:
-            self.progress.emit(f"❌ uiautomator APK安装失败: {str(e)}")
+            self.progress.emit(f"❌ {self.tr('uiautomator APK安装失败:')} {str(e)}")
             return False
     
     def _ensure_screen_on_and_unlocked(self):
@@ -271,7 +301,7 @@ class HeraConfigWorker(QThread):
             if result.returncode == 0:
                 if "mScreenState=OFF" in result.stdout:
                     # 屏幕关闭，点亮
-                    self.progress.emit("屏幕关闭，正在点亮...")
+                    self.progress.emit(self.tr("屏幕关闭，正在点亮..."))
                     wake_cmd = f"adb -s {self.device} shell input keyevent KEYCODE_WAKEUP"
                     run_adb_command(wake_cmd, capture_output=True, text=True, timeout=15)
                     time.sleep(2)
@@ -281,11 +311,11 @@ class HeraConfigWorker(QThread):
             lock_result = run_adb_command(lock_check_cmd, capture_output=True, text=True, timeout=15)
             
             if lock_result.returncode == 0 and "mScreenLocked=true" in lock_result.stdout:
-                self.progress.emit("屏幕锁定，正在解锁...")
+                self.progress.emit(self.tr("屏幕锁定，正在解锁..."))
                 self._unlock_device()
                 time.sleep(1)
         except Exception as e:
-            self.progress.emit(f"❌ 屏幕状态处理失败: {str(e)}")
+            self.progress.emit(f"❌ {self.tr('屏幕状态处理失败:')} {str(e)}")
     
     def _unlock_device(self):
         """解锁设备"""
@@ -294,17 +324,20 @@ class HeraConfigWorker(QThread):
             run_adb_command(['adb', 'shell', 'input', 'keyevent', '82'], check=True)
             time.sleep(1)
         except Exception as e:
-            self.progress.emit(f"❌ 解锁设备失败: {str(e)}")
+            self.progress.emit(f"❌ {self.tr('解锁设备失败:')} {str(e)}")
     
     def _connect_device_with_retry(self, device_id, max_retries=3):
         """带重试机制的设备连接"""
         for attempt in range(max_retries):
             try:
+                print(f"[DEBUG] {self.tr('尝试连接设备')} {device_id}{self.tr('，第')}{attempt + 1}{self.tr('次')}")
                 device = u2.connect(device_id)
                 device.info
+                print(f"[DEBUG] {self.tr('设备连接成功:')} {device_id}")
                 return device
             except Exception as e:
-                self.progress.emit(f"❌ 连接尝试{attempt + 1}失败: {str(e)}")
+                print(f"[DEBUG] {self.tr('连接尝试')}{attempt + 1}{self.tr('失败:')} {str(e)}")
+                self.progress.emit(f"❌ {self.tr('连接尝试')}{attempt + 1}{self.tr('失败:')} {str(e)}")
                 if attempt < max_retries - 1:
                     time.sleep(2)
                 else:
@@ -318,11 +351,11 @@ class HeraConfigWorker(QThread):
             
             device_info = self.d.info
             if device_info and 'displayWidth' in device_info:
-                self.progress.emit(f"✅ 设备信息获取成功: {device_info['displayWidth']}x{device_info['displayHeight']}")
+                self.progress.emit(f"✅ {self.tr('设备信息获取成功:')} {device_info['displayWidth']}x{device_info['displayHeight']}")
                 return True
             return False
         except Exception as e:
-            self.progress.emit(f"❌ uiautomator连接测试异常: {str(e)}")
+            self.progress.emit(f"❌ {self.tr('uiautomator连接测试异常:')} {str(e)}")
             return False
     
     def _set_screen_timeout(self, timeout):
@@ -330,21 +363,21 @@ class HeraConfigWorker(QThread):
         try:
             run_adb_command(["adb", "-s", self.device, "shell", "settings", "put", "system", "screen_off_timeout", str(timeout)])
             if timeout == 2147483647:
-                self.progress.emit("✅ 屏幕超时已设置为永不灭屏")
+                self.progress.emit(f"✅ {self.tr('屏幕超时已设置为永不灭屏')}")
             elif timeout == 60000:
-                self.progress.emit("✅ 屏幕超时已设置为60秒")
+                self.progress.emit(f"✅ {self.tr('屏幕超时已设置为60秒')}")
             else:
-                self.progress.emit(f"✅ 屏幕超时已设置为{timeout}毫秒")
+                self.progress.emit(f"✅ {self.tr('屏幕超时已设置为')}{timeout}{self.tr('毫秒')}")
         except Exception as e:
-            self.progress.emit(f"❌ 设置屏幕超时失败: {str(e)}")
+            self.progress.emit(f"❌ {self.tr('设置屏幕超时失败:')} {str(e)}")
     
     def _disable_tcl_logger(self):
         """禁用TCL logger"""
         try:
             run_adb_command(["adb", "-s", self.device, "shell", "pm", "disable-user", "com.tcl.logger"], check=True)
-            self.progress.emit("✅ com.tcl.logger 已禁用")
+            self.progress.emit(f"✅ {self.tr('com.tcl.logger 已禁用')}")
         except Exception as e:
-            self.progress.emit(f"❌ 禁用TCL logger失败: {str(e)}")
+            self.progress.emit(f"❌ {self.tr('禁用TCL logger失败:')} {str(e)}")
     
     def _start_logger(self):
         """启动logger"""
@@ -352,7 +385,7 @@ class HeraConfigWorker(QThread):
             run_adb_command(["adb", "-s", self.device, "shell", "am", "start", "-n", "com.debug.loggerui/.MainActivity"], check=True)
             time.sleep(1)
         except Exception as e:
-            self.progress.emit(f"❌ 启动Logger失败: {str(e)}")
+            self.progress.emit(f"❌ {self.tr('启动Logger失败:')} {str(e)}")
     
     def _setup_mobile_log(self):
         """设置MobileLog"""
@@ -371,11 +404,11 @@ class HeraConfigWorker(QThread):
             if self.d:
                 self._check_and_click_mobile_log_toggle()
             else:
-                self.progress.emit("⚠️ 跳过MobileLog开关点击 (需要UI自动化)")
+                self.progress.emit(f"⚠️ {self.tr('跳过MobileLog开关点击 (需要UI自动化)')}")
             
-            self.progress.emit("✅ 日志设置完成")
+                self.progress.emit(f"✅ {self.tr('日志设置完成')}")
         except Exception as e:
-            self.progress.emit(f"❌ 设置MobileLog失败: {str(e)}")
+            self.progress.emit(f"❌ {self.tr('设置MobileLog失败:')} {str(e)}")
     
     def _check_and_click_mobile_log_toggle(self):
         """检查并点击MobileLog开关"""
@@ -390,14 +423,14 @@ class HeraConfigWorker(QThread):
                 info = toggle_button.info
                 if not info.get('checked', False):
                     toggle_button.click()
-                    self.progress.emit("✅ MobileLog日志开关已点击")
+                    self.progress.emit(f"✅ {self.tr('MobileLog日志开关已点击')}")
                     time.sleep(1)
                 else:
-                    self.progress.emit("✅ MobileLog日志已启用")
+                    self.progress.emit(f"✅ {self.tr('MobileLog日志已启用')}")
             else:
-                self.progress.emit("❌ MobileLog开关未找到")
+                self.progress.emit(f"❌ {self.tr('MobileLog开关未找到')}")
         except Exception as e:
-            self.progress.emit(f"❌ 点击MobileLog开关失败: {str(e)}")
+            self.progress.emit(f"❌ {self.tr('点击MobileLog开关失败:')} {str(e)}")
     
     def _handle_gdpr_settings(self):
         """处理GDPR设置"""
@@ -411,7 +444,7 @@ class HeraConfigWorker(QThread):
             # 返回主屏幕
             self._press_home()
         except Exception as e:
-            self.progress.emit(f"❌ 处理GDPR设置失败: {str(e)}")
+            self.progress.emit(f"❌ {self.tr('处理GDPR设置失败:')} {str(e)}")
     
     def _check_and_click_gdpr_checkbox(self):
         """检查并点击GDPR复选框"""
@@ -428,24 +461,24 @@ class HeraConfigWorker(QThread):
                 info = checkbox.info
                 if not info.get('checked', False):
                     checkbox.click()
-                    self.progress.emit("✅ GDPR复选框1已点击")
+                    self.progress.emit(f"✅ {self.tr('GDPR复选框1已点击')}")
                     time.sleep(1)
                 else:
-                    self.progress.emit("✅ GDPR复选框1已选中")
+                    self.progress.emit(f"✅ {self.tr('GDPR复选框1已选中')}")
             
             if checkbox2.exists():
                 info = checkbox2.info
                 if not info.get('checked', False):
                     checkbox2.click()
-                    self.progress.emit("✅ GDPR复选框2已点击")
+                    self.progress.emit(f"✅ {self.tr('GDPR复选框2已点击')}")
                     time.sleep(1)
                 else:
-                    self.progress.emit("✅ GDPR复选框2已选中")
+                    self.progress.emit(f"✅ {self.tr('GDPR复选框2已选中')}")
             
             if not checkbox.exists() and not checkbox2.exists():
-                self.progress.emit("❌ 未找到GDPR复选框")
+                self.progress.emit(f"❌ {self.tr('未找到GDPR复选框')}")
         except Exception as e:
-            self.progress.emit(f"❌ 处理GDPR复选框失败: {str(e)}")
+            self.progress.emit(f"❌ {self.tr('处理GDPR复选框失败:')} {str(e)}")
     
     def _check_all_status(self):
         """检查所有状态"""
@@ -453,7 +486,7 @@ class HeraConfigWorker(QThread):
         try:
             # 检查heserver
             if not self._check_heserver_running():
-                failed_items.append("heserver运行状态")
+                failed_items.append(self.tr("heserver运行状态"))
             
             # 导出feature信息
             self._dump_feature()
@@ -464,16 +497,16 @@ class HeraConfigWorker(QThread):
             
             # 检查UXP状态
             if not self._check_uxp_enable():
-                failed_items.append("UXP启用状态")
+                failed_items.append(self.tr("UXP启用状态"))
             
             # 检查在线支持
             if not self._check_online_support():
-                failed_items.append("在线支持服务")
+                failed_items.append(self.tr("在线支持服务"))
             
             return failed_items
         except Exception as e:
-            self.progress.emit(f"❌ 检查状态失败: {str(e)}")
-            failed_items.append("状态检查")
+            self.progress.emit(f"❌ {self.tr('检查状态失败:')} {str(e)}")
+            failed_items.append(self.tr("状态检查"))
             return failed_items
     
     def _check_heserver_running(self):
@@ -481,13 +514,13 @@ class HeraConfigWorker(QThread):
         try:
             result = run_adb_command(['adb', 'shell', 'ps', '-A'], capture_output=True, text=True)
             if 'heserver' in result.stdout:
-                self.progress.emit("✅ heserver正在运行")
+                self.progress.emit(f"✅ {self.tr('heserver正在运行')}")
                 return True
             else:
-                self.progress.emit("❌ heserver未运行")
+                self.progress.emit(f"❌ {self.tr('heserver未运行')}")
                 return False
         except Exception as e:
-            self.progress.emit(f"❌ 检查heserver失败: {str(e)}")
+            self.progress.emit(f"❌ {self.tr('检查heserver失败:')} {str(e)}")
             return False
     
     def _dump_feature(self):
@@ -497,9 +530,9 @@ class HeraConfigWorker(QThread):
             output_file = os.path.join(output_dir, 'dumpfeature.txt')
             with open(output_file, 'w', encoding='utf-8') as f:
                 run_adb_command(['adb', 'shell', 'dumpsys', 'feature'], stdout=f, check=True)
-            self.progress.emit(f"✅ Feature信息已导出到: {output_file}")
+            self.progress.emit(f"✅ {self.tr('Feature信息已导出到:')} {output_file}")
         except Exception as e:
-            self.progress.emit(f"❌ 导出Feature信息失败: {str(e)}")
+            self.progress.emit(f"❌ {self.tr('导出Feature信息失败:')} {str(e)}")
     
     def _check_heraeye_feature(self):
         """检查heraeye feature状态"""
@@ -507,13 +540,13 @@ class HeraConfigWorker(QThread):
             result = run_adb_command(['adb', 'shell', 'feature', 'query', 'heraeye'], 
                                    capture_output=True, text=True)
             if '{"name":"enable","value":"true"}' in result.stdout:
-                self.progress.emit("✅ Heraeye feature已启用")
+                self.progress.emit(f"✅ {self.tr('Heraeye feature已启用')}")
                 return True
             else:
-                self.progress.emit("❌ Heraeye feature未启用")
+                self.progress.emit(f"❌ {self.tr('Heraeye feature未启用')}")
                 return False
         except Exception as e:
-            self.progress.emit(f"❌ 检查Heraeye feature失败: {str(e)}")
+            self.progress.emit(f"❌ {self.tr('检查Heraeye feature失败:')} {str(e)}")
             return False
     
     def _check_uxp_enable(self):
@@ -522,13 +555,13 @@ class HeraConfigWorker(QThread):
             result = run_adb_command(['adb', 'shell', 'getprop', 'ro.product.uxp.enable'], 
                                    capture_output=True, text=True)
             if result.stdout.strip().lower() == 'true':
-                self.progress.emit("✅ UXP已启用")
+                self.progress.emit(f"✅ {self.tr('UXP已启用')}")
                 return True
             else:
-                self.progress.emit("❌ UXP未启用")
+                self.progress.emit(f"❌ {self.tr('UXP未启用')}")
                 return False
         except Exception as e:
-            self.progress.emit(f"❌ 检查UXP状态失败: {str(e)}")
+            self.progress.emit(f"❌ {self.tr('检查UXP状态失败:')} {str(e)}")
             return False
     
     def _check_online_support(self):
@@ -547,19 +580,19 @@ class HeraConfigWorker(QThread):
             register_status = 'Register: true' in result.stdout
             
             if register_status:
-                self.progress.emit("✅ 在线支持已注册")
+                self.progress.emit(f"✅ {self.tr('在线支持已注册')}")
                 return True
             else:
-                self.progress.emit("❌ 在线支持未注册")
+                self.progress.emit(f"❌ {self.tr('在线支持未注册')}")
                 return False
         except Exception as e:
-            self.progress.emit(f"❌ 检查在线支持失败: {str(e)}")
+            self.progress.emit(f"❌ {self.tr('检查在线支持失败:')} {str(e)}")
             return False
     
     def _run_bugreport(self):
         """运行bugreport"""
         try:
-            self.progress.emit("正在收集bugreport...")
+            self.progress.emit(self.tr("正在收集bugreport..."))
             
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             output_dir = self._ensure_output_directory()
@@ -569,27 +602,27 @@ class HeraConfigWorker(QThread):
             result = run_adb_command(cmd, capture_output=True, text=True, timeout=300)
             
             if result.returncode == 0:
-                self.progress.emit(f"✅ bugreport收集完成，保存到: {output_file}")
+                self.progress.emit(f"✅ {self.tr('bugreport收集完成，保存到:')} {output_file}")
                 return True
             else:
-                self.progress.emit(f"❌ bugreport收集失败: {result.stderr}")
+                self.progress.emit(f"❌ {self.tr('bugreport收集失败:')} {result.stderr}")
                 return False
         except Exception as e:
-            self.progress.emit(f"❌ 运行bugreport失败: {str(e)}")
+            self.progress.emit(f"❌ {self.tr('运行bugreport失败:')} {str(e)}")
             return False
     
     def _simulate_app_crash(self):
         """模拟应用崩溃"""
         try:
             if not self.d:
-                self.progress.emit("❌ 设备未连接，无法模拟崩溃")
+                self.progress.emit(f"❌ {self.tr('设备未连接，无法模拟崩溃')}")
                 return False
             
-            self.progress.emit("开始模拟应用崩溃 (10次，每次间隔305秒)...")
+            self.progress.emit(self.tr("开始模拟应用崩溃 (10次，每次间隔305秒)..."))
             
             success_count = 0
             for i in range(10):
-                self.progress.emit(f"执行第{i+1}次崩溃模拟...")
+                self.progress.emit(f"{self.tr('执行第')}{i+1}{self.tr('次崩溃模拟...')}")
                 
                 self._ensure_screen_on_and_unlocked()
                 
@@ -603,29 +636,29 @@ class HeraConfigWorker(QThread):
                 crash_button = self.d(resourceId="com.example.test:id/crash_button")
                 if crash_button.exists:
                     crash_button.click()
-                    self.progress.emit(f"✅ 第{i+1}次崩溃按钮已点击")
+                    self.progress.emit(f"✅ {self.tr('第')}{i+1}{self.tr('次崩溃按钮已点击')}")
                     time.sleep(3)
                     
                     # 检查崩溃日志
                     result = run_adb_command(['adb', 'logcat', '-b', 'crash', '-d'], 
                                            capture_output=True, text=True)
                     if "Simulated Crash" in result.stdout:
-                        self.progress.emit(f"✅ 第{i+1}次崩溃日志验证成功")
+                        self.progress.emit(f"✅ {self.tr('第')}{i+1}{self.tr('次崩溃日志验证成功')}")
                         success_count += 1
                     else:
-                        self.progress.emit(f"❌ 第{i+1}次崩溃日志验证失败")
+                        self.progress.emit(f"❌ {self.tr('第')}{i+1}{self.tr('次崩溃日志验证失败')}")
                 else:
-                    self.progress.emit(f"❌ 第{i+1}次崩溃按钮未找到")
+                    self.progress.emit(f"❌ {self.tr('第')}{i+1}{self.tr('次崩溃按钮未找到')}")
                 
                 # 如果不是最后一次，等待305秒
                 if i < 9:
-                    self.progress.emit(f"等待305秒后进行下一次崩溃模拟...")
+                    self.progress.emit(self.tr("等待305秒后进行下一次崩溃模拟..."))
                     time.sleep(305)
             
-            self.progress.emit(f"✅ 崩溃模拟完成，成功次数: {success_count}/10")
+            self.progress.emit(f"✅ {self.tr('崩溃模拟完成，成功次数:')} {success_count}/10")
             return success_count > 0
         except Exception as e:
-            self.progress.emit(f"❌ 模拟应用崩溃失败: {str(e)}")
+            self.progress.emit(f"❌ {self.tr('模拟应用崩溃失败:')} {str(e)}")
             return False
     
     def _press_home(self):
@@ -633,16 +666,16 @@ class HeraConfigWorker(QThread):
         try:
             run_adb_command(['adb', 'shell', 'input', 'keyevent', 'KEYCODE_HOME'], check=True)
             time.sleep(1)
-            self.progress.emit("✅ 已返回主屏幕")
+            self.progress.emit(f"✅ {self.tr('已返回主屏幕')}")
         except Exception as e:
-            self.progress.emit(f"❌ 返回主屏幕失败: {str(e)}")
+            self.progress.emit(f"❌ {self.tr('返回主屏幕失败:')} {str(e)}")
     
     def _show_completion_tips(self):
         """显示完成后的操作提示"""
-        tips = """Hera测试前置操作完成，
+        tips = f"""Hera测试前置操作完成，
 
 1. 保持SIM卡在手机中，WIFI一直处于连接状态，插上充电器等待超过25H。
-2. 25小时后点亮手机屏幕连接电脑，使用该工具"赫拉测试数据收集"按钮。
+2. 25小时后点亮手机屏幕连接电脑，使用该工具{self.tr("赫拉测试数据收集")}按钮。
 """
         self.progress.emit("=" * 60)
         self.progress.emit(tips)
@@ -659,17 +692,23 @@ class HeraDataCollectionWorker(QThread):
         super().__init__(parent)
         self.device = device
         self.output_dir = None
+        # 从父窗口获取语言管理器
+        self.lang_manager = parent.lang_manager if parent and hasattr(parent, 'lang_manager') else None
+    
+    def tr(self, text):
+        """安全地获取翻译文本"""
+        return self.lang_manager.tr(text) if self.lang_manager else text
         
     def run(self):
         """执行数据收集流程"""
         try:
-            self.progress.emit("开始赫拉测试数据收集...")
+            self.progress.emit(self.tr("开始赫拉测试数据收集..."))
             time.sleep(0.5)
             
             # 导出Onlinesupport数据
             if not self._export_onlinesupport_data():
-                self.progress.emit("❌ 导出Onlinesupport数据失败")
-                self.finished.emit(False, "导出Onlinesupport数据失败")
+                self.progress.emit(f"❌ {self.tr('导出Onlinesupport数据失败')}")
+                self.finished.emit(False, self.tr("导出Onlinesupport数据失败"))
                 return
             
             # 分析数据
@@ -677,20 +716,20 @@ class HeraDataCollectionWorker(QThread):
             
             # 显示结果
             if analysis_result["status"] == "success":
-                self.progress.emit("✅ 赫拉测试数据收集完成")
-                self.progress.emit("✅ 发现crash类型日志")
-                message = ("赫拉测试数据收集完成！\n\n"
-                          "✅ 发现crash类型日志\n\n"
-                          "请隔天在以下网站查询设备信息：\n"
+                self.progress.emit(f"✅ {self.tr('赫拉测试数据收集完成')}")
+                self.progress.emit(f"✅ {self.tr('发现crash类型日志')}")
+                message = (self.tr("赫拉测试数据收集完成！\n\n") +
+                          self.tr("发现crash类型日志\n\n") +
+                          self.tr("请隔天在以下网站查询设备信息：\n") +
                           "https://tmna.tclking.com/")
                 self.finished.emit(True, message)
             else:
                 self.progress.emit(f"❌ {analysis_result['message']}")
-                self.finished.emit(False, f"赫拉测试数据收集失败！\n\n{analysis_result['message']}")
+                self.finished.emit(False, f"{self.tr('赫拉测试数据收集失败！')}\n\n{analysis_result['message']}")
                 
         except Exception as e:
-            self.progress.emit(f"❌ 赫拉测试数据收集失败: {str(e)}")
-            self.finished.emit(False, f"数据收集失败: {str(e)}")
+            self.progress.emit(f"❌ {self.tr('赫拉测试数据收集失败:')} {str(e)}")
+            self.finished.emit(False, f"{self.tr('数据收集失败:')} {str(e)}")
     
     def _ensure_output_directory(self):
         """确保输出目录存在"""
@@ -709,7 +748,7 @@ class HeraDataCollectionWorker(QThread):
             output_dir = self._ensure_output_directory()
             output_file = os.path.join(output_dir, 'onlinesupport2.txt')
             
-            self.progress.emit("正在导出Onlinesupport数据...")
+            self.progress.emit(self.tr("正在导出Onlinesupport数据..."))
             
             cmd = f"adb -s {self.device} shell dumpsys activity service Onlinesupport"
             result = run_adb_command(cmd, capture_output=True, text=True, timeout=30)
@@ -718,13 +757,13 @@ class HeraDataCollectionWorker(QThread):
                 with open(output_file, 'w', encoding='utf-8') as f:
                     f.write(result.stdout)
                 
-                self.progress.emit(f"✅ Onlinesupport数据已导出到: {output_file}")
+                self.progress.emit(f"✅ {self.tr('Onlinesupport数据已导出到:')} {output_file}")
                 return True
             else:
-                self.progress.emit(f"❌ 导出Onlinesupport数据失败: {result.stderr}")
+                self.progress.emit(f"❌ {self.tr('导出Onlinesupport数据失败:')} {result.stderr}")
                 return False
         except Exception as e:
-            self.progress.emit(f"❌ 导出Onlinesupport数据异常: {str(e)}")
+            self.progress.emit(f"❌ {self.tr('导出Onlinesupport数据异常:')} {str(e)}")
             return False
     
     def _analyze_onlinesupport_data(self):
@@ -734,9 +773,9 @@ class HeraDataCollectionWorker(QThread):
             output_file = os.path.join(output_dir, 'onlinesupport2.txt')
             
             if not os.path.exists(output_file):
-                return {"status": "error", "message": "数据文件不存在"}
+                return {"status": "error", "message": self.tr("数据文件不存在")}
             
-            self.progress.emit("正在分析Onlinesupport数据...")
+            self.progress.emit(self.tr("正在分析Onlinesupport数据..."))
             
             with open(output_file, 'r', encoding='utf-8') as f:
                 content = f.read()
@@ -745,19 +784,19 @@ class HeraDataCollectionWorker(QThread):
             log_section = self._extract_log_section(content)
             
             if not log_section:
-                return {"status": "error", "message": "未找到LOG部分"}
+                return {"status": "error", "message": self.tr("未找到LOG部分")}
             
             # 分析LOG内容
             if "Empty" in log_section:
-                return {"status": "fail", "message": "onlinesupport LOG部分为空(Empty)"}
+                return {"status": "fail", "message": self.tr("onlinesupport LOG部分为空(Empty)")}
             
             # 检查是否有crash类型的日志
             if "type='crash'" in log_section:
-                return {"status": "success", "message": "发现crash类型日志", "has_crash": True}
+                return {"status": "success", "message": self.tr("发现crash类型日志"), "has_crash": True}
             else:
-                return {"status": "fail", "message": "LOG中有日志但无crash类型", "has_crash": False}
+                return {"status": "fail", "message": self.tr("LOG中有日志但无crash类型"), "has_crash": False}
         except Exception as e:
-            return {"status": "error", "message": f"分析数据异常: {str(e)}"}
+            return {"status": "error", "message": f"{self.tr('分析数据异常:')} {str(e)}"}
     
     def _extract_log_section(self, content):
         """提取LOG部分内容"""
@@ -779,7 +818,7 @@ class HeraDataCollectionWorker(QThread):
             
             return '\n'.join(log_lines)
         except Exception as e:
-            self.progress.emit(f"❌ 提取LOG部分失败: {str(e)}")
+            self.progress.emit(f"❌ {self.tr('提取LOG部分失败:')} {str(e)}")
             return None
 
 
@@ -791,7 +830,13 @@ class PyQtHeraConfigManager(QObject):
     def __init__(self, device_manager, parent=None):
         super().__init__(parent)
         self.device_manager = device_manager
+        # 从父窗口获取语言管理器
+        self.lang_manager = parent.lang_manager if parent and hasattr(parent, 'lang_manager') else None
         self.worker = None
+    
+    def tr(self, text):
+        """安全地获取翻译文本"""
+        return self.lang_manager.tr(text) if self.lang_manager else text
         
     def configure_hera(self):
         """赫拉配置"""
@@ -799,21 +844,21 @@ class PyQtHeraConfigManager(QObject):
             # 验证设备选择
             device = self.device_manager.validate_device_selection()
             if not device:
-                self.status_message.emit("赫拉配置失败: 请先选择设备")
+                self.status_message.emit(f"{self.tr('赫拉配置失败:')} {self.tr('请先选择设备')}")
                 return
             
             # 显示配置选项
             reply = QMessageBox.question(
                 None,
-                "赫拉配置选项",
-                "确定要开始赫拉配置吗？\n\n"
-                "配置内容包括:\n"
-                "• 安装测试APK\n"
-                "• 设置日志大小\n"
-                "• 仅开启mobile日志\n"
-                "• GDPR检查和设置\n"
-                "• 检查系统状态\n\n"
-                "是否继续？",
+                self.tr("赫拉配置选项"),
+                self.tr("确定要开始赫拉配置吗？\n\n") +
+                self.tr("配置内容包括:\n") +
+                self.tr("• 安装测试APK\n") +
+                self.tr("• 设置日志大小\n") +
+                self.tr("• 仅开启mobile日志\n") +
+                self.tr("• GDPR检查和设置\n") +
+                self.tr("• 检查系统状态\n\n") +
+                self.tr("是否继续？"),
                 QMessageBox.Yes | QMessageBox.No
             )
             
@@ -830,13 +875,13 @@ class PyQtHeraConfigManager(QObject):
             }
             
             # 启动配置线程
-            self.worker = HeraConfigWorker(device, config_options)
+            self.worker = HeraConfigWorker(device, config_options, self)
             self.worker.progress.connect(self._on_progress)
             self.worker.finished.connect(self._on_finished)
             self.worker.start()
             
         except Exception as e:
-            self.status_message.emit(f"赫拉配置失败: {str(e)}")
+            self.status_message.emit(f"{self.tr('赫拉配置失败:')} {str(e)}")
     
     def configure_collect_data(self):
         """赫拉测试数据收集"""
@@ -844,16 +889,16 @@ class PyQtHeraConfigManager(QObject):
             # 验证设备选择
             device = self.device_manager.validate_device_selection()
             if not device:
-                self.status_message.emit("赫拉测试数据收集失败: 请先选择设备")
+                self.status_message.emit(f"{self.tr('赫拉测试数据收集失败:')} {self.tr('请先选择设备')}")
                 return
             
             # 显示配置选项
             reply = QMessageBox.question(
                 None,
-                "赫拉测试数据收集",
-                "确定要开始赫拉测试数据收集吗？\n\n"
-                "此功能将收集测试数据。\n\n"
-                "是否继续？",
+                self.tr("赫拉测试数据收集"),
+                self.tr("确定要开始赫拉测试数据收集吗？\n\n") +
+                self.tr("此功能将收集测试数据。\n\n") +
+                self.tr("是否继续？"),
                 QMessageBox.Yes | QMessageBox.No
             )
             
@@ -861,13 +906,13 @@ class PyQtHeraConfigManager(QObject):
                 return
             
             # 启动数据收集线程
-            self.worker = HeraDataCollectionWorker(device)
+            self.worker = HeraDataCollectionWorker(device, self)
             self.worker.progress.connect(self._on_progress)
             self.worker.finished.connect(self._on_finished)
             self.worker.start()
             
         except Exception as e:
-            self.status_message.emit(f"赫拉测试数据收集失败: {str(e)}")
+            self.status_message.emit(f"{self.tr('赫拉测试数据收集失败:')} {str(e)}")
     
     def _on_progress(self, message):
         """进度更新"""
@@ -877,6 +922,6 @@ class PyQtHeraConfigManager(QObject):
         """配置完成"""
         # 只记录日志，不显示弹框
         if success:
-            self.status_message.emit(f"[赫拉配置] 成功: {message}")
+            self.status_message.emit(f"[{self.tr('赫拉配置')}] {self.tr('成功:')} {message}")
         else:
-            self.status_message.emit(f"[赫拉配置] 失败: {message}")
+            self.status_message.emit(f"[{self.tr('赫拉配置')}] {self.tr('失败:')} {message}")

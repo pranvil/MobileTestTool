@@ -10,8 +10,104 @@ import os
 import datetime
 import time
 import re
+import sys
 from PyQt5.QtCore import QObject, pyqtSignal, QThread, QMutex
 from PyQt5.QtWidgets import QMessageBox, QInputDialog, QFileDialog, QDialog, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton, QDialogButtonBox
+
+# 检测是否在PyInstaller打包环境中运行
+def is_pyinstaller():
+    """检测是否在PyInstaller打包环境中运行"""
+    return getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS')
+
+def check_logger_status(device, lang_manager):
+    """检查logger状态的统一函数，兼容exe环境"""
+    logger_is_running = False
+    
+    if U2_AVAILABLE:
+        # 尝试使用UIAutomator2（在exe和非exe环境下都尝试）
+        try:
+            print(f"[DEBUG] {lang_manager.tr('尝试连接设备:')} {device}")
+            d = u2.connect(device)
+            print(f"[DEBUG] {lang_manager.tr('设备连接成功，查找按钮:')} com.debug.loggerui:id/startStopToggleButton")
+            button = d(resourceId="com.debug.loggerui:id/startStopToggleButton")
+            if button.exists:
+                is_checked = button.info.get('checked', False)
+                logger_is_running = is_checked
+                print(f"[DEBUG] {lang_manager.tr('按钮存在，checked状态:')} {is_checked}, logger_is_running: {logger_is_running}")
+            else:
+                print(f"[DEBUG] {lang_manager.tr('按钮不存在，logger_is_running:')} {logger_is_running}")
+        except Exception as e:
+            print(f"[DEBUG] {lang_manager.tr('UIAutomator2连接失败:')} {str(e)}")
+            print(f"{lang_manager.tr('警告:')} {lang_manager.tr('UIAutomator2不可用 -')} {str(e)}")
+            print(f"{lang_manager.tr('提示:')} {lang_manager.tr('如果频繁出现此问题，建议重启手机后重试')}")
+            
+            # 如果UIAutomator2失败，在exe环境下假设logger正在运行
+            if is_pyinstaller():
+                print(f"[DEBUG] {lang_manager.tr('exe环境下UIAutomator2失败，假设logger正在运行')}")
+                logger_is_running = True
+            else:
+                logger_is_running = False
+    else:
+        print(f"[DEBUG] {lang_manager.tr('UIAutomator2不可用')}")
+        # 如果UIAutomator2不可用，在exe环境下假设logger正在运行
+        if is_pyinstaller():
+            print(f"[DEBUG] {lang_manager.tr('exe环境下UIAutomator2不可用，假设logger正在运行')}")
+            logger_is_running = True
+        else:
+            logger_is_running = False
+    
+    return logger_is_running
+
+def wait_for_logger_stop(device, progress_callback, tr_callback, max_wait_time=180):
+    """等待logger停止的统一函数，兼容exe环境"""
+    # 先等待2秒让logger有时间停止
+    time.sleep(2)
+    
+    # 尝试使用UIAutomator2检查（在exe和非exe环境下都尝试）
+    if U2_AVAILABLE:
+        progress_callback(30, tr_callback("正在确认logger已完全停止..."))
+        start_time = time.time()
+        check_count = 0
+        
+        while time.time() - start_time < max_wait_time:
+            check_count += 1
+            elapsed_time = time.time() - start_time
+            print(f"[DEBUG] {tr_callback('第')}{check_count}{tr_callback('次检查按钮状态，已等待')}{elapsed_time:.1f}{tr_callback('秒')}")
+            
+            try:
+                d = u2.connect(device)
+                button = d(resourceId="com.debug.loggerui:id/startStopToggleButton")
+                if button.exists:
+                    is_checked = button.info.get('checked', False)
+                    print(f"[DEBUG] {tr_callback('按钮存在，checked状态:')} {is_checked}")
+                    if not is_checked:
+                        print(f"[DEBUG] {tr_callback('Logger已成功停止，checked=false')}")
+                        break
+                else:
+                    print(f"[DEBUG] {tr_callback('按钮不存在')}")
+            except Exception as e:
+                print(f"[DEBUG] {tr_callback('检查按钮状态时出错:')} {str(e)}")
+                # 如果UIAutomator2检查失败，在exe环境下等待固定时间后继续
+                if is_pyinstaller():
+                    print(f"[DEBUG] {tr_callback('exe环境下UIAutomator2检查失败，等待3秒后继续')}")
+                    time.sleep(3)
+                break
+            time.sleep(1)
+        
+        final_elapsed = time.time() - start_time
+        print(f"[DEBUG] {tr_callback('停止检查完成，总耗时:')} {final_elapsed:.1f}{tr_callback('秒，检查次数:')} {check_count}")
+    else:
+        # UIAutomator2不可用，根据环境选择等待时间
+        if is_pyinstaller():
+            print(f"[DEBUG] {tr_callback('exe环境下UIAutomator2不可用，等待5秒后继续')}")
+            progress_callback(30, tr_callback("等待logger停止..."))
+            time.sleep(5)
+        else:
+            print(f"[DEBUG] {tr_callback('UIAutomator2不可用，等待3秒后继续')}")
+            progress_callback(30, tr_callback("等待logger停止..."))
+            time.sleep(3)
+    
+    return True
 
 # 尝试导入uiautomator2
 try:
@@ -21,16 +117,49 @@ except ImportError:
     u2 = None
     U2_AVAILABLE = False
 
+def init_uiautomator2_for_exe(lang_manager=None):
+    """在exe环境下初始化UIAutomator2"""
+    if not is_pyinstaller() or not U2_AVAILABLE:
+        return True
+    
+    try:
+        # 在exe环境下，可能需要设置一些环境变量或路径
+        import os
+        import sys
+        
+        # 获取exe的临时目录
+        if hasattr(sys, '_MEIPASS'):
+            temp_dir = sys._MEIPASS
+            print(f"[DEBUG] {lang_manager.tr('exe临时目录:') if lang_manager else 'exe临时目录:'} {temp_dir}")
+            
+            # 设置UIAutomator2相关的环境变量
+            os.environ['UIAUTOMATOR2_TEMP_DIR'] = temp_dir
+            
+        return True
+    except Exception as e:
+        print(f"[DEBUG] {lang_manager.tr('exe环境下初始化UIAutomator2失败:') if lang_manager else 'exe环境下初始化UIAutomator2失败:'} {str(e)}")
+        return False
+
 
 class LogSizeDialog(QDialog):
     """Log大小设置对话框"""
     
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("设置Log大小")
+        # 从父窗口获取语言管理器
+        self.lang_manager = parent.lang_manager if parent and hasattr(parent, 'lang_manager') else None
+        self.setWindowTitle(self.tr("设置Log大小"))
         self.setModal(True)
         self.resize(400, 200)
         
+        self.setup_ui()
+    
+    def tr(self, text):
+        """安全地获取翻译文本"""
+        return self.lang_manager.tr(text) if self.lang_manager else text
+    
+    def setup_ui(self):
+        """设置UI"""
         layout = QVBoxLayout()
         
         # Modem Log
@@ -38,7 +167,7 @@ class LogSizeDialog(QDialog):
         modem_layout.addWidget(QLabel("Modem Log (MB):"))
         self.modem_edit = QLineEdit()
         self.modem_edit.setText("20000")
-        self.modem_edit.setPlaceholderText("请输入Modem Log大小(MB)")
+        self.modem_edit.setPlaceholderText(self.tr("请输入Modem Log大小(MB)"))
         modem_layout.addWidget(self.modem_edit)
         layout.addLayout(modem_layout)
         
@@ -47,7 +176,7 @@ class LogSizeDialog(QDialog):
         mobile_layout.addWidget(QLabel("Mobile Log (MB):"))
         self.mobile_edit = QLineEdit()
         self.mobile_edit.setText("2000")
-        self.mobile_edit.setPlaceholderText("请输入Mobile Log大小(MB)")
+        self.mobile_edit.setPlaceholderText(self.tr("请输入Mobile Log大小(MB)"))
         mobile_layout.addWidget(self.mobile_edit)
         layout.addLayout(mobile_layout)
         
@@ -56,7 +185,7 @@ class LogSizeDialog(QDialog):
         netlog_layout.addWidget(QLabel("Netlog (MB):"))
         self.netlog_edit = QLineEdit()
         self.netlog_edit.setText("3000")
-        self.netlog_edit.setPlaceholderText("请输入Netlog大小(MB)")
+        self.netlog_edit.setPlaceholderText(self.tr("请输入Netlog大小(MB)"))
         netlog_layout.addWidget(self.netlog_edit)
         layout.addLayout(netlog_layout)
         
@@ -94,6 +223,16 @@ class MTKLogWorker(QThread):
         self.export_media = export_media
         self._mutex = QMutex()
         self._stop_requested = False
+        # 从父窗口获取语言管理器
+        self.lang_manager = parent.lang_manager if parent and hasattr(parent, 'lang_manager') else None
+        
+        # 在exe环境下初始化UIAutomator2
+        if is_pyinstaller():
+            init_uiautomator2_for_exe(self.lang_manager)
+    
+    def tr(self, text):
+        """安全地获取翻译文本"""
+        return self.lang_manager.tr(text) if self.lang_manager else text
         
     def run(self):
         """执行MTKLOG操作"""
@@ -107,56 +246,46 @@ class MTKLogWorker(QThread):
             elif self.operation == 'delete':
                 self._delete_mtklog()
         except Exception as e:
-            self.finished.emit(False, f"操作失败: {str(e)}")
+            self.finished.emit(False, f"{self.lang_manager.tr('操作失败:')} {str(e)}")
     
     def _start_mtklog(self):
         """开启MTKLOG"""
         try:
             # 1. 确保屏幕亮屏且解锁
-            self.progress.emit(5, "检查屏幕状态...")
+            self.progress.emit(5, self.tr("检查屏幕状态..."))
             if not self.device_manager.ensure_screen_unlocked(self.device):
-                raise Exception("无法确保屏幕状态")
+                raise Exception(self.lang_manager.tr("无法确保屏幕状态"))
             
             # 2. 启动logger应用
-            self.progress.emit(10, "启动logger应用...")
+            self.progress.emit(10, self.tr("启动logger应用..."))
             start_app_cmd = ["adb", "-s", self.device, "shell", "am", "start", "-n", "com.debug.loggerui/.MainActivity"]
             result = subprocess.run(start_app_cmd, capture_output=True, text=True, timeout=30,
                                   creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0)
             if result.returncode != 0:
-                print(f"警告: 启动logger应用失败: {result.stderr.strip()}")
+                print(f"{self.lang_manager.tr('警告:')} {self.lang_manager.tr('启动logger应用失败:')} {result.stderr.strip()}")
             time.sleep(2)
             
             # 3. 检查logger状态
-            self.progress.emit(15, "检查logger状态...")
-            
-            logger_is_running = False
-            if U2_AVAILABLE:
-                try:
-                    d = u2.connect(self.device)
-                    button = d(resourceId="com.debug.loggerui:id/startStopToggleButton")
-                    if button.exists:
-                        is_checked = button.info.get('checked', False)
-                        logger_is_running = is_checked
-                except Exception as e:
-                    logger_is_running = False
+            self.progress.emit(15, self.tr("检查logger状态..."))
+            logger_is_running = check_logger_status(self.device, self.lang_manager)
             
             # 4. 如果logger正在运行，先停止
             if logger_is_running:
-                self.progress.emit(20, "停止logger...")
+                self.progress.emit(20, self.tr("停止logger..."))
                 stop_cmd = ["adb", "-s", self.device, "shell", "am", "broadcast", "-a", "com.debug.loggerui.ADB_CMD", 
                            "-e", "cmd_name", "stop", "--ei", "cmd_target", "-1", "-n", "com.debug.loggerui/.framework.LogReceiver"]
                 
                 result = subprocess.run(stop_cmd, capture_output=True, text=True, timeout=15,
                                       creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0)
                 if result.returncode != 0:
-                    raise Exception(f"停止logger失败: {result.stderr.strip()}")
+                    raise Exception(f"{self.lang_manager.tr('停止logger失败:')} {result.stderr.strip()}")
                 
                 # 5. 等待2秒后检查按钮状态
-                self.progress.emit(25, "等待logger停止...")
+                self.progress.emit(25, self.tr("等待logger停止..."))
                 time.sleep(2)
                 
                 # 6. 检查按钮checked是否为false
-                self.progress.emit(30, "正在确认logger已完全停止...")
+                self.progress.emit(30, self.tr("正在确认logger已完全停止..."))
                 max_wait_time = 120
                 start_time = time.time()
                 while time.time() - start_time < max_wait_time:
@@ -173,40 +302,40 @@ class MTKLogWorker(QThread):
                     time.sleep(1)
             
             # 7. 清除旧日志
-            self.progress.emit(40, "清除旧日志...")
+            self.progress.emit(40, self.tr("清除旧日志..."))
             clear_cmd = ["adb", "-s", self.device, "shell", "am", "broadcast", "-a", "com.debug.loggerui.ADB_CMD", 
                         "-e", "cmd_name", "clear_logs_all", "--ei", "cmd_target", "0", "-n", "com.debug.loggerui/.framework.LogReceiver"]
             
             result = subprocess.run(clear_cmd, capture_output=True, text=True, timeout=15,
                                   creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0)
             if result.returncode != 0:
-                raise Exception(f"清除旧日志失败: {result.stderr.strip()}")
+                raise Exception(f"{self.lang_manager.tr('清除旧日志失败:')} {result.stderr.strip()}")
             
             # 等待3秒确保清除完毕
             time.sleep(3)
             
             # 8. 设置MD log缓存大小20GB
-            self.progress.emit(50, "设置缓存大小...")
+            self.progress.emit(50, self.tr("设置缓存大小..."))
             size_cmd = ["adb", "-s", self.device, "shell", "am", "broadcast", "-a", "com.debug.loggerui.ADB_CMD", 
                        "-e", "cmd_name", "set_log_size_20000", "--ei", "cmd_target", "2", "-n", "com.debug.loggerui/.framework.LogReceiver"]
             
             result = subprocess.run(size_cmd, capture_output=True, text=True, timeout=15,
                                   creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0)
             if result.returncode != 0:
-                raise Exception(f"设置缓存大小失败: {result.stderr.strip()}")
+                raise Exception(f"{self.lang_manager.tr('设置缓存大小失败:')} {result.stderr.strip()}")
             
             # 9. 开启MTK LOGGER
-            self.progress.emit(60, "开启logger...")
+            self.progress.emit(60, self.tr("开启logger..."))
             start_cmd = ["adb", "-s", self.device, "shell", "am", "broadcast", "-a", "com.debug.loggerui.ADB_CMD", 
                         "-e", "cmd_name", "start", "--ei", "cmd_target", "-1", "-n", "com.debug.loggerui/.framework.LogReceiver"]
             
             result = subprocess.run(start_cmd, capture_output=True, text=True, timeout=15,
                                   creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0)
             if result.returncode != 0:
-                raise Exception(f"开启logger失败: {result.stderr.strip()}")
+                raise Exception(f"{self.lang_manager.tr('开启logger失败:')} {result.stderr.strip()}")
             
             # 10. 等待"Starting logs"对话框消失
-            self.progress.emit(70, "等待logger启动...")
+            self.progress.emit(70, self.tr("等待logger启动..."))
             max_wait_time = 120
             start_time = time.time()
             dialog_appeared = False
@@ -229,7 +358,7 @@ class MTKLogWorker(QThread):
                 time.sleep(1)
             
             # 11. 检查按钮checked是否为true
-            self.progress.emit(90, "正在确认logger已完全启动...")
+            self.progress.emit(90, self.tr("正在确认logger已完全启动..."))
             start_time = time.time()
             while time.time() - start_time < max_wait_time:
                 if U2_AVAILABLE:
@@ -244,85 +373,76 @@ class MTKLogWorker(QThread):
                         break
                 time.sleep(1)
             
-            self.progress.emit(100, "完成!")
-            self.finished.emit(True, "MTKLOG启动成功")
+            self.progress.emit(100, self.tr("完成!"))
+            self.finished.emit(True, self.tr("MTKLOG启动成功"))
             
         except Exception as e:
-            self.finished.emit(False, f"启动MTKLOG失败: {str(e)}")
+            self.finished.emit(False, f"{self.lang_manager.tr('启动MTKLOG失败:')} {str(e)}")
     
     def _stop_and_export_mtklog(self, log_name, export_media):
         """停止并导出MTKLOG"""
         try:
+            print(f"[DEBUG] {self.tr('开始停止并导出MTKLOG操作，设备:')} {self.device}{self.tr(', 日志名称:')} {log_name}{self.tr(', 导出媒体:')} {export_media}")
+            
             # 1. 确保屏幕亮屏且解锁
-            self.progress.emit(5, "检查屏幕状态...")
+            self.progress.emit(5, self.tr("检查屏幕状态..."))
             if not self.device_manager.ensure_screen_unlocked(self.device):
-                raise Exception("无法确保屏幕状态")
+                raise Exception(self.lang_manager.tr("无法确保屏幕状态"))
+            print(f"[DEBUG] {self.tr('屏幕状态检查完成')}")
             
             # 2. 启动logger应用
-            self.progress.emit(10, "启动logger应用...")
+            self.progress.emit(10, self.tr("启动logger应用..."))
             start_app_cmd = ["adb", "-s", self.device, "shell", "am", "start", "-n", "com.debug.loggerui/.MainActivity"]
+            print(f"[DEBUG] {self.tr('启动logger应用命令:')} {' '.join(start_app_cmd)}")
             result = subprocess.run(start_app_cmd, capture_output=True, text=True, timeout=30,
                                   creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0)
+            print(f"[DEBUG] {self.tr('启动应用结果 - returncode:')} {result.returncode}, stdout: {result.stdout.strip()}, stderr: {result.stderr.strip()}")
             if result.returncode != 0:
-                print(f"警告: 启动logger应用失败: {result.stderr.strip()}")
+                print(f"{self.lang_manager.tr('警告:')} {self.lang_manager.tr('启动logger应用失败:')} {result.stderr.strip()}")
             time.sleep(2)
             
             # 3. 检查logger状态
-            self.progress.emit(15, "检查logger状态...")
-            
-            logger_is_running = False
-            if U2_AVAILABLE:
-                try:
-                    d = u2.connect(self.device)
-                    button = d(resourceId="com.debug.loggerui:id/startStopToggleButton")
-                    if button.exists:
-                        is_checked = button.info.get('checked', False)
-                        logger_is_running = is_checked
-                except Exception as e:
-                    print(f"警告: UIAutomator2不可用 - {str(e)}")
-                    print("提示: 如果频繁出现此问题，建议重启手机后重试")
-                    logger_is_running = False
+            self.progress.emit(15, self.tr("检查logger状态..."))
+            logger_is_running = check_logger_status(self.device, self.lang_manager)
             
             # 4. 如果logger正在运行，执行停止命令
             if logger_is_running:
-                self.progress.emit(20, "停止logger...")
+                print(f"[DEBUG] {self.tr('Logger正在运行，开始执行停止命令')}")
+                self.progress.emit(20, self.tr("停止logger..."))
                 stop_cmd = ["adb", "-s", self.device, "shell", "am", "broadcast", "-a", "com.debug.loggerui.ADB_CMD", 
                            "-e", "cmd_name", "stop", "--ei", "cmd_target", "-1", "-n", "com.debug.loggerui/.framework.LogReceiver"]
                 
+                print(f"[DEBUG] {self.tr('执行停止命令:')} {' '.join(stop_cmd)}")
                 result = subprocess.run(stop_cmd, capture_output=True, text=True, timeout=15,
                                       creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0)
+                print(f"[DEBUG] {self.tr('停止命令执行结果 - returncode:')} {result.returncode}")
+                print(f"[DEBUG] {self.tr('停止命令stdout:')} {result.stdout.strip()}")
+                print(f"[DEBUG] {self.tr('停止命令stderr:')} {result.stderr.strip()}")
+                
                 if result.returncode != 0:
-                    raise Exception(f"停止logger失败: {result.stderr.strip()}")
+                    raise Exception(f"{self.lang_manager.tr('停止logger失败:')} {result.stderr.strip()}")
                 
                 # 5. 等待2秒后检查按钮状态
-                self.progress.emit(25, "等待logger停止...")
+                self.progress.emit(25, self.tr("等待logger停止..."))
                 time.sleep(2)
                 
-                # 6. 检查按钮checked是否为false
-                self.progress.emit(30, "正在确认logger已完全停止...")
-                max_wait_time = 180
-                start_time = time.time()
-                while time.time() - start_time < max_wait_time:
-                    if U2_AVAILABLE:
-                        try:
-                            d = u2.connect(self.device)
-                            button = d(resourceId="com.debug.loggerui:id/startStopToggleButton")
-                            if button.exists:
-                                is_checked = button.info.get('checked', False)
-                                if not is_checked:
-                                    break
-                        except Exception as e:
-                            break
-                    time.sleep(1)
+                # 6. 等待logger停止（使用统一函数）
+                wait_for_logger_stop(self.device, self.progress.emit, self.tr)
+            else:
+                print(f"[DEBUG] {self.tr('Logger未在运行，跳过停止操作')}")
             
             # 7. 创建日志目录
-            self.progress.emit(40, "创建日志目录...")
+            self.progress.emit(40, self.tr("创建日志目录..."))
             curredate = datetime.datetime.now().strftime("%Y%m%d")
             log_dir = f"c:\\log\\{curredate}"
             log_folder = f"{log_dir}\\log_{log_name}"
+            print(f"[DEBUG] {self.tr('创建日志目录:')} {log_folder}")
             
             if not os.path.exists(log_dir):
                 os.makedirs(log_dir)
+                print(f"[DEBUG] {self.tr('创建目录:')} {log_dir}")
+            else:
+                print(f"[DEBUG] {self.tr('目录已存在:')} {log_dir}")
             
             # 8. 执行adb pull命令序列
             pull_commands = [
@@ -352,108 +472,105 @@ class MTKLogWorker(QThread):
             total_commands = len(pull_commands)
             
             for i, (source_path, folder_name) in enumerate(pull_commands):
-                self.progress.emit(45 + (i * 5), f"检查 {folder_name} ({i+1}/{total_commands})...")
+                self.progress.emit(45 + (i * 5), f"{self.lang_manager.tr('检查')} {folder_name} ({i+1}/{total_commands})...")
+                print(f"[DEBUG] {self.tr('检查文件夹:')} {source_path} -> {folder_name}")
                 
                 # 先检查文件夹是否存在
                 check_cmd = ["adb", "-s", self.device, "shell", "test", "-d", source_path]
                 check_result = subprocess.run(check_cmd, capture_output=True, text=True, timeout=10,
                                             creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0)
+                print(f"[DEBUG] {self.tr('检查命令结果 - returncode:')} {check_result.returncode}, stdout: {check_result.stdout.strip()}, stderr: {check_result.stderr.strip()}")
                 
                 if check_result.returncode != 0:
+                    print(f"[DEBUG] {self.tr('文件夹不存在，跳过:')} {source_path}")
                     continue
                 
                 # 文件夹存在，执行pull
-                self.progress.emit(45 + (i * 5), f"导出 {folder_name} ({i+1}/{total_commands})...")
+                self.progress.emit(45 + (i * 5), f"{self.lang_manager.tr('导出')} {folder_name} ({i+1}/{total_commands})...")
                 cmd = ["adb", "-s", self.device, "pull", source_path, log_folder]
+                print(f"[DEBUG] {self.tr('执行pull命令:')} {' '.join(cmd)}")
                 result = subprocess.run(cmd, capture_output=True, text=True, timeout=600,
                                       creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0)
+                print(f"[DEBUG] {self.tr('Pull命令结果 - returncode:')} {result.returncode}, stdout: {result.stdout.strip()}, stderr: {result.stderr.strip()}")
                 
                 if result.returncode != 0:
-                    print(f"警告: {folder_name} 导出失败: {result.stderr.strip()}")
+                    print(f"{self.lang_manager.tr('警告:')} {folder_name} {self.lang_manager.tr('导出失败:')} {result.stderr.strip()}")
+                else:
+                    print(f"[DEBUG] {folder_name} {self.tr('导出成功')}")
             
-            self.progress.emit(100, "完成!")
+            print(f"[DEBUG] {self.tr('MTKLOG停止并导出操作完成，导出路径:')} {log_folder}")
+            self.progress.emit(100, self.tr("完成!"))
             self.finished.emit(True, log_folder)
             
         except Exception as e:
-            self.finished.emit(False, f"导出MTKLOG失败: {str(e)}")
+            print(f"[DEBUG] {self.tr('MTKLOG停止并导出操作异常:')} {str(e)}")
+            self.finished.emit(False, f"{self.lang_manager.tr('导出MTKLOG失败:')} {str(e)}")
     
     def _stop_mtklog(self):
         """停止MTKLOG（不导出）"""
         try:
+            print(f"[DEBUG] {self.tr('开始停止MTKLOG操作，设备:')} {self.device}")
+            
             # 1. 确保屏幕亮屏且解锁
-            self.progress.emit(5, "检查屏幕状态...")
+            self.progress.emit(5, self.tr("检查屏幕状态..."))
             if not self.device_manager.ensure_screen_unlocked(self.device):
-                raise Exception("无法确保屏幕状态")
+                raise Exception(self.lang_manager.tr("无法确保屏幕状态"))
+            print(f"[DEBUG] {self.tr('屏幕状态检查完成')}")
             
             # 2. 启动logger应用
-            self.progress.emit(10, "启动logger应用...")
+            self.progress.emit(10, self.tr("启动logger应用..."))
             start_app_cmd = ["adb", "-s", self.device, "shell", "am", "start", "-n", "com.debug.loggerui/.MainActivity"]
+            print(f"[DEBUG] {self.tr('启动logger应用命令:')} {' '.join(start_app_cmd)}")
             result = subprocess.run(start_app_cmd, capture_output=True, text=True, timeout=30,
                                   creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0)
+            print(f"[DEBUG] {self.tr('启动应用结果 - returncode:')} {result.returncode}, stdout: {result.stdout.strip()}, stderr: {result.stderr.strip()}")
             if result.returncode != 0:
-                print(f"警告: 启动logger应用失败: {result.stderr.strip()}")
+                print(f"{self.lang_manager.tr('警告:')} {self.lang_manager.tr('启动logger应用失败:')} {result.stderr.strip()}")
             time.sleep(2)
             
             # 3. 检查logger状态
-            self.progress.emit(15, "检查logger状态...")
-            
-            logger_is_running = False
-            if U2_AVAILABLE:
-                try:
-                    d = u2.connect(self.device)
-                    button = d(resourceId="com.debug.loggerui:id/startStopToggleButton")
-                    if button.exists:
-                        is_checked = button.info.get('checked', False)
-                        logger_is_running = is_checked
-                except Exception as e:
-                    print(f"警告: UIAutomator2不可用 - {str(e)}")
-                    print("提示: 如果频繁出现此问题，建议重启手机后重试")
-                    logger_is_running = False
+            self.progress.emit(15, self.tr("检查logger状态..."))
+            logger_is_running = check_logger_status(self.device, self.lang_manager)
             
             # 4. 如果logger正在运行，执行停止命令
             if logger_is_running:
-                self.progress.emit(20, "停止logger...")
+                print(f"[DEBUG] {self.tr('Logger正在运行，开始执行停止命令')}")
+                self.progress.emit(20, self.tr("停止logger..."))
                 stop_cmd = ["adb", "-s", self.device, "shell", "am", "broadcast", "-a", "com.debug.loggerui.ADB_CMD", 
                            "-e", "cmd_name", "stop", "--ei", "cmd_target", "-1", "-n", "com.debug.loggerui/.framework.LogReceiver"]
                 
+                print(f"[DEBUG] {self.tr('执行停止命令:')} {' '.join(stop_cmd)}")
                 result = subprocess.run(stop_cmd, capture_output=True, text=True, timeout=15,
                                       creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0)
+                print(f"[DEBUG] {self.tr('停止命令执行结果 - returncode:')} {result.returncode}")
+                print(f"[DEBUG] {self.tr('停止命令stdout:')} {result.stdout.strip()}")
+                print(f"[DEBUG] {self.tr('停止命令stderr:')} {result.stderr.strip()}")
+                
                 if result.returncode != 0:
-                    raise Exception(f"停止logger失败: {result.stderr.strip()}")
+                    raise Exception(f"{self.lang_manager.tr('停止logger失败:')} {result.stderr.strip()}")
                 
                 # 5. 等待2秒后检查按钮状态
-                self.progress.emit(25, "等待logger停止...")
+                self.progress.emit(25, self.tr("等待logger停止..."))
                 time.sleep(2)
                 
-                # 6. 检查按钮checked是否为false
-                self.progress.emit(30, "正在确认logger已完全停止...")
-                max_wait_time = 180
-                start_time = time.time()
-                while time.time() - start_time < max_wait_time:
-                    if U2_AVAILABLE:
-                        try:
-                            d = u2.connect(self.device)
-                            button = d(resourceId="com.debug.loggerui:id/startStopToggleButton")
-                            if button.exists:
-                                is_checked = button.info.get('checked', False)
-                                if not is_checked:
-                                    break
-                        except Exception as e:
-                            break
-                    time.sleep(1)
+                # 6. 等待logger停止（使用统一函数）
+                wait_for_logger_stop(self.device, self.progress.emit, self.tr)
             else:
-                self.progress.emit(50, "Logger已处于停止状态...")
+                print(f"[DEBUG] {self.tr('Logger未在运行，跳过停止操作')}")
+                self.progress.emit(50, self.tr("Logger已处于停止状态..."))
             
-            self.progress.emit(100, "完成!")
-            self.finished.emit(True, "MTKLOG已停止")
+            print(f"[DEBUG] {self.tr('MTKLOG停止操作完成')}")
+            self.progress.emit(100, self.tr("完成!"))
+            self.finished.emit(True, self.tr("MTKLOG已停止"))
             
         except Exception as e:
-            self.finished.emit(False, f"停止MTKLOG失败: {str(e)}")
+            print(f"[DEBUG] {self.tr('MTKLOG停止操作异常:')} {str(e)}")
+            self.finished.emit(False, f"{self.lang_manager.tr('停止MTKLOG失败:')} {str(e)}")
     
     def _delete_mtklog(self):
         """删除MTKLOG"""
         try:
-            self.progress.emit(50, "执行删除命令...")
+            self.progress.emit(50, self.tr("执行删除命令..."))
             cmd = ["adb", "-s", self.device, "shell", "am", "broadcast", "-a", "com.debug.loggerui.ADB_CMD", 
                    "-e", "cmd_name", "clear_logs_all", "--ei", "cmd_target", "0", "-n", "com.debug.loggerui/.framework.LogReceiver"]
             
@@ -461,13 +578,13 @@ class MTKLogWorker(QThread):
                                   creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0)
             
             if result.returncode != 0:
-                error_msg = result.stderr.strip() if result.stderr else "未知错误"
-                raise Exception(f"删除MTKLOG失败: {error_msg}")
+                error_msg = result.stderr.strip() if result.stderr else self.lang_manager.tr("未知错误")
+                raise Exception(f"{self.lang_manager.tr('删除MTKLOG失败:')} {error_msg}")
             
-            self.progress.emit(100, "删除完成!")
-            self.finished.emit(True, "MTKLOG已删除")
+            self.progress.emit(100, self.tr("删除完成!"))
+            self.finished.emit(True, self.tr("MTKLOG已删除"))
         except Exception as e:
-            self.finished.emit(False, f"删除MTKLOG失败: {str(e)}")
+            self.finished.emit(False, f"{self.lang_manager.tr('删除MTKLOG失败:')} {str(e)}")
 
 class PyQtMTKLogManager(QObject):
     """PyQt5 MTKLOG管理器"""
@@ -483,6 +600,8 @@ class PyQtMTKLogManager(QObject):
     def __init__(self, device_manager, parent=None):
         super().__init__(parent)
         self.device_manager = device_manager
+        # 从父窗口获取语言管理器
+        self.lang_manager = parent.lang_manager if parent and hasattr(parent, 'lang_manager') else None
         self.worker = None
         self.is_running = False
         
@@ -494,11 +613,11 @@ class PyQtMTKLogManager(QObject):
         
         # 检查MTKLOGGER是否存在
         if not self._check_mtklogger_exists(device):
-            self.status_message.emit("未检测到MTKLOGGER，请先安装")
+            self.status_message.emit(self.lang_manager.tr("未检测到MTKLOGGER，请先安装"))
             return
         
         # 创建工作线程
-        self.worker = MTKLogWorker(device, 'start', self.device_manager)
+        self.worker = MTKLogWorker(device, 'start', self.device_manager, self)
         self.worker.progress.connect(self.progress_updated.emit)
         self.worker.finished.connect(self._on_mtklog_started)
         self.is_running = True
@@ -513,8 +632,8 @@ class PyQtMTKLogManager(QObject):
         # 获取日志名称
         log_name, ok = QInputDialog.getText(
             None,
-            "输入日志名称",
-            "请输入日志名称:"
+            self.lang_manager.tr("输入日志名称"),
+            self.lang_manager.tr("请输入日志名称:")
         )
         if not ok or not log_name:
             return
@@ -522,19 +641,19 @@ class PyQtMTKLogManager(QObject):
         # 询问是否导出截图和视频
         reply = QMessageBox.question(
             None,
-            "导出媒体文件",
-            "是否同时导出截图和录制的视频？\n\n"
-            "包括:\n"
-            "• 屏幕录制视频\n"
-            "• 截图文件\n\n"
-            "选择'是'将额外导出这些媒体文件。",
+            self.lang_manager.tr("导出媒体文件"),
+            (self.lang_manager.tr("是否同时导出截图和录制的视频？\n\n") +
+             self.lang_manager.tr("包括:\n") +
+             self.lang_manager.tr("• 屏幕录制视频\n") +
+             self.lang_manager.tr("• 截图文件\n\n") +
+             self.lang_manager.tr("选择") + self.lang_manager.tr("是") + self.lang_manager.tr("将额外导出这些媒体文件。")),
             QMessageBox.Yes | QMessageBox.No,
             QMessageBox.No
         )
         export_media = (reply == QMessageBox.Yes)
         
         # 创建工作线程
-        self.worker = MTKLogWorker(device, 'stop_export', self.device_manager, log_name=log_name, export_media=export_media)
+        self.worker = MTKLogWorker(device, 'stop_export', self.device_manager, self, log_name=log_name, export_media=export_media)
         self.worker.progress.connect(self.progress_updated.emit)
         self.worker.finished.connect(self._on_mtklog_stopped)
         self.is_running = True
@@ -547,7 +666,7 @@ class PyQtMTKLogManager(QObject):
             return
         
         # 创建工作线程
-        self.worker = MTKLogWorker(device, 'stop', self.device_manager)
+        self.worker = MTKLogWorker(device, 'stop', self.device_manager, self)
         self.worker.progress.connect(self.progress_updated.emit)
         self.worker.finished.connect(self._on_mtklog_stopped)
         self.is_running = True
@@ -562,8 +681,8 @@ class PyQtMTKLogManager(QObject):
         # 确认删除
         reply = QMessageBox.question(
             None,
-            "确认删除",
-            "确定要删除设备上的MTKLOG吗？",
+            self.lang_manager.tr("确认删除"),
+            self.lang_manager.tr("确定要删除设备上的MTKLOG吗？"),
             QMessageBox.Yes | QMessageBox.No,
             QMessageBox.No
         )
@@ -572,7 +691,7 @@ class PyQtMTKLogManager(QObject):
             return
         
         # 创建工作线程
-        self.worker = MTKLogWorker(device, 'delete', self.device_manager)
+        self.worker = MTKLogWorker(device, 'delete', self.device_manager, self)
         self.worker.progress.connect(self.progress_updated.emit)
         self.worker.finished.connect(self._on_mtklog_deleted)
         self.is_running = True
@@ -585,7 +704,7 @@ class PyQtMTKLogManager(QObject):
             return
         
         if not self._check_mtklogger_exists(device):
-            self.status_message.emit("未检测到MTKLOGGER，请先安装")
+            self.status_message.emit(self.lang_manager.tr("未检测到MTKLOGGER，请先安装"))
             return
         
         # 显示对话框
@@ -596,7 +715,7 @@ class PyQtMTKLogManager(QObject):
         # 获取输入的值
         modem_size, mobile_size, netlog_size = dialog.get_values()
         if modem_size is None or mobile_size is None or netlog_size is None:
-            self.status_message.emit("输入的值无效，请输入数字")
+            self.status_message.emit(self.lang_manager.tr("输入的值无效，请输入数字"))
             return
         
         try:
@@ -608,7 +727,7 @@ class PyQtMTKLogManager(QObject):
                                   creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0)
             
             if result.returncode != 0:
-                raise Exception(f"设置Modem Log大小失败: {result.stderr.strip()}")
+                raise Exception(f"{self.lang_manager.tr('设置Modem Log大小失败:')} {result.stderr.strip()}")
             
             # 设置Mobile Log大小 (cmd_target=1)
             mobile_cmd = ["adb", "-s", device, "shell", "am", "broadcast", "-a", "com.debug.loggerui.ADB_CMD", 
@@ -618,7 +737,7 @@ class PyQtMTKLogManager(QObject):
                                   creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0)
             
             if result.returncode != 0:
-                raise Exception(f"设置Mobile Log大小失败: {result.stderr.strip()}")
+                raise Exception(f"{self.lang_manager.tr('设置Mobile Log大小失败:')} {result.stderr.strip()}")
             
             # 设置Netlog大小 (cmd_target=4)
             netlog_cmd = ["adb", "-s", device, "shell", "am", "broadcast", "-a", "com.debug.loggerui.ADB_CMD", 
@@ -628,16 +747,16 @@ class PyQtMTKLogManager(QObject):
                                   creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0)
             
             if result.returncode != 0:
-                raise Exception(f"设置Netlog大小失败: {result.stderr.strip()}")
+                raise Exception(f"{self.lang_manager.tr('设置Netlog大小失败:')} {result.stderr.strip()}")
             
-            self.status_message.emit(f"Log大小设置成功 - Modem:{modem_size}MB, Mobile:{mobile_size}MB, Netlog:{netlog_size}MB")
+            self.status_message.emit(f"{self.lang_manager.tr('Log大小设置成功 - Modem:')}{modem_size}MB, Mobile:{mobile_size}MB, Netlog:{netlog_size}MB")
             
         except subprocess.TimeoutExpired:
-            self.status_message.emit("设置Log大小超时，请检查设备连接")
+            self.status_message.emit(self.lang_manager.tr("设置Log大小超时，请检查设备连接"))
         except FileNotFoundError:
-            self.status_message.emit("未找到adb命令，请确保Android SDK已安装并配置PATH")
+            self.status_message.emit(self.lang_manager.tr("未找到adb命令，请确保Android SDK已安装并配置PATH"))
         except Exception as e:
-            self.status_message.emit(f"设置Log大小失败: {str(e)}")
+            self.status_message.emit(f"{self.lang_manager.tr('设置Log大小失败:')} {str(e)}")
         
     def set_sd_mode(self):
         """设置SD模式"""
@@ -646,7 +765,7 @@ class PyQtMTKLogManager(QObject):
             return
         
         if not self._check_mtklogger_exists(device):
-            self.status_message.emit("未检测到MTKLOGGER，请先安装")
+            self.status_message.emit(self.lang_manager.tr("未检测到MTKLOGGER，请先安装"))
             return
         
         try:
@@ -657,16 +776,16 @@ class PyQtMTKLogManager(QObject):
                                   creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0)
             
             if result.returncode == 0:
-                self.status_message.emit(f"已设置为SD模式 - {device}")
+                self.status_message.emit(f"{self.lang_manager.tr('已设置为SD模式 -')} {device}")
             else:
-                error_msg = result.stderr.strip() if result.stderr else "未知错误"
-                self.status_message.emit(f"设置SD模式失败: {error_msg}")
+                error_msg = result.stderr.strip() if result.stderr else self.lang_manager.tr("未知错误")
+                self.status_message.emit(f"{self.lang_manager.tr('设置SD模式失败:')} {error_msg}")
         except subprocess.TimeoutExpired:
-            self.status_message.emit("设置SD模式超时，请检查设备连接")
+            self.status_message.emit(self.lang_manager.tr("设置SD模式超时，请检查设备连接"))
         except FileNotFoundError:
-            self.status_message.emit("未找到adb命令，请确保Android SDK已安装并配置PATH")
+            self.status_message.emit(self.lang_manager.tr("未找到adb命令，请确保Android SDK已安装并配置PATH"))
         except Exception as e:
-            self.status_message.emit(f"设置SD模式失败: {str(e)}")
+            self.status_message.emit(f"{self.lang_manager.tr('设置SD模式失败:')} {str(e)}")
     
     def set_usb_mode(self):
         """设置USB模式"""
@@ -675,7 +794,7 @@ class PyQtMTKLogManager(QObject):
             return
         
         if not self._check_mtklogger_exists(device):
-            self.status_message.emit("未检测到MTKLOGGER，请先安装")
+            self.status_message.emit(self.lang_manager.tr("未检测到MTKLOGGER，请先安装"))
             return
         
         try:
@@ -686,16 +805,16 @@ class PyQtMTKLogManager(QObject):
                                   creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0)
             
             if result.returncode == 0:
-                self.status_message.emit(f"已设置为USB模式 - {device}")
+                self.status_message.emit(f"{self.lang_manager.tr('已设置为USB模式 -')} {device}")
             else:
-                error_msg = result.stderr.strip() if result.stderr else "未知错误"
-                self.status_message.emit(f"设置USB模式失败: {error_msg}")
+                error_msg = result.stderr.strip() if result.stderr else self.lang_manager.tr("未知错误")
+                self.status_message.emit(f"{self.lang_manager.tr('设置USB模式失败:')} {error_msg}")
         except subprocess.TimeoutExpired:
-            self.status_message.emit("设置USB模式超时，请检查设备连接")
+            self.status_message.emit(self.lang_manager.tr("设置USB模式超时，请检查设备连接"))
         except FileNotFoundError:
-            self.status_message.emit("未找到adb命令，请确保Android SDK已安装并配置PATH")
+            self.status_message.emit(self.lang_manager.tr("未找到adb命令，请确保Android SDK已安装并配置PATH"))
         except Exception as e:
-            self.status_message.emit(f"设置USB模式失败: {str(e)}")
+            self.status_message.emit(f"{self.lang_manager.tr('设置USB模式失败:')} {str(e)}")
     
     def install_mtklogger(self):
         """安装MTKLOGGER"""
@@ -706,7 +825,7 @@ class PyQtMTKLogManager(QObject):
         # 选择APK文件
         apk_file, _ = QFileDialog.getOpenFileName(
             None,
-            "选择MTKLOGGER APK文件",
+            self.lang_manager.tr("选择MTKLOGGER APK文件"),
             "",
             "APK Files (*.apk)"
         )
@@ -715,7 +834,7 @@ class PyQtMTKLogManager(QObject):
             return
         
         try:
-            self.status_message.emit("正在安装MTKLOGGER...")
+            self.status_message.emit(self.lang_manager.tr("正在安装MTKLOGGER..."))
             
             # 1. 安装MTKLOGGER
             install_cmd = ["adb", "-s", device, "install", "--bypass-low-target-sdk-block", apk_file]
@@ -723,31 +842,31 @@ class PyQtMTKLogManager(QObject):
                                   creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0)
             
             if result.returncode != 0:
-                error_msg = result.stderr.strip() if result.stderr else "未知错误"
-                raise Exception(f"安装失败: {error_msg}")
+                error_msg = result.stderr.strip() if result.stderr else self.lang_manager.tr("未知错误")
+                raise Exception(f"{self.lang_manager.tr('安装失败:')} {error_msg}")
             
             # 检查安装结果
             if "Success" not in result.stdout and "success" not in result.stdout.lower():
-                raise Exception(f"安装可能失败: {result.stdout.strip()}")
+                raise Exception(f"{self.lang_manager.tr('安装可能失败:')} {result.stdout.strip()}")
             
             # 2. 启动MTKLOGGER
-            self.status_message.emit("启动MTKLOGGER...")
+            self.status_message.emit(self.lang_manager.tr("启动MTKLOGGER..."))
             
             # 确保屏幕亮屏且解锁
             if not self.device_manager.ensure_screen_unlocked(device):
-                raise Exception("无法确保屏幕状态")
+                raise Exception(self.lang_manager.tr("无法确保屏幕状态"))
             
             start_cmd = ["adb", "-s", device, "shell", "am", "start", "-n", "com.debug.loggerui/.MainActivity"]
             result = subprocess.run(start_cmd, capture_output=True, text=True, timeout=30,
                                   creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0)
             
             if result.returncode != 0:
-                print(f"警告: 启动MTKLOGGER失败: {result.stderr.strip()}")
+                print(f"{self.lang_manager.tr('警告:')} {self.lang_manager.tr('启动MTKLOGGER失败:')} {result.stderr.strip()}")
             
-            self.status_message.emit("MTKLOGGER安装成功")
+            self.status_message.emit(self.lang_manager.tr("MTKLOGGER安装成功"))
             
         except Exception as e:
-            self.status_message.emit(f"安装MTKLOGGER失败: {str(e)}")
+            self.status_message.emit(f"{self.lang_manager.tr('安装MTKLOGGER失败:')} {str(e)}")
     
     def _check_mtklogger_exists(self, device):
         """检查MTKLOGGER是否存在"""
@@ -782,8 +901,8 @@ class PyQtMTKLogManager(QObject):
             try:
                 os.startfile(export_path)
             except Exception as e:
-                self.status_message.emit(f"打开文件夹失败: {str(e)}")
-            self.status_message.emit(f"MTKLOG已停止并导出 - {export_path}")
+                self.status_message.emit(f"{self.lang_manager.tr('打开文件夹失败:')} {str(e)}")
+            self.status_message.emit(f"{self.lang_manager.tr('MTKLOG已停止并导出 -')} {export_path}")
         else:
             self.status_message.emit(message)
         

@@ -21,6 +21,8 @@ class PyQtTCPDumpManager(QObject):
     def __init__(self, device_manager, parent=None):
         super().__init__(parent)
         self.device_manager = device_manager
+        # 从父窗口获取语言管理器
+        self.lang_manager = parent.lang_manager if parent and hasattr(parent, 'lang_manager') else None
         self.process = None
         
     def show_tcpdump_dialog(self):
@@ -30,17 +32,17 @@ class PyQtTCPDumpManager(QObject):
             return
         
         # 获取用户输入
-        interface, ok1 = QInputDialog.getText(None, "TCPDUMP", "请输入网络接口 (如 wlan0):")
+        interface, ok1 = QInputDialog.getText(None, "TCPDUMP", self.lang_manager.tr("请输入网络接口 (如 wlan0):"))
         if not ok1 or not interface:
             return
         
-        duration, ok2 = QInputDialog.getInt(None, "TCPDUMP", "请输入持续时间(秒):", 60, 1, 3600)
+        duration, ok2 = QInputDialog.getInt(None, "TCPDUMP", self.lang_manager.tr("请输入持续时间(秒):"), 60, 1, 3600)
         if not ok2:
             return
         
         # 执行TCPDUMP
         try:
-            self.status_message.emit("开始TCPDUMP...")
+            self.status_message.emit(self.lang_manager.tr("开始TCPDUMP..."))
             
             # 创建保存目录
             current_time = datetime.datetime.now()
@@ -63,7 +65,7 @@ class PyQtTCPDumpManager(QObject):
             threading.Timer(duration, self._stop_tcpdump, args=[device, tcpdump_file]).start()
             
         except Exception as e:
-            self.status_message.emit(f"TCPDUMP失败: {str(e)}")
+            self.status_message.emit(f"{self.lang_manager.tr('TCPDUMP失败:')} {str(e)}")
     
     def _stop_tcpdump(self, device, output_file):
         """停止TCPDUMP并保存"""
@@ -83,10 +85,10 @@ class PyQtTCPDumpManager(QObject):
                 creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0
             )
             
-            self.status_message.emit(f"TCPDUMP已保存: {output_file}")
+            self.status_message.emit(f"{self.lang_manager.tr('TCPDUMP已保存:')} {output_file}")
             
         except Exception as e:
-            self.status_message.emit(f"保存TCPDUMP失败: {str(e)}")
+            self.status_message.emit(f"{self.lang_manager.tr('保存TCPDUMP失败:')} {str(e)}")
 
 
 class PyQtGoogleLogManager(QObject):
@@ -97,6 +99,8 @@ class PyQtGoogleLogManager(QObject):
     def __init__(self, device_manager, parent=None):
         super().__init__(parent)
         self.device_manager = device_manager
+        # 从父窗口获取语言管理器
+        self.lang_manager = parent.lang_manager if parent and hasattr(parent, 'lang_manager') else None
         self.google_log_enabled = False
         
     def toggle_google_log(self):
@@ -114,7 +118,7 @@ class PyQtGoogleLogManager(QObject):
                     creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0
                 )
                 self.google_log_enabled = False
-                self.status_message.emit("Google日志已禁用")
+                self.status_message.emit(self.lang_manager.tr("Google日志已禁用"))
             else:
                 # 启用
                 subprocess.run(
@@ -123,9 +127,9 @@ class PyQtGoogleLogManager(QObject):
                     creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0
                 )
                 self.google_log_enabled = True
-                self.status_message.emit("Google日志已启用")
+                self.status_message.emit(self.lang_manager.tr("Google日志已启用"))
         except Exception as e:
-            self.status_message.emit(f"切换Google日志失败: {str(e)}")
+            self.status_message.emit(f"{self.lang_manager.tr('切换Google日志失败:')} {str(e)}")
 
 
 class PyQtAEELogManager(QObject):
@@ -136,6 +140,8 @@ class PyQtAEELogManager(QObject):
     def __init__(self, device_manager, parent=None):
         super().__init__(parent)
         self.device_manager = device_manager
+        # 从父窗口获取语言管理器
+        self.lang_manager = parent.lang_manager if parent and hasattr(parent, 'lang_manager') else None
         
     def start_aee_log(self):
         """启动AEE Log"""
@@ -149,9 +155,9 @@ class PyQtAEELogManager(QObject):
                 timeout=10,
                 creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0
             )
-            self.status_message.emit("AEE Log已启动")
+            self.status_message.emit(self.lang_manager.tr("AEE Log已启动"))
         except Exception as e:
-            self.status_message.emit(f"启动AEE Log失败: {str(e)}")
+            self.status_message.emit(f"{self.lang_manager.tr('启动AEE Log失败:')} {str(e)}")
 
 
 class PyQtBugreportManager(QObject):
@@ -162,6 +168,8 @@ class PyQtBugreportManager(QObject):
     def __init__(self, device_manager, parent=None):
         super().__init__(parent)
         self.device_manager = device_manager
+        # 从父窗口获取语言管理器
+        self.lang_manager = parent.lang_manager if parent and hasattr(parent, 'lang_manager') else None
         
     def generate_bugreport(self):
         """生成Bugreport"""
@@ -170,7 +178,7 @@ class PyQtBugreportManager(QObject):
             return
         
         try:
-            self.status_message.emit("正在生成Bugreport...")
+            self.status_message.emit(self.lang_manager.tr("正在生成Bugreport..."))
             
             # 创建保存目录
             current_date = datetime.datetime.now().strftime("%Y%m%d")
@@ -206,16 +214,16 @@ class PyQtBugreportManager(QObject):
             self.worker.start()
             
         except Exception as e:
-            self.status_message.emit(f"生成Bugreport失败: {str(e)}")
+            self.status_message.emit(f"{self.lang_manager.tr('生成Bugreport失败:')} {str(e)}")
     
     def _on_bugreport_generated(self, success, result):
         """Bugreport生成完成"""
         if success:
-            self.status_message.emit(f"Bugreport已生成: {result}")
+            self.status_message.emit(f"{self.lang_manager.tr('Bugreport已生成:')} {result}")
             # 打开文件夹
             os.startfile(result)
         else:
-            self.status_message.emit(f"生成Bugreport失败: {result}")
+            self.status_message.emit(f"{self.lang_manager.tr('生成Bugreport失败:')} {result}")
     
     def pull_bugreport(self):
         """Pull Bugreport"""
@@ -225,7 +233,7 @@ class PyQtBugreportManager(QObject):
         
         try:
             # 先检查设备上是否有bugreport
-            self.status_message.emit("检查设备上的bugreport...")
+            self.status_message.emit(self.lang_manager.tr("检查设备上的bugreport..."))
             
             check_result = subprocess.run(
                 ["adb", "-s", device, "shell", "ls", "-l", "/data/user_de/0/com.android.shell/files/bugreports"],
@@ -237,19 +245,19 @@ class PyQtBugreportManager(QObject):
             
             # 检查是否返回错误信息
             if "No such file or directory" in check_result.stderr or check_result.returncode != 0:
-                self.status_message.emit("设备上没有bugreport")
+                self.status_message.emit(self.lang_manager.tr("设备上没有bugreport"))
                 from PyQt5.QtWidgets import QMessageBox
-                QMessageBox.information(None, "提示", "设备上没有bugreport文件")
+                QMessageBox.information(None, self.lang_manager.tr("提示"), "设备上没有bugreport文件")
                 return
             
             # 如果目录存在但为空，也提示
             if not check_result.stdout.strip():
-                self.status_message.emit("设备上的bugreport目录为空")
+                self.status_message.emit(self.lang_manager.tr("设备上的bugreport目录为空"))
                 from PyQt5.QtWidgets import QMessageBox
-                QMessageBox.information(None, "提示", "设备上的bugreport目录为空")
+                QMessageBox.information(None, self.lang_manager.tr("提示"), "设备上的bugreport目录为空")
                 return
             
-            self.status_message.emit("正在拉取Bugreport...")
+            self.status_message.emit(self.lang_manager.tr("正在拉取Bugreport..."))
             
             # 创建保存目录
             current_date = datetime.datetime.now().strftime("%Y%m%d")
@@ -265,13 +273,13 @@ class PyQtBugreportManager(QObject):
                 creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0
             )
             
-            self.status_message.emit(f"Bugreport已拉取: {bugreport_folder}")
+            self.status_message.emit(f"{self.lang_manager.tr('Bugreport已拉取:')} {bugreport_folder}")
             
             # 打开文件夹
             os.startfile(bugreport_folder)
             
         except Exception as e:
-            self.status_message.emit(f"拉取Bugreport失败: {str(e)}")
+            self.status_message.emit(f"{self.lang_manager.tr('拉取Bugreport失败:')} {str(e)}")
     
     def delete_bugreport(self):
         """删除Bugreport"""
@@ -283,8 +291,8 @@ class PyQtBugreportManager(QObject):
         from PyQt5.QtWidgets import QMessageBox
         reply = QMessageBox.question(
             None,
-            "确认删除",
-            "确定要删除设备上的bugreport吗？此操作不可恢复。",
+            self.lang_manager.tr("确认删除"),
+            self.lang_manager.tr("确定要删除设备上的bugreport吗？此操作不可恢复。"),
             QMessageBox.Yes | QMessageBox.No,
             QMessageBox.No
         )
@@ -298,11 +306,11 @@ class PyQtBugreportManager(QObject):
                 timeout=30,
                 creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0
             )
-            self.status_message.emit("Bugreport已删除")
-            QMessageBox.information(None, "成功", "bugreport已成功删除")
+            self.status_message.emit(self.lang_manager.tr("Bugreport已删除"))
+            QMessageBox.information(None, self.lang_manager.tr("成功"), "bugreport已成功删除")
         except Exception as e:
-            self.status_message.emit(f"删除Bugreport失败: {str(e)}")
-            QMessageBox.critical(None, "错误", f"删除Bugreport失败: {str(e)}")
+            self.status_message.emit(f"{self.lang_manager.tr('删除Bugreport失败:')} {str(e)}")
+            QMessageBox.critical(None, self.lang_manager.tr("错误"), f"删除Bugreport失败: {str(e)}")
 
 
 # 导出所有管理器

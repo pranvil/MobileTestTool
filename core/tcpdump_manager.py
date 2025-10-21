@@ -19,7 +19,9 @@ class TCPDumpDialog(QDialog):
     
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Android TCPDUMP 抓包工具")
+        # 从父窗口获取语言管理器
+        self.lang_manager = parent.lang_manager if parent and hasattr(parent, 'lang_manager') else None
+        self.setWindowTitle(self.lang_manager.tr("Android TCPDUMP 抓包工具") if self.lang_manager else "Android TCPDUMP 抓包工具")
         self.setMinimumSize(500, 400)
         self.setModal(True)
         
@@ -36,12 +38,12 @@ class TCPDumpDialog(QDialog):
         layout.setSpacing(10)
         
         # 标题
-        title = QLabel("🔧 Android TCPDUMP 抓包工具")
+        title = QLabel(self.lang_manager.tr("Android TCPDUMP 抓包工具"))
         title.setStyleSheet("font-size: 16pt; font-weight: bold;")
         layout.addWidget(title)
         
         # 状态显示区域
-        status_label = QLabel("状态信息:")
+        status_label = QLabel(self.lang_manager.tr("状态信息:"))
         layout.addWidget(status_label)
         
         # 创建状态文本显示区域
@@ -70,15 +72,15 @@ class TCPDumpDialog(QDialog):
         # 控制按钮
         button_layout = QHBoxLayout()
         
-        self.start_stop_btn = QPushButton("▶️ 开始")
+        self.start_stop_btn = QPushButton(self.lang_manager.tr("开始"))
         self.start_stop_btn.clicked.connect(self.toggle_capture)
         button_layout.addWidget(self.start_stop_btn)
         
-        clear_btn = QPushButton("🗑️ 清空日志")
+        clear_btn = QPushButton(self.lang_manager.tr("清空日志"))
         clear_btn.clicked.connect(self.clear_log)
         button_layout.addWidget(clear_btn)
         
-        close_btn = QPushButton("❌ 关闭")
+        close_btn = QPushButton(self.lang_manager.tr("关闭"))
         close_btn.clicked.connect(self.close)
         button_layout.addWidget(close_btn)
         
@@ -89,11 +91,11 @@ class TCPDumpDialog(QDialog):
         timestamp = datetime.now().strftime("%H:%M:%S")
         
         # 根据消息类型添加颜色标记
-        if "✅" in message or "成功" in message:
+        if "✅" in message or self.lang_manager.tr("成功") in message:
             color = "#28a745"  # 绿色
-        elif "❌" in message or "失败" in message or "错误" in message:
+        elif "❌" in message or self.lang_manager.tr("失败") in message or self.lang_manager.tr("错误") in message:
             color = "#dc3545"  # 红色
-        elif "⚠️" in message or "警告" in message:
+        elif "⚠️" in message or self.lang_manager.tr("警告") in message:
             color = "#ffc107"  # 黄色
         else:
             color = "#17a2b8"  # 蓝色
@@ -116,17 +118,17 @@ class TCPDumpDialog(QDialog):
                                   creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0)
             return result.returncode == 0, result.stdout, result.stderr
         except subprocess.TimeoutExpired:
-            return False, "", "命令执行超时"
+            return False, "", self.lang_manager.tr("命令执行超时")
         except Exception as e:
             return False, "", str(e)
     
     def check_root_permission(self):
         """检查Root权限"""
-        self.log_message("正在检查Root权限...")
+        self.log_message(self.lang_manager.tr("正在检查Root权限..."))
         success, stdout, stderr = self.run_adb_command("adb root")
         
         if not success:
-            self.log_message(f"ADB命令执行失败: {stderr}")
+            self.log_message(f"{self.lang_manager.tr('ADB命令执行失败:')} {stderr}")
             return False
         
         # adb root的错误信息通常在stdout中，需要同时检查stdout和stderr
@@ -135,48 +137,48 @@ class TCPDumpDialog(QDialog):
             return False
         else:
             # 只要不是production builds错误，都认为有root权限
-            self.log_message("✅ Root权限检查通过")
+            self.log_message(self.lang_manager.tr("Root权限检查通过"))
             return True
     
     def check_tcpdump_support(self):
         """检查TCPDUMP支持"""
-        self.log_message("正在检查TCPDUMP支持...")
+        self.log_message(self.lang_manager.tr("正在检查TCPDUMP支持..."))
         success, stdout, stderr = self.run_adb_command("adb shell tcpdump --version")
         
         if not success or "inaccessible or not found" in stderr:
-            self.log_message("❌ 设备不支持TCPDUMP命令")
+            self.log_message(self.lang_manager.tr("设备不支持TCPDUMP命令"))
             return False
         else:
-            self.log_message("✅ TCPDUMP支持检查通过")
+            self.log_message(self.lang_manager.tr("TCPDUMP支持检查通过"))
             return True
     
     def check_initial_status(self):
         """初始化状态检查"""
-        self.log_message("开始初始化检查...")
+        self.log_message(self.lang_manager.tr("开始初始化检查..."))
         
         # 检查ADB连接
         success, stdout, stderr = self.run_adb_command("adb devices")
         if not success:
-            self.log_message("❌ ADB连接失败，请确保设备已连接并开启USB调试")
+            self.log_message(self.lang_manager.tr("ADB连接失败，请确保设备已连接并开启USB调试"))
             return
         
         if "device" not in stdout:
-            self.log_message("❌ 未检测到连接的设备")
+            self.log_message(self.lang_manager.tr("未检测到连接的设备"))
             return
         
-        self.log_message("✅ 设备连接正常")
+        self.log_message(self.lang_manager.tr("设备连接正常"))
         
         # 检查Root权限
         if not self.check_root_permission():
-            self.log_message("❌ 设备不支持Root权限")
+            self.log_message(self.lang_manager.tr("设备不支持Root权限"))
             return
         
         # 检查TCPDUMP支持
         if not self.check_tcpdump_support():
-            self.log_message("❌ 设备不支持TCPDUMP")
+            self.log_message(self.lang_manager.tr("设备不支持TCPDUMP"))
             return
         
-        self.log_message("✅ 所有检查通过，可以开始抓包")
+        self.log_message(self.lang_manager.tr("所有检查通过，可以开始抓包"))
     
     def get_log_path(self):
         """根据设备类型获取日志路径"""
@@ -197,26 +199,26 @@ class TCPDumpDialog(QDialog):
         log_dir = self.get_log_directory()
         log_path = self.get_log_path()
         
-        self.log_message(f"检查设备路径: {log_dir}")
+        self.log_message(f"{self.lang_manager.tr('检查设备路径:')} {log_dir}")
         
         # 检查路径是否存在
         success, stdout, stderr = self.run_adb_command(f"adb shell ls -d '{log_dir}'")
         
         if not success or "No such file or directory" in stderr:
-            self.log_message(f"❌ 路径不存在: {log_dir}")
-            self.log_message("正在尝试创建目录...")
+            self.log_message(f"❌ {self.lang_manager.tr('路径不存在:')} {log_dir}")
+            self.log_message(self.lang_manager.tr("正在尝试创建目录..."))
             
             # 尝试创建目录
             success2, stdout2, stderr2 = self.run_adb_command(f"adb shell mkdir -p '{log_dir}'")
             
             if success2:
-                self.log_message(f"✅ 目录创建成功: {log_dir}")
+                self.log_message(f"✅ {self.lang_manager.tr('目录创建成功:')} {log_dir}")
             else:
-                self.log_message(f"❌ 目录创建失败: {stderr2}")
-                self.log_message("❌ 程序停止：无法创建必要的目录")
+                self.log_message(f"❌ {self.lang_manager.tr('目录创建失败:')} {stderr2}")
+                self.log_message(self.lang_manager.tr("程序停止：无法创建必要的目录"))
                 return
         else:
-            self.log_message(f"✅ 路径存在: {log_dir}")
+            self.log_message(f"✅ {self.lang_manager.tr('路径存在:')} {log_dir}")
         
         # 在新线程中启动抓包，避免UI阻塞
         threading.Thread(target=self.start_capture, daemon=True).start()
@@ -224,7 +226,7 @@ class TCPDumpDialog(QDialog):
     def start_capture(self):
         """开始抓包"""
         log_path = self.get_log_path()
-        self.log_message(f"开始抓包，日志保存到: {log_path}")
+        self.log_message(f"{self.lang_manager.tr('开始抓包，日志保存到:')} {log_path}")
         
         # 构建tcpdump命令
         tcpdump_cmd = f'adb shell "nohup tcpdump -i any -s 0 -w {log_path} >/dev/null 2>&1 &"'
@@ -233,28 +235,28 @@ class TCPDumpDialog(QDialog):
         
         if success:
             self.is_running = True
-            self.start_stop_btn.setText("⏹️ 停止")
-            self.log_message("✅ TCPDUMP进程启动成功")
+            self.start_stop_btn.setText(self.lang_manager.tr("停止"))
+            self.log_message(self.lang_manager.tr("TCPDUMP进程启动成功"))
             
             # 等待进程启动
-            self.log_message("⏳ 等待TCPDUMP进程启动...")
+            self.log_message(self.lang_manager.tr("等待TCPDUMP进程启动..."))
             time.sleep(1)
             
             # 验证进程是否真的在运行（重试检查）
             self.verify_tcpdump_process()
         else:
-            self.log_message(f"❌ TCPDUMP启动失败: {stderr}")
+            self.log_message(f"❌ {self.lang_manager.tr('TCPDUMP启动失败:')} {stderr}")
     
     def stop_capture(self):
         """停止抓包并拉取日志"""
-        self.log_message("正在停止抓包...")
+        self.log_message(self.lang_manager.tr("正在停止抓包..."))
         
         # 停止tcpdump进程
         success, stdout, stderr = self.run_adb_command("adb shell pkill tcpdump")
         if success:
-            self.log_message("✅ TCPDUMP进程已停止")
+            self.log_message(self.lang_manager.tr("TCPDUMP进程已停止"))
         else:
-            self.log_message(f"⚠️ 停止进程时出现警告: {stderr}")
+            self.log_message(f"⚠️ {self.lang_manager.tr('停止进程时出现警告:')} {stderr}")
         
         # 等待进程完全停止
         time.sleep(2)
@@ -264,12 +266,12 @@ class TCPDumpDialog(QDialog):
         
         # 更新UI状态
         self.is_running = False
-        self.start_stop_btn.setText("▶️ 开始")
+        self.start_stop_btn.setText(self.lang_manager.tr("开始"))
     
     def pull_log_file(self):
         """拉取日志文件到本地"""
         log_path = self.get_log_path()
-        self.log_message(f"正在拉取日志文件: {log_path}")
+        self.log_message(f"{self.lang_manager.tr('正在拉取日志文件:')} {log_path}")
         
         # 创建本地日志目录 - 使用统一的路径格式 c:\log\yyyymmdd\tcpdump
         date_str = datetime.now().strftime("%Y%m%d")
@@ -277,9 +279,9 @@ class TCPDumpDialog(QDialog):
         
         try:
             os.makedirs(local_log_dir, exist_ok=True)
-            self.log_message(f"✅ 创建日志目录: {local_log_dir}")
+            self.log_message(f"✅ {self.lang_manager.tr('创建日志目录:')} {local_log_dir}")
         except Exception as e:
-            self.log_message(f"⚠️ 无法创建日志目录，将保存到当前目录: {e}")
+            self.log_message(f"⚠️ {self.lang_manager.tr('无法创建日志目录，将保存到当前目录:')} {e}")
             local_log_dir = "."
         
         # 生成带时间戳的文件名
@@ -293,42 +295,42 @@ class TCPDumpDialog(QDialog):
         
         if success and os.path.exists(local_file):
             file_size = os.path.getsize(local_file)
-            self.log_message(f"✅ 日志文件拉取成功")
-            self.log_message(f"📁 文件路径: {os.path.abspath(local_file)}")
-            self.log_message(f"📊 文件大小: {file_size} 字节")
+            self.log_message(f"✅ {self.lang_manager.tr('日志文件拉取成功')}")
+            self.log_message(f"📁 {self.lang_manager.tr('文件路径:')} {os.path.abspath(local_file)}")
+            self.log_message(f"📊 {self.lang_manager.tr('文件大小:')} {file_size} {self.lang_manager.tr('字节')}")
             
             # 打开文件夹
             try:
                 os.startfile(os.path.dirname(os.path.abspath(local_file)))
-                self.log_message("✅ 已打开日志文件夹")
+                self.log_message(self.lang_manager.tr("已打开日志文件夹"))
             except Exception as e:
-                self.log_message(f"⚠️ 无法自动打开文件夹: {e}")
+                self.log_message(f"⚠️ {self.lang_manager.tr('无法自动打开文件夹:')} {e}")
         else:
-            self.log_message(f"❌ 日志文件拉取失败: {stderr}")
-            self.log_message("请检查设备存储空间和文件权限")
+            self.log_message(f"❌ {self.lang_manager.tr('日志文件拉取失败:')} {stderr}")
+            self.log_message(self.lang_manager.tr("请检查设备存储空间和文件权限"))
     
     def check_system_requirements(self):
         """检查系统要求"""
-        self.log_message("检查系统要求...")
+        self.log_message(self.lang_manager.tr("检查系统要求..."))
         
         # 检查ADB连接
         success, stdout, stderr = self.run_adb_command("adb devices")
         if not success:
-            self.log_message("❌ ADB连接失败，请确保设备已连接并开启USB调试")
+            self.log_message(self.lang_manager.tr("ADB连接失败，请确保设备已连接并开启USB调试"))
             return False
         
         if "device" not in stdout:
-            self.log_message("❌ 未检测到连接的设备")
+            self.log_message(self.lang_manager.tr("未检测到连接的设备"))
             return False
         
         # 检查Root权限
         if not self.check_root_permission():
-            self.log_message("❌ 设备不支持Root权限，程序终止")
+            self.log_message(self.lang_manager.tr("设备不支持Root权限，程序终止"))
             return False
         
         # 检查TCPDUMP支持
         if not self.check_tcpdump_support():
-            self.log_message("❌ 设备不支持TCPDUMP，程序终止")
+            self.log_message(self.lang_manager.tr("设备不支持TCPDUMP，程序终止"))
             return False
         
         return True
@@ -346,26 +348,26 @@ class TCPDumpDialog(QDialog):
                 lines = stdout.strip().split('\n')
                 for line in lines:
                     if "tcpdump" in line and "grep" not in line:
-                        self.log_message("✅ 确认TCPDUMP进程正在运行")
+                        self.log_message(self.lang_manager.tr("确认TCPDUMP进程正在运行"))
                         return True
             
             # 如果未找到，等待后重试
             if attempt < max_retries - 1:
-                self.log_message("⏳ 等待进程启动...")
+                self.log_message(self.lang_manager.tr("等待进程启动..."))
                 time.sleep(1)
             else:
                 # 检查日志文件是否存在
                 log_path = self.get_log_path()
                 success2, stdout2, stderr2 = self.run_adb_command(f"adb shell ls -la '{log_path}'")
                 if success2 and log_path.split('/')[-1] in stdout2:
-                    self.log_message("✅ 日志文件存在，TCPDUMP可能正在后台运行")
+                    self.log_message(self.lang_manager.tr("日志文件存在，TCPDUMP可能正在后台运行"))
                     return True
                 else:
-                    self.log_message("❌ TCPDUMP进程不存在，程序终止")
-                    self.log_message("请检查设备权限和TCPDUMP安装状态")
+                    self.log_message(self.lang_manager.tr("TCPDUMP进程不存在，程序终止"))
+                    self.log_message(self.lang_manager.tr("请检查设备权限和TCPDUMP安装状态"))
                     # 恢复按钮状态
                     self.is_running = False
-                    self.start_stop_btn.setText("▶️ 开始")
+                    self.start_stop_btn.setText(self.lang_manager.tr("开始"))
                     return False
         return False
     
@@ -374,7 +376,7 @@ class TCPDumpDialog(QDialog):
         from PyQt5.QtWidgets import QRadioButton, QButtonGroup
         
         device_dialog = QDialog(self)
-        device_dialog.setWindowTitle("选择设备类型")
+        device_dialog.setWindowTitle(self.lang_manager.tr("选择设备类型"))
         device_dialog.setFixedSize(300, 200)
         device_dialog.setModal(True)
         
@@ -383,7 +385,7 @@ class TCPDumpDialog(QDialog):
         layout.setSpacing(15)
         
         # 标题
-        title = QLabel("请选择设备类型")
+        title = QLabel(self.lang_manager.tr("请选择设备类型"))
         title.setStyleSheet("font-size: 12pt; font-weight: bold;")
         layout.addWidget(title)
         
@@ -413,11 +415,11 @@ class TCPDumpDialog(QDialog):
         def on_cancel():
             device_dialog.reject()
         
-        ok_btn = QPushButton("确定")
+        ok_btn = QPushButton(self.lang_manager.tr("确定"))
         ok_btn.clicked.connect(on_ok)
         button_layout.addWidget(ok_btn)
         
-        cancel_btn = QPushButton("取消")
+        cancel_btn = QPushButton(self.lang_manager.tr("取消"))
         cancel_btn.clicked.connect(on_cancel)
         button_layout.addWidget(cancel_btn)
         
@@ -433,7 +435,7 @@ class TCPDumpDialog(QDialog):
         else:
             # 先检查系统要求
             if not self.check_system_requirements():
-                self.log_message("❌ 系统检查失败，无法开始抓包")
+                self.log_message(self.lang_manager.tr("系统检查失败，无法开始抓包"))
                 return
             
             # 显示设备选择对话框
@@ -444,8 +446,8 @@ class TCPDumpDialog(QDialog):
         if self.is_running:
             reply = QMessageBox.question(
                 self,
-                "确认关闭",
-                "TCPDUMP正在运行中，关闭对话框将停止抓包。是否继续？",
+                self.lang_manager.tr("确认关闭"),
+                self.lang_manager.tr("TCPDUMP正在运行中，关闭对话框将停止抓包。是否继续？"),
                 QMessageBox.Yes | QMessageBox.No
             )
             if reply == QMessageBox.Yes:
@@ -465,6 +467,8 @@ class PyQtTCPDumpManager(QObject):
     def __init__(self, device_manager, parent=None):
         super().__init__(parent)
         self.device_manager = device_manager
+        # 从父窗口获取语言管理器
+        self.lang_manager = parent.lang_manager if parent and hasattr(parent, 'lang_manager') else None
         self.dialog = None
         
     def show_tcpdump_dialog(self):
@@ -483,6 +487,6 @@ class PyQtTCPDumpManager(QObject):
             return True
             
         except Exception as e:
-            QMessageBox.critical(None, "错误", f"打开TCPDUMP工具失败: {str(e)}")
+            QMessageBox.critical(None, self.lang_manager.tr("错误"), f"打开TCPDUMP工具失败: {str(e)}")
             return False
 

@@ -82,7 +82,7 @@ def add_card_shadow(widget: QWidget) -> QGraphicsDropShadowEffect:
     
     性能提示:
         - 大量卡片在QScrollArea中时，阴影会增加合成成本
-        - 大列表建议按需开关或只为"首层卡片"加阴影
+        - 大列表建议按需开关或只为self.lang_manager.tr("首层卡片")加阴影
         - 确保卡片四周有margin（8-16px），否则阴影会被父容器裁掉
     """
     return add_shadow(widget, blur=18, dx=0, dy=4, alpha=120)

@@ -18,7 +18,18 @@ class LogViewer(QWidget):
     
     def __init__(self, parent=None):
         super().__init__(parent)
+        # 从父窗口获取语言管理器
+        if parent and hasattr(parent, 'lang_manager'):
+            self.lang_manager = parent.lang_manager
+        else:
+            # 如果没有父窗口或语言管理器，创建一个默认的
+            from core.language_manager import LanguageManager
+            self.lang_manager = LanguageManager()
         self.setup_ui()
+    
+    def tr(self, text):
+        """安全地获取翻译文本"""
+        return self.lang_manager.tr(text) if self.lang_manager else text
         
         # 搜索相关
         self.search_keyword = ""
@@ -33,7 +44,7 @@ class LogViewer(QWidget):
         layout.setSpacing(0)
         
         # 日志显示标签
-        label = QLabel("日志内容")
+        label = QLabel(self.lang_manager.tr("日志内容"))
         label.setStyleSheet("font-weight: bold; padding: 5px;")
         layout.addWidget(label)
         
@@ -69,34 +80,34 @@ class LogViewer(QWidget):
         search_layout = QHBoxLayout()
         search_layout.setContentsMargins(5, 5, 5, 5)
         
-        search_label = QLabel("搜索:")
+        search_label = QLabel(self.lang_manager.tr("搜索:"))
         search_layout.addWidget(search_label)
         
         self.search_edit = QLineEdit()
-        self.search_edit.setPlaceholderText("输入搜索关键字...")
+        self.search_edit.setPlaceholderText(self.lang_manager.tr("输入搜索关键字..."))
         self.search_edit.returnPressed.connect(self.on_return_pressed)
         search_layout.addWidget(self.search_edit)
         
-        self.search_btn = QPushButton("搜索")
+        self.search_btn = QPushButton(self.lang_manager.tr("搜索"))
         self.search_btn.clicked.connect(self.on_search)
         search_layout.addWidget(self.search_btn)
         
-        self.search_all_btn = QPushButton("搜索全部")
+        self.search_all_btn = QPushButton(self.lang_manager.tr("搜索全部"))
         self.search_all_btn.clicked.connect(self.show_all_results)
         search_layout.addWidget(self.search_all_btn)
         
-        self.case_check = QCheckBox("区分大小写")
+        self.case_check = QCheckBox(self.lang_manager.tr("区分大小写"))
         search_layout.addWidget(self.case_check)
         
-        self.prev_btn = QPushButton("上一个")
+        self.prev_btn = QPushButton(self.lang_manager.tr("上一个"))
         self.prev_btn.clicked.connect(self.find_previous)
         search_layout.addWidget(self.prev_btn)
         
-        self.next_btn = QPushButton("下一个")
+        self.next_btn = QPushButton(self.lang_manager.tr("下一个"))
         self.next_btn.clicked.connect(self.find_next)
         search_layout.addWidget(self.next_btn)
         
-        self.clear_btn = QPushButton("清空日志")
+        self.clear_btn = QPushButton(self.lang_manager.tr("清空日志"))
         self.clear_btn.clicked.connect(self.clear_logs)
         search_layout.addWidget(self.clear_btn)
         
@@ -210,9 +221,9 @@ class LogViewer(QWidget):
         if self.search_results:
             self.current_search_index = 0
             self.highlight_search_results()
-            self.status_message.emit(f"找到 {len(self.search_results)} 个匹配项，当前第 1 个")
+            self.status_message.emit(f"{self.tr('找到 ')}{len(self.search_results)}{self.tr(' 个匹配项，当前第 1 个')}")
         else:
-            self.status_message.emit("未找到匹配项")
+            self.status_message.emit(self.lang_manager.tr("未找到匹配项"))
             
     def clear_search_highlight(self):
         """清除搜索高亮"""
@@ -254,7 +265,7 @@ class LogViewer(QWidget):
             
         self.current_search_index = (self.current_search_index + 1) % len(self.search_results)
         self.highlight_search_results()
-        self.status_message.emit(f"找到 {len(self.search_results)} 个匹配项，当前第 {self.current_search_index + 1} 个")
+        self.status_message.emit(f"{self.tr('找到 ')}{len(self.search_results)}{self.tr(' 个匹配项，当前第 ')}{self.current_search_index + 1}{self.tr(' 个')}")
         
     def find_previous(self):
         """查找上一个"""
@@ -263,7 +274,7 @@ class LogViewer(QWidget):
             
         self.current_search_index = (self.current_search_index - 1) % len(self.search_results)
         self.highlight_search_results()
-        self.status_message.emit(f"找到 {len(self.search_results)} 个匹配项，当前第 {self.current_search_index + 1} 个")
+        self.status_message.emit(f"{self.tr('找到 ')}{len(self.search_results)}{self.tr(' 个匹配项，当前第 ')}{self.current_search_index + 1}{self.tr(' 个')}")
         
     def clear_logs(self):
         """清空日志"""
@@ -275,14 +286,14 @@ class LogViewer(QWidget):
         """显示所有搜索结果"""
         keyword = self.search_edit.text()
         if not keyword:
-            self.status_message.emit("请输入搜索关键字")
+            self.status_message.emit(self.lang_manager.tr("请输入搜索关键字"))
             return
         
         # 获取文本内容
         text_content = self.text_edit.toPlainText()
         
         if not text_content.strip():
-            self.status_message.emit("没有日志内容可搜索")
+            self.status_message.emit(self.lang_manager.tr("没有日志内容可搜索"))
             return
         
         # 搜索所有匹配的行
@@ -298,7 +309,7 @@ class LogViewer(QWidget):
                 matching_lines.append((i + 1, line))
         
         if not matching_lines:
-            self.status_message.emit("未找到匹配项")
+            self.status_message.emit(self.lang_manager.tr("未找到匹配项"))
             return
         
         # 创建结果显示窗口
@@ -307,7 +318,7 @@ class LogViewer(QWidget):
         from PyQt5.QtWidgets import QMessageBox
         
         results_window = QDialog(self)
-        results_window.setWindowTitle(f"搜索结果 - 找到 {len(matching_lines)} 个匹配项")
+        results_window.setWindowTitle(f"{self.tr('搜索结果 - 找到 ')}{len(matching_lines)}{self.tr(' 个匹配项')}")
         results_window.resize(1000, 600)
         
         # 主布局
@@ -318,24 +329,24 @@ class LogViewer(QWidget):
         # 标题和统计信息
         title_layout = QHBoxLayout()
         
-        title_label = QLabel(f"搜索关键字: {keyword}")
+        title_label = QLabel(f"{self.lang_manager.tr('搜索关键字:')} {keyword}")
         title_label.setStyleSheet("font-weight: bold; font-size: 12pt;")
         title_layout.addWidget(title_label)
         
-        count_label = QLabel(f"找到 {len(matching_lines)} 个匹配项")
+        count_label = QLabel(f"{self.lang_manager.tr('找到')} {len(matching_lines)} {self.lang_manager.tr('个匹配项')}")
         count_label.setStyleSheet("color: blue;")
         title_layout.addWidget(count_label)
         
         title_layout.addStretch()
         
         # 按钮
-        select_all_btn = QPushButton("全选")
+        select_all_btn = QPushButton(self.lang_manager.tr("全选"))
         title_layout.addWidget(select_all_btn)
         
-        copy_btn = QPushButton("复制")
+        copy_btn = QPushButton(self.lang_manager.tr("复制"))
         title_layout.addWidget(copy_btn)
         
-        close_btn = QPushButton("关闭")
+        close_btn = QPushButton(self.lang_manager.tr("关闭"))
         title_layout.addWidget(close_btn)
         
         main_layout.addLayout(title_layout)
@@ -412,7 +423,7 @@ class LogViewer(QWidget):
         
         def copy_results():
             results_text.copy()
-            QMessageBox.information(results_window, "成功", "搜索结果已复制到剪贴板")
+            QMessageBox.information(results_window, self.lang_manager.tr("成功"), "搜索结果已复制到剪贴板")
         
         def close_window():
             results_window.accept()
@@ -423,7 +434,7 @@ class LogViewer(QWidget):
         
         # 显示窗口
         results_window.exec_()
-        self.status_message.emit(f"显示 {len(matching_lines)} 个匹配项")
+        self.status_message.emit(f"{self.tr('显示 ')}{len(matching_lines)}{self.tr(' 个匹配项')}")
         
     # 信号定义（用于发送状态消息）
     status_message = pyqtSignal(str)

@@ -34,6 +34,13 @@ class AppOperationsTab(QWidget):
     
     def __init__(self, parent=None):
         super().__init__(parent)
+        # 从父窗口获取语言管理器
+        if parent and hasattr(parent, 'lang_manager'):
+            self.lang_manager = parent.lang_manager
+        else:
+            # 如果没有父窗口或语言管理器，创建一个默认的
+            from core.language_manager import LanguageManager
+            self.lang_manager = LanguageManager()
         self.setup_ui()
         
     def setup_ui(self):
@@ -97,7 +104,7 @@ class AppOperationsTab(QWidget):
         v.setSpacing(4)
         
         # 标题
-        title = QLabel("查询操作")
+        title = QLabel(self.lang_manager.tr("查询操作"))
         title.setProperty("class", "section-title")
         v.addWidget(title)
         
@@ -110,15 +117,15 @@ class AppOperationsTab(QWidget):
         card_layout.setContentsMargins(10, 1, 10, 1)
         card_layout.setSpacing(8)
         
-        self.query_package_btn = QPushButton("查询package")
+        self.query_package_btn = QPushButton(self.lang_manager.tr("查询package"))
         self.query_package_btn.clicked.connect(self.query_package.emit)
         card_layout.addWidget(self.query_package_btn)
         
-        self.query_package_name_btn = QPushButton("查询包名")
+        self.query_package_name_btn = QPushButton(self.lang_manager.tr("查询包名"))
         self.query_package_name_btn.clicked.connect(self.query_package_name.emit)
         card_layout.addWidget(self.query_package_name_btn)
         
-        self.query_install_path_btn = QPushButton("查询安装路径")
+        self.query_install_path_btn = QPushButton(self.lang_manager.tr("查询安装路径"))
         self.query_install_path_btn.clicked.connect(self.query_install_path.emit)
         card_layout.addWidget(self.query_install_path_btn)
         
@@ -137,7 +144,7 @@ class AppOperationsTab(QWidget):
         v.setSpacing(4)
         
         # 标题
-        title = QLabel("APK操作")
+        title = QLabel(self.lang_manager.tr("APK操作"))
         title.setProperty("class", "section-title")
         v.addWidget(title)
         
@@ -154,11 +161,11 @@ class AppOperationsTab(QWidget):
         self.pull_apk_btn.clicked.connect(self.pull_apk.emit)
         card_layout.addWidget(self.pull_apk_btn)
         
-        self.push_apk_btn = QPushButton("push 文件")
+        self.push_apk_btn = QPushButton(self.lang_manager.tr("push 文件"))
         self.push_apk_btn.clicked.connect(self.push_apk.emit)
         card_layout.addWidget(self.push_apk_btn)
         
-        self.install_apk_btn = QPushButton("安装APK")
+        self.install_apk_btn = QPushButton(self.lang_manager.tr("安装APK"))
         self.install_apk_btn.clicked.connect(self.install_apk.emit)
         card_layout.addWidget(self.install_apk_btn)
         
@@ -177,7 +184,7 @@ class AppOperationsTab(QWidget):
         v.setSpacing(4)
         
         # 标题
-        title = QLabel("进程操作")
+        title = QLabel(self.lang_manager.tr("进程操作"))
         title.setProperty("class", "section-title")
         v.addWidget(title)
         
@@ -190,7 +197,7 @@ class AppOperationsTab(QWidget):
         card_layout.setContentsMargins(10, 1, 10, 1)
         card_layout.setSpacing(8)
         
-        self.view_processes_btn = QPushButton("查看进程")
+        self.view_processes_btn = QPushButton(self.lang_manager.tr("查看进程"))
         self.view_processes_btn.clicked.connect(self.view_processes.emit)
         card_layout.addWidget(self.view_processes_btn)
         
@@ -213,7 +220,7 @@ class AppOperationsTab(QWidget):
         v.setSpacing(4)
         
         # 标题
-        title = QLabel("APP状态操作")
+        title = QLabel(self.lang_manager.tr("APP状态操作"))
         title.setProperty("class", "section-title")
         v.addWidget(title)
         
@@ -226,11 +233,11 @@ class AppOperationsTab(QWidget):
         card_layout.setContentsMargins(10, 1, 1, 10)
         card_layout.setSpacing(8)
         
-        self.enable_app_btn = QPushButton("启用app")
+        self.enable_app_btn = QPushButton(self.lang_manager.tr("启用app"))
         self.enable_app_btn.clicked.connect(self.enable_app.emit)
         card_layout.addWidget(self.enable_app_btn)
         
-        self.disable_app_btn = QPushButton("禁用app")
+        self.disable_app_btn = QPushButton(self.lang_manager.tr("禁用app"))
         self.disable_app_btn.clicked.connect(self.disable_app.emit)
         card_layout.addWidget(self.disable_app_btn)
         
@@ -240,3 +247,52 @@ class AppOperationsTab(QWidget):
         
         return container
 
+    def refresh_texts(self, lang_manager=None):
+        """刷新所有文本（用于语言切换）"""
+        if lang_manager:
+            self.lang_manager = lang_manager
+        
+        if not self.lang_manager:
+            return
+        
+        # 刷新组标题标签
+        self._refresh_section_titles()
+        
+        # 刷新查询操作组按钮
+        if hasattr(self, 'query_package_btn'):
+            self.query_package_btn.setText(self.lang_manager.tr("查询package"))
+        if hasattr(self, 'query_package_name_btn'):
+            self.query_package_name_btn.setText(self.lang_manager.tr("查询包名"))
+        if hasattr(self, 'query_install_path_btn'):
+            self.query_install_path_btn.setText(self.lang_manager.tr("查询安装路径"))
+        
+        # 刷新APK操作组按钮
+        if hasattr(self, 'push_apk_btn'):
+            self.push_apk_btn.setText(self.lang_manager.tr("push 文件"))
+        if hasattr(self, 'install_apk_btn'):
+            self.install_apk_btn.setText(self.lang_manager.tr("安装APK"))
+        
+        # 刷新进程管理组按钮
+        if hasattr(self, 'view_processes_btn'):
+            self.view_processes_btn.setText(self.lang_manager.tr("查看进程"))
+        
+        # 刷新应用控制组按钮
+        if hasattr(self, 'enable_app_btn'):
+            self.enable_app_btn.setText(self.lang_manager.tr("启用app"))
+        if hasattr(self, 'disable_app_btn'):
+            self.disable_app_btn.setText(self.lang_manager.tr("禁用app"))
+    
+    def _refresh_section_titles(self):
+        """刷新组标题标签"""
+        # 查找所有QLabel并刷新标题
+        for label in self.findChildren(QLabel):
+            current_text = label.text()
+            # 根据当前文本匹配对应的翻译
+            if current_text in ["查询操作", "Query Operations"]:
+                label.setText(self.lang_manager.tr("查询操作"))
+            elif current_text in ["APK操作", "APK Operations"]:
+                label.setText(self.lang_manager.tr("APK操作"))
+            elif current_text in ["进程操作", "Process Operations"]:
+                label.setText(self.lang_manager.tr("进程操作"))
+            elif current_text in ["APP状态操作", "APP Status Operations"]:
+                label.setText(self.lang_manager.tr("APP状态操作"))
