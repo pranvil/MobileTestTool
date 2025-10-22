@@ -37,7 +37,7 @@ class CustomButtonDialog(QDialog):
         layout = QVBoxLayout(self)
         
         # 顶部说明
-        info_text = (self.tr("在此配置自定义命令按钮，按钮将显示在指定的Tab和卡片中。") +
+        info_text = (self.tr("💡 在此配置自定义命令按钮，按钮将显示在指定的Tab和卡片中。") +
                     self.tr("adb命令会自动加上 'adb -s {device}' 前缀。"))
         
         info_label = QLabel(info_text)

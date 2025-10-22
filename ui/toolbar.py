@@ -228,7 +228,7 @@ class DeviceToolBar(QToolBar):
         self.screenshot_btn.setText(self.lang_manager.tr("截图"))
         self.record_btn.setText(self.lang_manager.tr("开始录制"))
         self.reboot_btn.setText(self.lang_manager.tr("重启手机"))
-        self.root_remount_btn.setText(self.lang_manager.tr("Root&Remount"))
+        self.root_remount_btn.setText(self.lang_manager.tr("Root&&Remount"))
         
         # 刷新ADB命令标签
         adb_label = None

@@ -137,7 +137,7 @@ class TCPDumpDialog(QDialog):
             return False
         else:
             # 只要不是production builds错误，都认为有root权限
-            self.log_message(self.lang_manager.tr("Root权限检查通过"))
+            self.log_message(self.lang_manager.tr("✅ Root权限检查通过"))
             return True
     
     def check_tcpdump_support(self):
@@ -146,10 +146,10 @@ class TCPDumpDialog(QDialog):
         success, stdout, stderr = self.run_adb_command("adb shell tcpdump --version")
         
         if not success or "inaccessible or not found" in stderr:
-            self.log_message(self.lang_manager.tr("设备不支持TCPDUMP命令"))
+            self.log_message(self.lang_manager.tr("❌ 设备不支持TCPDUMP命令"))
             return False
         else:
-            self.log_message(self.lang_manager.tr("TCPDUMP支持检查通过"))
+            self.log_message(self.lang_manager.tr("✅ TCPDUMP支持检查通过"))
             return True
     
     def check_initial_status(self):
@@ -159,26 +159,26 @@ class TCPDumpDialog(QDialog):
         # 检查ADB连接
         success, stdout, stderr = self.run_adb_command("adb devices")
         if not success:
-            self.log_message(self.lang_manager.tr("ADB连接失败，请确保设备已连接并开启USB调试"))
+            self.log_message(self.lang_manager.tr("❌ ADB连接失败，请确保设备已连接并开启USB调试"))
             return
         
         if "device" not in stdout:
-            self.log_message(self.lang_manager.tr("未检测到连接的设备"))
+            self.log_message(self.lang_manager.tr("❌ 未检测到连接的设备"))
             return
         
-        self.log_message(self.lang_manager.tr("设备连接正常"))
+        self.log_message(self.lang_manager.tr("✅ 设备连接正常"))
         
         # 检查Root权限
         if not self.check_root_permission():
-            self.log_message(self.lang_manager.tr("设备不支持Root权限"))
+            self.log_message(self.lang_manager.tr("❌ 设备不支持Root权限"))
             return
         
         # 检查TCPDUMP支持
         if not self.check_tcpdump_support():
-            self.log_message(self.lang_manager.tr("设备不支持TCPDUMP"))
+            self.log_message(self.lang_manager.tr("❌ 设备不支持TCPDUMP"))
             return
         
-        self.log_message(self.lang_manager.tr("所有检查通过，可以开始抓包"))
+        self.log_message(self.lang_manager.tr("✅ 所有检查通过，可以开始抓包"))
     
     def get_log_path(self):
         """根据设备类型获取日志路径"""
@@ -435,7 +435,7 @@ class TCPDumpDialog(QDialog):
         else:
             # 先检查系统要求
             if not self.check_system_requirements():
-                self.log_message(self.lang_manager.tr("系统检查失败，无法开始抓包"))
+                self.log_message(self.lang_manager.tr("❌ 系统检查失败，无法开始抓包"))
                 return
             
             # 显示设备选择对话框

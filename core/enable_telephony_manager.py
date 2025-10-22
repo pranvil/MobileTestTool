@@ -453,7 +453,7 @@ class PyQtTelephonyManager(QObject):
             if reply == QMessageBox.Yes:
                 self.reboot_device()
             else:
-                QMessageBox.information(None, self.lang_manager.tr("完成"), "Telephony日志设置完成！\n请手动重启设备以使设置生效。")
+                QMessageBox.information(None, self.lang_manager.tr("完成"), self.lang_manager.tr("Telephony日志设置完成！\n请手动重启设备以使设置生效。"))
         else:
             QMessageBox.critical(None, self.lang_manager.tr("错误"), f"设置Telephony日志失败: {message}")
     

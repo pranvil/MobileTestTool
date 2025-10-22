@@ -67,7 +67,19 @@ class LanguageManager(QObject):
     def _load_saved_language(self):
         """加载用户保存的语言偏好"""
         try:
-            config_file = get_resource_path('config/language.conf')
+            # 使用与保存相同的路径逻辑
+            if is_pyinstaller():
+                # 在exe环境中，从用户目录加载
+                user_config_dir = os.path.join(os.path.expanduser('~'), '.MobileTestTool')
+                config_file = os.path.join(user_config_dir, 'language.conf')
+            else:
+                # 在Python环境中，从项目目录加载
+                config_dir = os.path.join(
+                    os.path.dirname(os.path.dirname(__file__)),
+                    'config'
+                )
+                config_file = os.path.join(config_dir, 'language.conf')
+            
             logger.info(f"尝试加载语言配置: {config_file}")
             
             if os.path.exists(config_file):
@@ -75,7 +87,9 @@ class LanguageManager(QObject):
                     lang = f.read().strip()
                     if lang in ['zh', 'en']:
                         self.current_lang = lang
-                        logger.info("加载保存的语言设置")
+                        logger.info(f"加载保存的语言设置: {lang}")
+            else:
+                logger.info(f"语言配置文件不存在，使用默认语言: {self.current_lang}")
         except Exception as e:
             logger.error(f"加载保存的语言设置失败: {str(e)}")
     
@@ -84,7 +98,6 @@ class LanguageManager(QObject):
         try:
             if is_pyinstaller():
                 # 在exe环境中，保存到用户目录
-                import os
                 user_config_dir = os.path.join(os.path.expanduser('~'), '.MobileTestTool')
                 os.makedirs(user_config_dir, exist_ok=True)
                 config_file = os.path.join(user_config_dir, 'language.conf')
@@ -96,6 +109,8 @@ class LanguageManager(QObject):
                 )
                 os.makedirs(config_dir, exist_ok=True)
                 config_file = os.path.join(config_dir, 'language.conf')
+            
+            logger.info(f"尝试保存语言配置: {config_file}, 语言: {lang}")
             
             with open(config_file, 'w', encoding='utf-8') as f:
                 f.write(lang)
@@ -119,7 +134,7 @@ class LanguageManager(QObject):
             return
         
         self.current_lang = lang
-        logger.info(f"{self.tr('语言已切换到:')} {lang}")
+        # 语言切换日志由UI界面处理，这里不重复输出
         
         # 保存偏好
         self._save_language_preference(lang)

@@ -402,7 +402,7 @@ class PyQtGoogleLogManager(QObject):
             if self.video_manager:
                 # 连接视频导出完成信号
                 self.video_manager.video_saved.connect(self._on_video_exported)
-                success = self.video_manager.stop_and_export_to_folder(device, folder)
+                success = self.video_manager.stop_and_export_to_video_dir(device, folder)
                 if not success:
                     self.status_message.emit(self.lang_manager.tr("停止视频录制失败"))
                     self._on_video_exported(folder, 0)

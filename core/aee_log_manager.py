@@ -183,8 +183,7 @@ class PyQtAEELogManager(QObject):
                     None,
                     self.lang_manager.tr("安装提示"),
                     self.lang_manager.tr("com.tcl.logger未安装，是否选择APK文件进行安装？\n\n") +
-                    self.lang_manager.tr("点击self.lang_manager.tr('是')选择APK文件进行安装\n") +
-                    self.lang_manager.tr("点击self.lang_manager.tr('否')取消操作"),
+                    self.lang_manager.tr("点击 '是' 选择APK文件进行安装\n点击 '否' 取消操作"),
                     QMessageBox.Yes | QMessageBox.No
                 )
                 

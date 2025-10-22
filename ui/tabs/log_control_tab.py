@@ -152,7 +152,7 @@ class LogControlTab(QWidget):
         self.mtklog_install_btn.clicked.connect(self.mtklog_install.emit)
         row2.addWidget(self.mtklog_install_btn)
         
-        self.telephony_btn = QPushButton(self.lang_manager.tr("启用 Telephony 日志"))
+        self.telephony_btn = QPushButton(self.lang_manager.tr("启用Telephony日志"))
         self.telephony_btn.clicked.connect(self.telephony_enable.emit)
         row2.addWidget(self.telephony_btn)
         
@@ -293,8 +293,8 @@ class LogControlTab(QWidget):
             self.adblog_export_btn.setText(self.lang_manager.tr("导出"))
         
         # 刷新其他按钮
-        if hasattr(self, 'telephony_enable_btn'):
-            self.telephony_enable_btn.setText(self.lang_manager.tr("启用 Telephony 日志"))
+        if hasattr(self, 'telephony_btn'):
+            self.telephony_btn.setText(self.lang_manager.tr("启用Telephony日志"))
         if hasattr(self, 'google_log_btn'):
             if "Google" in self.google_log_btn.text():
                 self.google_log_btn.setText(self.lang_manager.tr("Google 日志"))

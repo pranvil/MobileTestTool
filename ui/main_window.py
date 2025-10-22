@@ -264,7 +264,6 @@ class MainWindow(QMainWindow):
         self.toolbar.root_remount_clicked.connect(self._on_root_remount)
         self.toolbar.theme_toggled.connect(self._on_theme_toggled)
         self.toolbar.adb_command_executed.connect(self._on_adb_command_executed)
-        self.toolbar.language_changed.connect(self._on_language_changed)
         
         # 连接语言管理器信号
         self.lang_manager.language_changed.connect(self._on_language_changed)
@@ -633,7 +632,7 @@ class MainWindow(QMainWindow):
     
     def _on_language_changed(self, new_lang):
         """语言切换处理"""
-        self.append_log.emit(f"{self.tr('语言已切换到: ')}{'英文' if new_lang == 'en' else '中文'}\n", None)
+        self.append_log.emit(f"{self.tr('语言已切换到:')}{self.tr('英文') if new_lang == 'en' else self.tr('中文')}\n", None)
         # 刷新所有UI文本
         self._refresh_all_ui_texts()
     

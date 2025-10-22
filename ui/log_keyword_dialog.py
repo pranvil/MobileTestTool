@@ -37,7 +37,7 @@ class LogKeywordDialog(QDialog):
         
         # 顶部说明
         info_label = QLabel(
-            self.tr("在此配置log过滤关键字，可以使用正则表达式。支持导入/导出JSON配置文件。")
+            self.tr("💡 在此配置log过滤关键字，可以使用正则表达式。支持导入/导出JSON配置文件。")
         )
         info_label.setWordWrap(True)
         info_label.setStyleSheet("color: #17a2b8; padding: 10px; background: #d1ecf1; border-radius: 4px;")

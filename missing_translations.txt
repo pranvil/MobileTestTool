@@ -457,3 +457,292 @@ API级别:
 
 例如: adb devices, adb shell pm list packages 等
 
+支持快速执行一次性ADB命令
+
+例如: adb devices, adb shell pm list packages 等
+
+服务器活动已启动并设置完成
+支持快速执行一次性ADB命令
+
+例如: adb devices, adb shell pm list packages 等
+
+确定要开始赫拉配置吗？
+
+
+配置内容包括:
+
+• 安装测试APK
+
+• 设置日志大小
+
+• 仅开启mobile日志
+
+• GDPR检查和设置
+
+• 检查系统状态
+
+
+赫拉配置选项
+帮助
+支持快速执行一次性ADB命令
+
+例如: adb devices, adb shell pm list packages 等
+
+确定要开始赫拉配置吗？
+
+
+配置内容包括:
+
+•
+安装测试APK
+
+设置日志大小
+
+仅开启mobile日志
+
+GDPR检查和设置
+
+检查系统状态
+
+
+支持快速执行一次性ADB命令
+
+例如: adb devices, adb shell pm list packages 等
+
+确定要开始赫拉配置吗？
+
+
+配置内容包括:
+
+检查系统状态
+
+
+支持快速执行一次性ADB命令
+
+例如: adb devices, adb shell pm list packages 等
+
+确定要开始赫拉配置吗？
+
+
+检查系统状态
+
+
+支持快速执行一次性ADB命令
+
+例如: adb devices, adb shell pm list packages 等
+
+检查系统状态
+
+
+确定要开始赫拉配置吗？
+
+
+安装测试APK
+
+设置日志大小
+
+仅开启mobile日志
+
+GDPR检查和设置
+
+支持快速执行一次性ADB命令
+
+例如: adb devices, adb shell pm list packages 等
+
+-
+检查系统状态
+
+
+支持快速执行一次性ADB命令
+
+例如: adb devices, adb shell pm list packages 等
+
+ - 
+检查系统状态
+
+
+支持快速执行一次性ADB命令
+
+例如: adb devices, adb shell pm list packages 等
+
+检查系统状态
+
+
+支持快速执行一次性ADB命令
+
+例如: adb devices, adb shell pm list packages 等
+
+支持快速执行一次性ADB命令
+
+例如: adb devices, adb shell pm list packages 等
+
+支持快速执行一次性ADB命令
+
+例如: adb devices, adb shell pm list packages 等
+
+Android TCPDUMP 抓包工具
+状态信息:
+开始初始化检查...
+警告
+✅ 设备连接正常
+正在检查Root权限...
+支持快速执行一次性ADB命令
+
+例如: adb devices, adb shell pm list packages 等
+
+支持快速执行一次性ADB命令
+
+例如: adb devices, adb shell pm list packages 等
+
+支持快速执行一次性ADB命令
+
+例如: adb devices, adb shell pm list packages 等
+
+检查系统要求...
+系统检查失败，无法开始抓包
+支持快速执行一次性ADB命令
+
+例如: adb devices, adb shell pm list packages 等
+
+支持快速执行一次性ADB命令
+
+例如: adb devices, adb shell pm list packages 等
+
+com.tcl.logger未安装，是否选择APK文件进行安装？
+
+
+点击self.lang_manager.tr('是')选择APK文件进行安装
+
+Bugreport已生成:
+成功杀掉连线logcat进程 PID:
+支持快速执行一次性ADB命令
+
+例如: adb devices, adb shell pm list packages 等
+
+点击self.lang_manager.tr('是')选择APK文件进行安装
+
+保留设备 
+ 的旧log文件
+找到nohup logcat进程 PID:
+成功停止nohup logcat进程 PID:
+成功导出:
+支持快速执行一次性ADB命令
+
+例如: adb devices, adb shell pm list packages 等
+
+支持快速执行一次性ADB命令
+
+例如: adb devices, adb shell pm list packages 等
+
+支持快速执行一次性ADB命令
+
+例如: adb devices, adb shell pm list packages 等
+
+中文
+英文
+支持快速执行一次性ADB命令
+
+例如: adb devices, adb shell pm list packages 等
+
+支持快速执行一次性ADB命令
+
+例如: adb devices, adb shell pm list packages 等
+
+支持快速执行一次性ADB命令
+
+例如: adb devices, adb shell pm list packages 等
+
+Telephony日志设置完成！
+
+
+为了确保设置生效，建议立即重启设备。
+
+支持快速执行一次性ADB命令
+
+例如: adb devices, adb shell pm list packages 等
+
+启用Telephony日志
+已切换到
+主题
+支持快速执行一次性ADB命令
+
+例如: adb devices, adb shell pm list packages 等
+
+支持快速执行一次性ADB命令
+
+例如: adb devices, adb shell pm list packages 等
+
+支持快速执行一次性ADB命令
+
+例如: adb devices, adb shell pm list packages 等
+
+支持快速执行一次性ADB命令
+
+例如: adb devices, adb shell pm list packages 等
+
+adb命令会自动加上 'adb -s {device}' 前缀。
+支持快速执行一次性ADB命令
+
+例如: adb devices, adb shell pm list packages 等
+
+支持快速执行一次性ADB命令
+
+例如: adb devices, adb shell pm list packages 等
+
+adb命令会自动加上 adb -s {device} 前缀。
+支持快速执行一次性ADB命令
+
+例如: adb devices, adb shell pm list packages 等
+
+支持快速执行一次性ADB命令
+
+例如: adb devices, adb shell pm list packages 等
+
+支持快速执行一次性ADB命令
+
+例如: adb devices, adb shell pm list packages 等
+
+支持快速执行一次性ADB命令
+
+例如: adb devices, adb shell pm list packages 等
+
+支持快速执行一次性ADB命令
+
+例如: adb devices, adb shell pm list packages 等
+
+支持快速执行一次性ADB命令
+
+例如: adb devices, adb shell pm list packages 等
+
+支持快速执行一次性ADB命令
+
+例如: adb devices, adb shell pm list packages 等
+
+执行 adb root...
+执行 adb remount...
+Root&remount 完成
+支持快速执行一次性ADB命令
+
+例如: adb devices, adb shell pm list packages 等
+
+支持快速执行一次性ADB命令
+
+例如: adb devices, adb shell pm list packages 等
+
+支持快速执行一次性ADB命令
+
+例如: adb devices, adb shell pm list packages 等
+
+支持快速执行一次性ADB命令
+
+例如: adb devices, adb shell pm list packages 等
+
+支持快速执行一次性ADB命令
+
+例如: adb devices, adb shell pm list packages 等
+
+支持快速执行一次性ADB命令
+
+例如: adb devices, adb shell pm list packages 等
+
+停止ADB日志失败

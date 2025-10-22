@@ -221,8 +221,8 @@ class LogFilterTab(QWidget):
             return
         
         # 刷新按钮文本
-        if hasattr(self, 'start_filter_btn'):
-            self.start_filter_btn.setText(self.lang_manager.tr("开始过滤"))
+        if hasattr(self, 'filter_button'):
+            self.filter_button.setText(self.lang_manager.tr("开始过滤"))
         if hasattr(self, 'stop_filter_btn'):
             self.stop_filter_btn.setText(self.lang_manager.tr("停止过滤"))
         if hasattr(self, 'manage_keywords_btn'):

@@ -853,11 +853,11 @@ class PyQtHeraConfigManager(QObject):
                 self.tr("赫拉配置选项"),
                 self.tr("确定要开始赫拉配置吗？\n\n") +
                 self.tr("配置内容包括:\n") +
-                self.tr("• 安装测试APK\n") +
-                self.tr("• 设置日志大小\n") +
-                self.tr("• 仅开启mobile日志\n") +
-                self.tr("• GDPR检查和设置\n") +
-                self.tr("• 检查系统状态\n\n") +
+                self.tr("•") + self.tr("安装测试APK\n") +
+                self.tr("•") + self.tr("设置日志大小\n") +
+                self.tr("•") + self.tr("仅开启mobile日志\n") +
+                self.tr("•") + self.tr("GDPR检查和设置\n") +
+                self.tr("•") + self.tr("检查系统状态\n\n") +
                 self.tr("是否继续？"),
                 QMessageBox.Yes | QMessageBox.No
             )
