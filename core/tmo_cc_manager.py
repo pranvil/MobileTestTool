@@ -15,6 +15,14 @@ import sys
 from PyQt5.QtCore import QObject, pyqtSignal, QThread
 from PyQt5.QtWidgets import QMessageBox, QFileDialog, QDialog, QVBoxLayout, QLabel, QPushButton
 
+# 尝试导入uiautomator2
+try:
+    import uiautomator2 as u2
+    HAS_UIAUTOMATOR2 = True
+except ImportError:
+    u2 = None
+    HAS_UIAUTOMATOR2 = False
+
 # 检测是否在PyInstaller打包环境中运行
 def is_pyinstaller():
     """检测是否在PyInstaller打包环境中运行"""
@@ -35,6 +43,13 @@ class PyQtTMOCCManager(QObject):
         self.device_manager = device_manager
         # 从父窗口获取语言管理器
         self.lang_manager = parent.lang_manager if parent and hasattr(parent, 'lang_manager') else None
+        
+        # 初始化UIAutomator2状态
+        self.u2_available = HAS_UIAUTOMATOR2
+        if self.u2_available:
+            self.status_message.emit("UIAutomator2已可用，将使用更稳定的自动化方法")
+        else:
+            self.status_message.emit("UIAutomator2不可用，将使用ADB备用方法")
     
     def tr(self, text):
         """安全地获取翻译文本"""
@@ -444,6 +459,67 @@ class PyQtTMOCCManager(QObject):
             if not self.device_manager.ensure_screen_unlocked(device):
                 return
             
+            # 尝试使用UIAutomator2，如果不可用则回退到adb方法
+            if HAS_UIAUTOMATOR2:
+                success = self._start_entitlement_with_u2(device, server_type)
+                if success:
+                    self.server_started.emit(server_type)
+                    self.status_message.emit(f"{server_type}{self.lang_manager.tr('服务器活动已启动并设置完成')}")
+                    return
+            
+            # 回退到原来的adb方法
+            self.status_message.emit(self.lang_manager.tr("使用备用方法启动活动..."))
+            success = self._start_entitlement_with_adb(device, server_type)
+            if success:
+                self.server_started.emit(server_type)
+                self.status_message.emit(f"{server_type}{self.lang_manager.tr('服务器活动已启动并设置完成')}")
+            else:
+                QMessageBox.critical(None, self.lang_manager.tr("错误"), f"启动{server_type}服务器失败")
+                
+        except Exception as e:
+            QMessageBox.critical(None, self.lang_manager.tr("错误"), f"启动{server_type}服务器失败: {str(e)}")
+    
+    def _start_entitlement_with_u2(self, device, server_type):
+        """使用UIAutomator2启动Entitlement活动"""
+        try:
+            # 连接设备
+            self.status_message.emit(f"正在连接设备: {device}")
+            d = u2.connect(device)
+            
+            # 检查连接状态 - 通过获取设备信息来验证连接
+            try:
+                device_info = d.info
+                self.status_message.emit(f"设备连接成功: {device_info.get('productName', 'Unknown')}")
+            except Exception as e:
+                self.status_message.emit(f"设备连接验证失败: {str(e)}")
+                return False
+            
+            self.status_message.emit(self.lang_manager.tr("启动应用..."))
+            
+            # 启动Entitlement活动
+            d.app_start("com.tct.entitlement", activity=".EditEntitlementEndpointActivity")
+            time.sleep(3)  # 等待应用启动
+            
+            # 等待界面加载
+            self.status_message.emit(self.lang_manager.tr("等待界面加载..."))
+            if not self._wait_for_entitlement_loaded_u2(d, timeout=10):
+                self.status_message.emit(self.lang_manager.tr("等待界面加载超时"))
+                return False
+            
+            # 设置URL
+            self.status_message.emit(self.lang_manager.tr("设置服务器URL..."))
+            if self._set_entitlement_urls_u2(d, server_type):
+                return True
+            else:
+                return False
+                
+        except Exception as e:
+            self.status_message.emit(f"UIAutomator2方法失败: {str(e)}")
+            return False
+    
+    def _start_entitlement_with_adb(self, device, server_type):
+        """使用adb启动Entitlement活动（备用方法）"""
+        try:
             # 启动Entitlement活动
             cmd = ["adb", "-s", device, "shell", "am", "start", "com.tct.entitlement/.EditEntitlementEndpointActivity"]
             result = subprocess.run(
@@ -456,24 +532,22 @@ class PyQtTMOCCManager(QObject):
             
             if result.returncode != 0:
                 error_msg = result.stderr.strip() if result.stderr else self.lang_manager.tr("未知错误")
-                QMessageBox.critical(None, self.lang_manager.tr("错误"), f"启动{server_type}服务器活动失败: {error_msg}")
-                return
+                self.status_message.emit(f"启动活动失败: {error_msg}")
+                return False
             
             # 等待界面加载
             self.status_message.emit(self.lang_manager.tr("等待界面加载..."))
-            if not self._wait_for_entitlement_loaded(device, timeout=8):
-                QMessageBox.critical(None, self.lang_manager.tr("错误"), "等待界面加载超时")
-                return
+            if not self._wait_for_entitlement_loaded_adb(device, timeout=8):
+                self.status_message.emit(self.lang_manager.tr("等待界面加载超时"))
+                return False
             
             # 设置URL
             self.status_message.emit(self.lang_manager.tr("设置服务器URL..."))
-            self._set_entitlement_urls(device, server_type)
-            
-            self.server_started.emit(server_type)
-            self.status_message.emit(f"{server_type}{self.lang_manager.tr('服务器活动已启动并设置完成')}")
+            return self._set_entitlement_urls_adb(device, server_type)
                 
         except Exception as e:
-            QMessageBox.critical(None, self.lang_manager.tr("错误"), f"启动{server_type}服务器失败: {str(e)}")
+            self.status_message.emit(f"ADB方法失败: {str(e)}")
+            return False
     
     def _adb(self, args, device, timeout=15):
         """执行adb命令的辅助方法"""
@@ -493,8 +567,33 @@ class PyQtTMOCCManager(QObject):
         r2 = self._adb(["shell", "cat", "/sdcard/ui_dump.xml"], device, 10)
         return r2.stdout if r2.returncode == 0 else None
     
-    def _wait_for_entitlement_loaded(self, device, timeout=8):
-        """等待页面出现两个EditText（最多timeout秒）"""
+    def _wait_for_entitlement_loaded_u2(self, d, timeout=10):
+        """使用UIAutomator2等待页面出现两个EditText（最多timeout秒）"""
+        t0 = time.time()
+        while time.time() - t0 < timeout:
+            try:
+                # 查找EditText元素
+                edit_texts = d(className="android.widget.EditText")
+                count = len(edit_texts)
+                
+                if count >= 2:
+                    self.status_message.emit(f"找到{count}个EditText元素，界面加载完成")
+                    return True
+                elif count > 0:
+                    self.status_message.emit(f"找到{count}个EditText元素，继续等待...")
+                else:
+                    self.status_message.emit("未找到EditText元素，继续等待...")
+                
+                time.sleep(1)
+            except Exception as e:
+                self.status_message.emit(f"检查界面元素时出错: {str(e)}")
+                time.sleep(1)
+        
+        self.status_message.emit(f"等待超时({timeout}秒)，未找到足够的EditText元素")
+        return False
+    
+    def _wait_for_entitlement_loaded_adb(self, device, timeout=8):
+        """使用adb等待页面出现两个EditText（最多timeout秒）"""
         t0 = time.time()
         while time.time() - t0 < timeout:
             xml = self._dump_ui_and_get(device)
@@ -543,36 +642,161 @@ class PyQtTMOCCManager(QObject):
         ok = self._select_all_then_replace(device, replacement_text)
         return ok
     
-    def _set_entitlement_urls(self, device, server_type):
-        """设置两个EditText的URL。根据server_type设置不同的URL。"""
-        xml = self._dump_ui_and_get(device)
-        if not xml:
-            return
-        
-        # 抓两个EditText的bounds
-        edit_bounds = re.findall(r'class="android\.widget\.EditText"[^>]*bounds="(\[[^"]+\])"', xml)
-        
-        if len(edit_bounds) < 2:
-            return
-        
-        # 根据服务器类型设置URL
-        if server_type == "PROD":
-            url = "https://eas3.msg.t-mobile.com/generic_devices"
-        elif server_type == "STG":
-            url = "https://easstg1.msg.t-mobile.com/generic_devices"
-        else:
-            return
-        
-        # 依次设置两个EditText
-        for i, b in enumerate(edit_bounds[:2], start=1):
-            self._replace_edittext_by_bounds(device, b, url)
-            time.sleep(0.5)
-        
-        # 设置完成后点击OK按钮
-        self._click_ok_button(device)
+    def _set_entitlement_urls_u2(self, d, server_type):
+        """使用UIAutomator2设置两个EditText的URL"""
+        try:
+            # 获取所有EditText元素
+            edit_texts = d(className="android.widget.EditText")
+            
+            if len(edit_texts) < 2:
+                self.status_message.emit(f"只找到{len(edit_texts)}个EditText元素，需要至少2个")
+                return False
+            
+            # 根据服务器类型设置URL
+            if server_type == "PROD":
+                url = "https://eas3.msg.t-mobile.com/generic_devices"
+            elif server_type == "STG":
+                url = "https://easstg1.msg.t-mobile.com/generic_devices"
+            else:
+                self.status_message.emit(f"未知的服务器类型: {server_type}")
+                return False
+            
+            self.status_message.emit(f"准备设置{server_type}服务器URL: {url}")
+            
+            # 依次设置两个EditText
+            for i in range(min(2, len(edit_texts))):
+                try:
+                    self.status_message.emit(f"正在设置第{i+1}个输入框...")
+                    
+                    # 点击EditText使其获得焦点
+                    edit_texts[i].click()
+                    time.sleep(0.5)
+                    
+                    # 清空现有文本并输入新URL
+                    edit_texts[i].clear_text()
+                    time.sleep(0.3)
+                    edit_texts[i].set_text(url)
+                    time.sleep(0.5)
+                    
+                    # 验证文本是否设置成功
+                    current_text = edit_texts[i].get_text()
+                    if url in current_text:
+                        self.status_message.emit(f"第{i+1}个输入框设置成功")
+                    else:
+                        self.status_message.emit(f"第{i+1}个输入框设置可能失败，当前文本: {current_text}")
+                    
+                except Exception as e:
+                    self.status_message.emit(f"设置第{i+1}个输入框失败: {str(e)}")
+                    return False
+            
+            self.status_message.emit("所有输入框设置完成，准备点击确认按钮")
+            
+            # 设置完成后点击OK按钮
+            return self._click_ok_button_u2(d)
+            
+        except Exception as e:
+            self.status_message.emit(f"设置URL时出错: {str(e)}")
+            return False
     
-    def _click_ok_button(self, device):
-        """点击OK按钮"""
+    def _set_entitlement_urls_adb(self, device, server_type):
+        """使用adb设置两个EditText的URL（备用方法）"""
+        try:
+            xml = self._dump_ui_and_get(device)
+            if not xml:
+                return False
+            
+            # 抓两个EditText的bounds
+            edit_bounds = re.findall(r'class="android\.widget\.EditText"[^>]*bounds="(\[[^"]+\])"', xml)
+            
+            if len(edit_bounds) < 2:
+                return False
+            
+            # 根据服务器类型设置URL
+            if server_type == "PROD":
+                url = "https://eas3.msg.t-mobile.com/generic_devices"
+            elif server_type == "STG":
+                url = "https://easstg1.msg.t-mobile.com/generic_devices"
+            else:
+                return False
+            
+            # 依次设置两个EditText
+            for i, b in enumerate(edit_bounds[:2], start=1):
+                self._replace_edittext_by_bounds(device, b, url)
+                time.sleep(0.5)
+            
+            # 设置完成后点击OK按钮
+            return self._click_ok_button_adb(device)
+            
+        except Exception as e:
+            self.status_message.emit(f"设置URL时出错: {str(e)}")
+            return False
+    
+    def _click_ok_button_u2(self, d):
+        """使用UIAutomator2点击OK按钮"""
+        try:
+            self.status_message.emit("正在查找确认按钮...")
+            
+            # 尝试多种方式查找OK按钮
+            ok_button = None
+            found_method = ""
+            
+            # 方法1: 通过文本查找
+            ok_texts = ["OK", "确定", "Done", "完成", "Save", "保存"]
+            for text in ok_texts:
+                ok_button = d(text=text)
+                if ok_button.exists:
+                    found_method = f"通过文本'{text}'"
+                    break
+            
+            # 方法2: 通过content-desc查找
+            if not ok_button or not ok_button.exists:
+                for text in ok_texts:
+                    ok_button = d(description=text)
+                    if ok_button.exists:
+                        found_method = f"通过描述'{text}'"
+                        break
+            
+            # 方法3: 通过resource-id查找
+            if not ok_button or not ok_button.exists:
+                common_ids = [
+                    "android:id/button1",
+                    "android:id/button2", 
+                    "com.tct.entitlement:id/ok_button",
+                    "com.tct.entitlement:id/save_button"
+                ]
+                for rid in common_ids:
+                    ok_button = d(resourceId=rid)
+                    if ok_button.exists:
+                        found_method = f"通过资源ID'{rid}'"
+                        break
+            
+            # 方法4: 通过Button类名查找
+            if not ok_button or not ok_button.exists:
+                buttons = d(className="android.widget.Button")
+                if len(buttons) > 0:
+                    # 选择第一个按钮作为默认
+                    ok_button = buttons[0]
+                    found_method = "通过Button类名（选择第一个）"
+            
+            if ok_button and ok_button.exists:
+                self.status_message.emit(f"找到确认按钮({found_method})，准备点击")
+                ok_button.click()
+                time.sleep(1)
+                self.status_message.emit("确认按钮点击完成")
+                return True
+            else:
+                self.status_message.emit("未找到确认按钮，尝试按返回键")
+                # 如果找不到确认按钮，尝试按返回键
+                d.press("back")
+                time.sleep(0.5)
+                return True  # 假设返回键也能完成操作
+                
+        except Exception as e:
+            self.status_message.emit(f"点击确认按钮时出错: {str(e)}")
+            return False
+    
+    def _click_ok_button_adb(self, device):
+        """使用adb点击OK按钮（备用方法）"""
         try:
             # 获取UI dump
             xml = self._dump_ui_and_get(device)

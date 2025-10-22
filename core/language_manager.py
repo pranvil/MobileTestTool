@@ -193,10 +193,21 @@ class LanguageManager(QObject):
             
             # 检查是否已经记录过这个翻译
             if os.path.exists(log_file):
-                with open(log_file, 'r', encoding='utf-8') as f:
-                    existing_translations = f.read().splitlines()
-                    if text in existing_translations:
-                        return  # 已经记录过，不重复记录
+                try:
+                    with open(log_file, 'r', encoding='utf-8') as f:
+                        existing_translations = f.read().splitlines()
+                        if text in existing_translations:
+                            return  # 已经记录过，不重复记录
+                except UnicodeDecodeError:
+                    # 如果UTF-8解码失败，尝试其他编码
+                    try:
+                        with open(log_file, 'r', encoding='gbk') as f:
+                            existing_translations = f.read().splitlines()
+                            if text in existing_translations:
+                                return
+                    except UnicodeDecodeError:
+                        # 如果还是失败，忽略检查，直接追加
+                        pass
             
             with open(log_file, 'a', encoding='utf-8') as f:
                 f.write(f"{text}\n")

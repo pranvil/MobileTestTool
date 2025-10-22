@@ -1,0 +1,269 @@
+个自定义按钮
+支持快速执行一次性ADB命令
+
+例如: adb devices, adb shell pm list packages 等
+
+不支持持续输出命令（logcat、top等），请使用对应功能
+点击切换语言 / Click to switch language
+开始初始化所有Tab页面...
+初始化 Log控制 Tab...
+Log控制 Tab 初始化成功
+初始化 Log过滤 Tab...
+Log过滤 Tab 初始化成功
+初始化 网络信息 Tab...
+网络信息 Tab 初始化成功
+初始化 TMO CC Tab...
+TMO CC Tab 初始化成功
+初始化 TMO Echolocate Tab...
+TMO Echolocate Tab 初始化成功
+初始化 24小时背景数据 Tab...
+24小时背景数据 Tab 初始化成功
+初始化 APP操作 Tab...
+APP操作 Tab 初始化成功
+初始化 其他 Tab...
+其他 Tab 初始化成功
+所有Tab页面初始化完成
+开始为所有Tab加载自定义按钮...
+默认
+所有Tab的自定义按钮加载完成
+请输入灭屏时间(秒，0表示永不灭屏):
+获取手机信息...
+设备信息
+
+设备基本信息:
+
+设备型号:
+未知
+设备品牌:
+Android版本:
+API级别:
+设备序列号:
+详细信息:
+
+卡槽
+编译时间:
+[设备信息] 设备信息获取完成!
+
+打开工具配置对话框...
+工具配置对话框已关闭
+ADB命令
+打开文件
+运行程序
+系统命令
+内容...
+自定义按钮使用帮助
+选择MTKlog文件夹
+启动
+服务器...
+日志过滤已启动
+检测超时
+�过滤
+个自定义按钮
+支持快速执行一次性ADB命令
+
+例如: adb devices, adb shell pm list packages 等
+
+不支持持续输出命令（logcat、top等），请使用对应功能
+点击切换语言 / Click to switch language
+开始初始化所有Tab页面...
+初始化 Log控制 Tab...
+Log控制 Tab 初始化成功
+初始化 Log过滤 Tab...
+Log过滤 Tab 初始化成功
+初始化 网络信息 Tab...
+网络信息 Tab 初始化成功
+初始化 TMO CC Tab...
+TMO CC Tab 初始化成功
+初始化 TMO Echolocate Tab...
+TMO Echolocate Tab 初始化成功
+初始化 24小时背景数据 Tab...
+24小时背景数据 Tab 初始化成功
+初始化 APP操作 Tab...
+APP操作 Tab 初始化成功
+初始化 其他 Tab...
+其他 Tab 初始化成功
+所有Tab页面初始化完成
+开始为所有Tab加载自定义按钮...
+所有Tab的自定义按钮加载完成
+设备信息
+
+设备基本信息:
+
+详细信息:
+
+[设备信息] 设备信息获取完成!
+
+个自定义按钮
+支持快速执行一次性ADB命令
+
+例如: adb devices, adb shell pm list packages 等
+
+不支持持续输出命令（logcat、top等），请使用对应功能
+点击切换语言 / Click to switch language
+开始初始化所有Tab页面...
+初始化 Log控制 Tab...
+Log控制 Tab 初始化成功
+初始化 Log过滤 Tab...
+Log过滤 Tab 初始化成功
+初始化 网络信息 Tab...
+网络信息 Tab 初始化成功
+初始化 TMO CC Tab...
+TMO CC Tab 初始化成功
+初始化 TMO Echolocate Tab...
+TMO Echolocate Tab 初始化成功
+初始化 24小时背景数据 Tab...
+24小时背景数据 Tab 初始化成功
+初始化 APP操作 Tab...
+APP操作 Tab 初始化成功
+初始化 其他 Tab...
+其他 Tab 初始化成功
+所有Tab页面初始化完成
+开始为所有Tab加载自定义按钮...
+所有Tab的自定义按钮加载完成
+个自定义按钮
+支持快速执行一次性ADB命令
+
+例如: adb devices, adb shell pm list packages 等
+
+不支持持续输出命令（logcat、top等），请使用对应功能
+点击切换语言 / Click to switch language
+开始初始化所有Tab页面...
+初始化 Log控制 Tab...
+Log控制 Tab 初始化成功
+初始化 Log过滤 Tab...
+Log过滤 Tab 初始化成功
+初始化 网络信息 Tab...
+网络信息 Tab 初始化成功
+初始化 TMO CC Tab...
+TMO CC Tab 初始化成功
+初始化 TMO Echolocate Tab...
+TMO Echolocate Tab 初始化成功
+初始化 24小时背景数据 Tab...
+24小时背景数据 Tab 初始化成功
+初始化 APP操作 Tab...
+APP操作 Tab 初始化成功
+初始化 其他 Tab...
+其他 Tab 初始化成功
+所有Tab页面初始化完成
+开始为所有Tab加载自定义按钮...
+所有Tab的自定义按钮加载完成
+个自定义按钮
+支持快速执行一次性ADB命令
+
+例如: adb devices, adb shell pm list packages 等
+
+不支持持续输出命令（logcat、top等），请使用对应功能
+点击切换语言 / Click to switch language
+开始初始化所有Tab页面...
+初始化 Log控制 Tab...
+Log控制 Tab 初始化成功
+初始化 Log过滤 Tab...
+Log过滤 Tab 初始化成功
+初始化 网络信息 Tab...
+网络信息 Tab 初始化成功
+初始化 TMO CC Tab...
+TMO CC Tab 初始化成功
+初始化 TMO Echolocate Tab...
+TMO Echolocate Tab 初始化成功
+初始化 24小时背景数据 Tab...
+24小时背景数据 Tab 初始化成功
+初始化 APP操作 Tab...
+APP操作 Tab 初始化成功
+初始化 其他 Tab...
+其他 Tab 初始化成功
+所有Tab页面初始化完成
+开始为所有Tab加载自定义按钮...
+所有Tab的自定义按钮加载完成
+服务器活动已启动并设置完成
+CC文件已拉取到: 
+CC文件已拉取到:
+语言已切换到:
+中文
+启用Telephony日志
+拉取 Bugreport
+Ping
+Root&&Remount
+中/EN
+启动
+服务器...
+个自定义按钮
+Root&&Remount
+支持快速执行一次性ADB命令
+
+例如: adb devices, adb shell pm list packages 等
+
+不支持持续输出命令（logcat、top等），请使用对应功能
+点击切换语言 / Click to switch language
+开始初始化所有Tab页面...
+初始化 Log控制 Tab...
+启用Telephony日志
+Log控制 Tab 初始化成功
+初始化 Log过滤 Tab...
+Log过滤 Tab 初始化成功
+初始化 网络信息 Tab...
+网络信息 Tab 初始化成功
+初始化 TMO CC Tab...
+TMO CC Tab 初始化成功
+初始化 TMO Echolocate Tab...
+TMO Echolocate Tab 初始化成功
+初始化 24小时背景数据 Tab...
+24小时背景数据 Tab 初始化成功
+初始化 APP操作 Tab...
+APP操作 Tab 初始化成功
+初始化 其他 Tab...
+其他 Tab 初始化成功
+所有Tab页面初始化完成
+启用Telephony日志
+拉取 Bugreport
+Ping
+点击
+按钮获取网络信息
+中/EN
+开始为所有Tab加载自定义按钮...
+默认
+所有Tab的自定义按钮加载完成
+启动
+服务器...
+使用备用方法启动活动...
+等待界面加载超时
+个自定义按钮
+Root&&Remount
+支持快速执行一次性ADB命令
+
+例如: adb devices, adb shell pm list packages 等
+
+不支持持续输出命令（logcat、top等），请使用对应功能
+点击切换语言 / Click to switch language
+开始初始化所有Tab页面...
+初始化 Log控制 Tab...
+启用Telephony日志
+Log控制 Tab 初始化成功
+初始化 Log过滤 Tab...
+Log过滤 Tab 初始化成功
+初始化 网络信息 Tab...
+网络信息 Tab 初始化成功
+初始化 TMO CC Tab...
+TMO CC Tab 初始化成功
+初始化 TMO Echolocate Tab...
+TMO Echolocate Tab 初始化成功
+初始化 24小时背景数据 Tab...
+24小时背景数据 Tab 初始化成功
+初始化 APP操作 Tab...
+APP操作 Tab 初始化成功
+初始化 其他 Tab...
+其他 Tab 初始化成功
+所有Tab页面初始化完成
+启用Telephony日志
+拉取 Bugreport
+Ping
+点击
+按钮获取网络信息
+中/EN
+开始为所有Tab加载自定义按钮...
+默认
+所有Tab的自定义按钮加载完成
+启动
+服务器...
+启动应用...
+服务器活动已启动
+服务器活动已启动并设置完成
