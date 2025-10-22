@@ -896,9 +896,7 @@ class PyQtHeraConfigManager(QObject):
             reply = QMessageBox.question(
                 None,
                 self.tr("赫拉测试数据收集"),
-                self.tr("确定要开始赫拉测试数据收集吗？\n\n") +
-                self.tr("此功能将收集测试数据。\n\n") +
-                self.tr("是否继续？"),
+                self.tr("\n\n 确定要开始赫拉测试数据收集吗？\n\n"),
                 QMessageBox.Yes | QMessageBox.No
             )
             

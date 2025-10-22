@@ -261,7 +261,7 @@ class PyQtBugreportManager(QObject):
             
             # 创建保存目录
             current_date = datetime.datetime.now().strftime("%Y%m%d")
-            bugreport_folder = f"C:\\{current_date}\\bugreport"
+            bugreport_folder = f"C:\\log\\{current_date}\\bugreport"
             
             if not os.path.exists(bugreport_folder):
                 os.makedirs(bugreport_folder)

@@ -126,52 +126,52 @@ class AppOperationsManager(QObject):
     
     def show_package_query_dialog(self, device):
         """显示package查询参数选择对话框"""
-        dialog = PackageQueryDialog(device, self)
+        dialog = PackageQueryDialog(device, self, self.parent().parent())
         dialog.exec_()
     
     def show_package_name_query_dialog(self, device):
         """显示包名查询提示对话框"""
-        dialog = PackageNameQueryDialog(device, self)
+        dialog = PackageNameQueryDialog(device, self, self.parent().parent())
         dialog.exec_()
     
     def show_package_name_input_dialog(self, device):
         """显示包名输入对话框"""
-        dialog = PackageNameInputDialog(device, self)
+        dialog = PackageNameInputDialog(device, self, self.parent().parent())
         dialog.exec_()
     
     def show_pull_apk_dialog(self, device):
         """显示pull APK包名输入对话框"""
-        dialog = PullApkDialog(device, self)
+        dialog = PullApkDialog(device, self, self.parent().parent())
         dialog.exec_()
     
     def show_install_apk_dialog(self, device):
         """显示APK安装参数选择对话框"""
-        dialog = InstallApkDialog(device, self)
+        dialog = InstallApkDialog(device, self, self.parent().parent())
         dialog.exec_()
     
     def show_process_view_dialog(self, device):
         """显示进程查看参数选择对话框"""
-        dialog = ProcessViewDialog(device, self)
+        dialog = ProcessViewDialog(device, self, self.parent().parent())
         dialog.exec_()
     
     def show_dump_app_dialog(self, device):
         """显示dump应用对话框"""
-        dialog = DumpAppDialog(device, self)
+        dialog = DumpAppDialog(device, self, self.parent().parent())
         dialog.exec_()
     
     def show_enable_app_dialog(self, device):
         """显示启用应用包名输入对话框"""
-        dialog = EnableAppDialog(device, self)
+        dialog = EnableAppDialog(device, self, self.parent().parent())
         dialog.exec_()
     
     def show_disable_app_dialog(self, device):
         """显示禁用应用包名输入对话框"""
-        dialog = DisableAppDialog(device, self)
+        dialog = DisableAppDialog(device, self, self.parent().parent())
         dialog.exec_()
     
     def show_push_apk_dialog(self, device):
         """显示推送文件对话框"""
-        dialog = PushApkDialog(device, self)
+        dialog = PushApkDialog(device, self, self.parent().parent())
         dialog.exec_()
     
     def execute_package_query(self, device, selected_params, filter_text):
@@ -825,7 +825,7 @@ class AppOperationsManager(QObject):
             if install_paths:
                 self._log_message(f"{self.lang_manager.tr(' 应用 ')}{package_name}{self.lang_manager.tr(' 的安装路径:')}")
                 for i, path in enumerate(install_paths, 1):
-                    self._log_message(f"{self.lang_manager.tr('  路径 ')}{i}: {path}")
+                    self._log_message(f"{self.lang_manager.tr('路径 ')}{i}: {path}")
                 self._log_message(f"{self.lang_manager.tr(' 共找到 ')}{len(install_paths)}{self.lang_manager.tr(' 个安装路径')}")
             else:
                 self._log_message(f"{self.lang_manager.tr(' 未找到应用 ')}{package_name}{self.lang_manager.tr(' 的安装路径')}")
@@ -1071,7 +1071,7 @@ class PackageQueryDialog(QDialog):
         ]
         
         for param, description in param_options:
-            cb = QCheckBox(f"{param}: {description}")
+            cb = QCheckBox(f"{param}: {self.tr(description)}")
             self.param_checkboxes[param] = cb
             params_layout.addWidget(cb)
         
@@ -1259,7 +1259,7 @@ class PullApkDialog(QDialog):
         layout.addWidget(self.package_entry)
         
         # 保存路径信息
-        save_info = QLabel("文件将保存到: c:\\log\\yyyymmdd\\<包名>")
+        save_info = QLabel(self.tr("文件将保存到: c:\\log\\yyyymmdd\\<包名>"))
         save_info.setStyleSheet("color: blue;")
         layout.addWidget(save_info)
         
@@ -1327,7 +1327,7 @@ class InstallApkDialog(QDialog):
         ]
         
         for param, description in param_options:
-            cb = QCheckBox(f"{param}: {description}")
+            cb = QCheckBox(f"{param}: {self.tr(description)}")
             self.param_checkboxes[param] = cb
             params_layout.addWidget(cb)
         
@@ -1399,7 +1399,7 @@ class ProcessViewDialog(QDialog):
         ]
         
         for param, description in param_options:
-            cb = QCheckBox(f"{param}: {description}")
+            cb = QCheckBox(f"{param}: {self.tr(description)}")
             if param == "-A":  # 默认勾选-A
                 cb.setChecked(True)
             self.param_checkboxes[param] = cb

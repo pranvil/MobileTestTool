@@ -104,7 +104,7 @@ class MainWindow(QMainWindow):
         """初始化所有管理器"""
         # 初始化设备工具类
         from core.utilities import DeviceUtilities
-        self.device_utilities = DeviceUtilities(self.device_manager)
+        self.device_utilities = DeviceUtilities(self.device_manager, self)
         self.device_utilities.status_message.connect(self._on_device_status_message)
         self.device_utilities.reboot_started.connect(self._on_reboot_started)
         self.device_utilities.reboot_finished.connect(self._on_reboot_finished)
@@ -1489,7 +1489,29 @@ class MainWindow(QMainWindow):
     # APP操作管理器信号处理
     def _on_app_operations_status(self, message):
         """APP操作状态消息"""
-        self.append_log.emit(f"{message}\n", None)
+        # 检查是否包含包名信息，如果是则使用绿色
+        if "Current foreground app package:" in message or "当前前台应用包名:" in message:
+            # 提取包名部分并设置为绿色
+            import re
+            # 匹配包名模式 (com.xxx.xxx 格式)
+            package_pattern = r'(com\.[a-zA-Z0-9_.]+)'
+            if re.search(package_pattern, message):
+                # 分割消息，分别处理包名部分和其他部分
+                parts = re.split(package_pattern, message)
+                for i, part in enumerate(parts):
+                    if re.match(package_pattern, part):
+                        # 包名部分使用绿色
+                        self.append_log.emit(part, "green")
+                    else:
+                        # 其他部分使用默认颜色，最后添加换行符
+                        if i == len(parts) - 1:  # 最后一部分
+                            self.append_log.emit(f"{part}\n", None)
+                        else:
+                            self.append_log.emit(part, None)
+            else:
+                self.append_log.emit(f"{message}\n", None)
+        else:
+            self.append_log.emit(f"{message}\n", None)
     
     # 设备信息管理器信号处理
     def _on_device_info_status(self, message):

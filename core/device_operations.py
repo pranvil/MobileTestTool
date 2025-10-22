@@ -1046,7 +1046,7 @@ class PyQtOtherOperationsManager(QObject):
         
         try:
             # 创建并显示对话框
-            dialog = InputTextDialog(device, parent=None)
+            dialog = InputTextDialog(device, parent=self.parent())
             dialog.exec_()
             
         except Exception as e:
