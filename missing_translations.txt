@@ -1593,3 +1593,98 @@ MTKLOG已停止
 MTKLOG已导出到: 
 MTKLOG已停止并导出 -
 Logger未在运行，跳过停止操作
+个自定义按钮
+Root&&Remount
+支持快速执行一次性ADB命令
+
+例如: adb devices, adb shell pm list packages 等
+
+不支持持续输出命令（logcat、top等），请使用对应功能
+点击切换语言 / Click to switch language
+开始初始化所有Tab页面...
+初始化 Log控制 Tab...
+启用Telephony日志
+连线log
+离线log
+Log控制 Tab 初始化成功
+初始化 Log过滤 Tab...
+Log过滤 Tab 初始化成功
+初始化 网络信息 Tab...
+网络信息 Tab 初始化成功
+初始化 TMO CC Tab...
+TMO CC Tab 初始化成功
+初始化 TMO Echolocate Tab...
+TMO Echolocate Tab 初始化成功
+初始化 24小时背景数据 Tab...
+24小时背景数据 Tab 初始化成功
+初始化 APP操作 Tab...
+APP操作 Tab 初始化成功
+初始化 其他 Tab...
+其他 Tab 初始化成功
+所有Tab页面初始化完成
+连线log
+离线log
+启用Telephony日志
+拉取 Bugreport
+TCPDUMP
+Ping
+点击
+按钮获取网络信息
+中/EN
+开始为所有Tab加载自定义按钮...
+默认
+所有Tab的自定义按钮加载完成
+个文件)
+个自定义按钮
+Root&&Remount
+支持快速执行一次性ADB命令
+
+例如: adb devices, adb shell pm list packages 等
+
+不支持持续输出命令（logcat、top等），请使用对应功能
+点击切换语言 / Click to switch language
+开始初始化所有Tab页面...
+初始化 Log控制 Tab...
+启用Telephony日志
+连线log
+离线log
+Log控制 Tab 初始化成功
+初始化 Log过滤 Tab...
+Log过滤 Tab 初始化成功
+初始化 网络信息 Tab...
+网络信息 Tab 初始化成功
+初始化 TMO CC Tab...
+TMO CC Tab 初始化成功
+初始化 TMO Echolocate Tab...
+TMO Echolocate Tab 初始化成功
+初始化 24小时背景数据 Tab...
+24小时背景数据 Tab 初始化成功
+初始化 APP操作 Tab...
+APP操作 Tab 初始化成功
+初始化 其他 Tab...
+其他 Tab 初始化成功
+所有Tab页面初始化完成
+连线log
+离线log
+启用Telephony日志
+拉取 Bugreport
+TCPDUMP
+Ping
+点击
+按钮获取网络信息
+中/EN
+开始为所有Tab加载自定义按钮...
+默认
+所有Tab的自定义按钮加载完成
+个文件)
+设备 
+ 未连接或连接异常
+打开工具配置对话框...
+存储路径配置
+存储路径:
+留空使用默认路径: c:\log\yyyymmdd
+浏览
+ELT路径:
+高通工具路径:
+选择存储路径
+工具配置对话框已关闭

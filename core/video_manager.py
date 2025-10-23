@@ -133,18 +133,8 @@ class VideoManager(QObject):
                 time_str = current_time.strftime("%Y%m%d_%H%M%S")
                 filename = f"video_{time_str}.mp4"
                 
-                # 检查是否有mtklog文件夹
-                check_cmd = ["adb", "-s", device, "shell", "ls", "/sdcard"]
-                result = subprocess.run(
-                    check_cmd,
-                    capture_output=True,
-                    text=True,
-                    timeout=30,
-                    creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0
-                )
-                
-                if result.returncode == 0 and result.stdout:
-                    video_path = f"/sdcard/Recorders/{filename}"
+                # 直接使用/sdcard作为录制路径
+                video_path = f"/sdcard/{filename}"
                 
                 # 记录录制的文件路径
                 self.recorded_files.append(video_path)
@@ -152,26 +142,6 @@ class VideoManager(QObject):
                 # 智能录制：先尝试无限时间(0)，如果失败则使用180秒
                 time_limit = "0"  # 默认尝试无限时间
                 record_cmd = ["adb", "-s", device, "shell", "screenrecord", "--time-limit", time_limit, video_path]
-                
-                # 先测试命令是否支持time-limit 0
-                test_cmd = ["adb", "-s", device, "shell", "screenrecord", "--time-limit", "0", "/sdcard/"]
-                test_result = subprocess.run(
-                    test_cmd,
-                    capture_output=True,
-                    text=True,
-                    encoding='utf-8',
-                    errors='replace',
-                    timeout=5,
-                    creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0
-                )
-                
-                # 如果测试失败，说明不支持time-limit 0，使用180秒
-                if test_result.returncode != 0 and "outside acceptable range" in test_result.stderr:
-                    time_limit = "180"
-                    record_cmd = ["adb", "-s", device, "shell", "screenrecord", "--time-limit", time_limit, video_path]
-                    print(f"设备不支持time-limit 0，使用180秒限制")
-                else:
-                    print(f"设备支持time-limit 0，使用无限时间录制")
                 
                 self.recording_process = subprocess.Popen(
                     record_cmd,
@@ -182,6 +152,27 @@ class VideoManager(QObject):
                 
                 # 等待录制完成或停止
                 self.recording_process.wait()
+                
+                # 检查录制是否因为time-limit 0失败
+                if self.recording_process and self.recording_process.returncode != 0:
+                    stderr_output = self.recording_process.stderr.read().decode('utf-8', errors='replace')
+                    if "outside acceptable range" in stderr_output:
+                        print(f"设备不支持time-limit 0，使用180秒限制重新录制")
+                        # 重新使用180秒录制
+                        time_limit = "180"
+                        record_cmd = ["adb", "-s", device, "shell", "screenrecord", "--time-limit", time_limit, video_path]
+                        self.recording_process = subprocess.Popen(
+                            record_cmd,
+                            stdout=subprocess.PIPE,
+                            stderr=subprocess.PIPE,
+                            creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0
+                        )
+                        # 等待录制完成或停止
+                        self.recording_process.wait()
+                    else:
+                        print(f"录制失败，错误信息: {stderr_output}")
+                elif self.recording_process and self.recording_process.returncode == 0:
+                    print(f"设备支持time-limit 0，使用无限时间录制成功")
                 
                 if not self.is_recording:
                     break
@@ -256,7 +247,7 @@ class VideoManager(QObject):
             # 如果录制记录为空，搜索可能的目录
             if not video_files:
                 print("录制记录为空，开始搜索视频文件...")
-                search_paths = ["/sdcard/mtklog", "/sdcard"]
+                search_paths = ["/sdcard"]
                 
                 for search_path in search_paths:
                     try:
@@ -456,7 +447,7 @@ class VideoManager(QObject):
             
             # 如果录制记录为空，搜索可能的目录
             if not video_files:
-                search_paths = ["/sdcard/mtklog", "/sdcard"]
+                search_paths = ["/sdcard"]
                 
                 for search_path in search_paths:
                     try:
