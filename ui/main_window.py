@@ -303,6 +303,7 @@ class MainWindow(QMainWindow):
         self.echolocate_manager.file_pulled.connect(self._on_echolocate_file_pulled)
         self.echolocate_manager.file_deleted.connect(self._on_echolocate_file_deleted)
         self.echolocate_manager.status_message.connect(self._on_echolocate_status)
+        self.echolocate_manager.log_message.connect(self._on_echolocate_log)
         
         # 连接背景数据管理器信号
         self.background_data_manager.status_message.connect(self._on_background_data_status)
@@ -383,7 +384,6 @@ class MainWindow(QMainWindow):
         
         # 连接 24小时背景数据 Tab 信号
         self.background_data_tab.configure_phone.connect(self._on_configure_phone)
-        self.background_data_tab.export_background_logs.connect(self._on_export_background_logs)
         self.background_data_tab.analyze_logs.connect(self._on_analyze_logs)
         
         # 连接 APP操作 Tab 信号
@@ -1219,6 +1219,34 @@ class MainWindow(QMainWindow):
         """获取Echolocate版本号"""
         self.echolocate_manager.get_echolocate_version()
         
+    def _on_echolocate_log(self, message, color):
+        """Echolocate日志消息（带颜色）"""
+        # 检查是否包含版本号信息，如果是则只让版本号部分显示为绿色
+        if "Echolocate版本号:" in message or "Echolocate版本信息:" in message:
+            # 提取版本号部分并设置为绿色
+            import re
+            # 匹配版本号模式 (更宽泛的版本号格式)
+            version_pattern = r'([0-9]+\.[0-9A-Za-z._-]+)'
+            if re.search(version_pattern, message):
+                # 分割消息，分别处理版本号部分和其他部分
+                parts = re.split(version_pattern, message)
+                for i, part in enumerate(parts):
+                    if re.match(version_pattern, part):
+                        # 版本号部分使用绿色
+                        self.append_log.emit(part, "green")
+                    else:
+                        # 其他部分使用默认颜色，最后添加换行符
+                        if i == len(parts) - 1:  # 最后一部分
+                            self.append_log.emit(f"{part}\n", None)
+                        else:
+                            self.append_log.emit(part, None)
+            else:
+                # 如果没有匹配到版本号模式，使用原来的颜色
+                self.append_log.emit(f"{message}\n", color)
+        else:
+            # 其他消息使用原来的颜色
+            self.append_log.emit(f"{message}\n", color)
+        
     def _on_filter_callid(self):
         """过滤CallID"""
         self.echolocate_manager.filter_callid()
@@ -1251,10 +1279,6 @@ class MainWindow(QMainWindow):
     def _on_configure_phone(self):
         """配置手机"""
         self.background_data_manager.configure_phone()
-        
-    def _on_export_background_logs(self):
-        """导出背景日志"""
-        self.background_data_manager.export_background_logs()
         
     def _on_analyze_logs(self):
         """分析日志"""

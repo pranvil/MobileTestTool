@@ -16,7 +16,6 @@ class BackgroundDataTab(QWidget):
     # 信号定义
     # 背景数据操作
     configure_phone = pyqtSignal()
-    export_background_logs = pyqtSignal()
     analyze_logs = pyqtSignal()
     
     def __init__(self, parent=None):
@@ -84,10 +83,6 @@ class BackgroundDataTab(QWidget):
         self.configure_phone_btn.clicked.connect(self.configure_phone.emit)
         card_layout.addWidget(self.configure_phone_btn)
         
-        self.export_logs_btn = QPushButton(self.lang_manager.tr("导出log"))
-        self.export_logs_btn.clicked.connect(self.export_background_logs.emit)
-        card_layout.addWidget(self.export_logs_btn)
-        
         self.analyze_logs_btn = QPushButton(self.lang_manager.tr("分析log"))
         self.analyze_logs_btn.clicked.connect(self.analyze_logs.emit)
         card_layout.addWidget(self.analyze_logs_btn)
@@ -112,8 +107,6 @@ class BackgroundDataTab(QWidget):
         # 刷新24小时背景数据操作按钮
         if hasattr(self, 'configure_phone_btn'):
             self.configure_phone_btn.setText(self.lang_manager.tr("配置手机"))
-        if hasattr(self, 'export_logs_btn'):
-            self.export_logs_btn.setText(self.lang_manager.tr("导出log"))
         if hasattr(self, 'analyze_logs_btn'):
             self.analyze_logs_btn.setText(self.lang_manager.tr("分析log"))
     

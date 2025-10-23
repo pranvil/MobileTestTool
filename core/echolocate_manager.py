@@ -221,6 +221,7 @@ class PyQtEcholocateManager(QObject):
     file_pulled = pyqtSignal(str)  # folder
     file_deleted = pyqtSignal()
     status_message = pyqtSignal(str)
+    log_message = pyqtSignal(str, str)  # text, color
     
     def __init__(self, device_manager, parent=None):
         super().__init__(parent)
@@ -929,10 +930,18 @@ class PyQtEcholocateManager(QObject):
                     if 'versionName=' in version_line:
                         version = version_line.split('versionName=')[1]
                         # QMessageBox.information(None, "Echolocate版本", f"Echolocate版本号:\n{version}")
-                        self.status_message.emit(self.tr("Echolocate版本号: ") + version)
+                        version_msg = f"📱 {self.tr('Echolocate版本号')}: {version}"
+                        if hasattr(self, 'log_message'):
+                            self.log_message.emit(version_msg, "green")
+                        else:
+                            self.status_message.emit(version_msg)
                     else:
                         # QMessageBox.information(None, "Echolocate版本", f"版本信息:\n{version_line}")
-                        self.status_message.emit(self.tr("Echolocate版本信息: ") + version_line)
+                        version_msg = f"📱 {self.tr('Echolocate版本信息')}: {version_line}"
+                        if hasattr(self, 'log_message'):
+                            self.log_message.emit(version_msg, "green")
+                        else:
+                            self.status_message.emit(version_msg)
                 else:
                     # QMessageBox.warning(None, "版本信息", "未找到版本信息，可能应用未安装")
                     self.status_message.emit(self.tr("未找到Echolocate版本信息"))

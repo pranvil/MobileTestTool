@@ -30,9 +30,135 @@ class PyQtBackgroundDataManager(QObject):
         return self.lang_manager.tr(text) if self.lang_manager else text
         
     def configure_phone(self):
-        """配置手机"""
-        self.status_message.emit(self.tr("配置手机..."))
-        # TODO: 实现配置手机逻辑
+        """配置手机 - 设置SELinux为Permissive模式"""
+        try:
+            device = self.device_manager.validate_device_selection()
+            if not device:
+                return
+            
+            self.status_message.emit(self.tr("正在配置手机..."))
+            
+            # 步骤1: 执行adb root
+            self.status_message.emit(self.tr("步骤1: 执行adb root..."))
+            try:
+                result = subprocess.run(
+                    ["adb", "-s", device, "root"],
+                    capture_output=True,
+                    text=True,
+                    timeout=15,
+                    creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0
+                )
+                
+                if result.returncode == 0:
+                    success_msg = f"✅ {self.tr('adb root 执行成功')}"
+                    if hasattr(self, 'log_message'):
+                        self.log_message.emit(success_msg, "green")
+                    else:
+                        self.status_message.emit(success_msg)
+                else:
+                    error_msg = f"❌ {self.tr('adb root 执行失败')}: {result.stderr}"
+                    if hasattr(self, 'log_message'):
+                        self.log_message.emit(error_msg, "red")
+                    else:
+                        self.status_message.emit(error_msg)
+                    return
+                    
+            except Exception as e:
+                error_msg = f"❌ {self.tr('adb root 执行异常')}: {str(e)}"
+                if hasattr(self, 'log_message'):
+                    self.log_message.emit(error_msg, "red")
+                else:
+                    self.status_message.emit(error_msg)
+                return
+            
+            # 等待一下确保root权限生效
+            import time
+            time.sleep(2)
+            
+            # 步骤2: 设置SELinux为Permissive
+            self.status_message.emit(self.tr("步骤2: 设置SELinux为Permissive模式..."))
+            try:
+                result = subprocess.run(
+                    ["adb", "-s", device, "shell", "setenforce", "0"],
+                    capture_output=True,
+                    text=True,
+                    timeout=10,
+                    creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0
+                )
+                
+                if result.returncode == 0:
+                    success_msg = f"✅ {self.tr('setenforce 0 执行成功')}"
+                    if hasattr(self, 'log_message'):
+                        self.log_message.emit(success_msg, "green")
+                    else:
+                        self.status_message.emit(success_msg)
+                else:
+                    error_msg = f"❌ {self.tr('setenforce 0 执行失败')}: {result.stderr}"
+                    if hasattr(self, 'log_message'):
+                        self.log_message.emit(error_msg, "red")
+                    else:
+                        self.status_message.emit(error_msg)
+                    return
+                    
+            except Exception as e:
+                error_msg = f"❌ {self.tr('setenforce 0 执行异常')}: {str(e)}"
+                if hasattr(self, 'log_message'):
+                    self.log_message.emit(error_msg, "red")
+                else:
+                    self.status_message.emit(error_msg)
+                return
+            
+            # 步骤3: 验证SELinux状态
+            self.status_message.emit(self.tr("步骤3: 验证SELinux状态..."))
+            try:
+                result = subprocess.run(
+                    ["adb", "-s", device, "shell", "getenforce"],
+                    capture_output=True,
+                    text=True,
+                    timeout=10,
+                    creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0
+                )
+                
+                if result.returncode == 0:
+                    selinux_status = result.stdout.strip()
+                    status_msg = f"📊 {self.tr('当前SELinux状态')}: {selinux_status}"
+                    if hasattr(self, 'log_message'):
+                        self.log_message.emit(status_msg, "blue")
+                    else:
+                        self.status_message.emit(status_msg)
+                    
+                    if selinux_status == "Permissive":
+                        success_msg = f"✅ {self.tr('手机配置成功！')}\n📊 {self.tr('SELinux状态')}: {selinux_status}\n🔧 {self.tr('已设置为Permissive模式')}"
+                        if hasattr(self, 'log_message'):
+                            self.log_message.emit(success_msg, "green")
+                        else:
+                            self.status_message.emit(success_msg)
+                    else:
+                        warning_msg = f"⚠️ {self.tr('SELinux状态未正确设置')}\n📊 {self.tr('当前状态')}: {selinux_status}\n❌ {self.tr('期望状态: Permissive')}"
+                        if hasattr(self, 'log_message'):
+                            self.log_message.emit(warning_msg, "orange")
+                        else:
+                            self.status_message.emit(warning_msg)
+                else:
+                    error_msg = f"❌ {self.tr('获取SELinux状态失败')}: {result.stderr}"
+                    if hasattr(self, 'log_message'):
+                        self.log_message.emit(error_msg, "red")
+                    else:
+                        self.status_message.emit(error_msg)
+                    
+            except Exception as e:
+                error_msg = f"❌ {self.tr('验证SELinux状态异常')}: {str(e)}"
+                if hasattr(self, 'log_message'):
+                    self.log_message.emit(error_msg, "red")
+                else:
+                    self.status_message.emit(error_msg)
+                
+        except Exception as e:
+            error_msg = f"❌ {self.tr('配置手机失败:')} {str(e)}"
+            if hasattr(self, 'log_message'):
+                self.log_message.emit(error_msg, "red")
+            else:
+                self.status_message.emit(error_msg)
     
     def export_background_logs(self):
         """导出背景日志"""
@@ -311,7 +437,16 @@ class OtherOperationsWorker(QThread):
                 "-o", "merge.elg"
             ]
             
-            result = subprocess.run(cmd, cwd=log_folder, capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=300)
+            result = subprocess.run(
+                cmd, 
+                cwd=log_folder, 
+                capture_output=True, 
+                text=True, 
+                encoding='utf-8', 
+                errors='replace', 
+                timeout=300,
+                creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0
+            )
             
             if result.returncode == 0:
                 self.status_updated.emit(self.tr("合并完成!"))
@@ -378,7 +513,16 @@ class OtherOperationsWorker(QThread):
                 ]
                 
                 try:
-                    result = subprocess.run(cmd, cwd=elgcap_path, capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=300)
+                    result = subprocess.run(
+                        cmd, 
+                        cwd=elgcap_path, 
+                        capture_output=True, 
+                        text=True, 
+                        encoding='utf-8', 
+                        errors='replace', 
+                        timeout=300,
+                        creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0
+                    )
                     if result.returncode == 0:
                         success_count += 1
                 except subprocess.TimeoutExpired:
@@ -440,7 +584,15 @@ class OtherOperationsWorker(QThread):
             # 执行合并命令
             merge_cmd = [mergecap_exe, "-w", merge_pcap_path] + pcap_files
             
-            result = subprocess.run(merge_cmd, capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=120)
+            result = subprocess.run(
+                merge_cmd, 
+                capture_output=True, 
+                text=True, 
+                encoding='utf-8', 
+                errors='replace', 
+                timeout=120,
+                creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0
+            )
             
             if result.returncode == 0:
                 self.status_updated.emit(self.tr("合并完成!"))
@@ -493,7 +645,15 @@ class OtherOperationsWorker(QThread):
                 cmd = [pcap_gen_exe, hdf_path, log_folder]
                 
                 try:
-                    result = subprocess.run(cmd, capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=300)
+                    result = subprocess.run(
+                        cmd, 
+                        capture_output=True, 
+                        text=True, 
+                        encoding='utf-8', 
+                        errors='replace', 
+                        timeout=300,
+                        creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0
+                    )
                     if result.returncode == 0:
                         success_count += 1
                 except subprocess.TimeoutExpired:
@@ -549,7 +709,15 @@ class OtherOperationsWorker(QThread):
             # 执行合并命令
             merge_cmd = [mergecap_exe, "-w", merge_pcap_path] + pcap_files
             
-            result = subprocess.run(merge_cmd, capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=120)
+            result = subprocess.run(
+                merge_cmd, 
+                capture_output=True, 
+                text=True, 
+                encoding='utf-8', 
+                errors='replace', 
+                timeout=120,
+                creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0
+            )
             
             return result.returncode == 0
                 
@@ -868,7 +1036,11 @@ class PyQtOtherOperationsManager(QObject):
                              wireshark_path=self.tool_config.get("wireshark_path"))
             
         except Exception as e:
-            QMessageBox.critical(None, self.tr("错误"), f"提取pcap失败: {str(e)}")
+            error_msg = f"❌ {self.tr('提取pcap失败:')} {str(e)}"
+            if hasattr(self, 'log_message'):
+                self.log_message.emit(error_msg, "red")
+            else:
+                self.status_message.emit(error_msg)
     
     def merge_pcap(self):
         """合并PCAP文件"""
@@ -934,7 +1106,11 @@ class PyQtOtherOperationsManager(QObject):
                              wireshark_path=self.tool_config.get("wireshark_path"))
             
         except Exception as e:
-            QMessageBox.critical(None, self.tr("错误"), f"提取高通pcap失败: {str(e)}")
+            error_msg = f"❌ {self.tr('提取高通pcap失败:')} {str(e)}"
+            if hasattr(self, 'log_message'):
+                self.log_message.emit(error_msg, "red")
+            else:
+                self.status_message.emit(error_msg)
     
     def _start_worker(self, operation_type, **kwargs):
         """启动工作线程"""
@@ -990,36 +1166,65 @@ class PyQtOtherOperationsManager(QObject):
     
     def _on_worker_finished(self, result):
         """工作线程完成"""
-        from PyQt5.QtWidgets import QMessageBox
-        
         if self.progress_dialog:
             self.progress_dialog.accept()
             self.progress_dialog = None
         
         if result.get('success', False):
             if result.get('merge_file'):
-                QMessageBox.information(
-                    None, self.tr("成功"), 
-                    f"{self.tr('操作成功完成！')}\n\n{self.tr('合并文件:')} {result['merge_file']}\n"
-                    f"{self.tr('处理文件:')} {result.get('file_count', result.get('total_files', 0))} {self.tr('个')}"
-                )
+                # 在日志中显示成功信息
+                success_msg = f"✅ {self.tr('PCAP提取成功完成！')}\n"
+                success_msg += f"📁 {self.tr('合并文件:')} {result['merge_file']}\n"
+                success_msg += f"📊 {self.tr('处理文件:')} {result.get('file_count', result.get('total_files', 0))} {self.tr('个')}"
+                
+                # 发送到日志栏
+                if hasattr(self, 'log_message'):
+                    self.log_message.emit(success_msg)
+                else:
+                    # 如果没有日志信号，使用状态消息
+                    self.status_message.emit(success_msg)
+                
+                # 自动打开pcap文件
+                merge_file = result['merge_file']
+                if os.path.exists(merge_file):
+                    try:
+                        os.startfile(merge_file)
+                    except Exception as e:
+                        error_msg = f"⚠️ {self.tr('自动打开文件失败:')} {str(e)}"
+                        if hasattr(self, 'log_message'):
+                            self.log_message.emit(error_msg)
+                        else:
+                            self.status_message.emit(error_msg)
             else:
-                QMessageBox.information(None, self.tr("成功"), self.tr("操作成功完成！"))
+                # 在日志中显示成功信息
+                success_msg = f"✅ {self.tr('操作成功完成！')}"
+                if hasattr(self, 'log_message'):
+                    self.log_message.emit(success_msg)
+                else:
+                    self.status_message.emit(success_msg)
         else:
             error_msg = result.get('error', self.tr('未知错误'))
-            QMessageBox.critical(None, self.tr("失败"), f"{self.tr('操作失败:')} {error_msg}")
+            error_display = f"❌ {self.tr('操作失败:')} {error_msg}"
+            if hasattr(self, 'log_message'):
+                self.log_message.emit(error_display)
+            else:
+                self.status_message.emit(error_display)
         
         self.worker = None
     
     def _on_worker_error(self, error_msg):
         """工作线程错误"""
-        from PyQt5.QtWidgets import QMessageBox
-        
         if self.progress_dialog:
             self.progress_dialog.reject()
             self.progress_dialog = None
         
-        QMessageBox.critical(None, self.tr("错误"), f"操作失败: {error_msg}")
+        # 在日志中显示错误信息
+        error_display = f"❌ {self.tr('操作失败:')} {error_msg}"
+        if hasattr(self, 'log_message'):
+            self.log_message.emit(error_display)
+        else:
+            self.status_message.emit(error_display)
+        
         self.worker = None
     
     def configure_tools(self):
