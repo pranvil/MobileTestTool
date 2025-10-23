@@ -17,15 +17,16 @@ class TelephonyWorker(QThread):
     finished = pyqtSignal(bool, str)
     progress = pyqtSignal(str)
     
-    def __init__(self, device, telephony_commands):
+    def __init__(self, device, telephony_commands, lang_manager=None):
         super().__init__()
         self.device = device
         self.telephony_commands = telephony_commands
+        self.lang_manager = lang_manager
         
     def run(self):
         """执行Telephony命令"""
         try:
-            self.progress.emit("正在准备Telephony命令...")
+            self.progress.emit(self.lang_manager.tr("正在准备Telephony命令..."))
             
             # 准备所有命令（移除"adb shell"前缀）
             command_list = []
@@ -39,7 +40,7 @@ class TelephonyWorker(QThread):
             # 将所有命令连接成一个字符串，用换行符分隔
             all_commands = "\n".join(command_list)
             
-            self.progress.emit("正在执行Telephony命令...")
+            self.progress.emit(self.lang_manager.tr("正在执行Telephony命令..."))
             
             # 执行adb shell一次，通过stdin发送所有命令
             result = subprocess.run(
@@ -52,17 +53,17 @@ class TelephonyWorker(QThread):
             )
             
             if result.returncode != 0:
-                print(f"[WARNING] 部分命令执行失败")
-                print(f"[WARNING] 错误信息: {result.stderr}")
+                print(f"[WARNING] {self.lang_manager.tr('部分命令执行失败')}")
+                print(f"[WARNING] {self.lang_manager.tr('错误信息:')} {result.stderr}")
                 # 即使有错误，也继续执行，因为setprop命令通常不会失败
             
-            self.progress.emit("所有命令执行完成")
-            self.finished.emit(True, "Telephony日志设置完成")
+            self.progress.emit(self.lang_manager.tr("所有命令执行完成"))
+            self.finished.emit(True, self.lang_manager.tr("Telephony日志设置完成"))
             
         except subprocess.TimeoutExpired:
-            self.finished.emit(False, "命令执行超时")
+            self.finished.emit(False, self.lang_manager.tr("命令执行超时"))
         except Exception as e:
-            self.finished.emit(False, f"执行Telephony命令失败: {str(e)}")
+            self.finished.emit(False, f"{self.lang_manager.tr('执行Telephony命令失败:')} {str(e)}")
 
 
 class PyQtTelephonyManager(QObject):
@@ -73,8 +74,18 @@ class PyQtTelephonyManager(QObject):
     def __init__(self, device_manager, parent=None):
         super().__init__(parent)
         self.device_manager = device_manager
+        # 从父窗口获取语言管理器
+        self.lang_manager = parent.lang_manager if parent and hasattr(parent, 'lang_manager') else None
         self.worker = None
+        # 初始化Telephony命令列表
+        self._init_telephony_commands()
+    
+    def tr(self, text):
+        """安全地获取翻译文本"""
+        return self.lang_manager.tr(text) if self.lang_manager else text
         
+    def _init_telephony_commands(self):
+        """初始化Telephony命令列表"""
         # Telephony相关的adb命令列表
         self.telephony_commands = [
             "adb shell setprop persist.log.tag.RfxController D",
@@ -407,12 +418,12 @@ class PyQtTelephonyManager(QObject):
         """启用Telephony日志"""
         device = self.device_manager.validate_device_selection()
         if not device:
-            self.status_message.emit("请先选择设备")
+            self.status_message.emit(self.lang_manager.tr("请先选择设备"))
             return
         
         try:
             # 创建工作线程
-            self.worker = TelephonyWorker(device, self.telephony_commands)
+            self.worker = TelephonyWorker(device, self.telephony_commands, self.lang_manager)
             # 先连接信号，再启动线程
             self.worker.progress.connect(self.status_message.emit)
             self.worker.finished.connect(self._on_telephony_finished)
@@ -420,8 +431,8 @@ class PyQtTelephonyManager(QObject):
             self.worker.start()
             
         except Exception as e:
-            self.status_message.emit(f"启用Telephony日志失败: {str(e)}")
-            QMessageBox.critical(None, "错误", f"启用Telephony日志失败: {str(e)}")
+            self.status_message.emit("❌ " + self.tr("启用Telephony日志失败: ") + str(e))
+            QMessageBox.critical(None, self.lang_manager.tr("错误"), self.tr("启用Telephony日志失败: ") + str(e))
     
     def _on_telephony_finished(self, success, message):
         """Telephony设置完成"""
@@ -431,10 +442,10 @@ class PyQtTelephonyManager(QObject):
             # 询问是否立即重启
             reply = QMessageBox.question(
                 None,
-                "重启确认",
-                "Telephony日志设置完成！\n\n"
-                "为了确保设置生效，建议立即重启设备。\n"
-                "是否现在重启设备？",
+                self.lang_manager.tr("重启确认"),
+                self.lang_manager.tr("Telephony日志设置完成！\n\n") +
+                self.lang_manager.tr("为了确保设置生效，建议立即重启设备。\n") +
+                self.lang_manager.tr("是否现在重启设备？"),
                 QMessageBox.Yes | QMessageBox.No,
                 QMessageBox.Yes
             )
@@ -442,9 +453,9 @@ class PyQtTelephonyManager(QObject):
             if reply == QMessageBox.Yes:
                 self.reboot_device()
             else:
-                QMessageBox.information(None, "完成", "Telephony日志设置完成！\n请手动重启设备以使设置生效。")
+                QMessageBox.information(None, self.lang_manager.tr("完成"), self.lang_manager.tr("Telephony日志设置完成！\n请手动重启设备以使设置生效。"))
         else:
-            QMessageBox.critical(None, "错误", f"设置Telephony日志失败: {message}")
+            QMessageBox.critical(None, self.lang_manager.tr("错误"), f"设置Telephony日志失败: {message}")
     
     def reboot_device(self):
         """重启设备"""
@@ -463,16 +474,16 @@ class PyQtTelephonyManager(QObject):
             )
             
             if result.returncode == 0:
-                QMessageBox.information(None, "成功", f"设备 {device} 正在重启...")
-                self.status_message.emit(f"设备 {device} 正在重启...")
+                QMessageBox.information(None, self.lang_manager.tr("成功"), self.tr("设备 ") + device + self.tr(" 正在重启..."))
+                self.status_message.emit(self.tr("设备 ") + device + self.tr(" 正在重启..."))
             else:
-                QMessageBox.critical(None, "错误", f"重启设备失败: {result.stderr}")
-                self.status_message.emit(f"重启设备失败: {result.stderr}")
+                QMessageBox.critical(None, self.lang_manager.tr("错误"), self.tr("重启设备失败: ") + result.stderr)
+                self.status_message.emit("❌ " + self.tr("重启设备失败: ") + result.stderr)
                 
         except subprocess.TimeoutExpired:
-            QMessageBox.critical(None, "错误", "重启命令超时")
-            self.status_message.emit("重启命令超时")
+            QMessageBox.critical(None, self.lang_manager.tr("错误"), self.lang_manager.tr("重启命令超时"))
+            self.status_message.emit(self.lang_manager.tr("重启命令超时"))
         except Exception as e:
-            QMessageBox.critical(None, "错误", f"重启设备失败: {str(e)}")
-            self.status_message.emit(f"重启设备失败: {str(e)}")
+            QMessageBox.critical(None, self.lang_manager.tr("错误"), self.tr("重启设备失败: ") + str(e))
+            self.status_message.emit("❌ " + self.tr("重启设备失败: ") + str(e))
 

@@ -16,11 +16,17 @@ class BackgroundDataTab(QWidget):
     # 信号定义
     # 背景数据操作
     configure_phone = pyqtSignal()
-    export_background_logs = pyqtSignal()
     analyze_logs = pyqtSignal()
     
     def __init__(self, parent=None):
         super().__init__(parent)
+        # 从父窗口获取语言管理器
+        if parent and hasattr(parent, 'lang_manager'):
+            self.lang_manager = parent.lang_manager
+        else:
+            # 如果没有父窗口或语言管理器，创建一个默认的
+            from core.language_manager import LanguageManager
+            self.lang_manager = LanguageManager()
         self.setup_ui()
         
     def setup_ui(self):
@@ -60,7 +66,7 @@ class BackgroundDataTab(QWidget):
         v.setSpacing(4)
         
         # 标题
-        title = QLabel("24小时背景数据操作")
+        title = QLabel(self.lang_manager.tr("24小时背景数据操作"))
         title.setProperty("class", "section-title")
         v.addWidget(title)
         
@@ -73,15 +79,11 @@ class BackgroundDataTab(QWidget):
         card_layout.setContentsMargins(10, 1, 10, 1)
         card_layout.setSpacing(8)
         
-        self.configure_phone_btn = QPushButton("配置手机")
+        self.configure_phone_btn = QPushButton(self.lang_manager.tr("配置手机"))
         self.configure_phone_btn.clicked.connect(self.configure_phone.emit)
         card_layout.addWidget(self.configure_phone_btn)
         
-        self.export_logs_btn = QPushButton("导出log")
-        self.export_logs_btn.clicked.connect(self.export_background_logs.emit)
-        card_layout.addWidget(self.export_logs_btn)
-        
-        self.analyze_logs_btn = QPushButton("分析log")
+        self.analyze_logs_btn = QPushButton(self.lang_manager.tr("分析log"))
         self.analyze_logs_btn.clicked.connect(self.analyze_logs.emit)
         card_layout.addWidget(self.analyze_logs_btn)
         
@@ -91,3 +93,28 @@ class BackgroundDataTab(QWidget):
         
         return container
 
+    def refresh_texts(self, lang_manager=None):
+        """刷新所有文本（用于语言切换）"""
+        if lang_manager:
+            self.lang_manager = lang_manager
+        
+        if not self.lang_manager:
+            return
+        
+        # 刷新组标题标签
+        self._refresh_section_titles()
+        
+        # 刷新24小时背景数据操作按钮
+        if hasattr(self, 'configure_phone_btn'):
+            self.configure_phone_btn.setText(self.lang_manager.tr("配置手机"))
+        if hasattr(self, 'analyze_logs_btn'):
+            self.analyze_logs_btn.setText(self.lang_manager.tr("分析log"))
+    
+    def _refresh_section_titles(self):
+        """刷新组标题标签"""
+        # 查找所有QLabel并刷新标题
+        for label in self.findChildren(QLabel):
+            current_text = label.text()
+            # 根据当前文本匹配对应的翻译
+            if current_text in ["24小时背景数据操作", "24h Background Data Operations"]:
+                label.setText(self.lang_manager.tr("24小时背景数据操作"))

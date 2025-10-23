@@ -113,7 +113,7 @@ class NetworkInfoWorker(threading.Thread):
             return None
                 
         except Exception as e:
-            print(f"获取WiFi信息失败: {e}")
+            print(f"{self.lang_manager.tr('获取WiFi信息失败:')} {e}")
             return None
     
     def _parse_network_info(self, output):
@@ -148,18 +148,19 @@ class NetworkInfoWorker(threading.Thread):
             return info_list
             
         except Exception as e:
-            print(f"解析网络信息失败: {e}")
+            print(f"{self.lang_manager.tr('解析网络信息失败:')} {e}")
             return []
 
 
 class PingWorker(threading.Thread):
     """Ping工作线程"""
     
-    def __init__(self, device, callback, stop_event):
+    def __init__(self, device, callback, stop_event, lang_manager=None):
         super().__init__()
         self.device = device
         self.callback = callback
         self.stop_event = stop_event
+        self.lang_manager = lang_manager
         self.ping_process = None
         self.last_status = None  # 记录上次的网络状态
         
@@ -234,7 +235,7 @@ class PingWorker(threading.Thread):
                     if self.ping_process and self.ping_process.poll() is not None:
                         # 进程已结束，可能是网络问题或正常停止
                         if not self.stop_event.is_set():  # 只有在用户没有主动停止时才显示异常
-                            self._update_status("网络异常")
+                            self._update_status(self.lang_manager.tr("网络异常"))
                             
                             
                             # 如果重试次数未达到上限，尝试重新启动ping进程
@@ -285,8 +286,8 @@ class PingWorker(threading.Thread):
                                 continue  # 继续监控新进程
                             else:
                                 # 已达到最大重试次数，记录日志并停止
-                                self.callback(f"Ping测试失败：已达到最大重试次数({max_retries}次)")
-                                self._update_status("网络异常")
+                                self.callback(f"{self.lang_manager.tr('Ping测试失败：已达到最大重试次数')}({max_retries}{self.lang_manager.tr('次')})")
+                                self._update_status(self.lang_manager.tr("网络异常"))
                                 self.stop_event.set()
                                 break
                         else:
@@ -296,7 +297,7 @@ class PingWorker(threading.Thread):
                     time.sleep(0.5)  # 缩短检查间隔，提高响应速度
                 except Exception as e:
                     if not self.stop_event.is_set():
-                        self._update_status("网络异常")
+                        self._update_status(self.lang_manager.tr("网络异常"))
                         # 如果重试次数未达到上限，尝试重新启动
                         if retry_count < max_retries:
                             retry_count += 1
@@ -343,13 +344,13 @@ class PingWorker(threading.Thread):
                                 active_stdout_thread.start()
                                 active_stderr_thread.start()
                             except Exception as e2:
-                                self.callback(f"Ping测试失败：重新启动进程失败 - {str(e2)}")
+                                self.callback(f"{self.lang_manager.tr('Ping测试失败：重新启动进程失败 -')} {str(e2)}")
                                 self.stop_event.set()
                                 break
                         else:
                             # 已达到最大重试次数，记录日志并停止
-                            self.callback(f"Ping测试失败：已达到最大重试次数({max_retries}次)")
-                            self._update_status("网络异常")
+                            self.callback(f"{self.lang_manager.tr('Ping测试失败：已达到最大重试次数')}({max_retries}{self.lang_manager.tr('次')})")
+                            self._update_status(self.lang_manager.tr("网络异常"))
                             self.stop_event.set()
                             break
             
@@ -358,8 +359,8 @@ class PingWorker(threading.Thread):
             active_stderr_thread.join(timeout=3)
                 
         except Exception as e:
-            self.callback(f"Ping测试异常：{str(e)}")
-            self._update_status("网络异常")
+            self.callback(f"{self.lang_manager.tr('Ping测试异常：')} {str(e)}")
+            self._update_status(self.lang_manager.tr("网络异常"))
         finally:
             # 通知 ping 已停止
             self.callback("ping_stopped")
@@ -390,26 +391,26 @@ class PingWorker(threading.Thread):
                 # 检查成功响应 - 改进检测逻辑
                 if any(keyword in line_lower for keyword in ["bytes from", "icmp_seq", "time="]):
                     # ping成功，显示绿色的"网络正常"
-                    self._update_status("网络正常")
+                    self._update_status(self.lang_manager.tr("网络正常"))
                 elif "ping:" in line_lower and ("unknown host" in line_lower or "name or service not known" in line_lower):
                     # DNS解析失败
-                    self._update_status("网络异常")
+                    self._update_status(self.lang_manager.tr("网络异常"))
                 elif "ping:" in line_lower and ("network is unreachable" in line_lower or "destination host unreachable" in line_lower):
                     # 网络不可达
-                    self._update_status("网络异常")
+                    self._update_status(self.lang_manager.tr("网络异常"))
                 elif "ping:" in line_lower and ("timeout" in line_lower or "no answer" in line_lower):
                     # 请求超时
-                    self._update_status("网络异常")
+                    self._update_status(self.lang_manager.tr("网络异常"))
                 elif "packets transmitted" in line_lower and "packet loss" in line_lower:
                     # ping统计信息
                     if "0% packet loss" in line_lower:
-                        self._update_status("网络正常")
+                        self._update_status(self.lang_manager.tr("网络正常"))
                     else:
-                        self._update_status("网络异常")
+                        self._update_status(self.lang_manager.tr("网络异常"))
                         
         except Exception as e:
             if not self.stop_event.is_set():  # 只有在未停止时才显示异常
-                self._update_status("网络异常")
+                self._update_status(self.lang_manager.tr("网络异常"))
     
     def _read_ping_stderr(self):
         """读取ping错误输出"""
@@ -436,11 +437,11 @@ class PingWorker(threading.Thread):
                     "no route to host",
                     "connection refused"
                 ]):
-                    self._update_status("网络异常")
+                    self._update_status(self.lang_manager.tr("网络异常"))
                         
         except Exception as e:
             if not self.stop_event.is_set():  # 只有在未停止时才显示异常
-                self._update_status("网络异常")
+                self._update_status(self.lang_manager.tr("网络异常"))
     
     def stop(self):
         """停止ping"""
@@ -487,6 +488,8 @@ class PyQtNetworkInfoManager(QObject):
     def __init__(self, device_manager, parent=None):
         super().__init__(parent)
         self.device_manager = device_manager
+        # 从父窗口获取语言管理器
+        self.lang_manager = parent.lang_manager if parent and hasattr(parent, 'lang_manager') else None
         self.network_worker = None
         self.ping_worker = None
         self.stop_event = None
@@ -501,7 +504,7 @@ class PyQtNetworkInfoManager(QObject):
             return
         
         if self.is_running:
-            self.status_message.emit("网络信息获取已经在运行中")
+            self.status_message.emit(self.lang_manager.tr("网络信息获取已经在运行中"))
             self.network_info_start_failed.emit()
             return
         
@@ -518,18 +521,18 @@ class PyQtNetworkInfoManager(QObject):
             self.network_worker.start()
             
             self.is_running = True
-            self.status_message.emit("网络信息获取已启动")
+            self.status_message.emit(self.lang_manager.tr("网络信息获取已启动"))
             self.network_info_started.emit()
             
         except Exception as e:
-            self.status_message.emit(f"启动网络信息获取失败: {str(e)}")
+            self.status_message.emit(f"{self.lang_manager.tr('启动网络信息获取失败:')} {str(e)}")
             self.network_info_start_failed.emit()
     
     def stop_network_info(self):
         """停止获取网络信息"""
         if not self.is_running:
             try:
-                self.status_message.emit("网络信息获取未运行")
+                self.status_message.emit(self.lang_manager.tr("网络信息获取未运行"))
             except RuntimeError:
                 pass
             return
@@ -544,13 +547,13 @@ class PyQtNetworkInfoManager(QObject):
             
             self.is_running = False
             try:
-                self.status_message.emit("网络信息获取已停止")
+                self.status_message.emit(self.lang_manager.tr("网络信息获取已停止"))
             except RuntimeError:
                 pass
             
         except Exception as e:
             try:
-                self.status_message.emit(f"停止网络信息获取失败: {str(e)}")
+                self.status_message.emit(f"{self.lang_manager.tr('停止网络信息获取失败:')} {str(e)}")
             except RuntimeError:
                 pass
     
@@ -559,7 +562,7 @@ class PyQtNetworkInfoManager(QObject):
         # 检查是否已经在运行
         if self.ping_worker and self.ping_worker.is_alive():
             try:
-                self.status_message.emit("Ping测试已经在运行中")
+                self.status_message.emit(self.lang_manager.tr("Ping测试已经在运行中"))
                 self.ping_start_failed.emit()
             except RuntimeError:
                 pass
@@ -578,19 +581,20 @@ class PyQtNetworkInfoManager(QObject):
             self.ping_worker = PingWorker(
                 device,
                 self._on_ping_result,
-                self.stop_event
+                self.stop_event,
+                self.lang_manager
             )
             self.ping_worker.start()
             
             try:
-                self.status_message.emit("Ping测试已启动")
+                self.status_message.emit(self.lang_manager.tr("Ping测试已启动"))
                 self.ping_started.emit()
             except RuntimeError:
                 pass
             
         except Exception as e:
             try:
-                self.status_message.emit(f"启动Ping测试失败: {str(e)}")
+                self.status_message.emit(f"{self.lang_manager.tr('启动Ping测试失败:')} {str(e)}")
                 self.ping_start_failed.emit()
             except RuntimeError:
                 pass
@@ -614,12 +618,12 @@ class PyQtNetworkInfoManager(QObject):
             self.stop_event = None
             
             try:
-                self.status_message.emit("Ping测试已停止")
+                self.status_message.emit(self.lang_manager.tr("Ping测试已停止"))
             except RuntimeError:
                 pass
         except Exception as e:
             try:
-                self.status_message.emit(f"停止Ping测试失败: {str(e)}")
+                self.status_message.emit(f"{self.lang_manager.tr('停止Ping测试失败:')} {str(e)}")
             except RuntimeError:
                 pass
             finally:

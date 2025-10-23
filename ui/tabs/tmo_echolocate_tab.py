@@ -20,8 +20,6 @@ class TMOEcholocateTab(QWidget):
     pull_echolocate_file = pyqtSignal()
     delete_echolocate_file = pyqtSignal()
     get_echolocate_version = pyqtSignal()
-    install_gslice1 = pyqtSignal()
-    install_gslice2 = pyqtSignal()
     
     # 过滤操作
     filter_callid = pyqtSignal()
@@ -34,6 +32,13 @@ class TMOEcholocateTab(QWidget):
     
     def __init__(self, parent=None):
         super().__init__(parent)
+        # 从父窗口获取语言管理器
+        if parent and hasattr(parent, 'lang_manager'):
+            self.lang_manager = parent.lang_manager
+        else:
+            # 如果没有父窗口或语言管理器，创建一个默认的
+            from core.language_manager import LanguageManager
+            self.lang_manager = LanguageManager()
         self.setup_ui()
         
     def setup_ui(self):
@@ -77,7 +82,7 @@ class TMOEcholocateTab(QWidget):
         v.setSpacing(4)
         
         # 标题
-        title = QLabel("Echolocate 操作")
+        title = QLabel(self.lang_manager.tr("Echolocate 操作"))
         title.setProperty("class", "section-title")
         v.addWidget(title)
         
@@ -90,7 +95,7 @@ class TMOEcholocateTab(QWidget):
         card_layout.setContentsMargins(10, 1, 10, 1)
         card_layout.setSpacing(8)
         
-        self.install_btn = QPushButton("安装DiagTrace")
+        self.install_btn = QPushButton(self.lang_manager.tr("安装"))
         self.install_btn.clicked.connect(self.install_echolocate.emit)
         card_layout.addWidget(self.install_btn)
         
@@ -102,21 +107,13 @@ class TMOEcholocateTab(QWidget):
         self.pull_file_btn.clicked.connect(self.pull_echolocate_file.emit)
         card_layout.addWidget(self.pull_file_btn)
         
-        self.delete_file_btn = QPushButton("删除手机文件")
+        self.delete_file_btn = QPushButton(self.lang_manager.tr("删除手机文件"))
         self.delete_file_btn.clicked.connect(self.delete_echolocate_file.emit)
         card_layout.addWidget(self.delete_file_btn)
         
         self.version_btn = QPushButton("EchoVersion")
         self.version_btn.clicked.connect(self.get_echolocate_version.emit)
         card_layout.addWidget(self.version_btn)
-        
-        self.gslice1_btn = QPushButton("安装Gslice1")
-        self.gslice1_btn.clicked.connect(self.install_gslice1.emit)
-        card_layout.addWidget(self.gslice1_btn)
-        
-        self.gslice2_btn = QPushButton("安装Gslice2")
-        self.gslice2_btn.clicked.connect(self.install_gslice2.emit)
-        card_layout.addWidget(self.gslice2_btn)
         
         card_layout.addStretch()
         
@@ -133,7 +130,7 @@ class TMOEcholocateTab(QWidget):
         v.setSpacing(4)
         
         # 标题
-        title = QLabel("过滤操作")
+        title = QLabel(self.lang_manager.tr("过滤操作"))
         title.setProperty("class", "section-title")
         v.addWidget(title)
         
@@ -174,7 +171,7 @@ class TMOEcholocateTab(QWidget):
         self.filter_allcallflow_btn.clicked.connect(self.filter_allcallflow.emit)
         row1_layout.addWidget(self.filter_allcallflow_btn)
         
-        self.filter_voice_intent_btn = QPushButton("voice_intent测试")
+        self.filter_voice_intent_btn = QPushButton(self.lang_manager.tr("voice_intent测试"))
         self.filter_voice_intent_btn.clicked.connect(self.filter_voice_intent.emit)
         row1_layout.addWidget(self.filter_voice_intent_btn)
         
@@ -186,3 +183,32 @@ class TMOEcholocateTab(QWidget):
         
         return container
 
+    def refresh_texts(self, lang_manager=None):
+        """刷新所有文本（用于语言切换）"""
+        if lang_manager:
+            self.lang_manager = lang_manager
+        
+        if not self.lang_manager:
+            return
+        
+        # 刷新组标题标签
+        self._refresh_section_titles()
+        
+        # 刷新Echolocate操作组按钮
+        if hasattr(self, 'install_btn'):
+            self.install_btn.setText(self.lang_manager.tr("安装"))
+        if hasattr(self, 'delete_file_btn'):
+            self.delete_file_btn.setText(self.lang_manager.tr("删除手机文件"))
+        if hasattr(self, 'filter_voice_intent_btn'):
+            self.filter_voice_intent_btn.setText(self.lang_manager.tr("voice_intent测试"))
+    
+    def _refresh_section_titles(self):
+        """刷新组标题标签"""
+        # 查找所有QLabel并刷新标题
+        for label in self.findChildren(QLabel):
+            current_text = label.text()
+            # 根据当前文本匹配对应的翻译
+            if current_text in ["Echolocate 操作", "Echolocate Operations"]:
+                label.setText(self.lang_manager.tr("Echolocate 操作"))
+            elif current_text in ["过滤操作", "Filter Operations"]:
+                label.setText(self.lang_manager.tr("过滤操作"))

@@ -27,6 +27,13 @@ class NetworkInfoTab(QWidget):
         super().__init__(parent)
         self.is_network_running = False
         self.is_ping_running = False
+        # 从父窗口获取语言管理器
+        if parent and hasattr(parent, 'lang_manager'):
+            self.lang_manager = parent.lang_manager
+        else:
+            # 如果没有父窗口或语言管理器，创建一个默认的
+            from core.language_manager import LanguageManager
+            self.lang_manager = LanguageManager()
         self.setup_ui()
         
     def setup_ui(self):
@@ -58,7 +65,7 @@ class NetworkInfoTab(QWidget):
         v.setSpacing(4)
         
         # 标题
-        title = QLabel("控制")
+        title = QLabel(self.lang_manager.tr("控制"))
         title.setProperty("class", "section-title")
         v.addWidget(title)
         
@@ -74,7 +81,7 @@ class NetworkInfoTab(QWidget):
         # 按钮行
         button_layout = QHBoxLayout()
         
-        self.network_button = QPushButton("开始")
+        self.network_button = QPushButton(self.lang_manager.tr("开始"))
         self.network_button.clicked.connect(self._on_toggle_network_info)
         button_layout.addWidget(self.network_button)
         
@@ -85,7 +92,7 @@ class NetworkInfoTab(QWidget):
         layout.addLayout(button_layout)
         
         # 状态标签
-        self.network_status_label = QLabel("未启动")
+        self.network_status_label = QLabel(self.lang_manager.tr("未启动"))
         self.network_status_label.setStyleSheet("color: gray; font-size: 9pt;")
         layout.addWidget(self.network_status_label)
         
@@ -109,7 +116,7 @@ class NetworkInfoTab(QWidget):
         v.setSpacing(4)
         
         # 标题
-        title = QLabel("网络信息")
+        title = QLabel(self.lang_manager.tr("网络信息"))
         title.setProperty("class", "section-title")
         v.addWidget(title)
         
@@ -259,9 +266,9 @@ class NetworkInfoTab(QWidget):
         """显示初始提示信息"""
         self.network_table.setRowCount(1)
         self.network_table.setColumnCount(1)
-        self.network_table.setHorizontalHeaderLabels(["提示"])
+        self.network_table.setHorizontalHeaderLabels([self.lang_manager.tr("提示")])
         
-        item = QTableWidgetItem("点击'开始'按钮获取网络信息")
+        item = QTableWidgetItem(self.lang_manager.tr("点击self.lang_manager.tr('开始')按钮获取网络信息"))
         item.setTextAlignment(Qt.AlignCenter)
         item.setForeground(Qt.gray)
         self.network_table.setItem(0, 0, item)
@@ -273,9 +280,9 @@ class NetworkInfoTab(QWidget):
             # 停止时立即改变状态
             self.stop_network_info.emit()
             self.is_network_running = False
-            self.network_button.setText("开始")
+            self.network_button.setText(self.lang_manager.tr("开始"))
             self.network_button.setStyleSheet("")
-            self.network_status_label.setText("已停止")
+            self.network_status_label.setText(self.lang_manager.tr("已停止"))
             self.network_status_label.setStyleSheet("color: gray; font-size: 9pt;")
         else:
             # 开始时只发送信号，等待成功回调再改变状态
@@ -298,23 +305,23 @@ class NetworkInfoTab(QWidget):
         """设置网络信息状态"""
         self.is_network_running = is_running
         if is_running:
-            self.network_button.setText("停止")
+            self.network_button.setText(self.lang_manager.tr("停止"))
             self.network_button.setStyleSheet("background-color: #f44336; color: white;")
-            self.network_status_label.setText("运行中...")
+            self.network_status_label.setText(self.lang_manager.tr("运行中..."))
             self.network_status_label.setStyleSheet("color: green; font-size: 9pt;")
         else:
-            self.network_button.setText("开始")
+            self.network_button.setText(self.lang_manager.tr("开始"))
             self.network_button.setStyleSheet("")
-            self.network_status_label.setText("已停止")
+            self.network_status_label.setText(self.lang_manager.tr("已停止"))
             self.network_status_label.setStyleSheet("color: gray; font-size: 9pt;")
             
     def set_ping_state(self, is_running):
         """设置 Ping 状态"""
         self.is_ping_running = is_running
         if is_running:
-            self.ping_button.setText("停止")
+            self.ping_button.setText(self.lang_manager.tr("停止"))
             self.ping_button.setStyleSheet("background-color: #f44336; color: white;")
-            self.ping_status_label.setText("Ping中...")
+            self.ping_status_label.setText(self.lang_manager.tr("Ping中..."))
             self.ping_status_label.setStyleSheet("color: blue; font-size: 9pt;")
         else:
             self.ping_button.setText("Ping")
@@ -373,10 +380,69 @@ class NetworkInfoTab(QWidget):
         
         self.ping_status_label.setText(status_text)
         # 根据状态设置颜色：网络正常=绿色，网络异常=红色
-        if status_text == "网络正常":
+        if status_text == self.lang_manager.tr("网络正常"):
             self.ping_status_label.setStyleSheet("color: green; font-size: 9pt;")
-        elif status_text == "网络异常":
-            self.ping_status_label.setStyleSheet("color: red; font-size: 9pt;")
+        elif status_text == self.lang_manager.tr("网络异常"):
+            self.ping_status_label.setStyleSheet("color: red; font-size: 9pt;")  
         else:
             self.ping_status_label.setStyleSheet("color: blue; font-size: 9pt;")
+    
+    def refresh_texts(self, lang_manager=None):
+        """刷新所有文本（用于语言切换）"""
+        if lang_manager:
+            self.lang_manager = lang_manager
+        
+        if not self.lang_manager:
+            return
+        
+        # 刷新按钮文本
+        if hasattr(self, 'network_button'):
+            if self.network_button.text() in ["开始", "Start"]:
+                self.network_button.setText(self.lang_manager.tr("开始"))
+            elif self.network_button.text() in ["停止", "Stop"]:
+                self.network_button.setText(self.lang_manager.tr("停止"))
+        if hasattr(self, 'ping_button'):
+            if self.ping_button.text() in ["Ping", "开始"]:
+                self.ping_button.setText(self.lang_manager.tr("Ping"))
+            elif self.ping_button.text() in ["停止", "Stop"]:
+                self.ping_button.setText(self.lang_manager.tr("停止"))
+        
+        # 刷新状态标签
+        if hasattr(self, 'network_status_label'):
+            current_text = self.network_status_label.text()
+            if current_text in ["未启动", "Not Started"]:
+                self.network_status_label.setText(self.lang_manager.tr("未启动"))
+            elif current_text in ["已停止", "Stopped"]:
+                self.network_status_label.setText(self.lang_manager.tr("已停止"))
+            elif current_text in ["运行中...", "Running..."]:
+                self.network_status_label.setText(self.lang_manager.tr("运行中..."))
+        
+        if hasattr(self, 'ping_status_label'):
+            current_text = self.ping_status_label.text()
+            if current_text in ["Ping中...", "Pinging..."]:
+                self.ping_status_label.setText(self.lang_manager.tr("Ping中..."))
+        
+        # 刷新表格标题
+        if hasattr(self, 'network_table'):
+            self.network_table.setHorizontalHeaderLabels([self.lang_manager.tr("提示")])
+        
+        # 刷新表格内容
+        if hasattr(self, 'network_table') and self.network_table.rowCount() > 0:
+            item = self.network_table.item(0, 0)
+            if item and "点击" in item.text():
+                item.setText(self.lang_manager.tr("点击") + self.lang_manager.tr("开始") + self.lang_manager.tr("按钮获取网络信息"))
+        
+        # 刷新组标题标签
+        self._refresh_section_titles()
+    
+    def _refresh_section_titles(self):
+        """刷新组标题标签"""
+        # 查找所有QLabel并刷新标题
+        for label in self.findChildren(QLabel):
+            current_text = label.text()
+            # 根据当前文本匹配对应的翻译
+            if current_text in ["控制", "Control"]:
+                label.setText(self.lang_manager.tr("控制"))
+            elif current_text in ["网络信息", "Network Info"]:
+                label.setText(self.lang_manager.tr("网络信息"))
 

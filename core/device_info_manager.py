@@ -52,7 +52,7 @@ class DeviceInfoManager:
         """
         解析 adb service call 的 Parcel(UTF-16) 十六进制转储。
         关键点：每个 32bit 字小端，需要按 [低16, 高16] 顺序取半字。
-        只收集 '0'..'9' (0x0030..0x0039)，并识别可选 '+' (0x002b) 前缀。
+        只收集 '0'..'9self.lang_manager.tr(' (0x0030..0x0039)，并识别可选 ')+' (0x002b) 前缀。
         """
         # 报错"not fully consumed"直接判失败
         if "not fully" in output.lower() and "consum" in output.lower():
@@ -244,7 +244,7 @@ class DeviceInfoManager:
         # Step 1: 校验设备状态
         rc, _, err = self.run_adb_command(f"adb -s {serial} get-state")
         if rc != 0:
-            raise Exception(f"设备状态检查失败: {err}")
+            raise Exception(f"{self.lang_manager.tr('设备状态检查失败:')} {err}")
         
         # Step 2: 发现订阅
         subscriptions = self.discover_subscriptions(serial)

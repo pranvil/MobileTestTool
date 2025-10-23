@@ -18,7 +18,7 @@ from PyQt5.QtWidgets import QMessageBox, QFileDialog
 class LogFilterWorker(threading.Thread):
     """Log过滤工作线程"""
     
-    def __init__(self, device, keyword, use_regex, case_sensitive, callback, stop_event):
+    def __init__(self, device, keyword, use_regex, case_sensitive, callback, stop_event, lang_manager=None):
         super().__init__()
         self.device = device
         self.keyword = keyword
@@ -26,6 +26,7 @@ class LogFilterWorker(threading.Thread):
         self.case_sensitive = case_sensitive
         self.callback = callback
         self.stop_event = stop_event
+        self.lang_manager = lang_manager
         self.process = None
         
         # 编译正则表达式
@@ -43,8 +44,8 @@ class LogFilterWorker(threading.Thread):
         while not self.stop_event.is_set():
             try:
                 # 检查设备选择
-                if not self.device or self.device in ["无设备", "检测失败", "检测超时", "adb未安装", "检测错误"]:
-                    self.callback("ERROR: 请先选择有效的设备\n")
+                if not self.device or self.device in [self.lang_manager.tr("无设备"), self.lang_manager.tr("检测失败"), self.lang_manager.tr("检测超时"), self.lang_manager.tr("adb未安装"), self.lang_manager.tr("检测错误")]:
+                    self.callback(f"ERROR: {self.lang_manager.tr('请先选择有效的设备')}\n")
                     return
                 
                 # 构建adb logcat命令，添加-b all参数确保完全输出
@@ -83,7 +84,7 @@ class LogFilterWorker(threading.Thread):
                     # 如果之前是waiting状态，现在收到正常日志，说明重连成功
                     if waiting_for_device:
                         waiting_for_device = False
-                        self.callback("STATUS: ADB重连成功，恢复正常过滤\n")
+                        self.callback(f"STATUS: {self.lang_manager.tr('ADB重连成功，恢复正常过滤')}\n")
                     
                     # 过滤日志
                     if self._should_show(line):
@@ -109,10 +110,10 @@ class LogFilterWorker(threading.Thread):
                     break
                     
             except FileNotFoundError:
-                self.callback("ERROR: 未找到adb命令，请确保Android SDK已安装并配置PATH\n")
+                self.callback(f"ERROR: {self.lang_manager.tr('未找到adb命令，请确保Android SDK已安装并配置PATH')}\n")
                 break
             except Exception as e:
-                self.callback(f"STATUS: ADB连接异常，等待重连...\n")
+                self.callback(f"{self.lang_manager.tr('STATUS: ADB连接异常，等待重连...')}\n")
                 
                 # 清理当前进程
                 if self.process:
@@ -177,6 +178,8 @@ class PyQtLogProcessor(QObject):
     def __init__(self, device_manager, parent=None):
         super().__init__(parent)
         self.device_manager = device_manager
+        # 从父窗口获取语言管理器
+        self.lang_manager = parent.lang_manager if parent and hasattr(parent, 'lang_manager') else None
         self.worker = None
         self.stop_event = None
         self.is_running = False
@@ -227,7 +230,7 @@ class PyQtLogProcessor(QObject):
     def start_filtering(self, keyword, use_regex, case_sensitive, color_highlight):
         """开始过滤日志"""
         if not keyword.strip():
-            self.status_message.emit("请输入过滤关键字")
+            self.status_message.emit(self.lang_manager.tr("请输入过滤关键字"))
             return
         
         device = self.device_manager.validate_device_selection()
@@ -235,7 +238,7 @@ class PyQtLogProcessor(QObject):
             return
         
         if self.is_running:
-            self.status_message.emit("日志过滤已经在运行中")
+            self.status_message.emit(self.lang_manager.tr("日志过滤已经在运行中"))
             return
         
         # 验证正则表达式
@@ -243,7 +246,7 @@ class PyQtLogProcessor(QObject):
             try:
                 re.compile(keyword)
             except re.error as e:
-                QMessageBox.critical(None, "错误", f"正则表达式无效: {e}")
+                QMessageBox.critical(None, self.lang_manager.tr("错误"), f"正则表达式无效: {e}")
                 return
         
         try:
@@ -259,7 +262,7 @@ class PyQtLogProcessor(QObject):
             # 创建工作线程
             self.worker = LogFilterWorker(
                 device, keyword, use_regex, case_sensitive,
-                self._on_log_received, self.stop_event
+                self._on_log_received, self.stop_event, self.lang_manager
             )
             self.worker.start()
             
@@ -272,18 +275,18 @@ class PyQtLogProcessor(QObject):
             self.performance_stats['processing_rate'] = 0.0
             
             self.filtering_started.emit()
-            self.status_message.emit("日志过滤已启动")
+            self.status_message.emit(self.lang_manager.tr("日志过滤已启动"))
             
             # 发出过滤状态变化信号
             self.filter_state_changed.emit(True, keyword)
             
         except Exception as e:
-            self.status_message.emit(f"启动日志过滤失败: {str(e)}")
+            self.status_message.emit(f"{self.lang_manager.tr('启动日志过滤失败:')} {str(e)}")
     
     def stop_filtering(self):
         """停止过滤日志"""
         if not self.is_running:
-            self.status_message.emit("日志过滤未运行")
+            self.status_message.emit(self.lang_manager.tr("日志过滤未运行"))
             return
         
         try:
@@ -294,7 +297,7 @@ class PyQtLogProcessor(QObject):
             
             self.is_running = False
             self.filtering_stopped.emit()
-            self.status_message.emit("日志过滤已停止")
+            self.status_message.emit(self.lang_manager.tr("日志过滤已停止"))
             
             # 重置性能统计
             self.performance_update.emit("")
@@ -303,7 +306,7 @@ class PyQtLogProcessor(QObject):
             self.filter_state_changed.emit(False, "")
             
         except Exception as e:
-            self.status_message.emit(f"停止日志过滤失败: {str(e)}")
+            self.status_message.emit(f"{self.lang_manager.tr('停止日志过滤失败:')} {str(e)}")
     
     def clear_device_logs(self):
         """清除设备日志缓存"""
@@ -319,43 +322,43 @@ class PyQtLogProcessor(QObject):
     def save_logs(self):
         """保存日志到文件"""
         if not self.log_viewer:
-            self.status_message.emit("日志查看器未初始化")
+            self.status_message.emit(self.lang_manager.tr("日志查看器未初始化"))
             return
         
         # 获取日志内容
         log_content = self.log_viewer.text_edit.toPlainText()
         
         if not log_content.strip():
-            QMessageBox.warning(None, "警告", "没有日志内容可保存")
+            QMessageBox.warning(None, self.lang_manager.tr("警告"), "没有日志内容可保存")
             return
         
         # 选择保存位置
         file_path, _ = QFileDialog.getSaveFileName(
             None,
-            "保存日志文件",
+            self.lang_manager.tr("保存日志文件"),
             f"log_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt",
-            "文本文件 (*.txt);;所有文件 (*.*)"
+            self.lang_manager.tr("文本文件 (*.txt);;所有文件 (*.*)")
         )
         
         if file_path:
             try:
                 with open(file_path, 'w', encoding='utf-8') as f:
                     f.write(log_content)
-                QMessageBox.information(None, "成功", f"日志已保存到: {file_path}")
-                self.status_message.emit(f"日志已保存到: {file_path}")
+                QMessageBox.information(None, self.lang_manager.tr("成功"), f"日志已保存到: {file_path}")
+                self.status_message.emit(f"{self.lang_manager.tr('日志已保存到:')} {file_path}")
             except Exception as e:
-                QMessageBox.critical(None, "错误", f"保存失败: {e}")
+                QMessageBox.critical(None, self.lang_manager.tr("错误"), f"保存失败: {e}")
     
     def clear_logs(self):
         """清空日志显示"""
         if not self.log_viewer:
-            self.status_message.emit("日志查看器未初始化")
+            self.status_message.emit(self.lang_manager.tr("日志查看器未初始化"))
             return
         
         reply = QMessageBox.question(
             None,
-            "确认",
-            "确定要清空所有日志吗？",
+            self.lang_manager.tr("确认"),
+            self.lang_manager.tr("确定要清空所有日志吗？"),
             QMessageBox.Yes | QMessageBox.No,
             QMessageBox.No
         )
@@ -363,7 +366,7 @@ class PyQtLogProcessor(QObject):
         if reply == QMessageBox.Yes:
             self.log_viewer.text_edit.clear()
             self._line_count = 0
-            self.status_message.emit("日志已清空")
+            self.status_message.emit(self.lang_manager.tr("日志已清空"))
             
             # 重置性能统计
             if self.is_running:
@@ -380,8 +383,8 @@ class PyQtLogProcessor(QObject):
         
         lines, ok = QInputDialog.getInt(
             None,
-            "设置最大显示行数",
-            f"当前设置: {current_lines} 行\n\n请输入新的最大显示行数 (100-100000):",
+            self.lang_manager.tr("设置最大显示行数"),
+            f"{self.lang_manager.tr('当前设置:')} {current_lines} {self.lang_manager.tr('行')}\n\n{self.lang_manager.tr('请输入新的最大显示行数 (100-100000):')}",
             current_lines,
             100,
             100000,
@@ -391,11 +394,11 @@ class PyQtLogProcessor(QObject):
         if ok:
             self.adaptive_params['max_display_lines'] = lines
             self.adaptive_params['trim_threshold'] = int(lines * 0.05)
-            self.status_message.emit(f"最大显示行数已设置为: {lines} 行")
+            self.status_message.emit(f"{self.lang_manager.tr('最大显示行数已设置为:')} {lines} {self.lang_manager.tr('行')}")
             QMessageBox.information(
                 None,
-                "成功",
-                f"设置已应用!\n最大显示行数: {lines}\ntrim_threshold: {self.adaptive_params['trim_threshold']}"
+                self.lang_manager.tr("成功"),
+                f"{self.lang_manager.tr('设置已应用!')}\n{self.lang_manager.tr('最大显示行数:')} {lines}\ntrim_threshold: {self.adaptive_params['trim_threshold']}"
             )
     
     def simple_filter(self):
@@ -421,12 +424,12 @@ class PyQtLogProcessor(QObject):
                 self.case_sensitive = False
                 self.color_highlight = True
                 self.start_filtering(simple_keywords, True, False, True)
-                self.status_message.emit("已切换到简单过滤")
+                self.status_message.emit(self.lang_manager.tr("已切换到简单过滤"))
                 return
             # 如果当前是简单过滤，则停止过滤
             elif current_keyword == simple_keywords:
                 self.stop_filtering()
-                self.status_message.emit("已停止简单过滤")
+                self.status_message.emit(self.lang_manager.tr("已停止简单过滤"))
                 return
             # 其他情况停止当前过滤
             else:
@@ -434,7 +437,7 @@ class PyQtLogProcessor(QObject):
         
         # 启动简单过滤
         self.start_filtering(simple_keywords, True, False, True)
-        self.status_message.emit("已启动简单过滤")
+        self.status_message.emit(self.lang_manager.tr("已启动简单过滤"))
     
     def complete_filter(self):
         """完全过滤 - TMO CC，支持智能切换"""
@@ -459,12 +462,12 @@ class PyQtLogProcessor(QObject):
                 self.case_sensitive = False
                 self.color_highlight = True
                 self.start_filtering(complete_keywords, True, False, True)
-                self.status_message.emit("已切换到完全过滤")
+                self.status_message.emit(self.lang_manager.tr("已切换到完全过滤"))
                 return
             # 如果当前是完全过滤，则停止过滤
             elif current_keyword == complete_keywords:
                 self.stop_filtering()
-                self.status_message.emit("已停止完全过滤")
+                self.status_message.emit(self.lang_manager.tr("已停止完全过滤"))
                 return
             # 其他情况停止当前过滤
             else:
@@ -472,15 +475,15 @@ class PyQtLogProcessor(QObject):
         
         # 启动完全过滤
         self.start_filtering(complete_keywords, True, False, True)
-        self.status_message.emit("已启动完全过滤")
+        self.status_message.emit(self.lang_manager.tr("已启动完全过滤"))
     
     def load_log_keywords(self):
         """加载log关键字文件"""
         file_path, _ = QFileDialog.getOpenFileName(
             None,
-            "选择log关键字文件",
+            self.lang_manager.tr("选择log关键字文件"),
             "",
-            "文本文件 (*.txt);;所有文件 (*.*)"
+            self.lang_manager.tr("文本文件 (*.txt);;所有文件 (*.*)")
         )
         
         if not file_path:
@@ -491,20 +494,20 @@ class PyQtLogProcessor(QObject):
                 keyword = f.read().strip()
             
             if not keyword:
-                QMessageBox.warning(None, "警告", "文件内容为空")
+                QMessageBox.warning(None, self.lang_manager.tr("警告"), "文件内容为空")
                 return
             
             # 发出关键字加载信号，让UI更新输入框
             self.keyword_loaded.emit(keyword)
-            self.status_message.emit(f"已加载关键字文件: {file_path}")
+            self.status_message.emit(f"{self.lang_manager.tr('已加载关键字文件:')} {file_path}")
             
             # 自动开始过滤
             self.start_filtering(keyword, True, False, True)
             
         except UnicodeDecodeError:
-            QMessageBox.critical(None, "错误", "文件编码错误，请确保文件是UTF-8编码")
+            QMessageBox.critical(None, self.lang_manager.tr("错误"), "文件编码错误，请确保文件是UTF-8编码")
         except Exception as e:
-            QMessageBox.critical(None, "错误", f"加载文件失败:\n{str(e)}")
+            QMessageBox.critical(None, self.lang_manager.tr("错误"), f"加载文件失败:\n{str(e)}")
     
     def _on_log_received(self, log_line):
         """接收日志行 - 添加到队列"""
@@ -652,10 +655,10 @@ class PyQtLogProcessor(QObject):
                     self._line_count = 0
                     
                     # 输出调试信息
-                    print(f"裁剪日志: 删除了 {lines_to_delete} 行，当前行数: {self.adaptive_params['max_display_lines']} (trim_threshold: {trim_threshold})")
+                    print(f"{self.lang_manager.tr('裁剪日志: 删除了 ')}{lines_to_delete}{self.lang_manager.tr(' 行，当前行数: ')}{self.adaptive_params['max_display_lines']} (trim_threshold: {trim_threshold})")
                     
             except Exception as e:
-                print(f"裁剪日志失败: {e}")
+                print(f"{self.lang_manager.tr('裁剪日志失败: ')}{e}")
                 # 重置计数器
                 self._line_count = 0
     
@@ -683,15 +686,15 @@ class PyQtLogProcessor(QObject):
         # 使用缓存机制计算当前显示的行数和内存使用
         current_display_lines, memory_mb = self.get_cached_performance_metrics()
         
-        performance_text = f"队列: {queue_size} | 速率: {rate_text} 行/秒 | 批次: {current_batch_size} | 间隔: {current_interval}ms | 显示: {current_display_lines}行 | 内存: {memory_mb:.1f}MB"
+        performance_text = f"{self.lang_manager.tr('队列')}: {queue_size} | {self.lang_manager.tr('速率')}: {rate_text} {self.lang_manager.tr('行/秒')} | {self.lang_manager.tr('批次')}: {current_batch_size} | {self.lang_manager.tr('间隔')}: {current_interval}ms | {self.lang_manager.tr('显示')}: {current_display_lines}{self.lang_manager.tr('行')} | {self.lang_manager.tr('内存')}: {memory_mb:.1f}MB"
         
         # 根据队列大小改变状态
         if queue_size > self.adaptive_params['high_load_threshold']:
-            performance_text += " (高负荷)"
+            performance_text += self.lang_manager.tr(" (高负荷)")
         elif queue_size > self.adaptive_params['medium_load_threshold']:
-            performance_text += " (中负荷)"
+            performance_text += self.lang_manager.tr(" (中负荷)")
         else:
-            performance_text += " (正常)"
+            performance_text += self.lang_manager.tr(" (正常)")
         
         self.performance_update.emit(performance_text)
     

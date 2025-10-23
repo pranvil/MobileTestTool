@@ -16,9 +16,10 @@ class RebootDeviceWorker(QThread):
     
     finished = pyqtSignal(bool, str)  # success, message
     
-    def __init__(self, device):
+    def __init__(self, device, lang_manager=None):
         super().__init__()
         self.device = device
+        self.lang_manager = lang_manager
     
     def run(self):
         """执行重启命令"""
@@ -34,17 +35,17 @@ class RebootDeviceWorker(QThread):
             )
             
             if result.returncode == 0:
-                self.finished.emit(True, f"设备 {self.device} 重启命令已执行")
+                self.finished.emit(True, f"{self.lang_manager.tr('设备')} {self.device} {self.lang_manager.tr('重启命令已执行')}")
             else:
-                error_msg = result.stderr.strip() if result.stderr else "未知错误"
-                self.finished.emit(False, f"重启设备失败: {error_msg}")
+                error_msg = result.stderr.strip() if result.stderr else (self.tr("未知错误") if self.lang_manager else "未知错误")
+                self.finished.emit(False, f"{self.lang_manager.tr('重启设备失败:')} {error_msg}")
                 
         except subprocess.TimeoutExpired:
-            self.finished.emit(False, "重启设备超时，请检查设备连接")
+            self.finished.emit(False, self.tr("重启设备超时，请检查设备连接"))
         except FileNotFoundError:
-            self.finished.emit(False, "未找到adb命令，请确保Android SDK已安装并配置PATH")
+            self.finished.emit(False, self.tr("未找到adb命令，请确保Android SDK已安装并配置PATH"))
         except Exception as e:
-            self.finished.emit(False, f"重启设备时发生错误: {e}")
+            self.finished.emit(False, f"{self.lang_manager.tr('重启设备时发生错误:')} {e}")
 
 
 class DeviceUtilities(QObject):
@@ -58,6 +59,12 @@ class DeviceUtilities(QObject):
     def __init__(self, device_manager, parent=None):
         super().__init__(parent)
         self.device_manager = device_manager
+        # 从父窗口获取语言管理器
+        self.lang_manager = parent.lang_manager if parent and hasattr(parent, 'lang_manager') else None
+    
+    def tr(self, text):
+        """安全地获取翻译文本"""
+        return self.lang_manager.tr(text) if self.lang_manager else text
     
     def reboot_device(self, parent_widget=None):
         """重启设备（异步执行）"""
@@ -67,8 +74,8 @@ class DeviceUtilities(QObject):
         
         reply = QMessageBox.question(
             parent_widget,
-            "确认重启",
-            f"确定要重启设备 {device} 吗？\n\n这将执行 'adb reboot' 命令",
+            self.tr("确认重启"),
+            f"{self.tr('确定要重启设备')} {device} {self.tr('吗？')}\n\n{self.tr('这将执行')} 'adb reboot' {self.tr('命令')}",
             QMessageBox.Yes | QMessageBox.No,
             QMessageBox.No
         )
@@ -77,12 +84,12 @@ class DeviceUtilities(QObject):
             return False
         
         # 创建并启动异步Worker
-        self.reboot_worker = RebootDeviceWorker(device)
+        self.reboot_worker = RebootDeviceWorker(device, self.lang_manager)
         self.reboot_worker.finished.connect(self._on_reboot_finished)
         
         # 发送开始信号
         self.reboot_started.emit(device)
-        self.status_message.emit(f"正在重启设备 {device}...")
+        self.status_message.emit(f"{self.lang_manager.tr('正在重启设备')} {device}...")
         
         # 启动Worker线程
         self.reboot_worker.start()
@@ -95,7 +102,7 @@ class DeviceUtilities(QObject):
         if success:
             self.status_message.emit(message)
         else:
-            self.status_message.emit(f"重启失败: {message}")
+            self.status_message.emit(f"{self.lang_manager.tr('重启失败:')} {message}")
         
         # 清理Worker
         if hasattr(self, 'reboot_worker'):
@@ -110,8 +117,8 @@ class DeviceUtilities(QObject):
         
         reply = QMessageBox.question(
             parent_widget,
-            "确认",
-            "确定要清除设备上的日志缓存吗？\n\n这将执行 'adb logcat -c' 命令",
+            self.tr("确认"),
+            self.tr("确定要清除设备上的日志缓存吗？\n\n这将执行 'adb logcat -c' 命令"),
             QMessageBox.Yes | QMessageBox.No,
             QMessageBox.No
         )
@@ -131,32 +138,32 @@ class DeviceUtilities(QObject):
             )
             
             if result.returncode == 0:
-                self.status_message.emit("设备日志缓存已清除")
+                self.status_message.emit(self.tr("设备日志缓存已清除"))
                 return True
             else:
-                error_msg = result.stderr.strip() if result.stderr else "未知错误"
-                QMessageBox.critical(parent_widget, "错误", f"清除设备日志缓存失败:\n{error_msg}")
-                self.status_message.emit("清除设备日志缓存失败")
+                error_msg = result.stderr.strip() if result.stderr else self.tr("未知错误")
+                QMessageBox.critical(parent_widget, self.tr("错误"), f"清除设备日志缓存失败:\n{error_msg}")
+                self.status_message.emit(self.tr("清除设备日志缓存失败"))
                 return False
                 
         except subprocess.TimeoutExpired:
-            QMessageBox.critical(parent_widget, "错误", "清除设备日志缓存超时，请检查设备连接")
-            self.status_message.emit("清除设备日志缓存超时")
+            QMessageBox.critical(parent_widget, self.tr("错误"), "清除设备日志缓存超时，请检查设备连接")
+            self.status_message.emit(self.tr("清除设备日志缓存超时"))
             return False
         except FileNotFoundError:
-            QMessageBox.critical(parent_widget, "错误", "未找到adb命令，请确保Android SDK已安装并配置PATH")
-            self.status_message.emit("未找到adb命令")
+            QMessageBox.critical(parent_widget, self.tr("错误"), "未找到adb命令，请确保Android SDK已安装并配置PATH")
+            self.status_message.emit(self.tr("未找到adb命令"))
             return False
         except Exception as e:
-            QMessageBox.critical(parent_widget, "错误", f"清除设备日志缓存时发生错误: {e}")
-            self.status_message.emit("清除设备日志缓存失败")
+            QMessageBox.critical(parent_widget, self.tr("错误"), f"清除设备日志缓存时发生错误: {e}")
+            self.status_message.emit(self.tr("清除设备日志缓存失败"))
             return False
     
     def execute_adb_command(self, command, parent_widget=None, timeout=30):
         """执行通用adb命令"""
         device = self.device_manager.validate_device_selection()
         if not device:
-            return False, "请先选择设备"
+            return False, self.tr("请先选择设备")
         
         try:
             # 构建完整的adb命令
@@ -185,22 +192,22 @@ class DeviceUtilities(QObject):
             )
             
             if result.returncode == 0:
-                self.status_message.emit(f"命令执行成功: {' '.join(cmd_parts)}")
+                self.status_message.emit(f"{self.lang_manager.tr('命令执行成功:')} {' '.join(cmd_parts)}")
                 return True, result.stdout.strip()
             else:
-                error_msg = result.stderr.strip() if result.stderr else "未知错误"
-                self.status_message.emit(f"命令执行失败: {error_msg}")
+                error_msg = result.stderr.strip() if result.stderr else self.tr("未知错误")
+                self.status_message.emit(f"{self.lang_manager.tr('命令执行失败:')} {error_msg}")
                 return False, error_msg
                 
         except subprocess.TimeoutExpired:
-            self.status_message.emit("命令执行超时")
-            return False, "命令执行超时"
+            self.status_message.emit(self.tr("命令执行超时"))
+            return False, self.tr("命令执行超时")
         except FileNotFoundError:
-            self.status_message.emit("未找到adb命令")
-            return False, "未找到adb命令，请确保Android SDK已安装并配置PATH"
+            self.status_message.emit(self.tr("未找到adb命令"))
+            return False, self.tr("未找到adb命令，请确保Android SDK已安装并配置PATH")
         except Exception as e:
-            self.status_message.emit(f"命令执行时发生错误: {e}")
-            return False, f"命令执行时发生错误: {e}"
+            self.status_message.emit(f"{self.lang_manager.tr('命令执行时发生错误:')} {e}")
+            return False, f"{self.tr('命令执行时发生错误:')} {e}"
     
     def get_device_info(self):
         """获取设备信息"""
@@ -248,15 +255,15 @@ class DeviceUtilities(QObject):
             )
             
             if result.returncode == 0:
-                self.status_message.emit(f"设备 {device} 已连接")
+                self.status_message.emit(f"{self.lang_manager.tr('设备')} {device} {self.lang_manager.tr('已连接')}")
                 return True
             else:
-                self.status_message.emit(f"等待设备 {device} 连接超时")
+                self.status_message.emit(f"{self.lang_manager.tr('等待设备')} {device} {self.lang_manager.tr('连接超时')}")
                 return False
                 
         except subprocess.TimeoutExpired:
-            self.status_message.emit(f"等待设备 {device} 连接超时")
+            self.status_message.emit(f"{self.lang_manager.tr('等待设备')} {device} {self.lang_manager.tr('连接超时')}")
             return False
         except Exception as e:
-            self.status_message.emit(f"等待设备连接时发生错误: {e}")
+            self.status_message.emit(f"{self.lang_manager.tr('等待设备连接时发生错误:')} {e}")
             return False

@@ -24,6 +24,12 @@ class DebugLogger:
             cls._instance._initialize()
         return cls._instance
     
+    def _tr(self, text):
+        """安全地获取翻译文本"""
+        if hasattr(self, 'lang_manager') and self.lang_manager:
+            return self.lang_manager.tr(text)
+        return text
+    
     def _initialize(self):
         """初始化日志文件"""
         try:
@@ -51,7 +57,7 @@ class DebugLogger:
             self._write_header()
             
         except Exception as e:
-            print(f"日志系统初始化失败: {e}")
+            # 静默处理日志系统初始化错误，避免控制台乱码
             self._log_file = None
     
     def _cleanup_old_logs(self, log_dir, days=7):
@@ -77,10 +83,11 @@ class DebugLogger:
                     # 如果文件超过保留天数，删除它
                     if file_mtime < cutoff_time:
                         os.remove(file_path)
-                        print(f"已删除旧日志文件: {filename}")
+                        # 静默删除旧日志文件，避免控制台乱码
         
         except Exception as e:
-            print(f"清理旧日志失败: {e}")
+            # 静默处理清理旧日志错误，避免控制台乱码
+            pass
     
     def _write_header(self):
         """写入日志文件头部信息"""
@@ -88,17 +95,18 @@ class DebugLogger:
             with open(self._log_file, 'w', encoding='utf-8') as f:
                 f.write("=" * 80 + "\n")
                 f.write("MobileTestTool Debug Log\n")
-                f.write(f"启动时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
-                f.write(f"Python版本: {sys.version}\n")
-                f.write(f"运行目录: {os.getcwd()}\n")
+                f.write(self._tr("启动时间:") + " " + datetime.now().strftime('%Y-%m-%d %H:%M:%S') + "\n")
+                f.write(self._tr("Python版本:") + " " + sys.version + "\n")
+                f.write(self._tr("运行目录:") + " " + os.getcwd() + "\n")
                 if getattr(sys, 'frozen', False):
-                    f.write(f"可执行文件: {sys.executable}\n")
-                    f.write("运行模式: 打包EXE模式\n")
+                    f.write(self._tr("可执行文件:") + " " + sys.executable + "\n")
+                    f.write(self._tr("运行模式:") + " " + self._tr("打包EXE模式") + "\n")
                 else:
-                    f.write("运行模式: 开发模式\n")
+                    f.write(self._tr("运行模式:") + " " + self._tr("开发模式") + "\n")
                 f.write("=" * 80 + "\n\n")
         except Exception as e:
-            print(f"写入日志头部失败: {e}")
+            # 静默处理写入日志头部错误，避免控制台乱码
+            pass
     
     def log(self, message, level="INFO"):
         """
@@ -118,11 +126,12 @@ class DebugLogger:
             with open(self._log_file, 'a', encoding='utf-8') as f:
                 f.write(log_line)
             
-            # 同时打印到控制台（如果有）
-            print(log_line.strip())
+            # 不再打印到控制台，避免乱码问题
+            # 所有日志信息都保存在文件中，用户可以通过日志文件查看详细信息
             
         except Exception as e:
-            print(f"写入日志失败: {e}")
+            # 静默处理日志写入错误，避免控制台乱码
+            pass
     
     def info(self, message):
         """记录INFO级别日志"""
@@ -159,11 +168,12 @@ class DebugLogger:
             with open(self._log_file, 'a', encoding='utf-8') as f:
                 f.write(log_content)
             
-            # 同时打印到控制台
-            print(log_content)
+            # 不再打印到控制台，避免乱码问题
+            # 异常信息已保存到日志文件中
             
         except Exception as e:
-            print(f"记录异常信息失败: {e}")
+            # 静默处理异常记录错误，避免控制台乱码
+            pass
     
     def separator(self):
         """写入分隔线"""
@@ -188,13 +198,13 @@ def log_function_call(func):
             pass
     """
     def wrapper(*args, **kwargs):
-        logger.debug(f"调用函数: {func.__name__}")
+        logger.debug(logger._tr("调用函数:") + " " + func.__name__)
         try:
             result = func(*args, **kwargs)
-            logger.debug(f"函数 {func.__name__} 执行成功")
+            logger.debug(logger._tr("函数") + " " + func.__name__ + " " + logger._tr("执行成功"))
             return result
         except Exception as e:
-            logger.exception(f"函数 {func.__name__} 执行失败")
+            logger.exception(logger._tr("函数") + " " + func.__name__ + " " + logger._tr("执行失败"))
             raise
     return wrapper
 
@@ -213,8 +223,8 @@ def setup_exception_hook():
         
         logger.error("=" * 80)
         logger.error("捕获到未处理的异常！")
-        logger.error(f"异常类型: {exc_type.__name__}")
-        logger.error(f"异常信息: {exc_value}")
+        logger.error(f"{logger._tr('异常类型:')} {exc_type.__name__}")
+        logger.error(f"{logger._tr('异常信息:')} {exc_value}")
         logger.error("-" * 80)
         
         # 记录完整的堆栈信息
@@ -229,9 +239,9 @@ def setup_exception_hook():
             from PyQt5.QtWidgets import QMessageBox
             msg = QMessageBox()
             msg.setIcon(QMessageBox.Critical)
-            msg.setWindowTitle("程序错误")
-            msg.setText(f"程序遇到错误：{exc_value}")
-            msg.setInformativeText(f"详细信息请查看日志文件：\n{logger.get_log_file_path()}")
+            msg.setWindowTitle("❌ " + logger._tr("程序错误"))
+            msg.setText(logger._tr("程序遇到错误：") + str(exc_value))
+            msg.setInformativeText(logger._tr("详细信息请查看日志文件：") + "\n" + logger.get_log_file_path())
             msg.setStandardButtons(QMessageBox.Ok)
             msg.exec_()
         except:
