@@ -33,6 +33,18 @@ class AppOperationsManager(QObject):
     def tr(self, text):
         """安全地获取翻译文本"""
         return self.lang_manager.tr(text) if self.lang_manager else text
+    
+    def get_storage_path(self):
+        """获取存储路径，优先使用用户配置的路径"""
+        # 从父窗口获取工具配置
+        if hasattr(self.parent(), 'tool_config') and self.parent().tool_config:
+            storage_path = self.parent().tool_config.get("storage_path", "")
+            if storage_path:
+                return storage_path
+        
+        # 使用默认路径
+        current_date = datetime.now().strftime("%Y%m%d")
+        return f"c:\\log\\{current_date}"
         
     def query_package(self):
         """查询package信息"""
@@ -357,7 +369,8 @@ class AppOperationsManager(QObject):
         """执行多个APK文件的拉取"""
         # 创建保存目录
         date_str = datetime.now().strftime("%Y%m%d")
-        save_dir = f"c:\\log\\{date_str}\\{package_name}"
+        base_log_dir = self.get_storage_path()
+        save_dir = os.path.join(base_log_dir, package_name)
         
         try:
             os.makedirs(save_dir, exist_ok=True)
@@ -1259,7 +1272,8 @@ class PullApkDialog(QDialog):
         layout.addWidget(self.package_entry)
         
         # 保存路径信息
-        save_info = QLabel(self.tr("文件将保存到: c:\\log\\yyyymmdd\\<包名>"))
+        storage_path = self.get_storage_path()
+        save_info = QLabel(self.tr(f"文件将保存到: {storage_path}\\<包名>"))
         save_info.setStyleSheet("color: blue;")
         layout.addWidget(save_info)
         

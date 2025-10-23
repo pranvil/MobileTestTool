@@ -160,6 +160,9 @@ class MainWindow(QMainWindow):
         # 初始化其他操作管理器
         self.other_operations_manager = PyQtOtherOperationsManager(self.device_manager, self)
         
+        # 添加工具配置属性，供其他管理器访问
+        self.tool_config = self.other_operations_manager.tool_config
+        
         # 初始化主题管理器
         self.theme_manager = ThemeManager()
         
@@ -330,6 +333,7 @@ class MainWindow(QMainWindow):
         self.log_control_tab.mtklog_usb_mode.connect(self._on_mtklog_usb_mode)
         self.log_control_tab.mtklog_install.connect(self._on_mtklog_install)
         self.log_control_tab.adblog_start.connect(self._on_adblog_start)
+        self.log_control_tab.adblog_online_start.connect(self._on_adblog_online_start)
         self.log_control_tab.adblog_export.connect(self._on_adblog_export)
         self.log_control_tab.telephony_enable.connect(self._on_telephony_enable)
         self.log_control_tab.google_log_toggle.connect(self._on_google_log_toggle)
@@ -786,103 +790,17 @@ class MainWindow(QMainWindow):
         self.append_log.emit(f"{message}\n", None)
         
     def _on_adblog_start(self):
-        """ADB Log 开启/停止"""
-        print(f"{self.tr('ADB Log按钮被点击，当前is_running状态: ')}{self.adblog_manager.is_running}")
+        """离线ADB Log 开启"""
+        print(f"{self.tr('离线ADB Log按钮被点击，当前is_running状态: ')}{self.adblog_manager.is_running}")
         
         # 检查ADB Log是否正在运行
         if self.adblog_manager.is_running:
-            print("ADB Log正在运行，执行停止操作")
-            # 停止连线logcat进程
-            self.adblog_manager.stop_online_adblog()
+            print("ADB Log正在运行，无法启动离线模式")
+            self.append_log.emit(self.lang_manager.tr("ADB Log已经在运行中，请先停止当前任务\n"), None)
             return
         
-        # 如果不在运行，则执行开启操作
-        print("ADB Log未运行，执行开启操作")
-        
-        from PyQt5.QtWidgets import (QDialog, QVBoxLayout, QLabel, QPushButton, 
-                                     QHBoxLayout, QDialogButtonBox, QInputDialog)
-        
-        # 1. 创建模式选择对话框
-        dialog = QDialog(self)
-        dialog.setWindowTitle(self.lang_manager.tr('选择ADB Log模式'))
-        dialog.setModal(True)
-        dialog.resize(500, 300)
-        
-        layout = QVBoxLayout(dialog)
-        
-        # 标题
-        title_label = QLabel(self.lang_manager.tr('请选择ADB Log抓取模式'))
-        title_label.setStyleSheet('font-size: 14pt; font-weight: bold; padding: 10px;')
-        layout.addWidget(title_label)
-        
-        # 离线模式按钮和说明
-        offline_btn = QPushButton(self.lang_manager.tr('离线模式'))
-        offline_btn.setStyleSheet('''
-            QPushButton {
-                background-color: #4CAF50;
-                color: white;
-                font-size: 12pt;
-                font-weight: bold;
-                padding: 10px;
-                min-height: 40px;
-            }
-            QPushButton:hover {
-                background-color: #45a049;
-            }
-        ''')
-        
-        offline_desc = QLabel(self.lang_manager.tr('手机可以断开USB连接\n使用nohup在设备上抓取log'))
-        offline_desc.setStyleSheet('font-size: 10pt; padding: 5px;')
-        
-        offline_layout = QHBoxLayout()
-        offline_layout.addWidget(offline_btn)
-        offline_layout.addWidget(offline_desc)
-        layout.addLayout(offline_layout)
-        
-        # 连线模式按钮和说明
-        online_btn = QPushButton(self.lang_manager.tr('连线模式'))
-        online_btn.setStyleSheet('''
-            QPushButton {
-                background-color: #2196F3;
-                color: white;
-                font-size: 12pt;
-                font-weight: bold;
-                padding: 10px;
-                min-height: 40px;
-            }
-            QPushButton:hover {
-                background-color: #0b7dda;
-            }
-        ''')
-        
-        online_desc = QLabel(self.lang_manager.tr('手机必须保持USB连接\n直接输出到PC本地文件'))
-        online_desc.setStyleSheet('font-size: 10pt; padding: 5px;')
-        
-        online_layout = QHBoxLayout()
-        online_layout.addWidget(online_btn)
-        online_layout.addWidget(online_desc)
-        layout.addLayout(online_layout)
-        
-        # 取消按钮
-        button_box = QDialogButtonBox(QDialogButtonBox.Cancel)
-        button_box.rejected.connect(dialog.reject)
-        layout.addWidget(button_box)
-        
-        # 连接按钮信号
-        mode = None
-        offline_btn.clicked.connect(lambda: dialog.done(1))  # 1 = 离线模式
-        online_btn.clicked.connect(lambda: dialog.done(2))   # 2 = 连线模式
-        
-        # 显示对话框并获取结果
-        result = dialog.exec_()
-        
-        if result == 0:  # 取消
-            return
-        
-        # 确定模式
-        mode = "offline" if result == 1 else "online"
-        
-        # 2. 获取log名称
+        # 获取log名称
+        from PyQt5.QtWidgets import QInputDialog
         log_name, ok = QInputDialog.getText(
             self,
             self.lang_manager.tr('输入log名称'),
@@ -895,9 +813,38 @@ class MainWindow(QMainWindow):
         # 处理log名称：替换空格为下划线
         log_name = log_name.replace(" ", "_")
         
-        # 3. 启动ADB Log
-        self.append_log.emit(f"{self.lang_manager.tr('开启 ADB Log ({mode}模式)...').format(mode=mode)}\n", None)
-        self.adblog_manager.start_adblog(mode, log_name)
+        # 启动离线ADB Log
+        self.append_log.emit(f"{self.lang_manager.tr('开启离线ADB Log...')}\n", None)
+        self.adblog_manager.start_adblog("offline", log_name)
+    
+    def _on_adblog_online_start(self):
+        """连线ADB Log 开启/停止"""
+        print(f"{self.tr('连线ADB Log按钮被点击，当前is_running状态: ')}{self.adblog_manager.is_running}")
+        
+        # 检查ADB Log是否正在运行
+        if self.adblog_manager.is_running:
+            print("ADB Log正在运行，执行停止操作")
+            # 停止连线logcat进程
+            self.adblog_manager.stop_online_adblog()
+            return
+        
+        # 获取log名称
+        from PyQt5.QtWidgets import QInputDialog
+        log_name, ok = QInputDialog.getText(
+            self,
+            self.lang_manager.tr('输入log名称'),
+            self.lang_manager.tr('请输入log名称:\n\n注意: 名称中不能包含空格，空格将被替换为下划线')
+        )
+        
+        if not ok or not log_name:
+            return
+        
+        # 处理log名称：替换空格为下划线
+        log_name = log_name.replace(" ", "_")
+        
+        # 启动连线ADB Log
+        self.append_log.emit(f"{self.lang_manager.tr('开启连线ADB Log...')}\n", None)
+        self.adblog_manager.start_adblog("online", log_name)
         
     def _on_adblog_export(self):
         """ADB Log 导出（只处理离线模式）"""

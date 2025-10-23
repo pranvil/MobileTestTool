@@ -776,6 +776,7 @@ class PyQtOtherOperationsManager(QObject):
             "mtk_tools": [],
             "qualcomm_tools": [],
             "wireshark_path": "",
+            "storage_path": "",
             "last_used_mtk": "",
             "last_used_qualcomm": "",
             "last_used_wireshark": ""

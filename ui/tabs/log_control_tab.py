@@ -24,7 +24,8 @@ class LogControlTab(QWidget):
     mtklog_install = pyqtSignal()
     
     # ADB Log 相关
-    adblog_start = pyqtSignal()
+    adblog_start = pyqtSignal()  # 保留原有信号，用于离线log
+    adblog_online_start = pyqtSignal()  # 新增连线log信号
     adblog_export = pyqtSignal()
     
     # Telephony 相关
@@ -189,9 +190,13 @@ class LogControlTab(QWidget):
         row1 = QHBoxLayout()
         row1.addWidget(QLabel("ADB Log:"))
         
-        self.adblog_start_btn = QPushButton(self.lang_manager.tr("开启"))
-        self.adblog_start_btn.clicked.connect(self.adblog_start.emit)
-        row1.addWidget(self.adblog_start_btn)
+        self.adblog_online_btn = QPushButton(self.lang_manager.tr("连线log"))
+        self.adblog_online_btn.clicked.connect(self.adblog_online_start.emit)
+        row1.addWidget(self.adblog_online_btn)
+        
+        self.adblog_offline_btn = QPushButton(self.lang_manager.tr("离线log"))
+        self.adblog_offline_btn.clicked.connect(self.adblog_start.emit)
+        row1.addWidget(self.adblog_offline_btn)
         
         self.adblog_export_btn = QPushButton(self.lang_manager.tr("导出"))
         self.adblog_export_btn.clicked.connect(self.adblog_export.emit)
@@ -238,9 +243,9 @@ class LogControlTab(QWidget):
     def set_online_mode_started(self):
         """连线模式已启动，改变按钮状态"""
         stop_text = self.lang_manager.tr("停止")
-        print(f"{self.tr('设置ADB Log按钮文本为: ')}'{stop_text}'")
-        self.adblog_start_btn.setText(stop_text)
-        self.adblog_start_btn.setStyleSheet("""
+        print(f"{self.tr('设置连线log按钮文本为: ')}'{stop_text}'")
+        self.adblog_online_btn.setText(stop_text)
+        self.adblog_online_btn.setStyleSheet("""
             QPushButton {
                 background-color: #f44336;
                 color: white;
@@ -256,8 +261,8 @@ class LogControlTab(QWidget):
     
     def set_online_mode_stopped(self):
         """连线模式已停止，恢复按钮状态"""
-        self.adblog_start_btn.setText(self.lang_manager.tr("开启"))
-        self.adblog_start_btn.setStyleSheet("")
+        self.adblog_online_btn.setText(self.lang_manager.tr("连线log"))
+        self.adblog_online_btn.setStyleSheet("")
     
     def refresh_texts(self, lang_manager=None):
         """刷新所有文本（用于语言切换）"""
@@ -284,11 +289,13 @@ class LogControlTab(QWidget):
             self.mtklog_install_btn.setText(self.lang_manager.tr("安装MTKLOGGER"))
         
         # 刷新ADB Log控制按钮
-        if hasattr(self, 'adblog_start_btn'):
-            if self.adblog_start_btn.text() in ["开启", "Start"]:
-                self.adblog_start_btn.setText(self.lang_manager.tr("开启"))
-            elif self.adblog_start_btn.text() in ["停止", "Stop"]:
-                self.adblog_start_btn.setText(self.lang_manager.tr("停止"))
+        if hasattr(self, 'adblog_online_btn'):
+            if self.adblog_online_btn.text() in ["连线log", "Online Log"]:
+                self.adblog_online_btn.setText(self.lang_manager.tr("连线log"))
+            elif self.adblog_online_btn.text() in ["停止", "Stop"]:
+                self.adblog_online_btn.setText(self.lang_manager.tr("停止"))
+        if hasattr(self, 'adblog_offline_btn'):
+            self.adblog_offline_btn.setText(self.lang_manager.tr("离线log"))
         if hasattr(self, 'adblog_export_btn'):
             self.adblog_export_btn.setText(self.lang_manager.tr("导出"))
         
@@ -308,8 +315,8 @@ class LogControlTab(QWidget):
             self.bugreport_delete_btn.setText(self.lang_manager.tr("删除 Bugreport"))
         if hasattr(self, 'aee_log_start_btn'):
             self.aee_log_start_btn.setText(self.lang_manager.tr("AEE日志"))
-        if hasattr(self, 'tcpdump_show_dialog_btn'):
-            self.tcpdump_show_dialog_btn.setText(self.lang_manager.tr("TCPDUMP"))
+        if hasattr(self, 'tcpdump_btn'):
+            self.tcpdump_btn.setText(self.lang_manager.tr("TCPDUMP"))
         
         # 刷新组标题标签
         self._refresh_section_titles()

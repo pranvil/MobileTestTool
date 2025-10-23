@@ -33,6 +33,22 @@ class VideoManager(QObject):
         self.recording_thread = None
         self.recorded_files = []
         
+    def tr(self, text):
+        """安全地获取翻译文本"""
+        return self.lang_manager.tr(text) if self.lang_manager else text
+    
+    def get_storage_path(self):
+        """获取存储路径，优先使用用户配置的路径"""
+        # 从父窗口获取工具配置
+        if hasattr(self.parent(), 'tool_config') and self.parent().tool_config:
+            storage_path = self.parent().tool_config.get("storage_path", "")
+            if storage_path:
+                return storage_path
+        
+        # 使用默认路径
+        current_date = datetime.datetime.now().strftime("%Y%m%d")
+        return f"c:\\log\\{current_date}"
+    
     def toggle_recording(self):
         """切换录制状态"""
         if self.is_recording:
@@ -138,7 +154,7 @@ class VideoManager(QObject):
                 record_cmd = ["adb", "-s", device, "shell", "screenrecord", "--time-limit", time_limit, video_path]
                 
                 # 先测试命令是否支持time-limit 0
-                test_cmd = ["adb", "-s", device, "shell", "screenrecord", "--time-limit", "0", "/dev/null"]
+                test_cmd = ["adb", "-s", device, "shell", "screenrecord", "--time-limit", "0", "/sdcard/"]
                 test_result = subprocess.run(
                     test_cmd,
                     capture_output=True,
@@ -221,7 +237,7 @@ class VideoManager(QObject):
             # 创建保存目录
             current_time = datetime.datetime.now()
             date_str = current_time.strftime("%Y%m%d")
-            log_dir = f"c:\\log\\{date_str}"
+            log_dir = self.get_storage_path()
             video_dir = os.path.join(log_dir, "video")
             
             if not os.path.exists(log_dir):

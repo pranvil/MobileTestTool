@@ -51,6 +51,18 @@ class PyQtTMOCCManager(QObject):
         else:
             self.status_message.emit("UIAutomator2不可用，将使用ADB备用方法")
     
+    def get_storage_path(self):
+        """获取存储路径，优先使用用户配置的路径"""
+        # 从父窗口获取工具配置
+        if hasattr(self.parent(), 'tool_config') and self.parent().tool_config:
+            storage_path = self.parent().tool_config.get("storage_path", "")
+            if storage_path:
+                return storage_path
+        
+        # 使用默认路径
+        current_date = datetime.datetime.now().strftime("%Y%m%d")
+        return f"c:\\log\\{current_date}"
+    
     def tr(self, text):
         """安全地获取翻译文本"""
         return self.lang_manager.tr(text) if self.lang_manager else text
@@ -119,7 +131,8 @@ class PyQtTMOCCManager(QObject):
             # 创建保存目录
             current_time = datetime.datetime.now()
             date_str = current_time.strftime("%Y%m%d")
-            target_dir = f"C:\\log\\{date_str}\\ccfile"
+            base_log_dir = self.get_storage_path()
+            target_dir = f"{base_log_dir}\\ccfile"
             os.makedirs(target_dir, exist_ok=True)
             deviceinfo_path = os.path.join(target_dir, "deviceInfo")
             

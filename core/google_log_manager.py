@@ -72,12 +72,13 @@ class GoogleLogWorker(QThread):
     error = pyqtSignal(str)
     progress = pyqtSignal(str, int)
     
-    def __init__(self, device, operation, google_log_folder=None, lang_manager=None):
+    def __init__(self, device, operation, google_log_folder=None, lang_manager=None, storage_path_func=None):
         super().__init__()
         self.device = device
         self.operation = operation
         self.google_log_folder = google_log_folder
         self.lang_manager = lang_manager
+        self.storage_path_func = storage_path_func  # 存储路径获取函数
         
     def run(self):
         """执行Google日志操作"""
@@ -104,8 +105,12 @@ class GoogleLogWorker(QThread):
             # 1. 创建日志目录
             self.progress.emit(self.lang_manager.tr("创建Google日志目录..."), 10)
             current_time = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-            current_date = datetime.datetime.now().strftime("%Y%m%d")
-            self.google_log_folder = f"C:\\log\\{current_date}\\Google_log_{current_time}"
+            if self.storage_path_func:
+                base_log_dir = self.storage_path_func()
+            else:
+                current_date = datetime.datetime.now().strftime("%Y%m%d")
+                base_log_dir = f"C:\\log\\{current_date}"
+            self.google_log_folder = f"{base_log_dir}\\Google_log_{current_time}"
             
             if not os.path.exists(self.google_log_folder):
                 os.makedirs(self.google_log_folder)
@@ -199,8 +204,12 @@ class GoogleLogWorker(QThread):
         try:
             # 1. 创建日志目录
             self.progress.emit(self.lang_manager.tr("创建bugreport目录..."), 20)
-            current_date = datetime.datetime.now().strftime("%Y%m%d")
-            self.google_log_folder = f"C:\\{current_date}\\bugreport"
+            if self.storage_path_func:
+                base_log_dir = self.storage_path_func()
+            else:
+                current_date = datetime.datetime.now().strftime("%Y%m%d")
+                base_log_dir = f"C:\\log\\{current_date}"
+            self.google_log_folder = f"{base_log_dir}\\bugreport"
             
             if not os.path.exists(self.google_log_folder):
                 os.makedirs(self.google_log_folder)
@@ -228,8 +237,12 @@ class GoogleLogWorker(QThread):
         try:
             # 1. 创建日志目录
             self.progress.emit(self.lang_manager.tr("创建bugreport目录..."), 20)
-            current_date = datetime.datetime.now().strftime("%Y%m%d")
-            bugreport_folder = f"C:\\{current_date}\\bugreport"
+            if self.storage_path_func:
+                base_log_dir = self.storage_path_func()
+            else:
+                current_date = datetime.datetime.now().strftime("%Y%m%d")
+                base_log_dir = f"C:\\log\\{current_date}"
+            bugreport_folder = f"{base_log_dir}\\bugreport"
             
             if not os.path.exists(bugreport_folder):
                 os.makedirs(bugreport_folder)
@@ -274,6 +287,18 @@ class PyQtGoogleLogManager(QObject):
     def tr(self, text):
         """安全地获取翻译文本"""
         return self.lang_manager.tr(text) if self.lang_manager else text
+    
+    def get_storage_path(self):
+        """获取存储路径，优先使用用户配置的路径"""
+        # 从父窗口获取工具配置
+        if hasattr(self.parent(), 'tool_config') and self.parent().tool_config:
+            storage_path = self.parent().tool_config.get("storage_path", "")
+            if storage_path:
+                return storage_path
+        
+        # 使用默认路径
+        current_date = datetime.datetime.now().strftime("%Y%m%d")
+        return f"c:\\log\\{current_date}"
         
     def start_google_log(self):
         """开始Google日志收集"""
@@ -282,7 +307,7 @@ class PyQtGoogleLogManager(QObject):
             return
         
         # 创建工作线程
-        self.worker = GoogleLogWorker(device, 'start', lang_manager=self.lang_manager)
+        self.worker = GoogleLogWorker(device, 'start', lang_manager=self.lang_manager, storage_path_func=self.get_storage_path)
         self.worker.progress.connect(self._on_progress)
         self.worker.finished.connect(self._on_google_log_started)
         self.worker.error.connect(self._on_google_log_error)
@@ -299,7 +324,7 @@ class PyQtGoogleLogManager(QObject):
             return
         
         # 创建工作线程
-        self.worker = GoogleLogWorker(device, 'stop', self.google_log_folder, self.lang_manager)
+        self.worker = GoogleLogWorker(device, 'stop', self.google_log_folder, self.lang_manager, storage_path_func=self.get_storage_path)
         self.worker.progress.connect(self._on_progress)
         self.worker.finished.connect(self._on_google_log_stopped)
         self.worker.error.connect(self._on_google_log_error)
@@ -312,7 +337,7 @@ class PyQtGoogleLogManager(QObject):
             return
         
         # 创建工作线程
-        self.worker = GoogleLogWorker(device, 'bugreport_only', lang_manager=self.lang_manager)
+        self.worker = GoogleLogWorker(device, 'bugreport_only', lang_manager=self.lang_manager, storage_path_func=self.get_storage_path)
         self.worker.progress.connect(self._on_progress)
         self.worker.finished.connect(self._on_bugreport_finished)
         self.worker.error.connect(self._on_google_log_error)
@@ -325,7 +350,7 @@ class PyQtGoogleLogManager(QObject):
             return
         
         # 创建工作线程
-        self.worker = GoogleLogWorker(device, 'pull_bugreport', lang_manager=self.lang_manager)
+        self.worker = GoogleLogWorker(device, 'pull_bugreport', lang_manager=self.lang_manager, storage_path_func=self.get_storage_path)
         self.worker.progress.connect(self._on_progress)
         self.worker.finished.connect(self._on_pull_bugreport_finished)
         self.worker.error.connect(self._on_google_log_error)

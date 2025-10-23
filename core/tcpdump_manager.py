@@ -31,6 +31,18 @@ class TCPDumpDialog(QDialog):
         
         self.init_ui()
     
+    def get_storage_path(self):
+        """获取存储路径，优先使用用户配置的路径"""
+        # 从父窗口获取工具配置
+        if hasattr(self.parent(), 'tool_config') and self.parent().tool_config:
+            storage_path = self.parent().tool_config.get("storage_path", "")
+            if storage_path:
+                return storage_path
+        
+        # 使用默认路径
+        current_date = datetime.now().strftime("%Y%m%d")
+        return f"c:\\log\\{current_date}"
+    
     def init_ui(self):
         """初始化UI"""
         layout = QVBoxLayout(self)
@@ -273,9 +285,10 @@ class TCPDumpDialog(QDialog):
         log_path = self.get_log_path()
         self.log_message(f"{self.lang_manager.tr('正在拉取日志文件:')} {log_path}")
         
-        # 创建本地日志目录 - 使用统一的路径格式 c:\log\yyyymmdd\tcpdump
+        # 创建本地日志目录 - 使用统一的路径格式
         date_str = datetime.now().strftime("%Y%m%d")
-        local_log_dir = f"C:\\log\\{date_str}\\tcpdump"
+        base_log_dir = self.get_storage_path()
+        local_log_dir = os.path.join(base_log_dir, "tcpdump")
         
         try:
             os.makedirs(local_log_dir, exist_ok=True)

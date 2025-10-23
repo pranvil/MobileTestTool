@@ -172,7 +172,7 @@ class VoiceIntentWorker(QThread):
             # 拉取日志文件
             self.progress_updated.emit(60, self.lang_manager.tr("拉取日志文件..."))
             date_str = now.strftime("%Y%m%d")
-            target_folder = f"C:\\log\\{date_str}\\{self.test_case_id}_{filename}"
+            target_folder = f"{self.progress_dialog.parent().get_storage_path()}\\{self.test_case_id}_{filename}"
             os.makedirs(target_folder, exist_ok=True)
             
             # 拉取echolocate文件
@@ -230,6 +230,18 @@ class PyQtEcholocateManager(QObject):
         self.lang_manager = parent.lang_manager if parent and hasattr(parent, 'lang_manager') else None
         self.is_installed = False
         self.is_running = False
+    
+    def get_storage_path(self):
+        """获取存储路径，优先使用用户配置的路径"""
+        # 从父窗口获取工具配置
+        if hasattr(self.parent(), 'tool_config') and self.parent().tool_config:
+            storage_path = self.parent().tool_config.get("storage_path", "")
+            if storage_path:
+                return storage_path
+        
+        # 使用默认路径
+        current_date = datetime.datetime.now().strftime("%Y%m%d")
+        return f"c:\\log\\{current_date}"
         
     def install_echolocate(self):
         """安装Echolocate"""
@@ -423,7 +435,7 @@ class PyQtEcholocateManager(QObject):
             self.status_message.emit(self.tr("开始拉取Echolocate文件..."))
             current_time = datetime.datetime.now()
             date_str = current_time.strftime("%Y%m%d")
-            target_dir = f"C:\\log\\{date_str}\\{folder_name}"
+            target_dir = f"{self.get_storage_path()}\\{folder_name}"
             os.makedirs(target_dir, exist_ok=True)
             
             # 拉取文件

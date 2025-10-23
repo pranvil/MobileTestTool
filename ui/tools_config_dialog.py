@@ -8,9 +8,8 @@ import os
 import glob
 import subprocess
 from PyQt5.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel, 
-                             QPushButton, QListWidget, QLineEdit, QGroupBox,
+                             QPushButton, QLineEdit, QGroupBox,
                              QMessageBox, QFileDialog)
-from PyQt5.QtCore import Qt
 
 
 class ToolsConfigDialog(QDialog):
@@ -41,27 +40,45 @@ class ToolsConfigDialog(QDialog):
         title_label.setStyleSheet("font-size: 16px; font-weight: bold;")
         layout.addWidget(title_label)
         
+        # 存储路径配置框架
+        storage_group = QGroupBox(self.tr("存储路径配置"))
+        storage_layout = QVBoxLayout(storage_group)
+        
+        # 存储路径显示
+        storage_path_layout = QHBoxLayout()
+        storage_path_layout.addWidget(QLabel(self.tr("存储路径:")))
+        
+        self.storage_entry = QLineEdit()
+        self.storage_entry.setPlaceholderText(self.tr("留空使用默认路径: c:\\log\\yyyymmdd"))
+        storage_path_layout.addWidget(self.storage_entry)
+        
+        browse_storage_btn = QPushButton(self.tr("浏览"))
+        browse_storage_btn.clicked.connect(self._browse_storage_path)
+        storage_path_layout.addWidget(browse_storage_btn)
+        
+        storage_layout.addLayout(storage_path_layout)
+        layout.addWidget(storage_group)
+        
         # MTK工具配置框架
         mtk_group = QGroupBox(self.tr("ELT路径配置"))
         mtk_layout = QVBoxLayout(mtk_group)
         
-        # 按钮行
-        mtk_button_layout = QHBoxLayout()
+        # MTK工具路径显示
+        mtk_path_layout = QHBoxLayout()
+        mtk_path_layout.addWidget(QLabel(self.tr("ELT路径:")))
+        
+        self.mtk_entry = QLineEdit()
+        mtk_path_layout.addWidget(self.mtk_entry)
+        
         detect_mtk_btn = QPushButton(self.tr("自动检测"))
         detect_mtk_btn.clicked.connect(self._detect_mtk_tools)
-        mtk_button_layout.addWidget(detect_mtk_btn)
+        mtk_path_layout.addWidget(detect_mtk_btn)
         
         manual_mtk_btn = QPushButton(self.tr("手动选择"))
         manual_mtk_btn.clicked.connect(self._manual_mtk_config)
-        mtk_button_layout.addWidget(manual_mtk_btn)
+        mtk_path_layout.addWidget(manual_mtk_btn)
         
-        mtk_button_layout.addStretch()
-        mtk_layout.addLayout(mtk_button_layout)
-        
-        # MTK工具列表
-        self.mtk_list = QListWidget()
-        self.mtk_list.setMaximumHeight(100)
-        mtk_layout.addWidget(self.mtk_list)
+        mtk_layout.addLayout(mtk_path_layout)
         
         layout.addWidget(mtk_group)
         
@@ -91,23 +108,22 @@ class ToolsConfigDialog(QDialog):
         qualcomm_group = QGroupBox(self.tr("高通工具配置"))
         qualcomm_layout = QVBoxLayout(qualcomm_group)
         
-        # 按钮行
-        qualcomm_button_layout = QHBoxLayout()
+        # 高通工具路径显示
+        qualcomm_path_layout = QHBoxLayout()
+        qualcomm_path_layout.addWidget(QLabel(self.tr("高通工具路径:")))
+        
+        self.qualcomm_entry = QLineEdit()
+        qualcomm_path_layout.addWidget(self.qualcomm_entry)
+        
         detect_qualcomm_btn = QPushButton(self.tr("自动检测"))
         detect_qualcomm_btn.clicked.connect(self._detect_qualcomm_tools)
-        qualcomm_button_layout.addWidget(detect_qualcomm_btn)
+        qualcomm_path_layout.addWidget(detect_qualcomm_btn)
         
         manual_qualcomm_btn = QPushButton(self.tr("手动选择"))
         manual_qualcomm_btn.clicked.connect(self._manual_qualcomm_config)
-        qualcomm_button_layout.addWidget(manual_qualcomm_btn)
+        qualcomm_path_layout.addWidget(manual_qualcomm_btn)
         
-        qualcomm_button_layout.addStretch()
-        qualcomm_layout.addLayout(qualcomm_button_layout)
-        
-        # 高通工具列表
-        self.qualcomm_list = QListWidget()
-        self.qualcomm_list.setMaximumHeight(100)
-        qualcomm_layout.addWidget(self.qualcomm_list)
+        qualcomm_layout.addLayout(qualcomm_path_layout)
         
         layout.addWidget(qualcomm_group)
         
@@ -126,23 +142,43 @@ class ToolsConfigDialog(QDialog):
         layout.addLayout(button_layout)
         
         # 初始化显示
-        self._refresh_mtk_list()
-        self._refresh_qualcomm_list()
+        self._refresh_mtk_entry()
+        self._refresh_qualcomm_entry()
         self.wireshark_entry.setText(self.temp_config.get("wireshark_path", ""))
+        self.storage_entry.setText(self.temp_config.get("storage_path", ""))
         
-    def _refresh_mtk_list(self):
-        """刷新MTK工具列表"""
-        self.mtk_list.clear()
-        for tool in self.temp_config.get("mtk_tools", []):
+    def _refresh_mtk_entry(self):
+        """刷新MTK工具输入框"""
+        mtk_tools = self.temp_config.get("mtk_tools", [])
+        if mtk_tools:
+            # 显示第一个工具的信息
+            tool = mtk_tools[0]
             display_text = f"{tool['name']} (Python {tool['python_version']}) - {tool['base_path']}"
-            self.mtk_list.addItem(display_text)
+            self.mtk_entry.setText(display_text)
+        else:
+            self.mtk_entry.setText("")
     
-    def _refresh_qualcomm_list(self):
-        """刷新高通工具列表"""
-        self.qualcomm_list.clear()
-        for tool in self.temp_config.get("qualcomm_tools", []):
+    def _refresh_qualcomm_entry(self):
+        """刷新高通工具输入框"""
+        qualcomm_tools = self.temp_config.get("qualcomm_tools", [])
+        if qualcomm_tools:
+            # 显示第一个工具的信息
+            tool = qualcomm_tools[0]
             display_text = f"{tool['name']} - {tool['base_path']}"
-            self.qualcomm_list.addItem(display_text)
+            self.qualcomm_entry.setText(display_text)
+        else:
+            self.qualcomm_entry.setText("")
+    
+    def _browse_storage_path(self):
+        """浏览选择存储路径"""
+        try:
+            path = QFileDialog.getExistingDirectory(self, self.tr("选择存储路径"))
+            
+            if path:
+                self.storage_entry.setText(path)
+                    
+        except Exception as e:
+            QMessageBox.critical(self, self.tr("错误"), f"{self.tr('选择存储路径失败')}: {str(e)}")
     
     def _detect_mtk_tools(self):
         """检测MTK工具"""
@@ -167,17 +203,12 @@ class ToolsConfigDialog(QDialog):
                             detected_tools.append(tool_info)
             
             if detected_tools:
-                # 添加到配置中
-                for tool in detected_tools:
-                    exists = any(t["base_path"] == tool["base_path"] 
-                               for t in self.temp_config.get("mtk_tools", []))
-                    if not exists:
-                        if "mtk_tools" not in self.temp_config:
-                            self.temp_config["mtk_tools"] = []
-                        self.temp_config["mtk_tools"].append(tool)
+                # 只保留第一个检测到的工具
+                tool = detected_tools[0]
+                self.temp_config["mtk_tools"] = [tool]
                 
-                self._refresh_mtk_list()
-                QMessageBox.information(self, self.tr("检测完成"), f"{self.tr('检测到')} {len(detected_tools)} {self.tr('个MTK工具')}")
+                self._refresh_mtk_entry()
+                QMessageBox.information(self, self.tr("检测完成"), f"{self.tr('检测到MTK工具:')} {tool['name']}")
             else:
                 QMessageBox.information(self, self.tr("检测结果"), self.tr("未检测到MTK工具，请尝试手动输入"))
                 
@@ -268,17 +299,10 @@ class ToolsConfigDialog(QDialog):
                 QMessageBox.critical(self, self.tr("错误"), self.tr("无法获取MTK工具信息"))
                 return
             
-            if "mtk_tools" not in self.temp_config:
-                self.temp_config["mtk_tools"] = []
-            
-            exists = any(t["base_path"] == tool_info["base_path"] 
-                        for t in self.temp_config["mtk_tools"])
-            if not exists:
-                self.temp_config["mtk_tools"].append(tool_info)
-                self._refresh_mtk_list()
-                QMessageBox.information(self, self.tr("成功"), f"{self.tr('已添加MTK工具')}: {tool_info['name']}")
-            else:
-                QMessageBox.information(self, self.tr("提示"), self.tr("该MTK工具已存在"))
+            # 直接替换为新的工具
+            self.temp_config["mtk_tools"] = [tool_info]
+            self._refresh_mtk_entry()
+            QMessageBox.information(self, self.tr("成功"), f"{self.tr('已设置MTK工具')}: {tool_info['name']}")
                 
         except Exception as e:
             QMessageBox.critical(self, self.tr("错误"), f"{self.tr('手动配置失败')}: {str(e)}")
@@ -339,17 +363,12 @@ class ToolsConfigDialog(QDialog):
                         detected_tools.append(tool_info)
             
             if detected_tools:
-                if "qualcomm_tools" not in self.temp_config:
-                    self.temp_config["qualcomm_tools"] = []
+                # 只保留第一个检测到的工具
+                tool = detected_tools[0]
+                self.temp_config["qualcomm_tools"] = [tool]
                 
-                for tool in detected_tools:
-                    exists = any(t["base_path"] == tool["base_path"] 
-                               for t in self.temp_config["qualcomm_tools"])
-                    if not exists:
-                        self.temp_config["qualcomm_tools"].append(tool)
-                
-                self._refresh_qualcomm_list()
-                QMessageBox.information(self, self.tr("检测完成"), f"{self.tr('检测到')} {len(detected_tools)} {self.tr('个高通工具')}")
+                self._refresh_qualcomm_entry()
+                QMessageBox.information(self, self.tr("检测完成"), f"{self.tr('检测到高通工具:')} {tool['name']}")
             else:
                 QMessageBox.information(self, self.tr("检测结果"), 
                     self.tr("未检测到高通工具，请尝试手动输入。\n\n常见路径:\n") +
@@ -401,17 +420,10 @@ class ToolsConfigDialog(QDialog):
                 QMessageBox.critical(self, self.tr("错误"), self.tr("无法获取高通工具信息"))
                 return
             
-            if "qualcomm_tools" not in self.temp_config:
-                self.temp_config["qualcomm_tools"] = []
-            
-            exists = any(t["base_path"] == tool_info["base_path"] 
-                        for t in self.temp_config["qualcomm_tools"])
-            if not exists:
-                self.temp_config["qualcomm_tools"].append(tool_info)
-                self._refresh_qualcomm_list()
-                QMessageBox.information(self, self.tr("成功"), f"{self.tr('已添加高通工具')}: {tool_info['name']}")
-            else:
-                QMessageBox.information(self, self.tr("提示"), self.tr("该高通工具已存在"))
+            # 直接替换为新的工具
+            self.temp_config["qualcomm_tools"] = [tool_info]
+            self._refresh_qualcomm_entry()
+            QMessageBox.information(self, self.tr("成功"), f"{self.tr('已设置高通工具')}: {tool_info['name']}")
                 
         except Exception as e:
             QMessageBox.critical(self, self.tr("错误"), f"{self.tr('手动配置失败')}: {str(e)}")
@@ -428,9 +440,31 @@ class ToolsConfigDialog(QDialog):
                     return
                 self.temp_config["wireshark_path"] = wireshark_path
             
+            # 保存存储路径
+            storage_path = self.storage_entry.text().strip()
+            if storage_path:
+                # 验证路径是否存在，如果不存在则创建
+                if not os.path.exists(storage_path):
+                    try:
+                        os.makedirs(storage_path)
+                    except Exception as e:
+                        QMessageBox.critical(self, self.tr("错误"), f"{self.tr('无法创建存储路径')}: {str(e)}")
+                        return
+                self.temp_config["storage_path"] = storage_path
+            else:
+                # 如果为空，删除存储路径配置，使用默认路径
+                self.temp_config.pop("storage_path", None)
+            
             # 更新原始配置
             self.tool_config.clear()
             self.tool_config.update(self.temp_config)
+            
+            # 保存到文件
+            if hasattr(self.parent(), 'other_operations_manager'):
+                success = self.parent().other_operations_manager._save_tool_config()
+                if not success:
+                    QMessageBox.critical(self, self.tr("错误"), self.tr("保存配置文件失败"))
+                    return
             
             QMessageBox.information(self, self.tr("成功"), self.tr("工具配置已保存"))
             self.accept()

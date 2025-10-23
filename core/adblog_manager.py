@@ -8,9 +8,7 @@ PyQt5 ADB Log管理器
 import subprocess
 import os
 import datetime
-import threading
 from PyQt5.QtCore import QObject, pyqtSignal, QThread
-from PyQt5.QtWidgets import QMessageBox
 
 
 class OfflineADBLogWorker(QThread):
@@ -25,7 +23,6 @@ class OfflineADBLogWorker(QThread):
         self.device = device
         self.log_name = log_name
         self.lang_manager = lang_manager
-        self.stop_flag = False
         
     def run(self):
         """执行离线ADB Log启动"""
@@ -79,7 +76,7 @@ class OnlineADBLogWorker(QThread):
     usb_disconnected = pyqtSignal(str)  # 设备ID
     usb_reconnected = pyqtSignal(str)   # 设备ID
     
-    def __init__(self, device, log_name, online_logcat_process_ref, online_log_file_path_ref, folder=None, lang_manager=None):
+    def __init__(self, device, log_name, online_logcat_process_ref, online_log_file_path_ref, folder=None, lang_manager=None, storage_path_func=None):
         super().__init__()
         self.device = device
         self.log_name = log_name
@@ -87,6 +84,7 @@ class OnlineADBLogWorker(QThread):
         self.online_logcat_process_ref = online_logcat_process_ref
         self.online_log_file_path_ref = online_log_file_path_ref
         self.folder = folder  # Google日志文件夹
+        self.storage_path_func = storage_path_func  # 存储路径获取函数
         self.stop_flag = False
         self.log_file_path = None
         self.monitor_stop_flag = False  # 监控循环停止标志
@@ -101,9 +99,13 @@ class OnlineADBLogWorker(QThread):
                 # 使用Google日志文件夹
                 log_dir = self.folder
             else:
-                # 默认目录
-                curredate = datetime.datetime.now().strftime("%Y%m%d")
-                log_dir = f"c:\\log\\{curredate}"
+                # 使用存储路径配置
+                if self.storage_path_func:
+                    log_dir = self.storage_path_func()
+                else:
+                    # 默认路径
+                    current_date = datetime.datetime.now().strftime("%Y%m%d")
+                    log_dir = f"c:\\log\\{current_date}"
             
             if not os.path.exists(log_dir):
                 os.makedirs(log_dir)
@@ -248,11 +250,11 @@ class ExportADBLogWorker(QThread):
     error = pyqtSignal(str)
     progress = pyqtSignal(str, int)
     
-    def __init__(self, device, lang_manager=None):
+    def __init__(self, device, lang_manager=None, storage_path_func=None):
         super().__init__()
         self.device = device
         self.lang_manager = lang_manager
-        self.stop_flag = False
+        self.storage_path_func = storage_path_func  # 存储路径获取函数
         
     def run(self):
         """执行ADB Log导出"""
@@ -321,8 +323,12 @@ class ExportADBLogWorker(QThread):
             
             # 4. 创建日志目录
             self.progress.emit(self.lang_manager.tr("创建日志目录..."), 50)
-            curredate = datetime.datetime.now().strftime("%Y%m%d")
-            log_dir = f"c:\\log\\{curredate}"
+            if self.storage_path_func:
+                log_dir = self.storage_path_func()
+            else:
+                # 默认路径
+                current_date = datetime.datetime.now().strftime("%Y%m%d")
+                log_dir = f"c:\\log\\{current_date}"
             
             if not os.path.exists(log_dir):
                 os.makedirs(log_dir)
@@ -406,6 +412,18 @@ class PyQtADBLogManager(QObject):
     def tr(self, text):
         """安全地获取翻译文本"""
         return self.lang_manager.tr(text) if self.lang_manager else text
+    
+    def get_storage_path(self):
+        """获取存储路径，优先使用用户配置的路径"""
+        # 从父窗口获取工具配置
+        if hasattr(self.parent(), 'tool_config') and self.parent().tool_config:
+            storage_path = self.parent().tool_config.get("storage_path", "")
+            if storage_path:
+                return storage_path
+        
+        # 使用默认路径
+        current_date = datetime.datetime.now().strftime("%Y%m%d")
+        return f"c:\\log\\{current_date}"
         
     def _init_adblog_variables(self):
         """初始化ADB Log相关变量"""
@@ -524,7 +542,7 @@ class PyQtADBLogManager(QObject):
         online_logcat_process_ref = {'process': None}
         online_log_file_path_ref = {'path': None}
         
-        self.worker = OnlineADBLogWorker(device, log_name, online_logcat_process_ref, online_log_file_path_ref, lang_manager=self.lang_manager)
+        self.worker = OnlineADBLogWorker(device, log_name, online_logcat_process_ref, online_log_file_path_ref, lang_manager=self.lang_manager, storage_path_func=self.get_storage_path)
         self.worker.finished.connect(lambda result: self._on_online_adblog_started_with_refs(result, online_logcat_process_ref, online_log_file_path_ref))
         self.worker.error.connect(self._on_online_adblog_error)
         self.worker.usb_disconnected.connect(self._on_usb_disconnected)
@@ -748,7 +766,7 @@ class PyQtADBLogManager(QObject):
     def _export_offline_adblog(self, device):
         """导出离线adb log"""
         # 创建工作线程
-        self.worker = ExportADBLogWorker(device, self.lang_manager)
+        self.worker = ExportADBLogWorker(device, self.lang_manager, self.get_storage_path)
         self.worker.finished.connect(self._on_offline_adblog_exported)
         self.worker.error.connect(self._on_offline_adblog_export_error)
         self.worker.start()
@@ -801,7 +819,8 @@ class PyQtADBLogManager(QObject):
                                         online_logcat_process_ref, 
                                         online_log_file_path_ref,
                                         folder,  # 传入Google日志文件夹
-                                        self.lang_manager)
+                                        self.lang_manager,
+                                        self.get_storage_path)
         self.worker.finished.connect(lambda result: self._on_google_adblog_started(result, folder, log_file_path))
         self.worker.error.connect(self._on_google_adblog_error)
         self.worker.start()

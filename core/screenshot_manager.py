@@ -19,10 +19,11 @@ class ScreenshotWorker(QThread):
     finished = pyqtSignal(bool, str)  # success, message
     progress = pyqtSignal(int, str)   # progress, status
     
-    def __init__(self, device, lang_manager=None, parent=None):
+    def __init__(self, device, lang_manager=None, parent=None, storage_path_func=None):
         super().__init__(parent)
         self.device = device
         self.lang_manager = lang_manager
+        self.storage_path_func = storage_path_func  # 存储路径获取函数
         self._mutex = QMutex()
         self._stop_requested = False
     
@@ -40,7 +41,10 @@ class ScreenshotWorker(QThread):
             
             current_time = datetime.datetime.now()
             date_str = current_time.strftime("%Y%m%d")
-            log_dir = f"c:\\log\\{date_str}"
+            if self.storage_path_func:
+                log_dir = self.storage_path_func()
+            else:
+                log_dir = f"c:\\log\\{date_str}"
             screenshot_folder = os.path.join(log_dir, "screenshot")
             
             if not os.path.exists(log_dir):
@@ -132,6 +136,18 @@ class PyQtScreenshotManager(QObject):
         # 从父窗口获取语言管理器
         self.lang_manager = parent.lang_manager if parent and hasattr(parent, 'lang_manager') else None
         self.worker = None
+    
+    def get_storage_path(self):
+        """获取存储路径，优先使用用户配置的路径"""
+        # 从父窗口获取工具配置
+        if hasattr(self.parent(), 'tool_config') and self.parent().tool_config:
+            storage_path = self.parent().tool_config.get("storage_path", "")
+            if storage_path:
+                return storage_path
+        
+        # 使用默认路径
+        current_date = datetime.datetime.now().strftime("%Y%m%d")
+        return f"c:\\log\\{current_date}"
         
     def take_screenshot(self):
         """截图功能"""
@@ -140,7 +156,7 @@ class PyQtScreenshotManager(QObject):
             return
         
         # 创建工作线程
-        self.worker = ScreenshotWorker(device, self.lang_manager)
+        self.worker = ScreenshotWorker(device, self.lang_manager, self, self.get_storage_path)
         self.worker.progress.connect(self.progress_updated.emit)
         self.worker.finished.connect(self._on_screenshot_finished)
         self.worker.start()

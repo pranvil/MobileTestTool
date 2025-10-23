@@ -24,6 +24,18 @@ class PyQtTCPDumpManager(QObject):
         # 从父窗口获取语言管理器
         self.lang_manager = parent.lang_manager if parent and hasattr(parent, 'lang_manager') else None
         self.process = None
+    
+    def get_storage_path(self):
+        """获取存储路径，优先使用用户配置的路径"""
+        # 从父窗口获取工具配置
+        if hasattr(self.parent(), 'tool_config') and self.parent().tool_config:
+            storage_path = self.parent().tool_config.get("storage_path", "")
+            if storage_path:
+                return storage_path
+        
+        # 使用默认路径
+        current_date = datetime.datetime.now().strftime("%Y%m%d")
+        return f"c:\\log\\{current_date}"
         
     def show_tcpdump_dialog(self):
         """显示TCPDUMP对话框"""
@@ -48,7 +60,7 @@ class PyQtTCPDumpManager(QObject):
             current_time = datetime.datetime.now()
             date_str = current_time.strftime("%Y%m%d")
             time_str = current_time.strftime("%H%M%S")
-            log_dir = f"c:\\log\\{date_str}"
+            log_dir = self.get_storage_path()
             tcpdump_file = os.path.join(log_dir, f"tcpdump_{time_str}.pcap")
             
             if not os.path.exists(log_dir):

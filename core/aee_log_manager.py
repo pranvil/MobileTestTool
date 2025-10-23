@@ -19,10 +19,11 @@ class AEELogWorker(QThread):
     
     finished = pyqtSignal(bool, str)
     
-    def __init__(self, device, lang_manager=None):
+    def __init__(self, device, lang_manager=None, storage_path_func=None):
         super().__init__()
         self.device = device
         self.lang_manager = lang_manager
+        self.storage_path_func = storage_path_func  # 存储路径获取函数
         
     def run(self):
         """等待5分钟并拉取日志文件"""
@@ -69,8 +70,11 @@ class AEELogWorker(QThread):
         """直接拉取AEE日志文件"""
         try:
             # 1. 创建日志目录
-            current_date = datetime.datetime.now().strftime("%Y%m%d")
-            log_dir = f"c:\\log\\{current_date}"
+            if self.storage_path_func:
+                log_dir = self.storage_path_func()
+            else:
+                current_date = datetime.datetime.now().strftime("%Y%m%d")
+                log_dir = f"c:\\log\\{current_date}"
             aee_log_dir = os.path.join(log_dir, "aeelog")
             
             if not os.path.exists(log_dir):
@@ -125,6 +129,18 @@ class PyQtAEELogManager(QObject):
     def tr(self, text):
         """安全地获取翻译文本"""
         return self.lang_manager.tr(text) if self.lang_manager else text
+    
+    def get_storage_path(self):
+        """获取存储路径，优先使用用户配置的路径"""
+        # 从父窗口获取工具配置
+        if hasattr(self.parent(), 'tool_config') and self.parent().tool_config:
+            storage_path = self.parent().tool_config.get("storage_path", "")
+            if storage_path:
+                return storage_path
+        
+        # 使用默认路径
+        current_date = datetime.datetime.now().strftime("%Y%m%d")
+        return f"c:\\log\\{current_date}"
         
     def start_aee_log(self):
         """开始AEE日志收集"""
@@ -164,7 +180,7 @@ class PyQtAEELogManager(QObject):
             self.status_message.emit(self.tr("AEE log打包中 - ") + device)
             
             # 在后台线程中等待并拉取日志
-            self.waiting_thread = AEELogWorker(device, self.lang_manager)
+            self.waiting_thread = AEELogWorker(device, self.lang_manager, self.get_storage_path)
             self.waiting_thread.finished.connect(self._on_waiting_finished)
             self.waiting_thread.start()
             

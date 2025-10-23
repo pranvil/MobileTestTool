@@ -62,6 +62,18 @@ class HeraConfigWorker(QThread):
         # 从父窗口获取语言管理器
         self.lang_manager = parent.lang_manager if parent and hasattr(parent, 'lang_manager') else None
     
+    def get_storage_path(self):
+        """获取存储路径，优先使用用户配置的路径"""
+        # 从父窗口获取工具配置
+        if hasattr(self.parent(), 'tool_config') and self.parent().tool_config:
+            storage_path = self.parent().tool_config.get("storage_path", "")
+            if storage_path:
+                return storage_path
+        
+        # 使用默认路径
+        current_date = datetime.now().strftime("%Y%m%d")
+        return f"c:\\log\\{current_date}"
+    
     def tr(self, text):
         """安全地获取翻译文本"""
         return self.lang_manager.tr(text) if self.lang_manager else text
@@ -145,8 +157,8 @@ class HeraConfigWorker(QThread):
         """确保输出目录存在"""
         if self.output_dir is None:
             try:
-                today = datetime.now().strftime("%Y%m%d")
-                self.output_dir = f"C:\\log\\{today}\\hera"
+                base_log_dir = self.get_storage_path()
+                self.output_dir = f"{base_log_dir}\\hera"
                 os.makedirs(self.output_dir, exist_ok=True)
             except Exception as e:
                 self.progress.emit(f"⚠️ {self.tr('创建输出目录失败:')} {str(e)}")
@@ -695,6 +707,18 @@ class HeraDataCollectionWorker(QThread):
         # 从父窗口获取语言管理器
         self.lang_manager = parent.lang_manager if parent and hasattr(parent, 'lang_manager') else None
     
+    def get_storage_path(self):
+        """获取存储路径，优先使用用户配置的路径"""
+        # 从父窗口获取工具配置
+        if hasattr(self.parent(), 'tool_config') and self.parent().tool_config:
+            storage_path = self.parent().tool_config.get("storage_path", "")
+            if storage_path:
+                return storage_path
+        
+        # 使用默认路径
+        current_date = datetime.now().strftime("%Y%m%d")
+        return f"c:\\log\\{current_date}"
+    
     def tr(self, text):
         """安全地获取翻译文本"""
         return self.lang_manager.tr(text) if self.lang_manager else text
@@ -735,8 +759,8 @@ class HeraDataCollectionWorker(QThread):
         """确保输出目录存在"""
         if self.output_dir is None:
             try:
-                today = datetime.now().strftime("%Y%m%d")
-                self.output_dir = f"C:\\log\\{today}\\hera"
+                base_log_dir = self.get_storage_path()
+                self.output_dir = f"{base_log_dir}\\hera"
                 os.makedirs(self.output_dir, exist_ok=True)
             except Exception as e:
                 self.output_dir = "."

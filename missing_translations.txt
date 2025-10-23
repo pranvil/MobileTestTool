@@ -942,3 +942,654 @@ Ping
 开始为所有Tab加载自定义按钮...
 默认
 所有Tab的自定义按钮加载完成
+个自定义按钮
+Root&&Remount
+支持快速执行一次性ADB命令
+
+例如: adb devices, adb shell pm list packages 等
+
+不支持持续输出命令（logcat、top等），请使用对应功能
+点击切换语言 / Click to switch language
+开始初始化所有Tab页面...
+初始化 Log控制 Tab...
+启用Telephony日志
+连线log
+离线log
+Log控制 Tab 初始化成功
+初始化 Log过滤 Tab...
+Log过滤 Tab 初始化成功
+初始化 网络信息 Tab...
+网络信息 Tab 初始化成功
+初始化 TMO CC Tab...
+TMO CC Tab 初始化成功
+初始化 TMO Echolocate Tab...
+TMO Echolocate Tab 初始化成功
+初始化 24小时背景数据 Tab...
+24小时背景数据 Tab 初始化成功
+初始化 APP操作 Tab...
+APP操作 Tab 初始化成功
+初始化 其他 Tab...
+其他 Tab 初始化成功
+所有Tab页面初始化完成
+连线log
+离线log
+启用Telephony日志
+拉取 Bugreport
+TCPDUMP
+Ping
+点击
+按钮获取网络信息
+中/EN
+开始为所有Tab加载自定义按钮...
+默认
+所有Tab的自定义按钮加载完成
+连线ADB Log按钮被点击，当前is_running状态: 
+开启连线ADB Log...
+Logcat进程已启动，PID:
+连线ADB log启动成功，设置is_running=True
+ADB Log已启动
+连线ADB log已开启 - {device} - {filename}
+设置连线log按钮文本为: 
+=== stop_online_adblog 被调用 ===
+当前模式:
+进程引用:
+is_running状态:
+=== 开始停止连线ADB log ===
+日志文件路径:
+设置正常停止标志
+设置监控循环停止标志
+正在终止logcat进程，PID:
+Logcat进程已成功终止
+日志文件已关闭
+尝试通过adb命令杀掉设备上的连线logcat进程...
+未找到需要停止的连线logcat进程
+打开日志文件夹:
+连线ADB log停止完成，设置is_running=False
+ADB Log已停止
+=== 连线ADB log进程已成功停止 ===
+监控循环已退出
+Logcat进程已退出，退出码:
+检测到USB断开
+USB断开 - 
+USB已重连
+Logcat进程已重新启动，追加模式
+=== USB重连:
+===
+USB已重连 - 
+进程引用更新:
+离线ADB Log按钮被点击，当前is_running状态: 
+开启离线ADB Log...
+保留设备 
+ 的旧log文件
+离线ADB log已开启 - {device} - {filename}
+导出 ADB Log...
+=== export_offline_adblog 被调用 ===
+检查设备连接状态...
+停止nohup logcat进程...
+找到nohup logcat进程 PID:
+成功停止nohup logcat进程 PID:
+导出log文件...
+成功导出:
+ADB Log已导出到:
+离线ADB log已导出 - {device}
+打开工具配置对话框...
+工具配置对话框已关闭
+个自定义按钮
+Root&&Remount
+支持快速执行一次性ADB命令
+
+例如: adb devices, adb shell pm list packages 等
+
+不支持持续输出命令（logcat、top等），请使用对应功能
+点击切换语言 / Click to switch language
+开始初始化所有Tab页面...
+初始化 Log控制 Tab...
+启用Telephony日志
+连线log
+离线log
+Log控制 Tab 初始化成功
+初始化 Log过滤 Tab...
+Log过滤 Tab 初始化成功
+初始化 网络信息 Tab...
+网络信息 Tab 初始化成功
+初始化 TMO CC Tab...
+TMO CC Tab 初始化成功
+初始化 TMO Echolocate Tab...
+TMO Echolocate Tab 初始化成功
+初始化 24小时背景数据 Tab...
+24小时背景数据 Tab 初始化成功
+初始化 APP操作 Tab...
+APP操作 Tab 初始化成功
+初始化 其他 Tab...
+其他 Tab 初始化成功
+所有Tab页面初始化完成
+连线log
+离线log
+启用Telephony日志
+拉取 Bugreport
+TCPDUMP
+Ping
+点击
+按钮获取网络信息
+中/EN
+开始为所有Tab加载自定义按钮...
+默认
+所有Tab的自定义按钮加载完成
+打开工具配置对话框...
+工具配置对话框已关闭
+个自定义按钮
+Root&&Remount
+支持快速执行一次性ADB命令
+
+例如: adb devices, adb shell pm list packages 等
+
+不支持持续输出命令（logcat、top等），请使用对应功能
+点击切换语言 / Click to switch language
+开始初始化所有Tab页面...
+初始化 Log控制 Tab...
+启用Telephony日志
+连线log
+离线log
+Log控制 Tab 初始化成功
+初始化 Log过滤 Tab...
+Log过滤 Tab 初始化成功
+初始化 网络信息 Tab...
+网络信息 Tab 初始化成功
+初始化 TMO CC Tab...
+TMO CC Tab 初始化成功
+初始化 TMO Echolocate Tab...
+TMO Echolocate Tab 初始化成功
+初始化 24小时背景数据 Tab...
+24小时背景数据 Tab 初始化成功
+初始化 APP操作 Tab...
+APP操作 Tab 初始化成功
+初始化 其他 Tab...
+其他 Tab 初始化成功
+所有Tab页面初始化完成
+连线log
+离线log
+启用Telephony日志
+拉取 Bugreport
+TCPDUMP
+Ping
+点击
+按钮获取网络信息
+中/EN
+开始为所有Tab加载自定义按钮...
+默认
+所有Tab的自定义按钮加载完成
+打开工具配置对话框...
+ELT路径:
+高通工具路径:
+工具配置对话框已关闭
+检测到MTK工具:
+检测到高通工具:
+选择高通工具目录
+选择MTK工具根目录
+选择Wireshark安装目录
+个自定义按钮
+Root&&Remount
+支持快速执行一次性ADB命令
+
+例如: adb devices, adb shell pm list packages 等
+
+不支持持续输出命令（logcat、top等），请使用对应功能
+点击切换语言 / Click to switch language
+开始初始化所有Tab页面...
+初始化 Log控制 Tab...
+启用Telephony日志
+连线log
+离线log
+Log控制 Tab 初始化成功
+初始化 Log过滤 Tab...
+Log过滤 Tab 初始化成功
+初始化 网络信息 Tab...
+网络信息 Tab 初始化成功
+初始化 TMO CC Tab...
+TMO CC Tab 初始化成功
+初始化 TMO Echolocate Tab...
+TMO Echolocate Tab 初始化成功
+初始化 24小时背景数据 Tab...
+24小时背景数据 Tab 初始化成功
+初始化 APP操作 Tab...
+APP操作 Tab 初始化成功
+初始化 其他 Tab...
+其他 Tab 初始化成功
+所有Tab页面初始化完成
+连线log
+离线log
+启用Telephony日志
+拉取 Bugreport
+TCPDUMP
+Ping
+点击
+按钮获取网络信息
+中/EN
+开始为所有Tab加载自定义按钮...
+默认
+所有Tab的自定义按钮加载完成
+打开工具配置对话框...
+存储路径配置
+存储路径:
+留空使用默认路径: c:\log\yyyymmdd
+浏览
+ELT路径:
+高通工具路径:
+选择存储路径
+工具配置对话框已关闭
+连线ADB Log按钮被点击，当前is_running状态: 
+开启连线ADB Log...
+Logcat进程已启动，PID:
+连线ADB log启动成功，设置is_running=True
+ADB Log已启动
+连线ADB log已开启 - {device} - {filename}
+设置连线log按钮文本为: 
+=== stop_online_adblog 被调用 ===
+当前模式:
+进程引用:
+is_running状态:
+=== 开始停止连线ADB log ===
+日志文件路径:
+设置正常停止标志
+设置监控循环停止标志
+正在终止logcat进程，PID:
+监控循环已退出
+Logcat进程已成功终止
+日志文件已关闭
+尝试通过adb命令杀掉设备上的连线logcat进程...
+未找到需要停止的连线logcat进程
+打开日志文件夹:
+连线ADB log停止完成，设置is_running=False
+ADB Log已停止
+=== 连线ADB log进程已成功停止 ===
+离线ADB Log按钮被点击，当前is_running状态: 
+开启离线ADB Log...
+正在清除设备 
+ 的旧log文件...
+已清除设备 
+ 的旧log文件
+离线ADB log已开启 - {device} - {filename}
+导出 ADB Log...
+=== export_offline_adblog 被调用 ===
+检查设备连接状态...
+停止nohup logcat进程...
+找到nohup logcat进程 PID:
+成功停止nohup logcat进程 PID:
+导出log文件...
+成功导出:
+ADB Log已导出到:
+离线ADB log已导出 - {device}
+个自定义按钮
+Root&&Remount
+支持快速执行一次性ADB命令
+
+例如: adb devices, adb shell pm list packages 等
+
+不支持持续输出命令（logcat、top等），请使用对应功能
+点击切换语言 / Click to switch language
+开始初始化所有Tab页面...
+初始化 Log控制 Tab...
+启用Telephony日志
+连线log
+离线log
+Log控制 Tab 初始化成功
+初始化 Log过滤 Tab...
+Log过滤 Tab 初始化成功
+初始化 网络信息 Tab...
+网络信息 Tab 初始化成功
+初始化 TMO CC Tab...
+TMO CC Tab 初始化成功
+初始化 TMO Echolocate Tab...
+TMO Echolocate Tab 初始化成功
+初始化 24小时背景数据 Tab...
+24小时背景数据 Tab 初始化成功
+初始化 APP操作 Tab...
+APP操作 Tab 初始化成功
+初始化 其他 Tab...
+其他 Tab 初始化成功
+所有Tab页面初始化完成
+连线log
+离线log
+启用Telephony日志
+拉取 Bugreport
+TCPDUMP
+Ping
+点击
+按钮获取网络信息
+中/EN
+开始为所有Tab加载自定义按钮...
+默认
+所有Tab的自定义按钮加载完成
+打开工具配置对话框...
+存储路径配置
+存储路径:
+留空使用默认路径: c:\log\yyyymmdd
+浏览
+ELT路径:
+高通工具路径:
+选择存储路径
+工具配置对话框已关闭
+连线ADB Log按钮被点击，当前is_running状态: 
+开启连线ADB Log...
+Logcat进程已启动，PID:
+连线ADB log启动成功，设置is_running=True
+ADB Log已启动
+连线ADB log已开启 - {device} - {filename}
+设置连线log按钮文本为: 
+=== stop_online_adblog 被调用 ===
+当前模式:
+进程引用:
+is_running状态:
+=== 开始停止连线ADB log ===
+日志文件路径:
+设置正常停止标志
+设置监控循环停止标志
+正在终止logcat进程，PID:
+Logcat进程已成功终止
+监控循环已退出
+日志文件已关闭
+尝试通过adb命令杀掉设备上的连线logcat进程...
+未找到需要停止的连线logcat进程
+打开日志文件夹:
+连线ADB log停止完成，设置is_running=False
+ADB Log已停止
+=== 连线ADB log进程已成功停止 ===
+个自定义按钮
+Root&&Remount
+支持快速执行一次性ADB命令
+
+例如: adb devices, adb shell pm list packages 等
+
+不支持持续输出命令（logcat、top等），请使用对应功能
+点击切换语言 / Click to switch language
+开始初始化所有Tab页面...
+初始化 Log控制 Tab...
+启用Telephony日志
+连线log
+离线log
+Log控制 Tab 初始化成功
+初始化 Log过滤 Tab...
+Log过滤 Tab 初始化成功
+初始化 网络信息 Tab...
+网络信息 Tab 初始化成功
+初始化 TMO CC Tab...
+TMO CC Tab 初始化成功
+初始化 TMO Echolocate Tab...
+TMO Echolocate Tab 初始化成功
+初始化 24小时背景数据 Tab...
+24小时背景数据 Tab 初始化成功
+初始化 APP操作 Tab...
+APP操作 Tab 初始化成功
+初始化 其他 Tab...
+其他 Tab 初始化成功
+所有Tab页面初始化完成
+连线log
+离线log
+启用Telephony日志
+拉取 Bugreport
+TCPDUMP
+Ping
+点击
+按钮获取网络信息
+中/EN
+开始为所有Tab加载自定义按钮...
+默认
+所有Tab的自定义按钮加载完成
+打开工具配置对话框...
+存储路径配置
+存储路径:
+留空使用默认路径: c:\log\yyyymmdd
+浏览
+ELT路径:
+高通工具路径:
+工具配置对话框已关闭
+连线ADB Log按钮被点击，当前is_running状态: 
+开启连线ADB Log...
+Logcat进程已启动，PID:
+连线ADB log启动成功，设置is_running=True
+ADB Log已启动
+连线ADB log已开启 - {device} - {filename}
+设置连线log按钮文本为: 
+=== stop_online_adblog 被调用 ===
+当前模式:
+进程引用:
+is_running状态:
+=== 开始停止连线ADB log ===
+日志文件路径:
+设置正常停止标志
+设置监控循环停止标志
+正在终止logcat进程，PID:
+Logcat进程已成功终止
+日志文件已关闭
+尝试通过adb命令杀掉设备上的连线logcat进程...
+未找到需要停止的连线logcat进程
+打开日志文件夹:
+连线ADB log停止完成，设置is_running=False
+ADB Log已停止
+=== 连线ADB log进程已成功停止 ===
+监控循环已退出
+离线ADB Log按钮被点击，当前is_running状态: 
+开启离线ADB Log...
+正在清除设备 
+ 的旧log文件...
+已清除设备 
+ 的旧log文件
+离线ADB log已开启 - {device} - {filename}
+导出 ADB Log...
+=== export_offline_adblog 被调用 ===
+检查设备连接状态...
+停止nohup logcat进程...
+找到nohup logcat进程 PID:
+成功停止nohup logcat进程 PID:
+导出log文件...
+成功导出:
+ADB Log已导出到:
+离线ADB log已导出 - {device}
+个自定义按钮
+Root&&Remount
+支持快速执行一次性ADB命令
+
+例如: adb devices, adb shell pm list packages 等
+
+不支持持续输出命令（logcat、top等），请使用对应功能
+点击切换语言 / Click to switch language
+开始初始化所有Tab页面...
+初始化 Log控制 Tab...
+启用Telephony日志
+连线log
+离线log
+Log控制 Tab 初始化成功
+初始化 Log过滤 Tab...
+Log过滤 Tab 初始化成功
+初始化 网络信息 Tab...
+网络信息 Tab 初始化成功
+初始化 TMO CC Tab...
+TMO CC Tab 初始化成功
+初始化 TMO Echolocate Tab...
+TMO Echolocate Tab 初始化成功
+初始化 24小时背景数据 Tab...
+24小时背景数据 Tab 初始化成功
+初始化 APP操作 Tab...
+APP操作 Tab 初始化成功
+初始化 其他 Tab...
+其他 Tab 初始化成功
+所有Tab页面初始化完成
+连线log
+离线log
+启用Telephony日志
+拉取 Bugreport
+TCPDUMP
+Ping
+点击
+按钮获取网络信息
+中/EN
+开始为所有Tab加载自定义按钮...
+默认
+所有Tab的自定义按钮加载完成
+打开工具配置对话框...
+存储路径配置
+存储路径:
+留空使用默认路径: c:\log\yyyymmdd
+浏览
+ELT路径:
+高通工具路径:
+工具配置对话框已关闭
+连线ADB Log按钮被点击，当前is_running状态: 
+开启连线ADB Log...
+Logcat进程已启动，PID:
+连线ADB log启动成功，设置is_running=True
+ADB Log已启动
+连线ADB log已开启 - {device} - {filename}
+设置连线log按钮文本为: 
+=== stop_online_adblog 被调用 ===
+当前模式:
+进程引用:
+is_running状态:
+=== 开始停止连线ADB log ===
+日志文件路径:
+设置正常停止标志
+设置监控循环停止标志
+正在终止logcat进程，PID:
+Logcat进程已成功终止
+日志文件已关闭
+尝试通过adb命令杀掉设备上的连线logcat进程...
+未找到需要停止的连线logcat进程
+打开日志文件夹:
+连线ADB log停止完成，设置is_running=False
+ADB Log已停止
+=== 连线ADB log进程已成功停止 ===
+监控循环已退出
+离线ADB Log按钮被点击，当前is_running状态: 
+开启离线ADB Log...
+保留设备 
+ 的旧log文件
+离线ADB log已开启 - {device} - {filename}
+导出 ADB Log...
+=== export_offline_adblog 被调用 ===
+检查设备连接状态...
+停止nohup logcat进程...
+找到nohup logcat进程 PID:
+成功停止nohup logcat进程 PID:
+导出log文件...
+成功导出:
+ADB Log已导出到:
+离线ADB log已导出 - {device}
+个自定义按钮
+Root&&Remount
+支持快速执行一次性ADB命令
+
+例如: adb devices, adb shell pm list packages 等
+
+不支持持续输出命令（logcat、top等），请使用对应功能
+点击切换语言 / Click to switch language
+开始初始化所有Tab页面...
+初始化 Log控制 Tab...
+启用Telephony日志
+连线log
+离线log
+Log控制 Tab 初始化成功
+初始化 Log过滤 Tab...
+Log过滤 Tab 初始化成功
+初始化 网络信息 Tab...
+网络信息 Tab 初始化成功
+初始化 TMO CC Tab...
+TMO CC Tab 初始化成功
+初始化 TMO Echolocate Tab...
+TMO Echolocate Tab 初始化成功
+初始化 24小时背景数据 Tab...
+24小时背景数据 Tab 初始化成功
+初始化 APP操作 Tab...
+APP操作 Tab 初始化成功
+初始化 其他 Tab...
+其他 Tab 初始化成功
+所有Tab页面初始化完成
+连线log
+离线log
+启用Telephony日志
+拉取 Bugreport
+TCPDUMP
+Ping
+点击
+按钮获取网络信息
+中/EN
+开始为所有Tab加载自定义按钮...
+默认
+所有Tab的自定义按钮加载完成
+打开工具配置对话框...
+存储路径配置
+存储路径:
+留空使用默认路径: c:\log\yyyymmdd
+浏览
+ELT路径:
+高通工具路径:
+工具配置对话框已关闭
+CC文件已拉取到: 
+CC文件已拉取到:
+启动
+服务器...
+启动应用...
+服务器活动已启动
+服务器活动已启动并设置完成
+开启 MTKLOG...
+检查屏幕状态...
+启动logger应用...
+检查logger状态...
+尝试连接设备:
+设备连接成功，查找按钮:
+停止并导出 MTKLOG...
+按钮存在，checked状态:
+停止logger...
+输入日志名称
+请输入日志名称:
+等待logger停止...
+正在确认logger已完全停止...
+清除旧日志...
+设置缓存大小...
+开启logger...
+等待logger启动...
+正在确认logger已完全启动...
+MTKLOG启动成功
+导出媒体文件
+是否同时导出截图和录制的视频？
+
+
+包括:
+
+• 屏幕录制视频
+
+• 截图文件
+
+
+选择
+是
+将额外导出这些媒体文件。
+开始停止并导出MTKLOG操作，设备:
+, 日志名称:
+, 导出媒体:
+屏幕状态检查完成
+启动logger应用命令:
+启动应用结果 - returncode:
+Logger正在运行，开始执行停止命令
+执行停止命令:
+停止命令执行结果 - returncode:
+停止命令stdout:
+停止命令stderr:
+次检查按钮状态，已等待
+秒
+Logger已成功停止，checked=false
+停止检查完成，总耗时:
+秒，检查次数:
+创建日志目录:
+目录已存在:
+检查
+检查文件夹:
+检查命令结果 - returncode:
+文件夹不存在，跳过:
+执行pull命令:
+Pull命令结果 - returncode:
+导出成功
+MTKLOG停止并导出操作完成，导出路径:
+MTKLOG已停止
+MTKLOG已导出到: 
+MTKLOG已停止并导出 -
+Logger未在运行，跳过停止操作
