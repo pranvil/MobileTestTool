@@ -25,9 +25,9 @@ class PyQtDeviceManager(QObject):
         if parent and hasattr(parent, 'lang_manager'):
             self.lang_manager = parent.lang_manager
         else:
-            # 如果没有父窗口或语言管理器，创建一个默认的
+            # 如果没有父窗口或语言管理器，使用单例
             from core.language_manager import LanguageManager
-            self.lang_manager = LanguageManager()
+            self.lang_manager = LanguageManager.get_instance()
     
     def tr(self, text):
         """安全地获取翻译文本"""

@@ -94,8 +94,9 @@ class MainWindow(QMainWindow):
         # 连接自定义按钮管理器信号
         self.custom_button_manager.buttons_updated.connect(self.on_custom_buttons_updated)
         
-        # 初始化完成后刷新设备列表
-        self.device_manager.refresh_devices()
+        # 异步刷新设备列表，避免阻塞UI显示
+        from PyQt5.QtCore import QTimer
+        QTimer.singleShot(100, self.device_manager.refresh_devices)
     
     def tr(self, text):
         """安全地获取翻译文本"""

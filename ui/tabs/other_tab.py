@@ -50,9 +50,9 @@ class OtherTab(QWidget):
             if parent and hasattr(parent, 'lang_manager'):
                 self.lang_manager = parent.lang_manager
             else:
-                # 如果没有父窗口或语言管理器，创建一个默认的
+                # 如果没有父窗口或语言管理器，使用单例
                 from core.language_manager import LanguageManager
-                self.lang_manager = LanguageManager()
+                self.lang_manager = LanguageManager.get_instance()
             self.setup_ui()
         except Exception as e:
             logger.exception(self.lang_manager.tr("OtherTab 初始化失败"))

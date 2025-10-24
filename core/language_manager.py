@@ -30,12 +30,32 @@ def get_resource_path(relative_path):
 
 
 class LanguageManager(QObject):
-    """语言管理器"""
+    """语言管理器 - 单例模式"""
     
     # 语言改变信号
     language_changed = pyqtSignal(str)  # 发送新语言代码
     
+    _instance = None
+    _initialized = False
+    
+    def __new__(cls, parent=None):
+        """单例模式实现"""
+        if cls._instance is None:
+            cls._instance = super(LanguageManager, cls).__new__(cls)
+        return cls._instance
+    
+    @classmethod
+    def get_instance(cls, parent=None):
+        """获取单例实例"""
+        if cls._instance is None:
+            cls._instance = cls(parent)
+        return cls._instance
+    
     def __init__(self, parent=None):
+        # 避免重复初始化
+        if self._initialized:
+            return
+            
         super().__init__(parent)
         self.current_lang = 'zh'  # 默认中文
         self.translations = {}
@@ -46,9 +66,16 @@ class LanguageManager(QObject):
         
         # 加载用户上次选择的语言
         self._load_saved_language()
+        
+        # 标记为已初始化
+        self._initialized = True
     
     def _load_translations(self):
         """加载翻译文件"""
+        # 如果已经加载过，直接返回
+        if hasattr(self, '_translations_loaded') and self._translations_loaded:
+            return
+            
         try:
             translation_file = get_resource_path('translations.json')
             logger.info(f"尝试加载翻译文件: {translation_file}")
@@ -61,12 +88,20 @@ class LanguageManager(QObject):
                 logger.warning(f"翻译文件不存在: {translation_file}")
                 # 创建空的翻译字典
                 self.translations = {'zh': {}, 'en': {}}
+            
+            # 标记为已加载
+            self._translations_loaded = True
         except Exception as e:
             logger.error(f"加载翻译文件失败: {str(e)}")
             self.translations = {'zh': {}, 'en': {}}
+            self._translations_loaded = True
     
     def _load_saved_language(self):
         """加载用户保存的语言偏好"""
+        # 如果已经加载过，直接返回
+        if hasattr(self, '_language_loaded') and self._language_loaded:
+            return
+            
         try:
             # 使用与保存相同的路径逻辑
             if is_pyinstaller():
@@ -91,8 +126,12 @@ class LanguageManager(QObject):
                         logger.info(f"加载保存的语言设置: {lang}")
             else:
                 logger.info(f"语言配置文件不存在，使用默认语言: {self.current_lang}")
+            
+            # 标记为已加载
+            self._language_loaded = True
         except Exception as e:
             logger.error(f"加载保存的语言设置失败: {str(e)}")
+            self._language_loaded = True
     
     def _save_language_preference(self, lang):
         """保存语言偏好"""

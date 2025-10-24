@@ -1,0 +1,80 @@
+{
+  "export_time": "2025-10-23T22:25:00.751455",
+  "version": "1.0",
+  "tab_config": {
+    "tab_order": [
+      "log_control",
+      "log_filter", 
+      "network_info",
+      "tmo_cc",
+      "tmo_echolocate",
+      "background_data",
+      "app_operations",
+      "other",
+      "custom_001"
+    ],
+    "tab_visibility": {
+      "log_control": true,
+      "log_filter": true,
+      "network_info": true,
+      "tmo_cc": true,
+      "tmo_echolocate": true,
+      "background_data": true,
+      "app_operations": true,
+      "other": true,
+      "custom_001": true
+    },
+    "custom_tabs": [
+      {
+        "id": "custom_001",
+        "name": "我的tab",
+        "description": "",
+        "cards": [],
+        "created_time": "2025-10-23T22:20:55.384796",
+        "visible": true
+      }
+    ],
+    "custom_cards": [
+      {
+        "id": "card_001",
+        "name": "Mycar1",
+        "description": "",
+        "tab_id": "custom_001",
+        "buttons": [],
+        "created_time": "2025-10-23T22:21:05.142746"
+      },
+      {
+        "id": "card_002",
+        "name": "mycard2",
+        "description": "",
+        "tab_id": "custom_001",
+        "buttons": [],
+        "created_time": "2025-10-23T22:21:11.930351"
+      }
+    ]
+  },
+  "button_config": {
+    "custom_buttons": [
+      {
+        "name": "查看设备属性",
+        "type": "adb",
+        "command": "shell getprop",
+        "tab": "我的tab",
+        "card": "Mycar1",
+        "enabled": true,
+        "description": "查看设备的所有系统属性",
+        "id": "default_001"
+      },
+      {
+        "name": "查看存储空间",
+        "type": "adb",
+        "command": "shell df -h",
+        "tab": "我的tab",
+        "card": "mycard2",
+        "enabled": true,
+        "description": "查看设备存储空间使用情况",
+        "id": "default_002"
+      }
+    ]
+  }
+}

@@ -388,6 +388,7 @@ class UnifiedManagerDialog(QDialog):
                     'export_time': datetime.datetime.now().isoformat(),
                     'version': '1.0',
                     'tab_config': {
+                        'tab_order': self.tab_config_manager.tab_order,
                         'tab_visibility': self.tab_config_manager.tab_visibility,
                         'custom_tabs': self.tab_config_manager.custom_tabs,
                         'custom_cards': self.tab_config_manager.custom_cards
@@ -444,6 +445,16 @@ class UnifiedManagerDialog(QDialog):
                     self.tab_config_manager.tab_visibility = tab_config.get('tab_visibility', {})
                     self.tab_config_manager.custom_tabs = tab_config.get('custom_tabs', [])
                     self.tab_config_manager.custom_cards = tab_config.get('custom_cards', [])
+                    
+                    # 处理tab_order，如果配置文件中没有则使用默认顺序
+                    if 'tab_order' in tab_config:
+                        self.tab_config_manager.tab_order = tab_config['tab_order']
+                    else:
+                        # 如果没有tab_order，创建默认顺序（包含自定义tab）
+                        default_order = [tab['id'] for tab in self.tab_config_manager.default_tabs]
+                        custom_tab_ids = [tab['id'] for tab in self.tab_config_manager.custom_tabs]
+                        self.tab_config_manager.tab_order = default_order + custom_tab_ids
+                    
                     self.tab_config_manager.save_config()
                     
                     # 导入按钮配置
@@ -453,6 +464,11 @@ class UnifiedManagerDialog(QDialog):
                     
                     # 重新加载所有配置
                     self.load_all_configs()
+                    
+                    # 通知主窗口重新加载Tab
+                    if self.parent() and hasattr(self.parent(), 'reload_tabs'):
+                        self.parent().reload_tabs()
+                        logger.info(self.tr("已通知主窗口重新加载Tab"))
                     
                     QMessageBox.information(self, self.tr("成功"), self.tr("配置导入成功！"))
                     logger.info(f"{self.tr('配置已从文件导入:')} {file_path}")
@@ -482,6 +498,11 @@ class UnifiedManagerDialog(QDialog):
                 
                 # 重新加载所有配置
                 self.load_all_configs()
+                
+                # 通知主窗口重新加载Tab
+                if self.parent() and hasattr(self.parent(), 'reload_tabs'):
+                    self.parent().reload_tabs()
+                    logger.info(self.tr("已通知主窗口重新加载Tab"))
                 
                 QMessageBox.information(self, self.tr("成功"), self.tr("已重置为默认配置"))
                 logger.info(self.tr("配置已重置为默认"))
