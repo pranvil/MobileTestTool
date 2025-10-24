@@ -258,19 +258,70 @@ class TabConfigManager(QObject):
     def update_custom_tab(self, tab_id, tab_data):
         """更新自定义tab"""
         try:
+            # 查找要更新的Tab
+            old_tab = None
             for i, tab in enumerate(self.custom_tabs):
                 if tab['id'] == tab_id:
+                    old_tab = tab.copy()
                     self.custom_tabs[i].update(tab_data)
-                    self.save_config()
-                    logger.info(f"{self.tr('成功更新自定义Tab:')} {tab_id}")
-                    return True
+                    break
             
-            logger.error(f"{self.tr('未找到Tab:')} {tab_id}")
-            return False
+            if old_tab is None:
+                logger.error(f"{self.tr('未找到Tab:')} {tab_id}")
+                return False
+            
+            # 如果Tab名称发生变化，需要更新相关的Button
+            old_name = old_tab.get('name', '')
+            new_name = tab_data.get('name', '')
+            if old_name != new_name and old_name:
+                self._update_buttons_for_tab_name_change(old_name, new_name)
+            
+            self.save_config()
+            logger.info(f"{self.tr('成功更新自定义Tab:')} {tab_id}")
+            return True
             
         except Exception as e:
             logger.exception(f"{self.tr('更新自定义Tab失败:')} {e}")
             return False
+    
+    def _update_buttons_for_tab_name_change(self, old_name, new_name):
+        """当Tab名称变化时，更新相关Button的tab字段"""
+        try:
+            # 尝试多种方式获取按钮管理器
+            button_manager = None
+            
+            # 方式1：从父窗口获取
+            if hasattr(self.parent(), 'custom_button_manager'):
+                button_manager = self.parent().custom_button_manager
+            
+            # 方式2：从主窗口获取
+            elif hasattr(self.parent(), 'parent') and hasattr(self.parent().parent(), 'custom_button_manager'):
+                button_manager = self.parent().parent().custom_button_manager
+            
+            # 方式3：直接导入并创建实例（作为备选方案）
+            if button_manager is None:
+                try:
+                    from core.custom_button_manager import CustomButtonManager
+                    button_manager = CustomButtonManager()
+                except Exception as e:
+                    logger.warning(f"{self.tr('无法获取按钮管理器:')} {e}")
+                    return
+            
+            # 更新所有相关按钮的tab字段
+            updated_count = 0
+            for button in button_manager.buttons:
+                if button.get('tab') == old_name:
+                    button['tab'] = new_name
+                    updated_count += 1
+            
+            if updated_count > 0:
+                button_manager.save_buttons()
+                logger.info(f"{self.tr('已更新')} {updated_count} {self.tr('个按钮的Tab名称:')} {old_name} -> {new_name}")
+            else:
+                logger.info(f"{self.tr('没有找到需要更新的按钮')}")
+                    
+        except Exception as e:
+            logger.exception(f"{self.tr('更新按钮Tab名称失败:')} {e}")
     
     def create_custom_card(self, card_data):
         """创建自定义card"""

@@ -472,6 +472,21 @@ class CustomCardDialog(QDialog):
         """设置UI"""
         layout = QVBoxLayout(self)
         
+        # 添加提示信息
+        hint_label = QLabel(self.tr("💡 提示：Card只能添加到自定义Tab中"))
+        hint_label.setStyleSheet("""
+            QLabel {
+                color: #17a2b8;
+                font-size: 12px;
+                padding: 8px;
+                background: #d1ecf1;
+                border-radius: 4px;
+                border: 1px solid #bee5eb;
+            }
+        """)
+        hint_label.setWordWrap(True)
+        layout.addWidget(hint_label)
+        
         # Card基本信息
         info_group = QGroupBox(self.tr("Card信息"))
         info_layout = QFormLayout(info_group)
@@ -505,12 +520,23 @@ class CustomCardDialog(QDialog):
         layout.addLayout(button_layout)
     
     def load_tab_options(self):
-        """加载Tab选项"""
+        """加载Tab选项 - 只显示自定义Tab"""
         self.tab_combo.clear()
-        all_tabs = self.tab_config_manager.get_all_tabs()
         
-        for tab in all_tabs:
+        # 只获取自定义Tab
+        custom_tabs = self.tab_config_manager.custom_tabs
+        
+        if not custom_tabs:
+            # 如果没有自定义Tab，显示提示信息
+            self.tab_combo.addItem(self.tr("请先创建自定义Tab"), "")
+            self.tab_combo.setEnabled(False)
+            return
+        
+        # 添加自定义Tab选项
+        for tab in custom_tabs:
             self.tab_combo.addItem(tab['name'], tab['id'])
+        
+        self.tab_combo.setEnabled(True)
     
     def load_card_data(self):
         """加载Card数据"""
@@ -540,6 +566,12 @@ class CustomCardDialog(QDialog):
         tab_id = self.tab_combo.currentData()
         if not tab_id:
             QMessageBox.warning(self, self.tr("警告"), self.tr("请选择所属Tab"))
+            return
+        
+        # 验证选择的Tab是否为自定义Tab
+        custom_tab_ids = [tab['id'] for tab in self.tab_config_manager.custom_tabs]
+        if tab_id not in custom_tab_ids:
+            QMessageBox.warning(self, self.tr("警告"), self.tr("Card只能添加到自定义Tab中"))
             return
         
         card_data = {

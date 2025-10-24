@@ -82,20 +82,6 @@ class UnifiedManagerDialog(QDialog):
         self.reset_btn.setStyleSheet("QPushButton { background-color: #dc3545; color: white; }")
         button_layout.addWidget(self.reset_btn)
         
-        self.apply_btn = QPushButton("✅ " + self.tr("应用"))
-        self.apply_btn.clicked.connect(self.apply_tab_visibility)
-        self.apply_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #28a745;
-                color: white;
-                font-weight: bold;
-            }
-            QPushButton:hover {
-                background-color: #218838;
-            }
-        """)
-        button_layout.addWidget(self.apply_btn)
-        
         self.close_btn = QPushButton("❌ " + self.tr("关闭"))
         self.close_btn.clicked.connect(self.accept)
         button_layout.addWidget(self.close_btn)
@@ -109,8 +95,9 @@ class UnifiedManagerDialog(QDialog):
         
         # Tab显示控制
         visibility_group = QGroupBox(self.tr("Tab显示控制"))
-        visibility_layout = QVBoxLayout(visibility_group)
+        visibility_main_layout = QHBoxLayout(visibility_group)
         
+        # 左侧：滚动区域
         scroll_area = QScrollArea()
         scroll_widget = QWidget()
         scroll_layout = QVBoxLayout(scroll_widget)
@@ -120,20 +107,41 @@ class UnifiedManagerDialog(QDialog):
         scroll_area.setWidgetResizable(True)
         scroll_area.setMinimumHeight(200)
         scroll_area.setMaximumHeight(300)
-        visibility_layout.addWidget(scroll_area)
+        visibility_main_layout.addWidget(scroll_area)
         
+        # 右侧：应用按钮
+        apply_layout = QVBoxLayout()
+        apply_layout.addStretch()
+        
+        self.apply_btn = QPushButton("✅ " + self.tr("应用"))
+        self.apply_btn.clicked.connect(self.apply_tab_visibility)
+        self.apply_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #28a745;
+                color: white;
+                font-weight: bold;
+                padding: 8px 16px;
+            }
+            QPushButton:hover {
+                background-color: #218838;
+            }
+        """)
+        apply_layout.addWidget(self.apply_btn)
+        
+        visibility_main_layout.addLayout(apply_layout)
         layout.addWidget(visibility_group)
         
         # 自定义Tab管理
         custom_tab_group = QGroupBox(self.tr("自定义Tab管理"))
-        custom_tab_layout = QVBoxLayout(custom_tab_group)
+        custom_tab_main_layout = QHBoxLayout(custom_tab_group)
         
+        # 左侧：Tab列表
         self.custom_tab_list = QListWidget()
         self.custom_tab_list.setMaximumHeight(120)
-        custom_tab_layout.addWidget(self.custom_tab_list)
+        custom_tab_main_layout.addWidget(self.custom_tab_list)
         
-        # 自定义Tab按钮
-        custom_tab_btn_layout = QHBoxLayout()
+        # 右侧：Tab按钮（垂直排列）
+        custom_tab_btn_layout = QVBoxLayout()
         self.add_tab_btn = QPushButton("➕ " + self.tr("添加Tab"))
         self.add_tab_btn.clicked.connect(self.show_add_tab_dialog)
         custom_tab_btn_layout.addWidget(self.add_tab_btn)
@@ -146,19 +154,24 @@ class UnifiedManagerDialog(QDialog):
         self.delete_tab_btn.clicked.connect(self.delete_custom_tab)
         custom_tab_btn_layout.addWidget(self.delete_tab_btn)
         
-        custom_tab_layout.addLayout(custom_tab_btn_layout)
+        custom_tab_main_layout.addLayout(custom_tab_btn_layout)
         layout.addWidget(custom_tab_group)
         
         # 自定义Card管理
         custom_card_group = QGroupBox(self.tr("自定义Card管理"))
-        custom_card_layout = QVBoxLayout(custom_card_group)
+        custom_card_main_layout = QHBoxLayout(custom_card_group)
+        
+        # 左侧：Card列表区域
+        card_left_layout = QVBoxLayout()
         
         self.custom_card_list = QListWidget()
         self.custom_card_list.setMaximumHeight(120)
-        custom_card_layout.addWidget(self.custom_card_list)
+        card_left_layout.addWidget(self.custom_card_list)
         
-        # 自定义Card按钮
-        custom_card_btn_layout = QHBoxLayout()
+        custom_card_main_layout.addLayout(card_left_layout)
+        
+        # 右侧：Card按钮（垂直排列）
+        custom_card_btn_layout = QVBoxLayout()
         self.add_card_btn = QPushButton("➕ " + self.tr("添加Card"))
         self.add_card_btn.clicked.connect(self.show_add_card_dialog)
         custom_card_btn_layout.addWidget(self.add_card_btn)
@@ -171,7 +184,7 @@ class UnifiedManagerDialog(QDialog):
         self.delete_card_btn.clicked.connect(self.delete_custom_card)
         custom_card_btn_layout.addWidget(self.delete_card_btn)
         
-        custom_card_layout.addLayout(custom_card_btn_layout)
+        custom_card_main_layout.addLayout(custom_card_btn_layout)
         layout.addWidget(custom_card_group)
         
         return widget
@@ -424,8 +437,13 @@ class UnifiedManagerDialog(QDialog):
                 # 确认导入
                 reply = QMessageBox.question(
                     self,
-                    self.tr("确认导入"),
-                    self.tr("导入配置将覆盖当前所有设置，确定要继续吗？"),
+                    self.tr("确认导入配置"),
+                    (self.tr("⚠️ 导入配置将完全覆盖当前所有设置！\n\n") +
+                     self.tr("• 所有自定义Tab将被替换\n") +
+                     self.tr("• 所有自定义Card将被替换\n") +
+                     self.tr("• 所有自定义Button将被替换\n") +
+                     self.tr("• 当前配置将永久丢失\n\n") +
+                     self.tr("确定要继续导入吗？")),
                     QMessageBox.Yes | QMessageBox.No,
                     QMessageBox.No
                 )
@@ -460,6 +478,10 @@ class UnifiedManagerDialog(QDialog):
                     # 导入按钮配置
                     button_config = config_data['button_config']
                     self.custom_button_manager.buttons = button_config.get('custom_buttons', [])
+                    
+                    # 验证并修复Button的Tab名称引用
+                    self._validate_and_fix_button_tab_references()
+                    
                     self.custom_button_manager.save_buttons()
                     
                     # 重新加载所有配置
@@ -470,12 +492,56 @@ class UnifiedManagerDialog(QDialog):
                         self.parent().reload_tabs()
                         logger.info(self.tr("已通知主窗口重新加载Tab"))
                     
-                    QMessageBox.information(self, self.tr("成功"), self.tr("配置导入成功！"))
+                    # 统计导入的内容
+                    tab_count = len(self.tab_config_manager.custom_tabs)
+                    card_count = len(self.tab_config_manager.custom_cards)
+                    button_count = len(self.custom_button_manager.buttons)
+                    
+                    success_msg = (self.tr("✅ 配置导入成功！\n\n") +
+                                 f"{self.tr('导入内容:')}\n" +
+                                 f"• {self.tr('自定义Tab')}: {tab_count} {self.tr('个')}\n" +
+                                 f"• {self.tr('自定义Card')}: {card_count} {self.tr('个')}\n" +
+                                 f"• {self.tr('自定义Button')}: {button_count} {self.tr('个')}\n\n" +
+                                 f"{self.tr('文件来源:')} {file_path}")
+                    
+                    QMessageBox.information(self, self.tr("导入成功"), success_msg)
                     logger.info(f"{self.tr('配置已从文件导入:')} {file_path}")
                     
         except Exception as e:
             logger.exception(f"{self.tr('导入配置失败:')} {e}")
             QMessageBox.critical(self, self.tr("错误"), f"{self.tr('导入配置失败:')} {str(e)}")
+    
+    def _validate_and_fix_button_tab_references(self):
+        """验证并修复Button的Tab名称引用"""
+        try:
+            # 获取所有有效的Tab名称
+            valid_tab_names = set()
+            
+            # 添加默认Tab名称
+            for tab in self.tab_config_manager.default_tabs:
+                valid_tab_names.add(tab['name'])
+            
+            # 添加自定义Tab名称
+            for tab in self.tab_config_manager.custom_tabs:
+                valid_tab_names.add(tab['name'])
+            
+            # 检查并修复Button的Tab引用
+            fixed_count = 0
+            for button in self.custom_button_manager.buttons:
+                button_tab = button.get('tab', '')
+                if button_tab and button_tab not in valid_tab_names:
+                    # 尝试找到对应的Tab（通过ID或其他方式）
+                    # 这里可以根据需要添加更复杂的匹配逻辑
+                    logger.warning(f"{self.tr('Button')} '{button.get('name', '')}' {self.tr('引用了不存在的Tab:')} '{button_tab}'")
+                    # 可以选择设置为空或使用默认值
+                    button['tab'] = ''
+                    fixed_count += 1
+            
+            if fixed_count > 0:
+                logger.info(f"{self.tr('已修复')} {fixed_count} {self.tr('个Button的Tab引用')}")
+                
+        except Exception as e:
+            logger.exception(f"{self.tr('验证Button Tab引用失败:')} {e}")
     
     def reset_to_default(self):
         """重置为默认配置"""
@@ -559,6 +625,15 @@ class UnifiedManagerDialog(QDialog):
     
     def show_add_card_dialog(self):
         """显示添加Card对话框"""
+        # 检查是否有自定义Tab
+        if not self.tab_config_manager.custom_tabs:
+            QMessageBox.information(
+                self, 
+                self.tr("提示"), 
+                self.tr("请先创建自定义Tab，Card只能添加到自定义Tab中")
+            )
+            return
+        
         from ui.tab_manager_dialog import CustomCardDialog
         dialog = CustomCardDialog(self.tab_config_manager, parent=self)
         if dialog.exec_() == QDialog.Accepted:

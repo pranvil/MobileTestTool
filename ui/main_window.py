@@ -70,10 +70,13 @@ class MainWindow(QMainWindow):
         # 初始化设备管理器
         self.device_manager = PyQtDeviceManager(self)
         
+        # 显示友好的加载界面
+        self._show_loading_screen()
+        
         # 初始化所有管理器
         self._init_managers()
         
-        # 设置UI
+        # 设置UI（但不显示主窗口）
         self.setup_ui()
         
         # 加载主题
@@ -94,6 +97,9 @@ class MainWindow(QMainWindow):
         # 连接自定义按钮管理器信号
         self.custom_button_manager.buttons_updated.connect(self.on_custom_buttons_updated)
         
+        # 隐藏加载界面，显示主界面
+        self._hide_loading_screen()
+        
         # 异步刷新设备列表，避免阻塞UI显示
         from PyQt5.QtCore import QTimer
         QTimer.singleShot(100, self.device_manager.refresh_devices)
@@ -101,6 +107,95 @@ class MainWindow(QMainWindow):
     def tr(self, text):
         """安全地获取翻译文本"""
         return self.lang_manager.tr(text) if self.lang_manager else text
+    
+    def _show_loading_screen(self):
+        """显示友好的加载界面"""
+        from PyQt5.QtWidgets import QLabel, QVBoxLayout, QWidget, QProgressBar
+        from PyQt5.QtCore import Qt, QTimer
+        from PyQt5.QtGui import QFont
+        
+        # 创建加载窗口
+        self.loading_window = QWidget()
+        self.loading_window.setWindowTitle(self.lang_manager.tr("手机测试辅助工具"))
+        self.loading_window.setFixedSize(400, 200)
+        self.loading_window.setWindowFlags(Qt.WindowStaysOnTopHint | Qt.FramelessWindowHint)
+        
+        # 设置窗口居中
+        from PyQt5.QtWidgets import QApplication
+        screen = QApplication.primaryScreen().geometry()
+        x = (screen.width() - self.loading_window.width()) // 2
+        y = (screen.height() - self.loading_window.height()) // 2
+        self.loading_window.move(x, y)
+        
+        # 设置样式
+        self.loading_window.setStyleSheet("""
+            QWidget {
+                background-color: #2b2b2b;
+                color: #ffffff;
+                border-radius: 10px;
+            }
+        """)
+        
+        # 创建布局
+        layout = QVBoxLayout(self.loading_window)
+        layout.setAlignment(Qt.AlignCenter)
+        layout.setSpacing(20)
+        
+        # 应用标题
+        title_label = QLabel(self.lang_manager.tr("手机测试辅助工具"))
+        title_font = QFont()
+        title_font.setPointSize(16)
+        title_font.setBold(True)
+        title_label.setFont(title_font)
+        title_label.setAlignment(Qt.AlignCenter)
+        title_label.setStyleSheet("color: #4CAF50; margin-bottom: 10px;")
+        
+        # 加载提示
+        loading_label = QLabel(self.lang_manager.tr("正在初始化..."))
+        loading_label.setAlignment(Qt.AlignCenter)
+        loading_label.setStyleSheet("color: #cccccc; font-size: 14px;")
+        
+        # 进度条
+        self.progress_bar = QProgressBar()
+        self.progress_bar.setRange(0, 0)  # 无限进度条
+        self.progress_bar.setStyleSheet("""
+            QProgressBar {
+                border: 2px solid #555555;
+                border-radius: 5px;
+                text-align: center;
+                background-color: #1e1e1e;
+            }
+            QProgressBar::chunk {
+                background-color: #4CAF50;
+                border-radius: 3px;
+            }
+        """)
+        
+        # 版本信息
+        version_label = QLabel("v0.91")
+        version_label.setAlignment(Qt.AlignCenter)
+        version_label.setStyleSheet("color: #888888; font-size: 12px;")
+        
+        # 添加到布局
+        layout.addWidget(title_label)
+        layout.addWidget(loading_label)
+        layout.addWidget(self.progress_bar)
+        layout.addWidget(version_label)
+        
+        # 显示加载窗口
+        self.loading_window.show()
+        
+        # 强制刷新界面
+        QApplication.processEvents()
+    
+    def _hide_loading_screen(self):
+        """隐藏加载界面并显示主窗口"""
+        if hasattr(self, 'loading_window'):
+            self.loading_window.close()
+            self.loading_window = None
+        
+        # 显示主窗口
+        self.showMaximized()
         
     def _init_managers(self):
         """初始化所有管理器"""
@@ -185,7 +280,7 @@ class MainWindow(QMainWindow):
         # 设置窗口属性
         self.setWindowTitle(self.lang_manager.tr("手机测试辅助工具 v0.91"))
         self.setGeometry(100, 100, 900, 600)
-        self.showMaximized()
+        # 不立即显示主窗口，等初始化完成后再显示
         
         # 创建顶部工具栏
         self.toolbar = DeviceToolBar(self)

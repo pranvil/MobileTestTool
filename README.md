@@ -2,7 +2,7 @@
 
 <div align="center">
 
-![Version](https://img.shields.io/badge/version-0.8-blue.svg)
+![Version](https://img.shields.io/badge/version-0.9-blue.svg)
 ![Python](https://img.shields.io/badge/python-3.6+-green.svg)
 ![Platform](https://img.shields.io/badge/platform-Windows-lightgrey.svg)
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
@@ -87,11 +87,12 @@ pyinstaller --clean MobileTestTool_pyqt.spec
 - **多语言支持**: 中英文双语切换
 
 ### 🔧 自定义功能
-- **🆕 自定义按钮**: 用户可自行添加ADB命令按钮，无需修改代码
-- **Python脚本执行**: 支持执行自定义Python代码
+- **🆕 自定义按钮**: 支持5种类型的自定义按钮（ADB命令、Python脚本、文件操作、运行程序、系统命令）
+- **🆕 Tab管理**: 支持Tab拖拽排序、显示/隐藏、自定义Tab和Card
+- **Python脚本执行**: 支持执行自定义Python代码，输出显示在日志区域
 - **文件操作**: 快速打开PC文件或文件夹
 - **系统命令**: 执行系统命令行指令
-- **配置管理**: 支持配置导入导出
+- **配置管理**: 支持配置导入导出和备份恢复
 
 ---
 
@@ -119,9 +120,35 @@ pyinstaller --clean MobileTestTool_pyqt.spec
 2. 点击"开始获取网络信息"
 3. 实时查看蜂窝网络和WiFi信息
 
-### 🆕 自定义按钮功能
+### 🆕 Tab管理功能
 
-**支持多种类型的自定义按钮：ADB命令、Python脚本、文件操作等！**
+**支持Tab拖拽排序、显示/隐藏、自定义Tab和Card！**
+
+#### 基本操作
+1. **拖拽排序**: 直接拖拽Tab标题即可调整顺序
+2. **隐藏Tab**: 
+   - 切换到"其他"标签页
+   - 点击"📋 Tab管理"按钮
+   - 在"Tab排序和显示"中取消勾选不需要的Tab
+   - 点击"保存"
+
+#### 高级功能
+1. **创建自定义Tab**:
+   - 打开Tab管理对话框
+   - 切换到"自定义Tab"标签页
+   - 点击"添加Tab"
+   - 填写Tab信息并保存
+
+2. **创建自定义Card**:
+   - 在Tab管理对话框中切换到"自定义Card"标签页
+   - 点击"添加Card"
+   - 选择所属Tab并填写Card信息
+   - 保存配置
+
+#### 详细文档
+- [Tab管理功能完整指南.md](Tab管理功能完整指南.md) - 完整功能指南和问题修复记录
+
+### 🆕 自定义按钮功能
 
 #### 快速配置
 1. 切换到"其他"标签页
@@ -148,10 +175,10 @@ pyinstaller --clean MobileTestTool_pyqt.spec
 - **📥 导入**: 从文件加载配置
 
 #### 详细文档
-- [自定义按钮功能说明.md](自定义按钮功能说明.md) - 基础功能
-- [自定义按钮扩展功能说明.md](自定义按钮扩展功能说明.md) - 扩展功能
+- [自定义按钮功能完整指南.md](自定义按钮功能完整指南.md) - 完整功能指南
+- [Tab管理功能完整指南.md](Tab管理功能完整指南.md) - Tab管理功能
 - [Python脚本功能使用指南.md](Python脚本功能使用指南.md) - Python脚本
-- [自定义按钮配置迁移指南.md](自定义按钮配置迁移指南.md) - 升级迁移
+- [MTKlogger_Debug_使用说明.md](MTKlogger_Debug_使用说明.md) - 调试说明
 
 ---
 
@@ -178,6 +205,7 @@ MobileTestTool/
 │   ├── theme_manager.py         # 主题管理
 │   ├── language_manager.py      # 语言管理
 │   ├── custom_button_manager.py # 自定义按钮管理
+│   ├── tab_config_manager.py    # Tab配置管理
 │   └── ...                      # 其他管理器
 │
 ├── ui/                       # 界面组件
@@ -185,6 +213,8 @@ MobileTestTool/
 │   ├── toolbar.py               # 工具栏
 │   ├── menu_bar.py              # 菜单栏
 │   ├── custom_button_dialog.py  # 自定义按钮配置对话框
+│   ├── tab_manager_dialog.py    # Tab管理对话框
+│   ├── unified_manager_dialog.py # 统一管理对话框
 │   ├── tabs/                    # 功能标签页
 │   │   ├── log_control_tab.py
 │   │   ├── log_filter_tab.py
@@ -199,6 +229,9 @@ MobileTestTool/
 ├── Network_info/             # 网络信息解析模块
 │   ├── telephony_parser.py     # 电话信息解析
 │   └── utilities_wifi_info.py  # WiFi信息解析
+│
+├── tools/                    # 工具脚本
+│   └── audit_translations.py   # 翻译审计工具
 │
 └── resources/                # 应用资源
     └── apk/                     # APK文件
@@ -274,6 +307,16 @@ adb version
 - 确保ADB命令路径正确
 - 查看日志区域的错误信息
 
+**问题6：Tab管理功能异常**
+- 检查配置文件权限
+- 尝试重置Tab配置
+- 查看Tab管理功能完整指南中的问题修复记录
+
+**问题7：Python脚本执行失败**
+- 检查脚本语法是否正确
+- 确认使用的模块是否在允许列表中
+- 查看日志区域的错误信息
+
 ### 调试模式
 如需调试，可参考 [MTKlogger_Debug_使用说明.md](MTKlogger_Debug_使用说明.md)
 
@@ -281,7 +324,30 @@ adb version
 
 ## 📝 更新日志
 
-### v0.8 (当前版本)
+### v0.9 (当前版本)
+- 🆕 **Tab管理功能**: 完整的Tab管理解决方案
+  - Tab拖拽排序功能
+  - Tab显示/隐藏控制
+  - 自定义Tab和Card创建
+  - 配置自动保存和恢复
+  - 修复了所有已知的Tab相关问题
+- 🆕 **自定义按钮功能**: 支持多种类型的自定义按钮
+  - 可视化配置界面
+  - 支持5种按钮类型：ADB命令、Python脚本、打开文件、运行程序、系统命令
+  - 灵活的位置选择（任意Tab和卡片）
+  - 命令安全验证和执行
+  - 支持配置导入导出和备份恢复
+  - 动态加载，无需重启
+- 📖 **文档整合优化**: 整合了所有功能文档
+  - 创建了完整的功能指南
+  - 删除了重复的文档文件
+  - 优化了文档结构和可读性
+- 🧹 **代码清理**: 清理了项目中的临时文件和开发工具
+  - 删除了未使用的测试文件
+  - 删除了重复的文档文件
+  - 优化了项目结构
+
+### v0.8
 - 🆕 **自定义按钮功能**: 支持多种类型的自定义按钮
   - 可视化配置界面
   - 支持5种按钮类型：ADB命令、Python脚本、打开文件、运行程序、系统命令
