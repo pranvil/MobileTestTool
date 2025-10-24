@@ -43,13 +43,19 @@ class CustomButtonManager(QObject):
         super().__init__(parent)
         self.config_file = os.path.expanduser("~/.netui/custom_buttons.json")
         self.buttons = []
-        # 从父窗口获取语言管理器
+        # 从父窗口获取语言管理器和Tab配置管理器
         if parent and hasattr(parent, 'lang_manager'):
             self.lang_manager = parent.lang_manager
         else:
             # 如果没有父窗口或语言管理器，创建一个默认的
             from core.language_manager import LanguageManager
             self.lang_manager = LanguageManager()
+        
+        # 获取Tab配置管理器引用
+        self.tab_config_manager = None
+        if parent and hasattr(parent, 'tab_config_manager'):
+            self.tab_config_manager = parent.tab_config_manager
+        
         self.load_buttons()
     
     def tr(self, text):
@@ -138,7 +144,7 @@ class CustomButtonManager(QObject):
     
     def get_available_tabs(self):
         """获取可用的Tab列表"""
-        return [
+        tabs = [
             self.lang_manager.tr('Log控制'),
             self.lang_manager.tr('Log过滤'),
             self.lang_manager.tr('网络信息'),
@@ -148,20 +154,62 @@ class CustomButtonManager(QObject):
             self.lang_manager.tr('APP操作'),
             self.lang_manager.tr('其他')
         ]
+        
+        # 添加自定义Tab
+        custom_tabs = self.get_custom_tabs()
+        for custom_tab in custom_tabs:
+            tabs.append(custom_tab['name'])
+        
+        return tabs
     
     def get_available_cards(self, tab_name):
         """获取指定Tab下可用的Card列表"""
-        cards_map = {
-            self.lang_manager.tr('Log控制'): [self.lang_manager.tr('MTKLOG 控制'), self.lang_manager.tr('ADB Log 控制')],
-            self.lang_manager.tr('Log过滤'): [self.lang_manager.tr('过滤控制')],
-            self.lang_manager.tr('网络信息'): [self.lang_manager.tr('控制'), self.lang_manager.tr('网络信息')],
-            'TMO CC': [self.lang_manager.tr('CC配置'), self.lang_manager.tr('过滤操作')],
-            'TMO Echolocate': [self.lang_manager.tr('Echolocate 操作'), self.lang_manager.tr('过滤操作')],
-            self.lang_manager.tr('24小时背景数据'): [self.lang_manager.tr('24小时背景数据操作')],
-            self.lang_manager.tr('APP操作'): [self.lang_manager.tr('查询操作'), self.lang_manager.tr('APK操作'), self.lang_manager.tr('进程操作'), self.lang_manager.tr('APP状态操作')],
-            self.lang_manager.tr('其他'): [self.lang_manager.tr('设备信息'), self.lang_manager.tr('赫拉配置'), self.lang_manager.tr('其他操作'), self.lang_manager.tr('log操作')]
-        }
-        return cards_map.get(tab_name, [self.lang_manager.tr('默认')])
+        cards = []
+        
+        # 首先检查是否是自定义Tab
+        custom_tabs = self.get_custom_tabs()
+        custom_tab = next((tab for tab in custom_tabs if tab['name'] == tab_name), None)
+        
+        if custom_tab:
+            # 对于自定义Tab，从Tab配置管理器获取其Card
+            if self.tab_config_manager:
+                custom_cards = self.tab_config_manager.get_custom_cards_for_tab(custom_tab['id'])
+                cards.extend([card['name'] for card in custom_cards])
+        else:
+            # 对于预制Tab，获取默认Card
+            cards_map = {
+                self.lang_manager.tr('Log控制'): [self.lang_manager.tr('MTKLOG 控制'), self.lang_manager.tr('ADB Log 控制')],
+                self.lang_manager.tr('Log过滤'): [self.lang_manager.tr('过滤控制')],
+                self.lang_manager.tr('网络信息'): [self.lang_manager.tr('控制'), self.lang_manager.tr('网络信息')],
+                'TMO CC': [self.lang_manager.tr('CC配置'), self.lang_manager.tr('过滤操作')],
+                'TMO Echolocate': [self.lang_manager.tr('Echolocate 操作'), self.lang_manager.tr('过滤操作')],
+                self.lang_manager.tr('24小时背景数据'): [self.lang_manager.tr('24小时背景数据操作')],
+                self.lang_manager.tr('APP操作'): [self.lang_manager.tr('查询操作'), self.lang_manager.tr('APK操作'), self.lang_manager.tr('进程操作'), self.lang_manager.tr('APP状态操作')],
+                self.lang_manager.tr('其他'): [self.lang_manager.tr('设备信息'), self.lang_manager.tr('赫拉配置'), self.lang_manager.tr('其他操作'), self.lang_manager.tr('log操作')]
+            }
+            cards.extend(cards_map.get(tab_name, [self.lang_manager.tr('默认')]))
+            
+            # 对于预制Tab，也添加自定义Card（如果存在）
+            if self.tab_config_manager:
+                # 找到对应的Tab ID
+                all_tabs = self.tab_config_manager.get_all_tabs()
+                tab_id = None
+                for tab in all_tabs:
+                    if tab['name'] == tab_name:
+                        tab_id = tab['id']
+                        break
+                
+                if tab_id:
+                    custom_cards = self.tab_config_manager.get_custom_cards_for_tab(tab_id)
+                    cards.extend([card['name'] for card in custom_cards])
+        
+        return cards
+    
+    def get_custom_tabs(self):
+        """获取自定义Tab列表"""
+        if self.tab_config_manager:
+            return self.tab_config_manager.custom_tabs
+        return []
     
     def add_button(self, button_data):
         """添加按钮"""

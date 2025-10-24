@@ -47,6 +47,7 @@ from core.theme_manager import ThemeManager
 from core.custom_button_manager import CustomButtonManager
 from core.log_keyword_manager import LogKeywordManager
 from core.language_manager import LanguageManager
+from core.tab_config_manager import TabConfigManager
 
 
 class MainWindow(QMainWindow):
@@ -172,6 +173,12 @@ class MainWindow(QMainWindow):
         # 初始化log关键字管理器
         self.log_keyword_manager = LogKeywordManager(self)
         
+        # 初始化Tab配置管理器
+        self.tab_config_manager = TabConfigManager(self)
+        
+        # 重新设置CustomButtonManager的tab_config_manager引用
+        self.custom_button_manager.tab_config_manager = self.tab_config_manager
+        
     def setup_ui(self):
         """设置用户界面"""
         # 设置窗口属性
@@ -197,6 +204,10 @@ class MainWindow(QMainWindow):
         
         # Tab 区域
         self.tab_widget = QTabWidget()
+        
+        # 启用Tab拖拽排序
+        self.tab_widget.setMovable(True)
+        self.tab_widget.tabBar().tabMoved.connect(self._on_tab_moved)
         
         # 添加各个Tab
         self.setup_tabs()
@@ -414,66 +425,202 @@ class MainWindow(QMainWindow):
         self.other_tab.show_input_text_dialog.connect(self._on_show_input_text_dialog)
         self.other_tab.show_tools_config_dialog.connect(self._on_show_tools_config_dialog)
         self.other_tab.show_display_lines_dialog.connect(self._on_show_display_lines_dialog)
-        self.other_tab.show_custom_button_manager.connect(self.show_custom_button_manager_dialog)
+        self.other_tab.show_unified_manager.connect(self.show_unified_manager_dialog)
+        
+        # 连接Tab配置管理器信号
+        self.tab_config_manager.tab_config_updated.connect(self._on_tab_config_updated)
         
     def setup_tabs(self):
         """设置Tab页面"""
         logger.info(self.lang_manager.tr("开始初始化所有Tab页面..."))
         
         try:
-            # Log控制 Tab
-            logger.debug(self.lang_manager.tr("初始化 Log控制 Tab..."))
+            # 获取Tab配置
+            tab_order = self.tab_config_manager.get_tab_order()
+            tab_visibility = self.tab_config_manager.get_tab_visibility()
+            all_tabs = self.tab_config_manager.get_all_tabs()
+            
+            
+            # 创建tab实例映射
+            tab_instances = {}
+            
+            # 初始化所有默认Tab
+            
             self.log_control_tab = LogControlTab()
-            self.tab_widget.addTab(self.log_control_tab, self.lang_manager.tr("Log控制"))
-            logger.debug(self.lang_manager.tr("Log控制 Tab 初始化成功"))
+            self.log_control_tab.tab_id = 'log_control'  # 添加tab_id属性
+            tab_instances['log_control'] = self.log_control_tab
             
-            # Log过滤 Tab
-            logger.debug(self.lang_manager.tr("初始化 Log过滤 Tab..."))
             self.log_filter_tab = LogFilterTab()
-            self.tab_widget.addTab(self.log_filter_tab, self.lang_manager.tr("Log过滤"))
-            logger.debug(self.lang_manager.tr("Log过滤 Tab 初始化成功"))
+            self.log_filter_tab.tab_id = 'log_filter'  # 添加tab_id属性
+            tab_instances['log_filter'] = self.log_filter_tab
             
-            # 网络信息 Tab
-            logger.debug(self.lang_manager.tr("初始化 网络信息 Tab..."))
             self.network_info_tab = NetworkInfoTab()
-            self.tab_widget.addTab(self.network_info_tab, self.lang_manager.tr("网络信息"))
-            logger.debug(self.lang_manager.tr("网络信息 Tab 初始化成功"))
+            self.network_info_tab.tab_id = 'network_info'  # 添加tab_id属性
+            tab_instances['network_info'] = self.network_info_tab
             
-            # TMO CC Tab
-            logger.debug(self.lang_manager.tr("初始化 TMO CC Tab..."))
             self.tmo_cc_tab = TMOCCTab()
-            self.tab_widget.addTab(self.tmo_cc_tab, "TMO CC")
-            logger.debug(self.lang_manager.tr("TMO CC Tab 初始化成功"))
+            self.tmo_cc_tab.tab_id = 'tmo_cc'  # 添加tab_id属性
+            tab_instances['tmo_cc'] = self.tmo_cc_tab
             
-            # TMO Echolocate Tab
-            logger.debug(self.lang_manager.tr("初始化 TMO Echolocate Tab..."))
             self.tmo_echolocate_tab = TMOEcholocateTab()
-            self.tab_widget.addTab(self.tmo_echolocate_tab, "TMO Echolocate")
-            logger.debug(self.lang_manager.tr("TMO Echolocate Tab 初始化成功"))
+            self.tmo_echolocate_tab.tab_id = 'tmo_echolocate'  # 添加tab_id属性
+            tab_instances['tmo_echolocate'] = self.tmo_echolocate_tab
             
-            # 24小时背景数据 Tab
-            logger.debug(self.lang_manager.tr("初始化 24小时背景数据 Tab..."))
             self.background_data_tab = BackgroundDataTab()
-            self.tab_widget.addTab(self.background_data_tab, self.lang_manager.tr("24小时背景数据"))
-            logger.debug(self.lang_manager.tr("24小时背景数据 Tab 初始化成功"))
+            self.background_data_tab.tab_id = 'background_data'  # 添加tab_id属性
+            tab_instances['background_data'] = self.background_data_tab
             
-            # APP操作 Tab
-            logger.debug(self.lang_manager.tr("初始化 APP操作 Tab..."))
             self.app_operations_tab = AppOperationsTab()
-            self.tab_widget.addTab(self.app_operations_tab, self.lang_manager.tr("APP操作"))
-            logger.debug(self.lang_manager.tr("APP操作 Tab 初始化成功"))
+            self.app_operations_tab.tab_id = 'app_operations'  # 添加tab_id属性
+            tab_instances['app_operations'] = self.app_operations_tab
             
-            # 其他 Tab
-            logger.debug(self.lang_manager.tr("初始化 其他 Tab..."))
             self.other_tab = OtherTab()
-            self.tab_widget.addTab(self.other_tab, self.lang_manager.tr("其他"))
-            logger.debug(self.lang_manager.tr("其他 Tab 初始化成功"))
+            self.other_tab.tab_id = 'other'  # 添加tab_id属性
+            tab_instances['other'] = self.other_tab
+            
+            # 初始化自定义Tab
+            for custom_tab in self.tab_config_manager.custom_tabs:
+                tab_id = custom_tab['id']
+                tab_name = custom_tab['name']
+                
+                # 创建自定义Tab实例（这里可以扩展为动态创建）
+                custom_tab_instance = self._create_custom_tab_instance(custom_tab)
+                if custom_tab_instance:
+                    tab_instances[tab_id] = custom_tab_instance
+            
+            # 按照配置的顺序添加Tab
+            for tab_id in tab_order:
+                if tab_id in tab_instances and tab_visibility.get(tab_id, True):
+                    tab_instance = tab_instances[tab_id]
+                    tab_name = self._get_tab_name(tab_id, all_tabs)
+                    
+                    self.tab_widget.addTab(tab_instance, tab_name)
             
             logger.info(self.lang_manager.tr("所有Tab页面初始化完成"))
             
         except Exception as e:
             logger.exception(self.lang_manager.tr("Tab页面初始化失败"))
             raise
+    
+    def _get_tab_name(self, tab_id, all_tabs):
+        """获取Tab名称"""
+        # 首先在all_tabs中查找
+        for tab in all_tabs:
+            if tab['id'] == tab_id:
+                return tab['name']
+        
+        # 如果找不到，使用默认映射（直接使用中文名称，避免翻译失败）
+        default_names = {
+            'log_control': 'Log控制',
+            'log_filter': 'Log过滤',
+            'network_info': '网络信息',
+            'tmo_cc': 'TMO CC',
+            'tmo_echolocate': 'TMO Echolocate',
+            'background_data': '24小时背景数据',
+            'app_operations': 'APP操作',
+            'other': '其他'
+        }
+        
+        result = default_names.get(tab_id, tab_id)
+        return result
+    
+    def _create_custom_tab_instance(self, custom_tab):
+        """创建自定义Tab实例"""
+        try:
+            from PyQt5.QtWidgets import QWidget, QVBoxLayout, QLabel, QGroupBox, QScrollArea, QFrame
+            from PyQt5.QtCore import Qt
+            
+            widget = QWidget()
+            widget.tab_id = custom_tab['id']  # 设置tab_id属性
+            layout = QVBoxLayout(widget)
+            
+            # 添加Tab标题和描述
+            title_label = QLabel(f"{self.tr('自定义Tab:')} {custom_tab['name']}")
+            title_label.setProperty("class", "section-title")
+            title_label.setStyleSheet("font-size: 16px; font-weight: bold; margin: 10px 0;")
+            layout.addWidget(title_label)
+            
+            if custom_tab.get('description'):
+                desc_label = QLabel(f"{self.tr('描述:')} {custom_tab['description']}")
+                desc_label.setWordWrap(True)
+                layout.addWidget(desc_label)
+            
+            # 创建滚动区域
+            scroll_area = QScrollArea()
+            scroll_widget = QWidget()
+            scroll_layout = QVBoxLayout(scroll_widget)
+            
+            # 添加自定义Card
+            custom_cards = self.tab_config_manager.get_custom_cards_for_tab(custom_tab['id'])
+            for card in custom_cards:
+                card_group = self._create_custom_card_group(card)
+                if card_group:
+                    scroll_layout.addWidget(card_group)
+            
+            # 如果没有Card，添加提示
+            if not custom_cards:
+                no_cards_label = QLabel(self.tr("暂无自定义Card，请在Tab管理中创建"))
+                no_cards_label.setStyleSheet("color: #666; font-style: italic;")
+                scroll_layout.addWidget(no_cards_label)
+            
+            scroll_layout.addStretch()
+            scroll_area.setWidget(scroll_widget)
+            scroll_area.setWidgetResizable(True)
+            layout.addWidget(scroll_area)
+            
+            return widget
+        except Exception as e:
+            logger.exception(f"{self.tr('创建自定义Tab实例失败:')} {e}")
+            return None
+    
+    def _create_custom_card_group(self, card):
+        """创建自定义Card组（仅创建结构，按钮由统一方法添加）"""
+        try:
+            from PyQt5.QtWidgets import QGroupBox, QVBoxLayout, QHBoxLayout, QLabel
+            from PyQt5.QtCore import Qt
+            
+            group = QGroupBox(card['name'])
+            group.setProperty('custom_card', True)  # 标记为自定义Card
+            layout = QVBoxLayout(group)
+            
+            # 添加Card描述
+            if card.get('description'):
+                desc_label = QLabel(card['description'])
+                desc_label.setWordWrap(True)
+                desc_label.setStyleSheet("color: #666; margin-bottom: 10px;")
+                layout.addWidget(desc_label)
+            
+            # 添加空的按钮布局（按钮由load_custom_buttons_for_all_tabs统一添加）
+            button_layout = QHBoxLayout()
+            button_layout.addStretch()  # 添加stretch，按钮会插入到stretch之前
+            layout.addLayout(button_layout)
+            
+            logger.debug(f"{self.tr('创建自定义Card组:')} '{card['name']}' {self.tr('（按钮稍后添加）')}")
+            
+            return group
+        except Exception as e:
+            logger.exception(f"{self.tr('创建自定义Card组失败:')} {e}")
+            return None
+    
+    def _get_tab_name_by_id(self, tab_id):
+        """根据Tab ID获取Tab名称"""
+        all_tabs = self.tab_config_manager.get_all_tabs()
+        for tab in all_tabs:
+            if tab['id'] == tab_id:
+                return tab['name']
+        return tab_id
+    
+    def _find_custom_card_by_name(self, card_name):
+        """根据Card名称查找自定义Card"""
+        try:
+            for card in self.tab_config_manager.custom_cards:
+                if card['name'] == card_name:
+                    return card
+            return None
+        except Exception as e:
+            logger.exception(f"{self.tr('查找自定义Card失败:')} {e}")
+            return None
+    
         
     def _append_log_handler(self, text, color=None):
         """日志追加处理"""
@@ -648,25 +795,20 @@ class MainWindow(QMainWindow):
             
             # 刷新所有Tab标题和内容
             if hasattr(self, 'tab_widget'):
-                # 定义Tab标题映射
-                tab_titles = [
-                    self.lang_manager.tr("Log控制"),
-                    self.lang_manager.tr("Log过滤"),
-                    self.lang_manager.tr("网络信息"),
-                    "TMO CC",
-                    "TMO Echolocate",
-                    self.lang_manager.tr("24小时背景数据"),
-                    self.lang_manager.tr("APP操作"),
-                    self.lang_manager.tr("其他")
-                ]
-                
+                # 根据Tab的实际内容来设置标题，而不是硬编码
                 for i in range(self.tab_widget.count()):
-                    # 更新Tab标题
-                    if i < len(tab_titles):
-                        self.tab_widget.setTabText(i, tab_titles[i])
+                    tab_widget = self.tab_widget.widget(i)
+                    
+                    # 根据Tab实例类型设置正确的标题
+                    if hasattr(tab_widget, 'tab_id'):
+                        tab_id = tab_widget.tab_id
+                        # 使用Tab配置管理器获取正确的标题
+                        all_tabs = self.tab_config_manager.get_all_tabs()
+                        correct_title = self._get_tab_name(tab_id, all_tabs)
+                        self.tab_widget.setTabText(i, correct_title)
+                        logger.debug(f"刷新Tab标题: 索引={i}, ID={tab_id}, 标题={correct_title}")
                     
                     # 更新Tab内容
-                    tab_widget = self.tab_widget.widget(i)
                     if hasattr(tab_widget, 'refresh_texts'):
                         tab_widget.refresh_texts(self.lang_manager)
             
@@ -1517,13 +1659,112 @@ class MainWindow(QMainWindow):
                 '其他': self.other_tab
             }
             
+            logger.debug(f"{self.lang_manager.tr('处理预制Tab:')} {list(tabs.keys())}")
+            
             for tab_name, tab_instance in tabs.items():
                 self.load_custom_buttons_for_tab(tab_name, tab_instance)
+            
+            # 处理自定义Tab
+            logger.debug(f"{self.lang_manager.tr('处理自定义Tab...')}")
+            for i in range(self.tab_widget.count()):
+                widget = self.tab_widget.widget(i)
+                if hasattr(widget, 'tab_id'):
+                    tab_id = widget.tab_id
+                    logger.debug(f"{self.lang_manager.tr('检查Tab:')} {tab_id}")
+                    
+                    # 检查是否是自定义Tab
+                    for custom_tab in self.tab_config_manager.custom_tabs:
+                        if custom_tab['id'] == tab_id:
+                            logger.debug(f"{self.lang_manager.tr('找到自定义Tab:')} {custom_tab['name']}")
+                            self.load_custom_buttons_for_custom_tab(custom_tab, widget)
+                            break
             
             logger.info(self.lang_manager.tr("所有Tab的自定义按钮加载完成"))
             
         except Exception as e:
             logger.exception(f"{self.lang_manager.tr('加载自定义按钮失败:')} {e}")
+    
+    def load_custom_buttons_for_custom_tab(self, custom_tab, tab_widget):
+        """为自定义Tab加载自定义按钮"""
+        try:
+            logger.debug(f"{self.lang_manager.tr('为自定义Tab加载按钮:')} {custom_tab['name']}")
+            
+            # 获取该自定义Tab的所有自定义Card
+            custom_cards = self.tab_config_manager.get_custom_cards_for_tab(custom_tab['id'])
+            logger.debug(f"{self.lang_manager.tr('找到')} {len(custom_cards)} {self.lang_manager.tr('个自定义Card')}")
+            
+            for card in custom_cards:
+                logger.debug(f"{self.lang_manager.tr('处理Card:')} {card['name']}")
+                
+                # 获取该Card的自定义按钮
+                tab_name = custom_tab['name']
+                logger.debug(f"{self.lang_manager.tr('查找按钮: Tab=')} '{tab_name}', {self.lang_manager.tr('Card=')} '{card['name']}'")
+                
+                # 先检查所有按钮配置
+                all_buttons = self.custom_button_manager.get_all_buttons()
+                logger.debug(f"{self.lang_manager.tr('所有按钮配置:')} {len(all_buttons)} {self.lang_manager.tr('个')}")
+                for btn in all_buttons:
+                    logger.debug(f"  - {btn.get('name', '')} -> Tab: '{btn.get('tab', '')}', Card: '{btn.get('card', '')}'")
+                
+                buttons = self.custom_button_manager.get_buttons_by_location(tab_name, card['name'])
+                logger.debug(f"{self.lang_manager.tr('Card')} '{card['name']}' {self.lang_manager.tr('有')} {len(buttons)} {self.lang_manager.tr('个按钮')}")
+                
+                if buttons:
+                    # 查找对应的Card GroupBox并添加按钮
+                    self._add_buttons_to_custom_card(tab_widget, card['name'], buttons)
+            
+        except Exception as e:
+            logger.exception(f"{self.lang_manager.tr('为自定义Tab加载按钮失败:')} {e}")
+    
+    def _add_buttons_to_custom_card(self, tab_widget, card_name, buttons):
+        """向自定义Card添加按钮"""
+        try:
+            from PyQt5.QtWidgets import QGroupBox, QPushButton, QHBoxLayout
+            
+            logger.debug(f"{self.lang_manager.tr('尝试向自定义Card添加按钮:')} '{card_name}'")
+            
+            # 查找对应的GroupBox
+            group_boxes = tab_widget.findChildren(QGroupBox)
+            logger.debug(f"{self.lang_manager.tr('找到')} {len(group_boxes)} {self.lang_manager.tr('个GroupBox')}")
+            
+            for group_box in group_boxes:
+                if group_box.title() == card_name:
+                    logger.debug(f"{self.lang_manager.tr('找到匹配的GroupBox:')} '{card_name}'")
+                    
+                    # 查找按钮布局
+                    button_layouts = group_box.findChildren(QHBoxLayout)
+                    logger.debug(f"{self.lang_manager.tr('找到')} {len(button_layouts)} {self.lang_manager.tr('个QHBoxLayout')}")
+                    
+                    if button_layouts:
+                        button_layout = button_layouts[0]  # 使用第一个水平布局
+                        logger.debug(f"{self.lang_manager.tr('使用按钮布局添加')} {len(buttons)} {self.lang_manager.tr('个按钮')}")
+                        
+                        for btn_data in buttons:
+                            custom_btn = QPushButton(btn_data['name'])
+                            custom_btn.setToolTip(btn_data.get('description', btn_data['command']))
+                            custom_btn.setProperty('custom_button', True)
+                            
+                            custom_btn.clicked.connect(
+                                lambda checked=False, data=btn_data: self.execute_custom_button_command(data)
+                            )
+                            
+                            # 在stretch之前插入
+                            count = button_layout.count()
+                            if count > 0:
+                                insert_pos = count - 1 if button_layout.itemAt(count - 1).spacerItem() else count
+                                button_layout.insertWidget(insert_pos, custom_btn)
+                            else:
+                                button_layout.addWidget(custom_btn)
+                            
+                            logger.debug(f"{self.lang_manager.tr('添加按钮')} '{btn_data['name']}' {self.lang_manager.tr('到Card')} '{card_name}'")
+                    else:
+                        logger.warning(f"{self.lang_manager.tr('未找到按钮布局')}")
+                    break
+            else:
+                logger.warning(f"{self.lang_manager.tr('未找到Card')} '{card_name}'")
+                
+        except Exception as e:
+            logger.exception(f"{self.lang_manager.tr('向自定义Card添加按钮失败:')} {e}")
     
     def load_custom_buttons_for_tab(self, tab_name, tab_instance):
         """为指定Tab加载自定义按钮"""
@@ -1553,14 +1794,20 @@ class MainWindow(QMainWindow):
                 self._inject_custom_buttons_to_card(tab_instance, card_name, buttons)
     
     def _inject_custom_buttons_to_card(self, tab_instance, card_name, buttons):
-        """向指定卡片注入自定义按钮"""
+        """向指定卡片注入自定义按钮（仅处理预制Card）"""
         try:
             from PyQt5.QtWidgets import QFrame, QPushButton, QHBoxLayout, QVBoxLayout, QWidget, QLabel
             from PyQt5.QtCore import Qt
             
-            logger.debug(f"{self.lang_manager.tr('尝试向卡片')} '{card_name}' {self.lang_manager.tr('注入')} {len(buttons)} {self.lang_manager.tr('个按钮')}")
+            logger.debug(f"{self.lang_manager.tr('尝试向预制卡片')} '{card_name}' {self.lang_manager.tr('注入')} {len(buttons)} {self.lang_manager.tr('个按钮')}")
             
-            # 搜索Tab中的所有Frame/卡片
+            # 检查是否是自定义Card，如果是则跳过（自定义Card由_create_custom_card_group处理）
+            custom_card = self._find_custom_card_by_name(card_name)
+            if custom_card:
+                logger.debug(f"{self.lang_manager.tr('跳过自定义Card')} '{card_name}' {self.lang_manager.tr('，由统一方法处理')}")
+                return
+            
+            # 搜索Tab中的所有Frame/卡片（仅处理预制Card）
             frames = tab_instance.findChildren(QFrame)
             logger.debug(f"{self.lang_manager.tr('找到')} {len(frames)} {self.lang_manager.tr('个Frame')}")
             
@@ -1570,216 +1817,75 @@ class MainWindow(QMainWindow):
                 parent_widget = frame.parent()
                 if parent_widget:
                     labels = parent_widget.findChildren(QLabel)
-                    logger.debug(f"{self.lang_manager.tr('在Frame的父控件中找到')} {len(labels)} {self.lang_manager.tr('个Label')}")
                     
                     for label in labels:
                         label_text = label.text()
                         label_class = label.property("class")
-                        logger.debug(f"{self.lang_manager.tr('检查Label:')} '{label_text}', class: '{label_class}'")
                         
                         if label_text == card_name and label_class == "section-title":
-                            logger.debug(f"{self.lang_manager.tr('找到匹配的卡片:')} '{card_name}'")
+                            logger.debug(f"{self.lang_manager.tr('找到匹配的预制卡片:')} '{card_name}'")
                             found_card = True
                             
                             # 找到了对应的卡片
                             layout = frame.layout()
                             if layout:
-                                # 特殊处理Log过滤选项卡的"过滤控制"卡片
-                                if card_name == "过滤控制" and isinstance(layout, QVBoxLayout):
-                                    # 查找按钮布局（QHBoxLayout）
-                                    button_layout = None
-                                    for i in range(layout.count()):
-                                        item = layout.itemAt(i)
-                                        if item and item.layout() and isinstance(item.layout(), QHBoxLayout):
-                                            button_layout = item.layout()
-                                            break
+                                # 使用统一的按钮添加逻辑
+                                self._add_buttons_to_layout(layout, buttons, card_name)
+                                break
+                    
+                    if found_card:
+                        break
                                     
-                                    if button_layout:
-                                        logger.debug(self.lang_manager.tr("找到Log过滤选项卡的按钮布局，使用水平布局"))
-                                        # 在按钮布局中添加自定义按钮
-                                        for btn_data in buttons:
-                                            custom_btn = QPushButton(btn_data['name'])
-                                            custom_btn.setToolTip(btn_data.get('description', btn_data['command']))
-                                            custom_btn.setProperty('custom_button', True)
-                                            
-                                            custom_btn.clicked.connect(
-                                                lambda checked=False, data=btn_data: self.execute_custom_button_command(data)
-                                            )
-                                            
-                                            # 在stretch之前插入
-                                            count = button_layout.count()
-                                            if count > 0:
-                                                insert_pos = count - 1 if button_layout.itemAt(count - 1).spacerItem() else count
-                                                button_layout.insertWidget(insert_pos, custom_btn)
-                                            else:
-                                                button_layout.addWidget(custom_btn)
-                                            
-                                            logger.debug(f"{self.lang_manager.tr('添加自定义按钮')} '{btn_data['name']}' {self.lang_manager.tr('到')} '{card_name}' {self.lang_manager.tr('的水平布局')}")
-                                    else:
-                                        logger.warning(self.lang_manager.tr("未找到Log过滤选项卡的按钮布局"))
-                                # 特殊处理Log控制选项卡的"MTKLOG 控制"卡片
-                                elif card_name == "MTKLOG 控制" and isinstance(layout, QVBoxLayout):
-                                    # 查找最后一个按钮布局（QHBoxLayout），通常是第二行
-                                    button_layout = None
-                                    for i in range(layout.count() - 1, -1, -1):  # 从后往前查找
-                                        item = layout.itemAt(i)
-                                        if item and item.layout() and isinstance(item.layout(), QHBoxLayout):
-                                            button_layout = item.layout()
-                                            break
-                                    
-                                    if button_layout:
-                                        logger.debug(self.lang_manager.tr("找到Log控制选项卡的按钮布局，使用水平布局"))
-                                        # 在按钮布局中添加自定义按钮
-                                        for btn_data in buttons:
-                                            custom_btn = QPushButton(btn_data['name'])
-                                            custom_btn.setToolTip(btn_data.get('description', btn_data['command']))
-                                            custom_btn.setProperty('custom_button', True)
-                                            
-                                            custom_btn.clicked.connect(
-                                                lambda checked=False, data=btn_data: self.execute_custom_button_command(data)
-                                            )
-                                            
-                                            # 在stretch之前插入
-                                            count = button_layout.count()
-                                            if count > 0:
-                                                insert_pos = count - 1 if button_layout.itemAt(count - 1).spacerItem() else count
-                                                button_layout.insertWidget(insert_pos, custom_btn)
-                                            else:
-                                                button_layout.addWidget(custom_btn)
-                                            
-                                            logger.debug(f"{self.lang_manager.tr('添加自定义按钮')} '{btn_data['name']}' {self.lang_manager.tr('到')} '{card_name}' {self.lang_manager.tr('的水平布局')}")
-                                    else:
-                                        logger.warning(self.lang_manager.tr("未找到Log控制选项卡的按钮布局"))
-                                # 特殊处理网络信息选项卡的"控制"卡片
-                                elif card_name == "控制" and isinstance(layout, QVBoxLayout):
-                                    # 查找按钮布局（QHBoxLayout）
-                                    button_layout = None
-                                    for i in range(layout.count()):
-                                        item = layout.itemAt(i)
-                                        if item and item.layout() and isinstance(item.layout(), QHBoxLayout):
-                                            button_layout = item.layout()
-                                            break
-                                    
-                                    if button_layout:
-                                        logger.debug(self.lang_manager.tr("找到网络信息选项卡的按钮布局，使用水平布局"))
-                                        # 在按钮布局中添加自定义按钮
-                                        for btn_data in buttons:
-                                            custom_btn = QPushButton(btn_data['name'])
-                                            custom_btn.setToolTip(btn_data.get('description', btn_data['command']))
-                                            custom_btn.setProperty('custom_button', True)
-                                            
-                                            custom_btn.clicked.connect(
-                                                lambda checked=False, data=btn_data: self.execute_custom_button_command(data)
-                                            )
-                                            
-                                            # 在stretch之前插入
-                                            count = button_layout.count()
-                                            if count > 0:
-                                                insert_pos = count - 1 if button_layout.itemAt(count - 1).spacerItem() else count
-                                                button_layout.insertWidget(insert_pos, custom_btn)
-                                            else:
-                                                button_layout.addWidget(custom_btn)
-                                            
-                                            logger.debug(f"{self.lang_manager.tr('添加自定义按钮')} '{btn_data['name']}' {self.lang_manager.tr('到')} '{card_name}' {self.lang_manager.tr('的水平布局')}")
-                                    else:
-                                        logger.warning(self.lang_manager.tr("未找到网络信息选项卡的按钮布局"))
-                                # 特殊处理TMO Echolocate选项卡的"过滤操作"卡片
-                                elif card_name == "过滤操作" and isinstance(layout, QVBoxLayout):
-                                    # 查找最后一个按钮布局（QHBoxLayout），通常是最后一行
-                                    button_layout = None
-                                    for i in range(layout.count() - 1, -1, -1):  # 从后往前查找
-                                        item = layout.itemAt(i)
-                                        if item and item.layout() and isinstance(item.layout(), QHBoxLayout):
-                                            button_layout = item.layout()
-                                            break
-                                    
-                                    if button_layout:
-                                        logger.debug(self.lang_manager.tr("找到TMO Echolocate选项卡的按钮布局，使用水平布局"))
-                                        # 在按钮布局中添加自定义按钮
-                                        for btn_data in buttons:
-                                            custom_btn = QPushButton(btn_data['name'])
-                                            custom_btn.setToolTip(btn_data.get('description', btn_data['command']))
-                                            custom_btn.setProperty('custom_button', True)
-                                            
-                                            custom_btn.clicked.connect(
-                                                lambda checked=False, data=btn_data: self.execute_custom_button_command(data)
-                                            )
-                                            
-                                            # 在stretch之前插入
-                                            count = button_layout.count()
-                                            if count > 0:
-                                                insert_pos = count - 1 if button_layout.itemAt(count - 1).spacerItem() else count
-                                                button_layout.insertWidget(insert_pos, custom_btn)
-                                            else:
-                                                button_layout.addWidget(custom_btn)
-                                            
-                                            logger.debug(f"{self.lang_manager.tr('添加自定义按钮')} '{btn_data['name']}' {self.lang_manager.tr('到')} '{card_name}' {self.lang_manager.tr('的水平布局')}")
-                                    else:
-                                        logger.warning(self.lang_manager.tr("未找到TMO Echolocate选项卡的按钮布局"))
-                                # 特殊处理Log控制选项卡的"ADB Log 控制"卡片
-                                elif card_name == "ADB Log 控制" and isinstance(layout, QVBoxLayout):
-                                    # 查找最后一个按钮布局（QHBoxLayout），通常是第二行
-                                    button_layout = None
-                                    for i in range(layout.count() - 1, -1, -1):  # 从后往前查找
-                                        item = layout.itemAt(i)
-                                        if item and item.layout() and isinstance(item.layout(), QHBoxLayout):
-                                            button_layout = item.layout()
-                                            break
-                                    
-                                    if button_layout:
-                                        logger.debug(self.lang_manager.tr("找到Log控制选项卡的ADB Log按钮布局，使用水平布局"))
-                                        # 在按钮布局中添加自定义按钮
-                                        for btn_data in buttons:
-                                            custom_btn = QPushButton(btn_data['name'])
-                                            custom_btn.setToolTip(btn_data.get('description', btn_data['command']))
-                                            custom_btn.setProperty('custom_button', True)
-                                            
-                                            custom_btn.clicked.connect(
-                                                lambda checked=False, data=btn_data: self.execute_custom_button_command(data)
-                                            )
-                                            
-                                            # 在stretch之前插入
-                                            count = button_layout.count()
-                                            if count > 0:
-                                                insert_pos = count - 1 if button_layout.itemAt(count - 1).spacerItem() else count
-                                                button_layout.insertWidget(insert_pos, custom_btn)
-                                            else:
-                                                button_layout.addWidget(custom_btn)
-                                            
-                                            logger.debug(f"{self.lang_manager.tr('添加自定义按钮')} '{btn_data['name']}' {self.lang_manager.tr('到')} '{card_name}' {self.lang_manager.tr('的水平布局')}")
-                                    else:
-                                        logger.warning(self.lang_manager.tr("未找到Log控制选项卡的ADB Log按钮布局"))
-                                else:
-                                    # 其他卡片的处理方式
-                                    for btn_data in buttons:
-                                        custom_btn = QPushButton(btn_data['name'])
-                                        custom_btn.setToolTip(btn_data.get('description', btn_data['command']))
-                                        custom_btn.setProperty('custom_button', True)
-                                        
-                                        custom_btn.clicked.connect(
-                                            lambda checked=False, data=btn_data: self.execute_custom_button_command(data)
-                                        )
-                                        
-                                        # 插入到布局中（在stretch之前）
-                                        count = layout.count()
-                                        if count > 0:
-                                            # 在最后一个stretch或widget之前插入
-                                            insert_pos = count - 1 if layout.itemAt(count - 1).spacerItem() else count
-                                            if isinstance(layout, QHBoxLayout):
-                                                layout.insertWidget(insert_pos, custom_btn)
-                                            else:
-                                                layout.addWidget(custom_btn)
-                                        else:
-                                            layout.addWidget(custom_btn)
-                                        
-                                        logger.debug(f"{self.lang_manager.tr('添加自定义按钮')} '{btn_data['name']}' {self.lang_manager.tr('到')} '{card_name}'")
-                            break
-            
             if not found_card:
-                logger.warning(f"{self.lang_manager.tr('未找到卡片')} '{card_name}'，{self.lang_manager.tr('可能卡片名称不匹配')}")
+                logger.warning(f"{self.lang_manager.tr('未找到预制卡片')} '{card_name}'")
             
         except Exception as e:
-            logger.exception(f"{self.lang_manager.tr('向卡片')} '{card_name}' {self.lang_manager.tr('注入自定义按钮失败:')} {e}")
+            logger.exception(f"{self.lang_manager.tr('向预制卡片')} '{card_name}' {self.lang_manager.tr('注入自定义按钮失败:')} {e}")
+    
+    def _add_buttons_to_layout(self, layout, buttons, card_name):
+        """向布局中添加按钮（统一逻辑）"""
+        try:
+            from PyQt5.QtWidgets import QPushButton, QHBoxLayout
+            
+            # 查找合适的按钮布局
+            button_layout = None
+            
+            if isinstance(layout, QVBoxLayout):
+                # 查找最后一个QHBoxLayout
+                for i in range(layout.count() - 1, -1, -1):
+                    item = layout.itemAt(i)
+                    if item and item.layout() and isinstance(item.layout(), QHBoxLayout):
+                        button_layout = item.layout()
+                        break
+            elif isinstance(layout, QHBoxLayout):
+                button_layout = layout
+            
+            if button_layout:
+                logger.debug(f"{self.lang_manager.tr('找到按钮布局，添加')} {len(buttons)} {self.lang_manager.tr('个按钮')}")
+                
+                for btn_data in buttons:
+                    custom_btn = QPushButton(btn_data['name'])
+                    custom_btn.setToolTip(btn_data.get('description', btn_data['command']))
+                    custom_btn.setProperty('custom_button', True)
+                    
+                    custom_btn.clicked.connect(
+                        lambda checked=False, data=btn_data: self.execute_custom_button_command(data)
+                    )
+                    
+                    # 在stretch之前插入
+                    count = button_layout.count()
+                    if count > 0:
+                        insert_pos = count - 1 if button_layout.itemAt(count - 1).spacerItem() else count
+                        button_layout.insertWidget(insert_pos, custom_btn)
+                    else:
+                        button_layout.addWidget(custom_btn)
+                    
+                    logger.debug(f"{self.lang_manager.tr('添加自定义按钮')} '{btn_data['name']}' {self.lang_manager.tr('到')} '{card_name}'")
+            else:
+                logger.warning(f"{self.lang_manager.tr('未找到合适的按钮布局')}")
+            
+        except Exception as e:
+            logger.exception(f"{self.lang_manager.tr('向布局添加按钮失败:')} {e}")
     
     def execute_custom_button_command(self, button_data):
         """执行自定义按钮命令"""
@@ -1815,13 +1921,90 @@ class MainWindow(QMainWindow):
             # 清除所有Tab中的自定义按钮
             self._clear_all_custom_buttons()
             
-            # 重新加载
+            # 重新加载预制Tab的自定义按钮
+            self.load_custom_buttons_for_all_tabs()
+            
+            # 重新加载自定义Tab（重新创建Tab实例以包含新的按钮）
+            self._refresh_custom_tabs()
+            
+            # 为新创建的自定义Tab加载按钮
             self.load_custom_buttons_for_all_tabs()
             
             self.append_log.emit(self.lang_manager.tr("自定义按钮已更新") + "\n", "#00FF00")
             
         except Exception as e:
             logger.exception(f"{self.lang_manager.tr('更新自定义按钮失败:')} {e}")
+    
+    def _refresh_custom_tabs(self):
+        """刷新自定义Tab（重新创建以包含新的按钮）"""
+        try:
+            logger.info(self.lang_manager.tr("刷新自定义Tab..."))
+            
+            # 获取当前Tab顺序和可见性
+            tab_order = self.tab_config_manager.get_tab_order()
+            tab_visibility = self.tab_config_manager.get_tab_visibility()
+            
+            # 找到所有自定义Tab的索引
+            custom_tab_indices = []
+            for i in range(self.tab_widget.count()):
+                widget = self.tab_widget.widget(i)
+                if hasattr(widget, 'tab_id'):
+                    tab_id = widget.tab_id
+                    # 检查是否是自定义Tab
+                    for custom_tab in self.tab_config_manager.custom_tabs:
+                        if custom_tab['id'] == tab_id:
+                            custom_tab_indices.append(i)
+                            break
+            
+            # 从后往前删除自定义Tab（避免索引变化）
+            for i in reversed(custom_tab_indices):
+                self.tab_widget.removeTab(i)
+            
+            # 重新创建自定义Tab
+            for custom_tab in self.tab_config_manager.custom_tabs:
+                tab_id = custom_tab['id']
+                if tab_visibility.get(tab_id, True):
+                    # 重新创建自定义Tab实例
+                    custom_tab_instance = self._create_custom_tab_instance(custom_tab)
+                    if custom_tab_instance:
+                        # 找到正确的插入位置
+                        insert_index = self._find_tab_insert_position(tab_id, tab_order)
+                        tab_name = self._get_tab_name(tab_id, self.tab_config_manager.get_all_tabs())
+                        self.tab_widget.insertTab(insert_index, custom_tab_instance, tab_name)
+                        logger.debug(f"{self.lang_manager.tr('重新创建自定义Tab:')} {tab_name}")
+            
+            logger.info(self.lang_manager.tr("自定义Tab刷新完成"))
+            
+        except Exception as e:
+            logger.exception(f"{self.lang_manager.tr('刷新自定义Tab失败:')} {e}")
+    
+    def _find_tab_insert_position(self, tab_id, tab_order):
+        """找到Tab的插入位置"""
+        try:
+            # 找到tab_id在tab_order中的位置
+            if tab_id in tab_order:
+                target_index = tab_order.index(tab_id)
+                
+                # 计算当前Tab中应该插入的位置
+                current_index = 0
+                for i, ordered_tab_id in enumerate(tab_order):
+                    if ordered_tab_id == tab_id:
+                        return current_index
+                    
+                    # 检查这个Tab是否在当前Tab中可见
+                    for j in range(self.tab_widget.count()):
+                        widget = self.tab_widget.widget(j)
+                        if hasattr(widget, 'tab_id') and widget.tab_id == ordered_tab_id:
+                            current_index += 1
+                            break
+                
+                return current_index
+            
+            return self.tab_widget.count()  # 如果找不到，插入到最后
+            
+        except Exception as e:
+            logger.exception(f"{self.lang_manager.tr('查找Tab插入位置失败:')} {e}")
+            return self.tab_widget.count()
     
     def _clear_all_custom_buttons(self):
         """清除所有自定义按钮"""
@@ -1852,17 +2035,238 @@ class MainWindow(QMainWindow):
         except Exception as e:
             logger.exception(f"{self.lang_manager.tr('清除自定义按钮失败:')} {e}")
     
-    def show_custom_button_manager_dialog(self):
-        """显示自定义按钮管理对话框"""
+    def show_unified_manager_dialog(self):
+        """显示自定义界面管理对话框"""
         try:
-            from ui.custom_button_dialog import CustomButtonDialog
+            from ui.unified_manager_dialog import UnifiedManagerDialog
             
-            dialog = CustomButtonDialog(self.custom_button_manager, parent=self)
+            dialog = UnifiedManagerDialog(self.tab_config_manager, self.custom_button_manager, parent=self)
             dialog.exec_()
             
+            # 对话框关闭后，重新加载Tab以应用可能的更改
+            self.reload_tabs()
+            
         except Exception as e:
-            logger.exception(f"{self.lang_manager.tr('显示自定义按钮管理对话框失败:')} {e}")
-            QMessageBox.critical(self, self.lang_manager.tr("错误"), f"{self.lang_manager.tr('打开自定义按钮管理失败')}：{str(e)}")
+            logger.exception(f"{self.lang_manager.tr('显示自定义界面管理对话框失败:')} {e}")
+            QMessageBox.critical(self, self.lang_manager.tr("错误"), f"{self.lang_manager.tr('打开自定义界面管理失败')}：{str(e)}")
+    
+    def _on_tab_moved(self, from_index, to_index):
+        """Tab拖拽移动处理"""
+        try:
+            # 使用防抖机制，避免频繁保存
+            if hasattr(self, '_tab_move_timer'):
+                self._tab_move_timer.stop()
+            else:
+                from PyQt5.QtCore import QTimer
+                self._tab_move_timer = QTimer()
+                self._tab_move_timer.setSingleShot(True)
+                self._tab_move_timer.timeout.connect(self._save_tab_order)
+            
+            # 延迟500ms保存，避免拖拽过程中频繁保存
+            self._tab_move_timer.start(500)
+            
+        except Exception as e:
+            logger.exception(f"{self.tr('Tab拖拽处理失败:')} {e}")
+    
+    def _save_tab_order(self):
+        """保存Tab顺序（防抖处理）"""
+        try:
+            # 获取新的Tab顺序
+            new_order = []
+            for i in range(self.tab_widget.count()):
+                widget = self.tab_widget.widget(i)
+                tab_id = self._get_tab_id_by_widget(widget)
+                if tab_id:
+                    new_order.append(tab_id)
+                    logger.debug(f"保存Tab顺序: 位置{i} -> Tab ID: {tab_id}, Widget: {type(widget).__name__}")
+                else:
+                    logger.warning(f"无法获取Tab ID: 位置{i}, Widget: {type(widget).__name__}")
+            
+            # 保存新的顺序
+            self.tab_config_manager.set_tab_order(new_order)
+            logger.debug(f"{self.tr('Tab顺序已更新:')} {new_order}")
+            
+        except Exception as e:
+            logger.exception(f"{self.tr('保存Tab顺序失败:')} {e}")
+    
+    def _get_tab_id_by_widget(self, widget):
+        """根据widget获取tab_id"""
+        # 直接从widget的tab_id属性获取ID
+        if hasattr(widget, 'tab_id'):
+            tab_id = widget.tab_id
+            logger.debug(f"从tab_id属性获取ID: {tab_id}, Widget: {type(widget).__name__}")
+            return tab_id
+        
+        # 如果widget没有tab_id属性，使用旧的映射方法作为后备
+        widget_to_id = {
+            self.log_control_tab: 'log_control',
+            self.log_filter_tab: 'log_filter',
+            self.network_info_tab: 'network_info',
+            self.tmo_cc_tab: 'tmo_cc',
+            self.tmo_echolocate_tab: 'tmo_echolocate',
+            self.background_data_tab: 'background_data',
+            self.app_operations_tab: 'app_operations',
+            self.other_tab: 'other'
+        }
+        
+        # 检查是否是默认tab
+        if widget in widget_to_id:
+            tab_id = widget_to_id[widget]
+            logger.debug(f"从widget_to_id映射获取ID: {tab_id}, Widget: {type(widget).__name__}")
+            return tab_id
+        
+        # 检查是否是自定义tab
+        for custom_tab in self.tab_config_manager.custom_tabs:
+            # 这里需要根据实际的自定义tab实例来判断
+            # 目前简化处理
+            pass
+        
+        logger.warning(f"无法获取Tab ID: Widget: {type(widget).__name__}")
+        return None
+    
+    def _on_tab_config_updated(self):
+        """Tab配置更新处理"""
+        try:
+            logger.info(self.tr("检测到Tab配置更新，重新加载Tab..."))
+            self.reload_tabs()
+        except Exception as e:
+            logger.exception(f"{self.tr('Tab配置更新处理失败:')} {e}")
+    
+    def reload_tabs(self):
+        """重新加载Tab"""
+        try:
+            # 保存当前选中的tab
+            current_index = self.tab_widget.currentIndex()
+            current_widget = self.tab_widget.currentWidget() if current_index >= 0 else None
+            
+            # 清除所有tab
+            while self.tab_widget.count() > 0:
+                self.tab_widget.removeTab(0)
+            
+            # 重新设置tab
+            self.setup_tabs()
+            
+            # 重新连接Tab信号槽
+            self._reconnect_tab_signals()
+            
+            # 重新加载所有Tab的自定义按钮
+            self.load_custom_buttons_for_all_tabs()
+            
+            # 尝试恢复之前选中的tab
+            if current_widget:
+                for i in range(self.tab_widget.count()):
+                    if self.tab_widget.widget(i) == current_widget:
+                        self.tab_widget.setCurrentIndex(i)
+                        break
+            
+            logger.info(self.tr("Tab重新加载完成"))
+            
+        except Exception as e:
+            logger.exception(f"{self.tr('Tab重新加载失败:')} {e}")
+    
+    def _reconnect_tab_signals(self):
+        """重新连接Tab信号槽"""
+        try:
+            # 连接 Log控制 Tab 信号
+            if hasattr(self, 'log_control_tab'):
+                self.log_control_tab.mtklog_start.connect(self._on_mtklog_start)
+                self.log_control_tab.mtklog_stop_export.connect(self._on_mtklog_stop_export)
+                self.log_control_tab.mtklog_delete.connect(self._on_mtklog_delete)
+                self.log_control_tab.mtklog_set_log_size.connect(self._on_mtklog_set_log_size)
+                self.log_control_tab.mtklog_sd_mode.connect(self._on_mtklog_sd_mode)
+                self.log_control_tab.mtklog_usb_mode.connect(self._on_mtklog_usb_mode)
+                self.log_control_tab.mtklog_install.connect(self._on_mtklog_install)
+                self.log_control_tab.adblog_start.connect(self._on_adblog_start)
+                self.log_control_tab.adblog_online_start.connect(self._on_adblog_online_start)
+                self.log_control_tab.adblog_export.connect(self._on_adblog_export)
+                self.log_control_tab.telephony_enable.connect(self._on_telephony_enable)
+                self.log_control_tab.google_log_toggle.connect(self._on_google_log_toggle)
+                self.log_control_tab.bugreport_generate.connect(self._on_bugreport_generate)
+                self.log_control_tab.bugreport_pull.connect(self._on_bugreport_pull)
+                self.log_control_tab.bugreport_delete.connect(self._on_bugreport_delete)
+                self.log_control_tab.aee_log_start.connect(self._on_aee_log_start)
+                self.log_control_tab.tcpdump_show_dialog.connect(self._on_tcpdump_show_dialog)
+            
+            # 连接 Log过滤 Tab 信号
+            if hasattr(self, 'log_filter_tab'):
+                self.log_filter_tab.start_filtering.connect(self._on_start_filtering)
+                self.log_filter_tab.stop_filtering.connect(self._on_stop_filtering)
+                self.log_filter_tab.manage_log_keywords.connect(self._on_manage_log_keywords)
+                self.log_filter_tab.clear_logs.connect(self._on_clear_logs)
+                self.log_filter_tab.clear_device_logs.connect(self._on_clear_device_logs)
+                self.log_filter_tab.show_display_lines_dialog.connect(self._on_show_display_lines_dialog)
+                self.log_filter_tab.save_logs.connect(self._on_save_logs)
+            
+            # 连接 网络信息 Tab 信号
+            if hasattr(self, 'network_info_tab'):
+                self.network_info_tab.start_network_info.connect(self._on_start_network_info)
+                self.network_info_tab.stop_network_info.connect(self._on_stop_network_info)
+                self.network_info_tab.start_ping.connect(self._on_start_ping)
+                self.network_info_tab.stop_ping.connect(self._on_stop_ping)
+            
+            # 连接 TMO CC Tab 信号
+            if hasattr(self, 'tmo_cc_tab'):
+                self.tmo_cc_tab.push_cc_file.connect(self._on_push_cc_file)
+                self.tmo_cc_tab.pull_cc_file.connect(self._on_pull_cc_file)
+                self.tmo_cc_tab.simple_filter.connect(self._on_simple_filter)
+                self.tmo_cc_tab.complete_filter.connect(self._on_complete_filter)
+                self.tmo_cc_tab.prod_server.connect(self._on_prod_server)
+                self.tmo_cc_tab.stg_server.connect(self._on_stg_server)
+                self.tmo_cc_tab.clear_logs.connect(self._on_clear_logs)
+                self.tmo_cc_tab.clear_device_logs.connect(self._on_clear_device_logs)
+            
+            # 连接 TMO Echolocate Tab 信号
+            if hasattr(self, 'tmo_echolocate_tab'):
+                self.tmo_echolocate_tab.install_echolocate.connect(self._on_install_echolocate)
+                self.tmo_echolocate_tab.trigger_echolocate.connect(self._on_trigger_echolocate)
+                self.tmo_echolocate_tab.pull_echolocate_file.connect(self._on_pull_echolocate_file)
+                self.tmo_echolocate_tab.delete_echolocate_file.connect(self._on_delete_echolocate_file)
+                self.tmo_echolocate_tab.get_echolocate_version.connect(self._on_get_echolocate_version)
+                self.tmo_echolocate_tab.filter_callid.connect(self._on_filter_callid)
+                self.tmo_echolocate_tab.filter_callstate.connect(self._on_filter_callstate)
+                self.tmo_echolocate_tab.filter_uicallstate.connect(self._on_filter_uicallstate)
+                self.tmo_echolocate_tab.filter_allcallstate.connect(self._on_filter_allcallstate)
+                self.tmo_echolocate_tab.filter_ims_signalling.connect(self._on_filter_ims_signalling)
+                self.tmo_echolocate_tab.filter_allcallflow.connect(self._on_filter_allcallflow)
+                self.tmo_echolocate_tab.filter_voice_intent.connect(self._on_filter_voice_intent)
+            
+            # 连接 24小时背景数据 Tab 信号
+            if hasattr(self, 'background_data_tab'):
+                self.background_data_tab.configure_phone.connect(self._on_configure_phone)
+                self.background_data_tab.analyze_logs.connect(self._on_analyze_logs)
+            
+            # 连接 APP操作 Tab 信号
+            if hasattr(self, 'app_operations_tab'):
+                self.app_operations_tab.query_package.connect(self._on_query_package)
+                self.app_operations_tab.query_package_name.connect(self._on_query_package_name)
+                self.app_operations_tab.query_install_path.connect(self._on_query_install_path)
+                self.app_operations_tab.pull_apk.connect(self._on_pull_apk)
+                self.app_operations_tab.push_apk.connect(self._on_push_apk)
+                self.app_operations_tab.install_apk.connect(self._on_install_apk)
+                self.app_operations_tab.view_processes.connect(self._on_view_processes)
+                self.app_operations_tab.dump_app.connect(self._on_dump_app)
+                self.app_operations_tab.enable_app.connect(self._on_enable_app)
+                self.app_operations_tab.disable_app.connect(self._on_disable_app)
+            
+            # 连接 其他 Tab 信号
+            if hasattr(self, 'other_tab'):
+                self.other_tab.show_device_info_dialog.connect(self._on_show_device_info_dialog)
+                self.other_tab.set_screen_timeout.connect(self._on_set_screen_timeout)
+                self.other_tab.merge_mtklog.connect(self._on_merge_mtklog)
+                self.other_tab.extract_pcap_from_mtklog.connect(self._on_extract_pcap_from_mtklog)
+                self.other_tab.merge_pcap.connect(self._on_merge_pcap)
+                self.other_tab.extract_pcap_from_qualcomm_log.connect(self._on_extract_pcap_from_qualcomm_log)
+                self.other_tab.configure_hera.connect(self._on_configure_hera)
+                self.other_tab.configure_collect_data.connect(self._on_configure_collect_data)
+                self.other_tab.show_input_text_dialog.connect(self._on_show_input_text_dialog)
+                self.other_tab.show_tools_config_dialog.connect(self._on_show_tools_config_dialog)
+                self.other_tab.show_display_lines_dialog.connect(self._on_show_display_lines_dialog)
+                self.other_tab.show_unified_manager.connect(self.show_unified_manager_dialog)
+            
+            logger.debug(self.tr("Tab信号槽重新连接完成"))
+            
+        except Exception as e:
+            logger.exception(f"{self.tr('重新连接Tab信号槽失败:')} {e}")
     
     def closeEvent(self, event):
         """窗口关闭事件"""

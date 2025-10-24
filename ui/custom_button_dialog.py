@@ -727,12 +727,14 @@ class ButtonEditDialog(QDialog):
         position_layout = QFormLayout(position_group)
         
         self.tab_combo = QComboBox()
-        self.tab_combo.addItems(self.button_manager.get_available_tabs())
         self.tab_combo.currentTextChanged.connect(self.on_tab_changed)
         position_layout.addRow(self.tr("所在Tab*:"), self.tab_combo)
         
         self.card_combo = QComboBox()
         position_layout.addRow(self.tr("所在卡片*:"), self.card_combo)
+        
+        # 在card_combo创建之后刷新Tab列表
+        self.refresh_tab_list()
         
         self.enabled_check = QCheckBox(self.tr("启用此按钮"))
         self.enabled_check.setChecked(True)
@@ -761,9 +763,6 @@ class ButtonEditDialog(QDialog):
         scroll_area.setWidget(scroll_content)
         layout.addWidget(scroll_area)
         
-        # 初始化Card列表
-        self.on_tab_changed(self.tab_combo.currentText())
-        
         # 底部按钮
         button_layout = QHBoxLayout()
         button_layout.addStretch()
@@ -778,8 +777,21 @@ class ButtonEditDialog(QDialog):
         
         layout.addLayout(button_layout)
         
+        # 初始化Card列表（在card_combo创建之后）
+        self.on_tab_changed(self.tab_combo.currentText())
+        
         # 初始预览
         self.update_preview()
+    
+    def refresh_tab_list(self):
+        """刷新Tab列表"""
+        self.tab_combo.clear()
+        tabs = self.button_manager.get_available_tabs()
+        self.tab_combo.addItems(tabs)
+        
+        # 如果有选中的Tab，触发Card列表更新
+        if tabs:
+            self.on_tab_changed(tabs[0])
     
     def on_tab_changed(self, tab_name):
         """Tab改变时更新Card列表"""

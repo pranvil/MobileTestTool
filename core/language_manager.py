@@ -8,6 +8,7 @@
 import json
 import os
 import sys
+from datetime import datetime
 from PyQt5.QtCore import QObject, pyqtSignal
 from core.debug_logger import logger
 
@@ -172,8 +173,8 @@ class LanguageManager(QObject):
                 self.missing_translations.add(text)
                 self._log_missing_translation(text)
             
-            # 只记录翻译失败的日志
-            logger.warning(f"翻译失败: '{text}' (语言: {self.current_lang}) -> 返回原文")
+            # 不再在debug日志中输出翻译失败信息，减少日志噪音
+            # logger.warning(f"翻译失败: '{text}' (语言: {self.current_lang}) -> 返回原文")
             # 如果是英文环境且找不到翻译，添加标记
             if self.current_lang == 'en':
                 return f"[?] {text}"
@@ -186,22 +187,24 @@ class LanguageManager(QObject):
     def _log_missing_translation(self, text):
         """记录缺失的翻译"""
         try:
-            log_file = os.path.join(
-                os.path.dirname(os.path.dirname(__file__)),
-                'missing_translations.txt'
-            )
+            # 创建专门的翻译失败日志文件
+            log_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'logs')
+            os.makedirs(log_dir, exist_ok=True)
+            
+            # 翻译失败日志文件
+            translation_log_file = os.path.join(log_dir, 'translation_failures.txt')
             
             # 检查是否已经记录过这个翻译
-            if os.path.exists(log_file):
+            if os.path.exists(translation_log_file):
                 try:
-                    with open(log_file, 'r', encoding='utf-8') as f:
+                    with open(translation_log_file, 'r', encoding='utf-8') as f:
                         existing_translations = f.read().splitlines()
                         if text in existing_translations:
                             return  # 已经记录过，不重复记录
                 except UnicodeDecodeError:
                     # 如果UTF-8解码失败，尝试其他编码
                     try:
-                        with open(log_file, 'r', encoding='gbk') as f:
+                        with open(translation_log_file, 'r', encoding='gbk') as f:
                             existing_translations = f.read().splitlines()
                             if text in existing_translations:
                                 return
@@ -209,11 +212,18 @@ class LanguageManager(QObject):
                         # 如果还是失败，忽略检查，直接追加
                         pass
             
-            with open(log_file, 'a', encoding='utf-8') as f:
+            # 记录到翻译失败日志文件
+            timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            with open(translation_log_file, 'a', encoding='utf-8') as f:
+                f.write(f"[{timestamp}] {text}\n")
+            
+            # 同时记录到missing_translations.txt（保持向后兼容）
+            missing_file = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'missing_translations.txt')
+            with open(missing_file, 'a', encoding='utf-8') as f:
                 f.write(f"{text}\n")
             
-            # 只在第一次记录缺失翻译时输出日志
-            logger.warning(f"发现缺失翻译: '{text}' (已记录到文件)")
+            # 不再在debug日志中输出翻译失败信息，减少日志噪音
+            # logger.warning(f"发现缺失翻译: '{text}' (已记录到文件)")
         except Exception as e:
             logger.error(f"记录缺失翻译失败: {str(e)}")
     

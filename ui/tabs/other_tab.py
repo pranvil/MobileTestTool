@@ -40,8 +40,8 @@ class OtherTab(QWidget):
     # 设置显示行数
     show_display_lines_dialog = pyqtSignal()
     
-    # 自定义按钮管理
-    show_custom_button_manager = pyqtSignal()
+    # 自定义界面管理
+    show_unified_manager = pyqtSignal()
     
     def __init__(self, parent=None):
         try:
@@ -53,9 +53,7 @@ class OtherTab(QWidget):
                 # 如果没有父窗口或语言管理器，创建一个默认的
                 from core.language_manager import LanguageManager
                 self.lang_manager = LanguageManager()
-            logger.debug("OtherTab.__init__ 开始")
             self.setup_ui()
-            logger.debug("OtherTab.setup_ui() 完成")
         except Exception as e:
             logger.exception(self.lang_manager.tr("OtherTab 初始化失败"))
             raise
@@ -63,12 +61,10 @@ class OtherTab(QWidget):
     def setup_ui(self):
         """设置UI"""
         try:
-            logger.debug(self.lang_manager.tr("OtherTab.setup_ui 开始..."))
             # 主布局
             main_layout = QVBoxLayout(self)
             main_layout.setContentsMargins(10, 10, 10, 10)
             main_layout.setSpacing(10)
-            logger.debug(self.lang_manager.tr("主布局创建完成"))
             
             # 创建滚动区域
             scroll = QScrollArea()
@@ -118,7 +114,6 @@ class OtherTab(QWidget):
     def create_device_info_group(self):
         """创建设备信息操作组（现代结构：QLabel + QFrame）"""
         try:
-            logger.debug(self.lang_manager.tr("创建设备信息操作组..."))
             # 容器
             container = QWidget()
             v = QVBoxLayout(container)
@@ -151,7 +146,6 @@ class OtherTab(QWidget):
             
             v.addWidget(card)
             
-            logger.debug(self.lang_manager.tr("设备信息操作组创建完成"))
             return container
         except Exception as e:
             logger.exception(self.lang_manager.tr("create_device_info_group 失败"))
@@ -228,19 +222,19 @@ class OtherTab(QWidget):
         self.show_display_lines_btn.clicked.connect(self.show_display_lines_dialog.emit)
         card_layout.addWidget(self.show_display_lines_btn)
         
-        self.custom_button_manager_btn = QPushButton("🔧 " + self.lang_manager.tr("管理自定义按钮"))
-        self.custom_button_manager_btn.clicked.connect(self.show_custom_button_manager.emit)
-        self.custom_button_manager_btn.setStyleSheet("""
+        self.unified_manager_btn = QPushButton("⚙️ " + self.lang_manager.tr("自定义界面管理"))
+        self.unified_manager_btn.clicked.connect(self.show_unified_manager.emit)
+        self.unified_manager_btn.setStyleSheet("""
             QPushButton {
-                background-color: #28a745;
+                background-color: #6f42c1;
                 color: white;
                 font-weight: bold;
             }
             QPushButton:hover {
-                background-color: #218838;
+                background-color: #5a32a3;
             }
         """)
-        card_layout.addWidget(self.custom_button_manager_btn)
+        card_layout.addWidget(self.unified_manager_btn)
         
         card_layout.addStretch()
         
@@ -327,7 +321,9 @@ class OtherTab(QWidget):
         if hasattr(self, 'show_display_lines_btn'):
             self.show_display_lines_btn.setText(self.lang_manager.tr("设置显示行数"))
         if hasattr(self, 'custom_button_manager_btn'):
-            self.custom_button_manager_btn.setText("🔧 " + self.lang_manager.tr("管理自定义按钮"))    
+            self.custom_button_manager_btn.setText("🔧 " + self.lang_manager.tr("管理自定义按钮"))
+        if hasattr(self, 'tab_manager_btn'):
+            self.tab_manager_btn.setText("📋 " + self.lang_manager.tr("Tab管理"))    
 
         # 刷新log操作组按钮
         if hasattr(self, 'merge_mtklog_btn'):
