@@ -862,8 +862,8 @@ class MainWindow(QMainWindow):
                         self.append_log.emit("❌ " + self.tr("执行 adb reboot 失败: ") + str(e) + "\n", "#FF0000")
                 else:
                     self.append_log.emit(f"{self.lang_manager.tr('用户取消重启')}\n", None)
-            else:
-                self.append_log.emit(f"{self.lang_manager.tr('Root&remount 完成')}\n", None)
+            # else:
+            #     self.append_log.emit(f"{self.lang_manager.tr('Root&remount 完成')}\n", None)
                     
         except subprocess.TimeoutExpired:
             self.append_log.emit(f"⚠️ {self.lang_manager.tr('adb remount 执行超时')}\n", "#FFA500")

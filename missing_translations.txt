@@ -1,0 +1,757 @@
+手机测试辅助工具
+正在初始化...
+个自定义按钮
+成功加载Tab配置
+Root&&Remount
+支持快速执行一次性ADB命令
+
+例如: adb devices, adb shell pm list packages 等
+
+不支持持续输出命令（logcat、top等），请使用对应功能
+点击切换语言 / Click to switch language
+开始初始化所有Tab页面...
+启用Telephony日志
+连线log
+离线log
+自定义界面管理
+自定义Tab:
+创建自定义Card组:
+（按钮稍后添加）
+所有Tab页面初始化完成
+拉取 Bugreport
+TCPDUMP
+Ping
+点击
+按钮获取网络信息
+中/EN
+开始为所有Tab加载自定义按钮...
+处理预制Tab:
+默认
+尝试向预制卡片
+注入
+个按钮
+找到
+个Frame
+找到匹配的预制卡片:
+处理自定义Tab...
+检查Tab:
+找到自定义Tab:
+为自定义Tab加载按钮:
+个自定义Card
+处理Card:
+查找按钮: Tab=
+Card=
+所有按钮配置:
+个
+Card
+有
+尝试向自定义Card添加按钮:
+个GroupBox
+找到匹配的GroupBox:
+个QHBoxLayout
+使用按钮布局添加
+到Card
+所有Tab的自定义按钮加载完成
+执行 adb root...
+执行 adb remount...
+手机测试辅助工具
+正在初始化...
+个自定义按钮
+成功加载Tab配置
+Root&&Remount
+支持快速执行一次性ADB命令
+
+例如: adb devices, adb shell pm list packages 等
+
+不支持持续输出命令（logcat、top等），请使用对应功能
+点击切换语言 / Click to switch language
+开始初始化所有Tab页面...
+启用Telephony日志
+连线log
+离线log
+自定义界面管理
+自定义Tab:
+创建自定义Card组:
+（按钮稍后添加）
+所有Tab页面初始化完成
+拉取 Bugreport
+TCPDUMP
+Ping
+点击
+按钮获取网络信息
+中/EN
+开始为所有Tab加载自定义按钮...
+处理预制Tab:
+默认
+尝试向预制卡片
+注入
+个按钮
+找到
+个Frame
+找到匹配的预制卡片:
+处理自定义Tab...
+检查Tab:
+找到自定义Tab:
+为自定义Tab加载按钮:
+个自定义Card
+处理Card:
+查找按钮: Tab=
+Card=
+所有按钮配置:
+个
+Card
+有
+尝试向自定义Card添加按钮:
+个GroupBox
+找到匹配的GroupBox:
+个QHBoxLayout
+使用按钮布局添加
+到Card
+所有Tab的自定义按钮加载完成
+停止并导出 MTKLOG...
+输入日志名称
+请输入日志名称:
+导出媒体文件
+是否同时导出截图和录制的视频？
+
+
+包括:
+
+• 屏幕录制视频
+
+• 截图文件
+
+
+选择
+是
+将额外导出这些媒体文件。
+开始停止并导出MTKLOG操作，设备:
+, 日志名称:
+, 导出媒体:
+检查屏幕状态...
+屏幕状态检查完成
+启动logger应用...
+启动logger应用命令:
+启动应用结果 - returncode:
+检查logger状态...
+尝试连接设备:
+设备连接成功，查找按钮:
+按钮存在，checked状态:
+Logger未在运行，跳过停止操作
+创建日志目录:
+目录已存在:
+检查
+检查文件夹:
+检查命令结果 - returncode:
+文件夹不存在，跳过:
+执行pull命令:
+Pull命令结果 - returncode:
+导出成功
+警告:
+导出失败:
+MTKLOG停止并导出操作完成，导出路径:
+MTKLOG已停止
+MTKLOG已导出到: 
+MTKLOG已停止并导出 -
+打开工具配置对话框...
+存储路径配置
+存储路径:
+留空使用默认路径: c:\log\yyyymmdd
+浏览
+ELT路径:
+高通工具路径:
+工具配置对话框已关闭
+手机测试辅助工具
+正在初始化...
+个自定义按钮
+成功加载Tab配置
+Root&&Remount
+支持快速执行一次性ADB命令
+
+例如: adb devices, adb shell pm list packages 等
+
+不支持持续输出命令（logcat、top等），请使用对应功能
+点击切换语言 / Click to switch language
+开始初始化所有Tab页面...
+启用Telephony日志
+连线log
+离线log
+自定义界面管理
+自定义Tab:
+创建自定义Card组:
+（按钮稍后添加）
+所有Tab页面初始化完成
+拉取 Bugreport
+TCPDUMP
+Ping
+点击
+按钮获取网络信息
+中/EN
+开始为所有Tab加载自定义按钮...
+处理预制Tab:
+默认
+尝试向预制卡片
+注入
+个按钮
+找到
+个Frame
+找到匹配的预制卡片:
+处理自定义Tab...
+检查Tab:
+找到自定义Tab:
+为自定义Tab加载按钮:
+个自定义Card
+处理Card:
+查找按钮: Tab=
+Card=
+所有按钮配置:
+个
+Card
+有
+尝试向自定义Card添加按钮:
+个GroupBox
+找到匹配的GroupBox:
+个QHBoxLayout
+使用按钮布局添加
+到Card
+所有Tab的自定义按钮加载完成
+停止并导出 MTKLOG...
+输入日志名称
+请输入日志名称:
+导出媒体文件
+是否同时导出截图和录制的视频？
+
+
+包括:
+
+• 屏幕录制视频
+
+• 截图文件
+
+
+选择
+是
+将额外导出这些媒体文件。
+开始停止并导出MTKLOG操作，设备:
+, 日志名称:
+, 导出媒体:
+检查屏幕状态...
+屏幕状态检查完成
+启动logger应用...
+启动logger应用命令:
+启动应用结果 - returncode:
+检查logger状态...
+尝试连接设备:
+设备连接成功，查找按钮:
+按钮存在，checked状态:
+Logger未在运行，跳过停止操作
+创建日志目录:
+目录已存在:
+检查
+检查文件夹:
+检查命令结果 - returncode:
+文件夹不存在，跳过:
+执行pull命令:
+MTKLOG停止并导出操作异常:
+导出MTKLOG失败:
+手机测试辅助工具
+正在初始化...
+个自定义按钮
+成功加载Tab配置
+Root&&Remount
+支持快速执行一次性ADB命令
+
+例如: adb devices, adb shell pm list packages 等
+
+不支持持续输出命令（logcat、top等），请使用对应功能
+点击切换语言 / Click to switch language
+开始初始化所有Tab页面...
+启用Telephony日志
+连线log
+离线log
+自定义界面管理
+自定义Tab:
+创建自定义Card组:
+（按钮稍后添加）
+所有Tab页面初始化完成
+拉取 Bugreport
+TCPDUMP
+Ping
+点击
+按钮获取网络信息
+中/EN
+开始为所有Tab加载自定义按钮...
+处理预制Tab:
+默认
+尝试向预制卡片
+注入
+个按钮
+找到
+个Frame
+找到匹配的预制卡片:
+处理自定义Tab...
+检查Tab:
+找到自定义Tab:
+为自定义Tab加载按钮:
+个自定义Card
+处理Card:
+查找按钮: Tab=
+Card=
+所有按钮配置:
+个
+Card
+有
+尝试向自定义Card添加按钮:
+个GroupBox
+找到匹配的GroupBox:
+个QHBoxLayout
+使用按钮布局添加
+到Card
+所有Tab的自定义按钮加载完成
+停止并导出 MTKLOG...
+输入日志名称
+请输入日志名称:
+导出媒体文件
+是否同时导出截图和录制的视频？
+
+
+包括:
+
+• 屏幕录制视频
+
+• 截图文件
+
+
+选择
+是
+将额外导出这些媒体文件。
+开始停止并导出MTKLOG操作，设备:
+, 日志名称:
+, 导出媒体:
+检查屏幕状态...
+屏幕状态检查完成
+启动logger应用...
+启动logger应用命令:
+启动应用结果 - returncode:
+检查logger状态...
+尝试连接设备:
+设备连接成功，查找按钮:
+按钮存在，checked状态:
+Logger未在运行，跳过停止操作
+创建日志目录:
+目录已存在:
+检查
+检查文件夹:
+检查命令结果 - returncode:
+文件夹不存在，跳过:
+执行pull命令:
+Pull命令结果 - returncode:
+警告:
+导出失败:
+MTKLOG停止并导出操作完成，导出路径:
+MTKLOG已停止
+MTKLOG已导出到: 
+MTKLOG已停止并导出 -
+手机测试辅助工具
+正在初始化...
+个自定义按钮
+成功加载Tab配置
+Root&&Remount
+支持快速执行一次性ADB命令
+
+例如: adb devices, adb shell pm list packages 等
+
+不支持持续输出命令（logcat、top等），请使用对应功能
+点击切换语言 / Click to switch language
+开始初始化所有Tab页面...
+启用Telephony日志
+连线log
+离线log
+自定义界面管理
+自定义Tab:
+创建自定义Card组:
+（按钮稍后添加）
+所有Tab页面初始化完成
+拉取 Bugreport
+TCPDUMP
+Ping
+点击
+按钮获取网络信息
+中/EN
+开始为所有Tab加载自定义按钮...
+处理预制Tab:
+默认
+尝试向预制卡片
+注入
+个按钮
+找到
+个Frame
+找到匹配的预制卡片:
+处理自定义Tab...
+检查Tab:
+找到自定义Tab:
+为自定义Tab加载按钮:
+个自定义Card
+处理Card:
+查找按钮: Tab=
+Card=
+所有按钮配置:
+个
+Card
+有
+尝试向自定义Card添加按钮:
+个GroupBox
+找到匹配的GroupBox:
+个QHBoxLayout
+使用按钮布局添加
+到Card
+所有Tab的自定义按钮加载完成
+停止并导出 MTKLOG...
+输入日志名称
+请输入日志名称:
+导出媒体文件
+是否同时导出截图和录制的视频？
+
+
+包括:
+
+• 屏幕录制视频
+
+• 截图文件
+
+
+选择
+是
+将额外导出这些媒体文件。
+开始停止并导出MTKLOG操作，设备:
+, 日志名称:
+, 导出媒体:
+检查屏幕状态...
+屏幕状态检查完成
+启动logger应用...
+启动logger应用命令:
+启动应用结果 - returncode:
+检查logger状态...
+尝试连接设备:
+设备连接成功，查找按钮:
+按钮存在，checked状态:
+Logger未在运行，跳过停止操作
+创建日志目录:
+目录已存在:
+检查
+检查文件夹:
+检查命令结果 - returncode:
+文件夹不存在，跳过:
+执行pull命令:
+错误:
+导出超时，跳过
+Pull命令结果 - returncode:
+导出成功
+MTKLOG停止并导出操作完成，导出路径:
+MTKLOG已停止
+MTKLOG已导出到: 
+MTKLOG已停止并导出 -
+手机测试辅助工具
+正在初始化...
+个自定义按钮
+成功加载Tab配置
+Root&&Remount
+支持快速执行一次性ADB命令
+
+例如: adb devices, adb shell pm list packages 等
+
+不支持持续输出命令（logcat、top等），请使用对应功能
+点击切换语言 / Click to switch language
+开始初始化所有Tab页面...
+启用Telephony日志
+连线log
+离线log
+自定义界面管理
+自定义Tab:
+创建自定义Card组:
+（按钮稍后添加）
+所有Tab页面初始化完成
+拉取 Bugreport
+TCPDUMP
+Ping
+点击
+按钮获取网络信息
+中/EN
+开始为所有Tab加载自定义按钮...
+处理预制Tab:
+默认
+尝试向预制卡片
+注入
+个按钮
+找到
+个Frame
+找到匹配的预制卡片:
+处理自定义Tab...
+检查Tab:
+找到自定义Tab:
+为自定义Tab加载按钮:
+个自定义Card
+处理Card:
+查找按钮: Tab=
+Card=
+所有按钮配置:
+个
+Card
+有
+尝试向自定义Card添加按钮:
+个GroupBox
+找到匹配的GroupBox:
+个QHBoxLayout
+使用按钮布局添加
+到Card
+所有Tab的自定义按钮加载完成
+停止并导出 MTKLOG...
+输入日志名称
+请输入日志名称:
+导出媒体文件
+是否同时导出截图和录制的视频？
+
+
+包括:
+
+• 屏幕录制视频
+
+• 截图文件
+
+
+选择
+是
+将额外导出这些媒体文件。
+开始停止并导出MTKLOG操作，设备:
+, 日志名称:
+, 导出媒体:
+检查屏幕状态...
+屏幕状态检查完成
+启动logger应用...
+启动logger应用命令:
+启动应用结果 - returncode:
+检查logger状态...
+尝试连接设备:
+设备连接成功，查找按钮:
+按钮存在，checked状态:
+Logger未在运行，跳过停止操作
+创建日志目录:
+目录已存在:
+检查
+检查文件夹:
+检查命令结果 - returncode:
+文件夹不存在，跳过:
+尝试检查bugreports路径权限:
+目录列表结果:
+执行pull命令:
+Pull命令结果 - returncode:
+导出成功
+警告:
+导出失败:
+MTKLOG停止并导出操作完成，导出路径:
+MTKLOG已停止
+MTKLOG已导出到: 
+MTKLOG已停止并导出 -
+手机测试辅助工具
+正在初始化...
+个自定义按钮
+成功加载Tab配置
+Root&&Remount
+支持快速执行一次性ADB命令
+
+例如: adb devices, adb shell pm list packages 等
+
+不支持持续输出命令（logcat、top等），请使用对应功能
+点击切换语言 / Click to switch language
+开始初始化所有Tab页面...
+启用Telephony日志
+连线log
+离线log
+自定义界面管理
+自定义Tab:
+创建自定义Card组:
+（按钮稍后添加）
+所有Tab页面初始化完成
+拉取 Bugreport
+TCPDUMP
+Ping
+点击
+按钮获取网络信息
+中/EN
+开始为所有Tab加载自定义按钮...
+处理预制Tab:
+默认
+尝试向预制卡片
+注入
+个按钮
+找到
+个Frame
+找到匹配的预制卡片:
+处理自定义Tab...
+检查Tab:
+找到自定义Tab:
+为自定义Tab加载按钮:
+个自定义Card
+处理Card:
+查找按钮: Tab=
+Card=
+所有按钮配置:
+个
+Card
+有
+尝试向自定义Card添加按钮:
+个GroupBox
+找到匹配的GroupBox:
+个QHBoxLayout
+使用按钮布局添加
+到Card
+所有Tab的自定义按钮加载完成
+停止并导出 MTKLOG...
+输入日志名称
+请输入日志名称:
+导出媒体文件
+是否同时导出截图和录制的视频？
+
+
+包括:
+
+• 屏幕录制视频
+
+• 截图文件
+
+
+选择
+是
+将额外导出这些媒体文件。
+开始停止并导出MTKLOG操作，设备:
+, 日志名称:
+, 导出媒体:
+检查屏幕状态...
+屏幕状态检查完成
+启动logger应用...
+启动logger应用命令:
+启动应用结果 - returncode:
+检查logger状态...
+尝试连接设备:
+设备连接成功，查找按钮:
+按钮存在，checked状态:
+Logger未在运行，跳过停止操作
+创建日志目录:
+目录已存在:
+检查
+检查文件夹:
+检查命令结果 - returncode:
+文件夹不存在，跳过:
+尝试检查bugreports路径权限:
+目录列表结果:
+执行pull命令:
+Pull命令结果 - returncode:
+警告:
+导出失败:
+MTKLOG停止并导出操作完成，导出路径:
+MTKLOG已停止
+MTKLOG已导出到: 
+打开文件夹失败:
+MTKLOG已停止并导出 -
+手机测试辅助工具
+正在初始化...
+个自定义按钮
+成功加载Tab配置
+Root&&Remount
+支持快速执行一次性ADB命令
+
+例如: adb devices, adb shell pm list packages 等
+
+不支持持续输出命令（logcat、top等），请使用对应功能
+点击切换语言 / Click to switch language
+开始初始化所有Tab页面...
+启用Telephony日志
+连线log
+离线log
+自定义界面管理
+自定义Tab:
+创建自定义Card组:
+（按钮稍后添加）
+所有Tab页面初始化完成
+拉取 Bugreport
+TCPDUMP
+Ping
+点击
+按钮获取网络信息
+中/EN
+开始为所有Tab加载自定义按钮...
+处理预制Tab:
+默认
+尝试向预制卡片
+注入
+个按钮
+找到
+个Frame
+找到匹配的预制卡片:
+处理自定义Tab...
+检查Tab:
+找到自定义Tab:
+为自定义Tab加载按钮:
+个自定义Card
+处理Card:
+查找按钮: Tab=
+Card=
+所有按钮配置:
+个
+Card
+有
+尝试向自定义Card添加按钮:
+个GroupBox
+找到匹配的GroupBox:
+个QHBoxLayout
+使用按钮布局添加
+到Card
+所有Tab的自定义按钮加载完成
+停止并导出 MTKLOG...
+输入日志名称
+请输入日志名称:
+导出媒体文件
+是否同时导出截图和录制的视频？
+
+
+包括:
+
+• 屏幕录制视频
+
+• 截图文件
+
+
+选择
+是
+将额外导出这些媒体文件。
+开始停止并导出MTKLOG操作，设备:
+, 日志名称:
+, 导出媒体:
+检查屏幕状态...
+屏幕状态检查完成
+启动logger应用...
+启动logger应用命令:
+启动应用结果 - returncode:
+检查logger状态...
+尝试连接设备:
+设备连接成功，查找按钮:
+按钮存在，checked状态:
+Logger未在运行，跳过停止操作
+创建日志目录:
+目录已存在:
+创建日志文件夹:
+检查
+检查文件夹:
+检查命令结果 - returncode:
+文件夹不存在，跳过:
+尝试检查bugreports路径权限:
+目录列表结果:
+执行pull命令:
+Pull命令结果 - returncode:
+导出成功
+警告:
+导出失败:
+MTKLOG停止并导出操作完成，导出路径:
+MTKLOG已停止
+MTKLOG已导出到: 
+MTKLOG已停止并导出 -

@@ -448,20 +448,25 @@ class MTKLogWorker(QThread):
             else:
                 print(f"[DEBUG] {self.tr('目录已存在:')} {log_dir}")
             
+            # 确保log_folder（一级目录）存在
+            if not os.path.exists(log_folder):
+                os.makedirs(log_folder)
+                print(f"[DEBUG] {self.tr('创建日志文件夹:')} {log_folder}")
+            else:
+                print(f"[DEBUG] {self.tr('日志文件夹已存在:')} {log_folder}")
+            
             # 8. 执行adb pull命令序列
             pull_commands = [
                 ("/sdcard/TCTReport", "TCTReport"),
-                ("/sdcard/mtklog", "mtklog"),
-                ("/sdcard/debuglogger", "debuglogger"),
-                ("/sdcard/logmanager", "logmanager"),
-                ("/data/debuglogger", "data_debuglogger"),
-                ("/sdcard/BugReport", "BugReport"),
-                ("/data/media/logmanager", "data_logmanager"),
                 ("/data/user_de/0/com.android.shell/files/bugreports/", "bugreports"),
-                ("/sdcard/Android/data/com.tmobile.echolocate/cache/dia_debug", "echolocate_dia_debug")
+                ("/sdcard/Android/data/com.tmobile.echolocate/cache/dia_debug", "echolocate_dia_debug"),
+                ("/sdcard/mtklog", "mtklog"),
+                ("/sdcard/logmanager", "logmanager"),
+                ("/sdcard/BugReport", "BugReport"),
+                ("/data/media/logmanager", "data_logmanager")
             ]
             
-            # 如果用户选择导出媒体文件，添加额外的命令
+            # 如果用户选择导出媒体文件，添加媒体文件命令（在debuglogger之前）
             if export_media:
                 media_commands = [
                     ("/sdcard/DCIM/Screen Recorder/.", "Screen_Recorder_DCIM"),
@@ -473,34 +478,57 @@ class MTKLogWorker(QThread):
                 ]
                 pull_commands.extend(media_commands)
             
+            # 将debuglogger相关的文件夹放到最后（最容易超时的文件夹）
+            debuglogger_commands = [
+                ("/sdcard/debuglogger", "debuglogger"),
+                ("/data/debuglogger", "data_debuglogger")
+            ]
+            pull_commands.extend(debuglogger_commands)
+            
             total_commands = len(pull_commands)
             
             for i, (source_path, folder_name) in enumerate(pull_commands):
-                self.progress.emit(45 + (i * 5), f"{self.lang_manager.tr('检查')} {folder_name} ({i+1}/{total_commands})...")
-                print(f"[DEBUG] {self.tr('检查文件夹:')} {source_path} -> {folder_name}")
-                
-                # 先检查文件夹是否存在
-                check_cmd = ["adb", "-s", self.device, "shell", "test", "-d", source_path]
-                check_result = subprocess.run(check_cmd, capture_output=True, text=True, timeout=10,
-                                            creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0)
-                print(f"[DEBUG] {self.tr('检查命令结果 - returncode:')} {check_result.returncode}, stdout: {check_result.stdout.strip()}, stderr: {check_result.stderr.strip()}")
-                
-                if check_result.returncode != 0:
-                    print(f"[DEBUG] {self.tr('文件夹不存在，跳过:')} {source_path}")
+                try:
+                    self.progress.emit(45 + (i * 5), f"{self.lang_manager.tr('检查')} {folder_name} ({i+1}/{total_commands})...")
+                    print(f"[DEBUG] {self.tr('检查文件夹:')} {source_path} -> {folder_name}")
+                    
+                    # 先检查文件夹是否存在
+                    check_cmd = ["adb", "-s", self.device, "shell", "test", "-d", source_path]
+                    check_result = subprocess.run(check_cmd, capture_output=True, text=True, timeout=10,
+                                                creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0)
+                    print(f"[DEBUG] {self.tr('检查命令结果 - returncode:')} {check_result.returncode}, stdout: {check_result.stdout.strip()}, stderr: {check_result.stderr.strip()}")
+                    
+                    if check_result.returncode != 0:
+                        print(f"[DEBUG] {self.tr('文件夹不存在，跳过:')} {source_path}")
+                        # 对于bugreports路径，额外检查权限问题
+                        if "bugreports" in source_path:
+                            print(f"[DEBUG] {self.tr('尝试检查bugreports路径权限:')} {source_path}")
+                            ls_cmd = ["adb", "-s", self.device, "shell", "ls", "-la", "/data/user_de/0/com.android.shell/files/"]
+                            ls_result = subprocess.run(ls_cmd, capture_output=True, text=True, timeout=10,
+                                                      creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0)
+                            print(f"[DEBUG] {self.tr('目录列表结果:')} {ls_result.stdout.strip()}")
+                        continue
+                    
+                    # 文件夹存在，执行pull
+                    self.progress.emit(45 + (i * 5), f"{self.lang_manager.tr('导出')} {folder_name} ({i+1}/{total_commands})...")
+                    target_path = os.path.join(log_folder, folder_name)
+                    cmd = ["adb", "-s", self.device, "pull", source_path, target_path]
+                    print(f"[DEBUG] {self.tr('执行pull命令:')} {' '.join(cmd)}")
+                    result = subprocess.run(cmd, capture_output=True, text=True, timeout=6000,
+                                          creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0)
+                    print(f"[DEBUG] {self.tr('Pull命令结果 - returncode:')} {result.returncode}, stdout: {result.stdout.strip()}, stderr: {result.stderr.strip()}")
+                    
+                    if result.returncode != 0:
+                        print(f"{self.lang_manager.tr('警告:')} {folder_name} {self.lang_manager.tr('导出失败:')} {result.stderr.strip()}")
+                    else:
+                        print(f"[DEBUG] {folder_name} {self.tr('导出成功')}")
+                        
+                except subprocess.TimeoutExpired:
+                    print(f"{self.lang_manager.tr('错误:')} {folder_name} {self.lang_manager.tr('导出超时，跳过')}")
                     continue
-                
-                # 文件夹存在，执行pull
-                self.progress.emit(45 + (i * 5), f"{self.lang_manager.tr('导出')} {folder_name} ({i+1}/{total_commands})...")
-                cmd = ["adb", "-s", self.device, "pull", source_path, log_folder]
-                print(f"[DEBUG] {self.tr('执行pull命令:')} {' '.join(cmd)}")
-                result = subprocess.run(cmd, capture_output=True, text=True, timeout=600,
-                                      creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0)
-                print(f"[DEBUG] {self.tr('Pull命令结果 - returncode:')} {result.returncode}, stdout: {result.stdout.strip()}, stderr: {result.stderr.strip()}")
-                
-                if result.returncode != 0:
-                    print(f"{self.lang_manager.tr('警告:')} {folder_name} {self.lang_manager.tr('导出失败:')} {result.stderr.strip()}")
-                else:
-                    print(f"[DEBUG] {folder_name} {self.tr('导出成功')}")
+                except Exception as e:
+                    print(f"{self.lang_manager.tr('错误:')} {folder_name} {self.lang_manager.tr('导出异常:')} {str(e)}")
+                    continue
             
             print(f"[DEBUG] {self.tr('MTKLOG停止并导出操作完成，导出路径:')} {log_folder}")
             self.progress.emit(100, self.tr("完成!"))
