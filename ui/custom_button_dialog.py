@@ -319,24 +319,28 @@ class CustomButtonDialog(QDialog):
                     <li><strong>命令/路径：</strong>可选，用于描述脚本功能</li>
                     <li><strong>Python脚本区域：</strong>必填，输入要执行的Python代码</li>
                 </ul>
-                <p><strong>可用模块：</strong>datetime、platform、os、json、math、random、time</p>
+                <p><strong>可用模块：</strong>datetime、platform、os、json、math、random、time、subprocess</p>
+                <p><strong>可用变量和函数：</strong></p>
+                <ul>
+                    <li><code>DEVICE_ID</code> - 当前连接的设备ID</li>
+                    <li><code>adb_shell(cmd_list)</code> - 执行ADB shell命令，例如：<code>result = adb_shell(["shell", "getprop"])</code></li>
+                </ul>
                 <p><strong>示例：</strong></p>
                 <div class="example">
-                    # 获取系统信息<br>
-                    import platform<br>
-                    print(f"系统: {platform.system()}")<br>
-                    print(f"版本: {platform.version()}")<br><br>
+                    # 执行ADB命令<br>
+                    import subprocess as sp<br>
+                    result = adb_shell(["shell", "getprop", "ro.product.model"])<br>
+                    print(f"设备型号: {result.stdout}")<br><br>
                     
-                    # 生成随机数<br>
-                    import random<br>
-                    print(f"随机数: {random.randint(1, 100)}")<br><br>
+                    # 获取设备ID<br>
+                    print(f"当前设备: {DEVICE_ID}")<br><br>
                     
                     # 获取当前时间<br>
                     import datetime<br>
                     print(f"当前时间: {datetime.datetime.now()}")
                 </div>
                 <div class="tip">
-                    <strong>💡 提示：</strong>Python脚本在沙箱环境中执行，输出会显示在日志区域。
+                    <strong>💡 提示：</strong>Python脚本在沙箱环境中执行，输出会显示在日志区域。使用 <code>adb_shell()</code> 函数可以执行ADB命令，会自动添加设备参数。
                 </div>
             </div>
             
@@ -354,13 +358,18 @@ class CustomButtonDialog(QDialog):
             
             <div class="type-section">
                 <h3>④ 运行程序</h3>
-                <p><strong>用途：</strong>启动指定的可执行程序</p>
+                <p><strong>用途：</strong>启动指定的可执行程序或Python脚本</p>
                 <p><strong>输入格式：</strong>输入完整的程序路径，或点击self.tr("浏览文件")按钮选择</p>
+                <p><strong>Python脚本支持：</strong>如果运行.py文件，系统会自动传递设备ID作为命令行参数</p>
                 <p><strong>示例：</strong></p>
                 <div class="example">
                     C:\\Program Files\\Notepad++\\notepad++.exe<br>
                     C:\\Windows\\System32\\calc.exe<br>
-                    D:\\Tools\\adb工具\\adb.exe
+                    D:\\Tools\\script.py  ← Python脚本会自动收到设备ID参数
+                </div>
+                <div class="tip">
+                    <strong>💡 提示：</strong>Python脚本可以通过 <code>sys.argv[1]</code> 获取设备ID，例如：<br>
+                    <code>import sys<br>device_id = sys.argv[1] if len(sys.argv) > 1 else None</code>
                 </div>
             </div>
             
@@ -561,24 +570,28 @@ class ButtonEditDialog(QDialog):
                     <li><strong>命令/路径：</strong>可选，用于描述脚本功能</li>
                     <li><strong>Python脚本区域：</strong>必填，输入要执行的Python代码</li>
                 </ul>
-                <p><strong>可用模块：</strong>datetime、platform、os、json、math、random、time</p>
+                <p><strong>可用模块：</strong>datetime、platform、os、json、math、random、time、subprocess</p>
+                <p><strong>可用变量和函数：</strong></p>
+                <ul>
+                    <li><code>DEVICE_ID</code> - 当前连接的设备ID</li>
+                    <li><code>adb_shell(cmd_list)</code> - 执行ADB shell命令，例如：<code>result = adb_shell(["shell", "getprop"])</code></li>
+                </ul>
                 <p><strong>示例：</strong></p>
                 <div class="example">
-                    # 获取系统信息<br>
-                    import platform<br>
-                    print(f"系统: {platform.system()}")<br>
-                    print(f"版本: {platform.version()}")<br><br>
+                    # 执行ADB命令<br>
+                    import subprocess as sp<br>
+                    result = adb_shell(["shell", "getprop", "ro.product.model"])<br>
+                    print(f"设备型号: {result.stdout}")<br><br>
                     
-                    # 生成随机数<br>
-                    import random<br>
-                    print(f"随机数: {random.randint(1, 100)}")<br><br>
+                    # 获取设备ID<br>
+                    print(f"当前设备: {DEVICE_ID}")<br><br>
                     
                     # 获取当前时间<br>
                     import datetime<br>
                     print(f"当前时间: {datetime.datetime.now()}")
                 </div>
                 <div class="tip">
-                    <strong>💡 提示：</strong>Python脚本在沙箱环境中执行，输出会显示在日志区域。
+                    <strong>💡 提示：</strong>Python脚本在沙箱环境中执行，输出会显示在日志区域。使用 <code>adb_shell()</code> 函数可以执行ADB命令，会自动添加设备参数。
                 </div>
             </div>
             
@@ -596,13 +609,18 @@ class ButtonEditDialog(QDialog):
             
             <div class="type-section">
                 <h3>④ 运行程序</h3>
-                <p><strong>用途：</strong>启动指定的可执行程序</p>
+                <p><strong>用途：</strong>启动指定的可执行程序或Python脚本</p>
                 <p><strong>输入格式：</strong>输入完整的程序路径，或点击self.tr("浏览文件")按钮选择</p>
+                <p><strong>Python脚本支持：</strong>如果运行.py文件，系统会自动传递设备ID作为命令行参数</p>
                 <p><strong>示例：</strong></p>
                 <div class="example">
                     C:\\Program Files\\Notepad++\\notepad++.exe<br>
                     C:\\Windows\\System32\\calc.exe<br>
-                    D:\\Tools\\adb工具\\adb.exe
+                    D:\\Tools\\script.py  ← Python脚本会自动收到设备ID参数
+                </div>
+                <div class="tip">
+                    <strong>💡 提示：</strong>Python脚本可以通过 <code>sys.argv[1]</code> 获取设备ID，例如：<br>
+                    <code>import sys<br>device_id = sys.argv[1] if len(sys.argv) > 1 else None</code>
                 </div>
             </div>
             
@@ -688,7 +706,11 @@ class ButtonEditDialog(QDialog):
         # 按钮类型选择
         self.type_combo = QComboBox()
         self.type_combo.addItems([
-            self.tr("ADB命令"), self.tr("Python脚本"), self.tr("打开文件"), self.tr("运行程序"), self.tr("系统命令")
+            self.tr("ADB命令"), 
+            self.tr("Python脚本"), 
+            self.tr("打开文件"), 
+            self.tr("运行程序"), 
+            self.tr("系统命令")
         ])
         self.type_combo.currentTextChanged.connect(self.on_type_changed)
         basic_layout.addRow(self.tr("按钮类型*:"), self.type_combo)

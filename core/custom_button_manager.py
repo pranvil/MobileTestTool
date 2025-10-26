@@ -453,11 +453,11 @@ class CustomButtonManager(QObject):
                 script_code = button_data.get('script', '')
                 if not script_code:
                     return False, self.lang_manager.tr("Python脚本内容为空")
-                return self._execute_python_script(script_code)
+                return self._execute_python_script(script_code, device_id)
             elif button_type == 'file':
                 return self._open_file(command)
             elif button_type == 'program':
-                return self._run_program(command)
+                return self._run_program(command, device_id)
             elif button_type == 'system':
                 return self._execute_system_command(command)
             else:
@@ -500,16 +500,27 @@ class CustomButtonManager(QObject):
         except Exception as e:
             return False, f"{self.lang_manager.tr('执行失败:')} {str(e)}"
     
-    def _execute_python_script(self, script_code):
+    def _execute_python_script(self, script_code, device_id=None):
         """执行Python脚本"""
         try:
             import io
-            import sys
             from contextlib import redirect_stdout, redirect_stderr
+            
+            # 导入需要的模块
+            import datetime
+            import platform
+            import os
+            import sys
+            import json
+            import math
+            import random
+            import time
+            import subprocess
             
             # 创建安全的执行环境
             safe_globals = {
                 '__builtins__': {
+                    '__import__': __import__,  # 允许使用 import 语句
                     'print': print,
                     'len': len,
                     'str': str,
@@ -533,15 +544,33 @@ class CustomButtonManager(QObject):
                     'setattr': setattr,
                     'dir': dir,
                     'help': help,
-                    'datetime': __import__('datetime'),
-                    'platform': __import__('platform'),
-                    'os': __import__('os'),
-                    'json': __import__('json'),
-                    'math': __import__('math'),
-                    'random': __import__('random'),
-                    'time': __import__('time'),
-                }
+                },
+                '__name__': '__main__',  # 允许使用 if __name__ == "__main__" 模式
+                'datetime': datetime,
+                'platform': platform,
+                'os': os,
+                'sys': sys,
+                'json': json,
+                'math': math,
+                'random': random,
+                'time': time,
+                'subprocess': subprocess,
             }
+            
+            # 添加设备ID到全局环境（如果提供）
+            if device_id:
+                safe_globals['DEVICE_ID'] = device_id
+                # 创建一个便捷的adb_shell函数
+                # 使用闭包捕获 device_id
+                current_device_id = device_id
+                def adb_shell_func(cmd):
+                    """在脚本中可用的ADB shell命令辅助函数"""
+                    if current_device_id:
+                        full_cmd = ['adb', '-s', current_device_id] + cmd
+                    else:
+                        full_cmd = ['adb'] + cmd
+                    return subprocess.run(full_cmd, capture_output=True, text=True, timeout=30)
+                safe_globals['adb_shell'] = adb_shell_func
             
             safe_locals = {}
             
@@ -594,14 +623,45 @@ class CustomButtonManager(QObject):
         except Exception as e:
             return False, f"{self.lang_manager.tr('打开文件失败:')} {str(e)}"
     
-    def _run_program(self, program_path):
+    def _run_program(self, program_path, device_id=None):
         """运行程序"""
         try:
-            if os.path.exists(program_path):
-                subprocess.Popen([program_path])
-                return True, f"{self.lang_manager.tr('已启动程序:')} {program_path}"
-            else:
+            if not os.path.exists(program_path):
                 return False, f"{self.lang_manager.tr('程序不存在:')} {program_path}"
+            
+            # 构建命令
+            cmd = [program_path]
+            
+            # 如果是Python脚本，使用python解释器运行，并传递设备ID
+            if program_path.lower().endswith('.py'):
+                import sys
+                cmd = [sys.executable, program_path]
+                
+                # 传递设备ID作为命令行参数
+                if device_id:
+                    cmd.append(device_id)
+            
+            # 启动程序
+            process = subprocess.Popen(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0
+            )
+            
+            # 读取输出（非阻塞）
+            try:
+                stdout, stderr = process.communicate(timeout=1)
+                if stdout:
+                    logger.info(f"程序输出: {stdout}")
+                if stderr:
+                    logger.warning(f"程序错误: {stderr}")
+            except subprocess.TimeoutExpired:
+                # 程序仍在运行，这是正常的
+                pass
+            
+            return True, f"{self.lang_manager.tr('已启动程序:')} {program_path}"
                 
         except Exception as e:
             return False, f"{self.lang_manager.tr('运行程序失败:')} {str(e)}"

@@ -324,7 +324,7 @@ class PyQtDeviceInfoManager(QObject):
         if not device:
             return
         
-        timeout, ok = QInputDialog.getInt(None, self.tr("设置灭屏时间"), self.tr("请输入灭屏时间(秒，0表示永不灭屏):"), 300, 0, 3600)
+        timeout, ok = QInputDialog.getInt(None, self.tr("设置灭屏时间"), self.tr("请输入灭屏时间(秒，0表示永不灭屏):"), 600, 0, 3600)
         if not ok:
             return
         
