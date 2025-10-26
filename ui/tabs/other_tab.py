@@ -43,6 +43,12 @@ class OtherTab(QWidget):
     # 自定义界面管理
     show_unified_manager = pyqtSignal()
     
+    # 暗码管理
+    show_secret_code_dialog = pyqtSignal()
+    
+    # 高通lock cell
+    show_lock_cell_dialog = pyqtSignal()
+    
     def __init__(self, parent=None):
         try:
             super().__init__(parent)
@@ -141,7 +147,15 @@ class OtherTab(QWidget):
             self.set_screen_timeout_btn = QPushButton(self.lang_manager.tr("设置灭屏时间"))
             self.set_screen_timeout_btn.clicked.connect(self.set_screen_timeout.emit)
             card_layout.addWidget(self.set_screen_timeout_btn)
+
+            self.secret_code_btn = QPushButton("🔑 " + self.lang_manager.tr("暗码"))
+            self.secret_code_btn.clicked.connect(self.show_secret_code_dialog.emit)
+            card_layout.addWidget(self.secret_code_btn)
             
+            self.lock_cell_btn = QPushButton("📱 " + self.lang_manager.tr("高通lock cell"))
+            self.lock_cell_btn.clicked.connect(self.show_lock_cell_dialog.emit)
+            card_layout.addWidget(self.lock_cell_btn)
+                     
             card_layout.addStretch()
             
             v.addWidget(card)
@@ -236,6 +250,8 @@ class OtherTab(QWidget):
         """)
         card_layout.addWidget(self.unified_manager_btn)
         
+
+        
         card_layout.addStretch()
         
         v.addWidget(card)
@@ -323,7 +339,11 @@ class OtherTab(QWidget):
         if hasattr(self, 'custom_button_manager_btn'):
             self.custom_button_manager_btn.setText("🔧 " + self.lang_manager.tr("管理自定义按钮"))
         if hasattr(self, 'tab_manager_btn'):
-            self.tab_manager_btn.setText("📋 " + self.lang_manager.tr("Tab管理"))    
+            self.tab_manager_btn.setText("📋 " + self.lang_manager.tr("Tab管理"))
+        if hasattr(self, 'secret_code_btn'):
+            self.secret_code_btn.setText("🔑 " + self.lang_manager.tr("暗码"))
+        if hasattr(self, 'lock_cell_btn'):
+            self.lock_cell_btn.setText("📱 " + self.lang_manager.tr("高通lock cell"))
 
         # 刷新log操作组按钮
         if hasattr(self, 'merge_mtklog_btn'):

@@ -463,7 +463,7 @@ class MTKLogWorker(QThread):
                 ("/sdcard/mtklog", "mtklog"),
                 ("/sdcard/logmanager", "logmanager"),
                 ("/sdcard/BugReport", "BugReport"),
-                ("/data/media/logmanager", "data_logmanager")
+                ("/data/media/logmanager", "logmanager")
             ]
             
             # 如果用户选择导出媒体文件，添加媒体文件命令（在debuglogger之前）
@@ -481,7 +481,7 @@ class MTKLogWorker(QThread):
             # 将debuglogger相关的文件夹放到最后（最容易超时的文件夹）
             debuglogger_commands = [
                 ("/sdcard/debuglogger", "debuglogger"),
-                ("/data/debuglogger", "data_debuglogger")
+                ("/data/debuglogger", "debuglogger")
             ]
             pull_commands.extend(debuglogger_commands)
             

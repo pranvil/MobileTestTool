@@ -41,6 +41,7 @@ class TabConfigManager(QObject):
             {'id': 'tmo_echolocate', 'name': 'TMO Echolocate', 'visible': True, 'custom': False},
             {'id': 'background_data', 'name': '24小时背景数据', 'visible': True, 'custom': False},
             {'id': 'app_operations', 'name': 'APP操作', 'visible': True, 'custom': False},
+            {'id': 'sim', 'name': 'SIM', 'visible': True, 'custom': False},
             {'id': 'other', 'name': '其他', 'visible': True, 'custom': False}
         ]
         

@@ -22,6 +22,7 @@ from ui.tabs.tmo_echolocate_tab import TMOEcholocateTab
 from ui.tabs.background_data_tab import BackgroundDataTab
 from ui.tabs.app_operations_tab import AppOperationsTab
 from ui.tabs.other_tab import OtherTab
+from ui.tabs.sim_tab import SimTab
 from core.device_manager import PyQtDeviceManager
 from core.mtklog_manager import PyQtMTKLogManager
 from core.adblog_manager import PyQtADBLogManager
@@ -172,7 +173,7 @@ class MainWindow(QMainWindow):
         """)
         
         # 版本信息
-        version_label = QLabel("v0.91")
+        version_label = QLabel("v0.92")
         version_label.setAlignment(Qt.AlignCenter)
         version_label.setStyleSheet("color: #888888; font-size: 12px;")
         
@@ -278,7 +279,7 @@ class MainWindow(QMainWindow):
     def setup_ui(self):
         """设置用户界面"""
         # 设置窗口属性
-        self.setWindowTitle(self.lang_manager.tr("手机测试辅助工具 v0.91"))
+        self.setWindowTitle(self.lang_manager.tr("手机测试辅助工具 v0.92"))
         self.setGeometry(100, 100, 900, 600)
         # 不立即显示主窗口，等初始化完成后再显示
         
@@ -431,6 +432,9 @@ class MainWindow(QMainWindow):
         # 连接其他操作管理器信号
         self.other_operations_manager.status_message.connect(self._on_other_operations_status)
         
+        # 连接 SIM Tab 信号
+        self.sim_tab.status_message.connect(self._on_sim_status_message)
+        
         # 连接 Log控制 Tab 信号
         self.log_control_tab.mtklog_start.connect(self._on_mtklog_start)
         self.log_control_tab.mtklog_stop_export.connect(self._on_mtklog_stop_export)
@@ -522,6 +526,8 @@ class MainWindow(QMainWindow):
         self.other_tab.show_tools_config_dialog.connect(self._on_show_tools_config_dialog)
         self.other_tab.show_display_lines_dialog.connect(self._on_show_display_lines_dialog)
         self.other_tab.show_unified_manager.connect(self.show_unified_manager_dialog)
+        self.other_tab.show_secret_code_dialog.connect(self.show_secret_code_dialog)
+        self.other_tab.show_lock_cell_dialog.connect(self.show_lock_cell_dialog)
         
         # 连接Tab配置管理器信号
         self.tab_config_manager.tab_config_updated.connect(self._on_tab_config_updated)
@@ -574,6 +580,10 @@ class MainWindow(QMainWindow):
             self.other_tab.tab_id = 'other'  # 添加tab_id属性
             tab_instances['other'] = self.other_tab
             
+            self.sim_tab = SimTab(self)
+            self.sim_tab.tab_id = 'sim'  # 添加tab_id属性
+            tab_instances['sim'] = self.sim_tab
+            
             # 初始化自定义Tab
             for custom_tab in self.tab_config_manager.custom_tabs:
                 tab_id = custom_tab['id']
@@ -614,7 +624,8 @@ class MainWindow(QMainWindow):
             'tmo_echolocate': 'TMO Echolocate',
             'background_data': '24小时背景数据',
             'app_operations': 'APP操作',
-            'other': '其他'
+            'other': '其他',
+            'sim': 'SIM'
         }
         
         result = default_names.get(tab_id, tab_id)
@@ -744,6 +755,10 @@ class MainWindow(QMainWindow):
     def _on_device_status_message(self, message):
         """设备状态消息"""
         self.append_log.emit(f"{message}\n", None)
+    
+    def _on_sim_status_message(self, message):
+        """SIM Tab状态消息"""
+        self.append_log.emit(f"[SIM] {message}\n", None)
         
     def _on_screenshot(self):
         """截图处理"""
@@ -887,7 +902,7 @@ class MainWindow(QMainWindow):
         """刷新所有UI文本"""
         try:
             # 刷新窗口标题
-            self.setWindowTitle(self.lang_manager.tr("手机测试辅助工具 v0.91"))
+            self.setWindowTitle(self.lang_manager.tr("手机测试辅助工具 v0.92"))
             
             # 刷新所有Tab标题和内容
             if hasattr(self, 'tab_widget'):
@@ -2146,6 +2161,30 @@ class MainWindow(QMainWindow):
             logger.exception(f"{self.lang_manager.tr('显示自定义界面管理对话框失败:')} {e}")
             QMessageBox.critical(self, self.lang_manager.tr("错误"), f"{self.lang_manager.tr('打开自定义界面管理失败')}：{str(e)}")
     
+    def show_secret_code_dialog(self):
+        """显示暗码管理对话框"""
+        try:
+            from ui.secret_code_dialog import SecretCodeDialog
+            
+            dialog = SecretCodeDialog(parent=self)
+            dialog.exec_()
+            
+        except Exception as e:
+            logger.exception(f"{self.lang_manager.tr('显示暗码管理对话框失败:')} {e}")
+            QMessageBox.critical(self, self.lang_manager.tr("错误"), f"{self.lang_manager.tr('打开暗码管理失败')}：{str(e)}")
+    
+    def show_lock_cell_dialog(self):
+        """显示高通lock cell对话框"""
+        try:
+            from ui.cell_lock_dialog import LockCellDialog
+            
+            dialog = LockCellDialog(parent=self)
+            dialog.exec_()
+            
+        except Exception as e:
+            logger.exception(f"{self.lang_manager.tr('显示高通lock cell对话框失败:')} {e}")
+            QMessageBox.critical(self, self.lang_manager.tr("错误"), f"{self.lang_manager.tr('打开高通lock cell失败')}：{str(e)}")
+    
     def _on_tab_moved(self, from_index, to_index):
         """Tab拖拽移动处理"""
         try:
@@ -2358,6 +2397,10 @@ class MainWindow(QMainWindow):
                 self.other_tab.show_tools_config_dialog.connect(self._on_show_tools_config_dialog)
                 self.other_tab.show_display_lines_dialog.connect(self._on_show_display_lines_dialog)
                 self.other_tab.show_unified_manager.connect(self.show_unified_manager_dialog)
+            
+            # 连接 SIM Tab 信号
+            if hasattr(self, 'sim_tab'):
+                self.sim_tab.status_message.connect(self._on_sim_status_message)
             
             logger.debug(self.tr("Tab信号槽重新连接完成"))
             

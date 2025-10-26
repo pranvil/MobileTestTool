@@ -103,18 +103,9 @@ class LanguageManager(QObject):
             return
             
         try:
-            # 使用与保存相同的路径逻辑
-            if is_pyinstaller():
-                # 在exe环境中，从用户目录加载
-                user_config_dir = os.path.join(os.path.expanduser('~'), '.MobileTestTool')
-                config_file = os.path.join(user_config_dir, 'language.conf')
-            else:
-                # 在Python环境中，从项目目录加载
-                config_dir = os.path.join(
-                    os.path.dirname(os.path.dirname(__file__)),
-                    'config'
-                )
-                config_file = os.path.join(config_dir, 'language.conf')
+            # 统一使用 ~/.netui/ 目录，与其他配置保持一致
+            user_config_dir = os.path.expanduser('~/.netui')
+            config_file = os.path.join(user_config_dir, 'language.conf')
             
             logger.info(f"尝试加载语言配置: {config_file}")
             
@@ -136,19 +127,10 @@ class LanguageManager(QObject):
     def _save_language_preference(self, lang):
         """保存语言偏好"""
         try:
-            if is_pyinstaller():
-                # 在exe环境中，保存到用户目录
-                user_config_dir = os.path.join(os.path.expanduser('~'), '.MobileTestTool')
-                os.makedirs(user_config_dir, exist_ok=True)
-                config_file = os.path.join(user_config_dir, 'language.conf')
-            else:
-                # 在Python环境中，保存到项目目录
-                config_dir = os.path.join(
-                    os.path.dirname(os.path.dirname(__file__)),
-                    'config'
-                )
-                os.makedirs(config_dir, exist_ok=True)
-                config_file = os.path.join(config_dir, 'language.conf')
+            # 统一保存到 ~/.netui/ 目录，与其他配置保持一致
+            user_config_dir = os.path.expanduser('~/.netui')
+            os.makedirs(user_config_dir, exist_ok=True)
+            config_file = os.path.join(user_config_dir, 'language.conf')
             
             logger.info(f"尝试保存语言配置: {config_file}, 语言: {lang}")
             
