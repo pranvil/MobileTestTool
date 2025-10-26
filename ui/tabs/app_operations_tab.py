@@ -230,7 +230,7 @@ class AppOperationsTab(QWidget):
         add_card_shadow(card)
         
         card_layout = QHBoxLayout(card)
-        card_layout.setContentsMargins(10, 1, 1, 10)
+        card_layout.setContentsMargins(10, 1, 10, 1)
         card_layout.setSpacing(8)
         
         self.enable_app_btn = QPushButton(self.lang_manager.tr("启用app"))

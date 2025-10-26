@@ -549,6 +549,7 @@ class MainWindow(QMainWindow):
         self.other_tab.show_input_text_dialog.connect(self._on_show_input_text_dialog)
         self.other_tab.show_tools_config_dialog.connect(self._on_show_tools_config_dialog)
         self.other_tab.show_display_lines_dialog.connect(self._on_show_display_lines_dialog)
+        self.other_tab.show_at_tool_dialog.connect(self._on_show_at_tool_dialog)
         self.other_tab.show_unified_manager.connect(self.show_unified_manager_dialog)
         self.other_tab.show_secret_code_dialog.connect(self.show_secret_code_dialog)
         self.other_tab.show_lock_cell_dialog.connect(self.show_lock_cell_dialog)
@@ -1609,6 +1610,18 @@ class MainWindow(QMainWindow):
             logger.exception(self.lang_manager.tr("打开工具配置对话框失败"))
             QMessageBox.critical(self, self.lang_manager.tr("错误"), f"{self.lang_manager.tr('打开工具配置对话框失败')}：{str(e)}")
     
+    def _on_show_at_tool_dialog(self):
+        """显示AT工具对话框"""
+        try:
+            logger.debug(self.lang_manager.tr("打开AT工具对话框..."))
+            from ui.at_tool_dialog import ATCommandDialog
+            dialog = ATCommandDialog(parent=self)
+            dialog.exec_()
+            logger.debug(self.lang_manager.tr("AT工具对话框已关闭"))
+        except Exception as e:
+            logger.exception(self.lang_manager.tr("打开AT工具对话框失败"))
+            QMessageBox.critical(self, self.lang_manager.tr("错误"), f"{self.lang_manager.tr('打开AT工具对话框失败')}：{str(e)}")
+    
     def _setup_shortcuts(self):
         """设置快捷键"""
         from PyQt5.QtWidgets import QShortcut
@@ -2420,6 +2433,7 @@ class MainWindow(QMainWindow):
                 self.other_tab.show_input_text_dialog.connect(self._on_show_input_text_dialog)
                 self.other_tab.show_tools_config_dialog.connect(self._on_show_tools_config_dialog)
                 self.other_tab.show_display_lines_dialog.connect(self._on_show_display_lines_dialog)
+                self.other_tab.show_at_tool_dialog.connect(self._on_show_at_tool_dialog)
                 self.other_tab.show_unified_manager.connect(self.show_unified_manager_dialog)
             
             # 连接 SIM Tab 信号

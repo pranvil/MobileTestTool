@@ -12,3 +12,6 @@ asn1crypto>=1.5.1
 # 可选：UI自动化测试
 uiautomator2>=2.16.25
 
+# 串口通信
+pyserial>=3.5
+

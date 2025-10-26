@@ -1,0 +1,11 @@
+{
+  "IMEI": "AT+CGSN",
+  "ICCID": "AT+ICCID",
+  "IMSI": "AT+CIMI",
+  "MSISDN": "AT+CNUM",
+  "RADIO OFF": "AT+CFUN=0",
+  "Radio ON": "AT+CFUN=1",
+  "auto search": "at+cops=0",
+  "Search network": "at+cops?",
+  "MTK SVN": "AT+EGMR=0,9"
+}

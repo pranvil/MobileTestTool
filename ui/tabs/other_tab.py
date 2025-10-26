@@ -40,6 +40,9 @@ class OtherTab(QWidget):
     # 设置显示行数
     show_display_lines_dialog = pyqtSignal()
     
+    # AT工具
+    show_at_tool_dialog = pyqtSignal()
+    
     # 自定义界面管理
     show_unified_manager = pyqtSignal()
     
@@ -236,6 +239,10 @@ class OtherTab(QWidget):
         self.show_display_lines_btn.clicked.connect(self.show_display_lines_dialog.emit)
         card_layout.addWidget(self.show_display_lines_btn)
         
+        self.show_at_tool_btn = QPushButton("📡 " + self.lang_manager.tr("AT工具"))
+        self.show_at_tool_btn.clicked.connect(self.show_at_tool_dialog.emit)
+        card_layout.addWidget(self.show_at_tool_btn)
+        
         self.unified_manager_btn = QPushButton("⚙️ " + self.lang_manager.tr("自定义界面管理"))
         self.unified_manager_btn.clicked.connect(self.show_unified_manager.emit)
         self.unified_manager_btn.setStyleSheet("""
@@ -336,6 +343,8 @@ class OtherTab(QWidget):
             self.show_tools_config_btn.setText(self.lang_manager.tr("工具配置"))
         if hasattr(self, 'show_display_lines_btn'):
             self.show_display_lines_btn.setText(self.lang_manager.tr("设置显示行数"))
+        if hasattr(self, 'show_at_tool_btn'):
+            self.show_at_tool_btn.setText("📡 " + self.lang_manager.tr("AT工具"))
         if hasattr(self, 'custom_button_manager_btn'):
             self.custom_button_manager_btn.setText("🔧 " + self.lang_manager.tr("管理自定义按钮"))
         if hasattr(self, 'tab_manager_btn'):
