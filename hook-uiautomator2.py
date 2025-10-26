@@ -5,7 +5,7 @@ PyInstaller hook for uiautomator2
 """
 
 import os
-from PyInstaller.utils.hooks import collect_all, collect_data_files, collect_submodules
+from PyInstaller.utils.hooks import collect_all, collect_data_files
 
 # 收集所有UIAutomator2相关的模块
 datas, binaries, hiddenimports = collect_all('uiautomator2')
@@ -17,14 +17,17 @@ try:
     assets_path = os.path.join(u2_path, 'assets')
     
     if os.path.exists(assets_path):
-        # 添加assets目录下的所有文件
+        # 收集assets目录下的所有文件（包括子目录）
         for root, dirs, files in os.walk(assets_path):
             for file in files:
                 src_path = os.path.join(root, file)
+                # 计算相对路径
                 rel_path = os.path.relpath(src_path, u2_path)
+                # 添加到datas，保持目录结构
                 datas.append((src_path, os.path.dirname(rel_path)))
                 print(f"[HOOK] 添加uiautomator2资源: {src_path} -> {os.path.dirname(rel_path)}")
 except ImportError:
+    print("[HOOK] uiautomator2 未安装，跳过资源文件收集")
     pass
 
 # 添加额外的隐藏导入（只添加确实存在的模块）
@@ -63,5 +66,15 @@ for dep in optional_deps:
 # 收集数据文件
 datas += collect_data_files('uiautomator2')
 
-# 收集子模块
-hiddenimports += collect_submodules('uiautomator2')
+# 手动添加常用的子模块，避免自动收集导致的警告
+manual_submodules = [
+    'uiautomator2.device',
+    'uiautomator2.devices',
+    'uiautomator2.session',
+]
+for module in manual_submodules:
+    try:
+        __import__(module)
+        hiddenimports.append(module)
+    except ImportError:
+        pass

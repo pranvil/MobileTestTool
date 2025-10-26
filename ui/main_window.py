@@ -109,6 +109,26 @@ class MainWindow(QMainWindow):
         """安全地获取翻译文本"""
         return self.lang_manager.tr(text) if self.lang_manager else text
     
+    def _set_window_icon(self):
+        """设置窗口图标"""
+        from PyQt5.QtGui import QIcon
+        import sys
+        import os
+        
+        # 尝试设置窗口图标
+        if hasattr(sys, 'frozen') and hasattr(sys, '_MEIPASS'):
+            # PyInstaller 环境
+            icon_path = os.path.join(sys._MEIPASS, 'icon.ico')
+        else:
+            # 开发环境
+            icon_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'icon.ico')
+        
+        if os.path.exists(icon_path):
+            self.setWindowIcon(QIcon(icon_path))
+            logger.info(f"窗口图标已设置: {icon_path}")
+        else:
+            logger.warning(f"图标文件不存在: {icon_path}")
+    
     def _show_loading_screen(self):
         """显示友好的加载界面"""
         from PyQt5.QtWidgets import QLabel, QVBoxLayout, QWidget, QProgressBar
@@ -281,6 +301,10 @@ class MainWindow(QMainWindow):
         # 设置窗口属性
         self.setWindowTitle(self.lang_manager.tr("手机测试辅助工具 v0.92"))
         self.setGeometry(100, 100, 900, 600)
+        
+        # 设置窗口图标（任务栏图标）
+        self._set_window_icon()
+        
         # 不立即显示主窗口，等初始化完成后再显示
         
         # 创建顶部工具栏

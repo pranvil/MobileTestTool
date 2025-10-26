@@ -6,9 +6,9 @@ PyQt5-sip>=12.12.0
 # 打包工具
 pyinstaller>=5.0
 
-# 可选：更好的主题支持
-qt-material>=2.14
-
 # SIM APDU Parser 依赖
 asn1crypto>=1.5.1
+
+# 可选：UI自动化测试
+uiautomator2>=2.16.25
 

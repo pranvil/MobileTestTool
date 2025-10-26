@@ -89,9 +89,28 @@ redirect_stdout_to_log()
 
 from PyQt5.QtWidgets import QApplication
 from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QFont
+from PyQt5.QtGui import QFont, QIcon
 
 from ui.main_window import MainWindow
+
+
+def _set_application_icon(app):
+    """设置应用程序图标"""
+    try:
+        if hasattr(sys, 'frozen') and hasattr(sys, '_MEIPASS'):
+            # PyInstaller 环境
+            icon_path = os.path.join(sys._MEIPASS, 'icon.ico')
+        else:
+            # 开发环境
+            icon_path = os.path.join(os.path.dirname(__file__), 'icon.ico')
+        
+        if os.path.exists(icon_path):
+            app.setWindowIcon(QIcon(icon_path))
+            logger.info(f"应用程序图标已设置: {icon_path}")
+        else:
+            logger.warning(f"图标文件不存在: {icon_path}")
+    except Exception as e:
+        logger.warning(f"设置图标失败: {str(e)}")
 
 
 def main():
@@ -113,6 +132,10 @@ def main():
         app.setApplicationName("手机测试辅助工具")
         app.setApplicationVersion("0.7-PyQt5")
         app.setOrganizationName("MobileTestTool")
+        
+        # 设置应用程序图标
+        _set_application_icon(app)
+        
         logger.info("应用程序属性设置完成")
         
         # 设置字体渲染质量和大小

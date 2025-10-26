@@ -31,25 +31,17 @@ class LockCellDialog(QDialog):
         self.setModal(True)
         self.resize(500, 400)
         
-        # 获取模板文件路径
-        self.base_path = self._get_base_path()
-        self.lte_template = os.path.join(self.base_path, "resources", "template", "cell_lock_list_LTE")
-        self.fg_template = os.path.join(self.base_path, "resources", "template", "pci_lock_info_5G")
+        # 导入资源路径工具
+        from core.resource_utils import get_resource_path
+        
+        # 获取模板文件路径（使用统一的资源路径函数）
+        self.lte_template = get_resource_path("resources/template/cell_lock_list_LTE")
+        self.fg_template = get_resource_path("resources/template/pci_lock_info_5G")
         
         # 用户选择
         self.cell_type = None  # "LTE" or "5G"
         
         self.setup_ui()
-    
-    def _get_base_path(self):
-        """获取基础路径，兼容exe和开发环境"""
-        if getattr(sys, 'frozen', False):
-            # 如果是打包后的exe，PyInstaller会在sys._MEIPASS中设置资源路径
-            base_path = getattr(sys, '_MEIPASS', os.path.dirname(sys.executable))
-            return base_path
-        else:
-            # 如果是开发环境
-            return os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     
     def tr(self, text):
         """安全地获取翻译文本"""

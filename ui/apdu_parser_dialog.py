@@ -402,7 +402,7 @@ class ApduParserDialog(QDialog):
     
     def start_parse(self):
         """开始解析"""
-        print("[DEBUG] start_parse method called")
+        
         
         if not self.current_file:
             QMessageBox.warning(self, "警告", "请先选择文件")

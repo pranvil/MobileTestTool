@@ -4753,3 +4753,105 @@ Ping
 高通 Lock Cell
 文件已保存: C:/Users/pranv/Desktop/5G1
 文件已保存: C:/Users/pranv/Desktop/LTE11
+手机测试辅助工具
+正在初始化...
+个自定义按钮
+成功加载Tab配置
+Root&&Remount
+支持快速执行一次性ADB命令
+
+例如: adb devices, adb shell pm list packages 等
+
+不支持持续输出命令（logcat、top等），请使用对应功能
+点击切换语言 / Click to switch language
+开始初始化所有Tab页面...
+启用Telephony日志
+连线log
+离线log
+自定义界面管理
+所有Tab页面初始化完成
+拉取 Bugreport
+TCPDUMP
+Ping
+点击
+按钮获取网络信息
+中/EN
+开始为所有Tab加载自定义按钮...
+处理预制Tab:
+默认
+尝试向预制卡片
+注入
+个按钮
+找到
+个Frame
+找到匹配的预制卡片:
+处理自定义Tab...
+检查Tab:
+所有Tab的自定义按钮加载完成
+新增
+手机测试辅助工具
+正在初始化...
+个自定义按钮
+成功加载Tab配置
+支持快速执行一次性ADB命令
+
+例如: adb devices, adb shell pm list packages 等
+
+不支持持续输出命令（logcat、top等），请使用对应功能
+点击切换语言 / Click to switch language
+开始初始化所有Tab页面...
+连线log
+离线log
+自定义界面管理
+所有Tab页面初始化完成
+TCPDUMP
+开始为所有Tab加载自定义按钮...
+处理预制Tab:
+处理自定义Tab...
+检查Tab:
+所有Tab的自定义按钮加载完成
+语言已切换到:
+中文
+启用Telephony日志
+拉取 Bugreport
+Ping
+Root&&Remount
+中/EN
+手机测试辅助工具
+正在初始化...
+个自定义按钮
+成功加载Tab配置
+Root&&Remount
+支持快速执行一次性ADB命令
+
+例如: adb devices, adb shell pm list packages 等
+
+不支持持续输出命令（logcat、top等），请使用对应功能
+点击切换语言 / Click to switch language
+开始初始化所有Tab页面...
+启用Telephony日志
+连线log
+离线log
+自定义界面管理
+所有Tab页面初始化完成
+拉取 Bugreport
+TCPDUMP
+Ping
+点击
+按钮获取网络信息
+中/EN
+开始为所有Tab加载自定义按钮...
+处理预制Tab:
+默认
+尝试向预制卡片
+注入
+个按钮
+找到
+个Frame
+找到匹配的预制卡片:
+处理自定义Tab...
+检查Tab:
+所有Tab的自定义按钮加载完成
+新增
+上移
+下移
