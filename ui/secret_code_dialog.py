@@ -8,12 +8,23 @@
 import os
 import json
 import sys
+import time
+import subprocess
+import re
 from PyQt5.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QPushButton, 
                              QTableWidget, QTableWidgetItem, QHeaderView,
                              QLineEdit, QMessageBox, QFileDialog, QSplitter,
                              QWidget, QLabel, QGroupBox, QMenu)
 from PyQt5.QtCore import Qt, QPoint, pyqtSignal, QTimer
 from core.debug_logger import logger
+
+# 尝试导入 uiautomator2
+try:
+    import uiautomator2 as u2
+    HAS_UIAUTOMATOR2 = True
+except ImportError:
+    u2 = None
+    HAS_UIAUTOMATOR2 = False
 
 
 class SecretCodeDialog(QDialog):
@@ -28,6 +39,12 @@ class SecretCodeDialog(QDialog):
         else:
             from core.language_manager import LanguageManager
             self.lang_manager = LanguageManager.get_instance()
+        
+        # 获取设备管理器
+        if parent and hasattr(parent, 'device_manager'):
+            self.device_manager = parent.device_manager
+        else:
+            self.device_manager = None
         
         self.setWindowTitle(self.tr("暗码管理"))
         self.setModal(True)
@@ -357,7 +374,7 @@ class SecretCodeDialog(QDialog):
                 
                 self.save_data()
                 self.refresh_code_table()
-                QMessageBox.information(self, self.tr("成功"), self.tr("暗码更新成功！"))
+                # QMessageBox.information(self, self.tr("成功"), self.tr("暗码更新成功！"))
     
     def delete_code(self):
         """删除暗码"""
@@ -473,10 +490,468 @@ class SecretCodeDialog(QDialog):
             )
     
     def on_code_double_clicked(self, item):
-        """双击code事件"""
-        # 占位函数，后续实现功能
-        logger.debug(f"双击暗码: {item.text()}")
-        pass
+        """双击暗码（任意列）事件 - 自动输入暗码"""
+        # 获取双击的行
+        row = item.row()
+        
+        # 必须从第0列（code列）获取code文本
+        code_item = self.code_table.item(row, 0)
+        if not code_item:
+            return
+        
+        code = code_item.text()
+        description = self.code_table.item(row, 1).text() if self.code_table.item(row, 1) else ""
+        
+        logger.debug(f"双击暗码: {code}, 描述: {description}")
+        
+        # 检查设备管理器是否可用
+        if not self.device_manager:
+            QMessageBox.warning(self, self.tr("错误"), self.tr("设备管理器未初始化"))
+            return
+        
+        # 验证设备选择
+        device = self.device_manager.validate_device_selection()
+        if not device:
+            return
+        
+        # 检查UIAutomator2是否可用
+        if not HAS_UIAUTOMATOR2:
+            QMessageBox.warning(self, self.tr("错误"), self.tr("uiautomator2未安装，无法执行自动输入"))
+            return
+        
+        # 在后台线程执行暗码输入，避免阻塞UI
+        import threading
+        def run_in_background():
+            try:
+                self._execute_secret_code(device, code)
+                logger.debug(f"暗码输入成功: {code}")
+            except Exception as e:
+                logger.exception(f"执行暗码输入失败: {e}")
+        
+        thread = threading.Thread(target=run_in_background, daemon=True)
+        thread.start()
+        
+        # 显示一个简单的提示，用户可以看到正在执行
+        # QMessageBox.information(self, self.tr("提示"), self.tr(f"正在执行暗码输入，请稍候...\n暗码: {code}"))
+    
+    def _execute_secret_code(self, device, code):
+        """执行暗码输入的完整流程"""
+        logger.debug(f"开始执行暗码输入流程: {code}")
+        
+        # 步骤1: 确保屏幕亮屏且解锁
+        if not self._ensure_screen_unlocked(device):
+            raise Exception(self.tr("无法确保屏幕解锁"))
+        
+        # 步骤2: 返回桌面
+        self._go_home(device)
+        time.sleep(1)
+        
+        # 步骤3: 打开Phone应用
+        self._open_phone_app(device)
+        time.sleep(2)
+        
+        # 步骤4: 获取当前包名
+        package_name = self._get_current_package_name(device)
+        logger.debug(f"检测到Phone app包名: {package_name}")
+        
+        # 步骤5: 检查并点击拨号盘（打开拨号盘），然后等待拨号盘加载
+        if not self._open_dialpad_and_wait(device, package_name):
+            raise Exception(self.tr("未找到拨号盘或拨号按钮"))
+        
+        # 步骤7: 输入暗码
+        self._input_text(device, code)
+        time.sleep(1)
+        
+        logger.debug("暗码输入流程完成")
+    
+    def _ensure_screen_unlocked(self, device):
+        """确保屏幕亮屏且解锁"""
+        try:
+            # 检查屏幕是否亮屏
+            screen_on = self._check_screen_on(device)
+            if not screen_on:
+                self._wake_screen(device)
+                time.sleep(2)
+            
+            # 检查屏幕是否解锁
+            screen_unlocked = self._check_screen_unlocked(device)
+            if not screen_unlocked:
+                self._unlock_screen(device)
+                time.sleep(1)
+            
+            return True
+        except Exception as e:
+            logger.exception(f"检查屏幕状态失败: {e}")
+            return False
+    
+    def _check_screen_on(self, device):
+        """检查屏幕是否亮屏"""
+        try:
+            cmd = ["adb", "-s", device, "shell", "dumpsys", "deviceidle"]
+            result = subprocess.run(
+                cmd, 
+                capture_output=True, 
+                text=True, 
+                encoding='utf-8', 
+                errors='replace', 
+                timeout=10,
+                creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0
+            )
+            
+            if result.returncode == 0:
+                for line in result.stdout.split('\n'):
+                    if 'mScreenOn' in line:
+                        return 'true' in line.lower()
+            return False
+        except Exception:
+            return False
+    
+    def _check_screen_unlocked(self, device):
+        """检查屏幕是否解锁"""
+        try:
+            cmd = ["adb", "-s", device, "shell", "dumpsys", "deviceidle"]
+            result = subprocess.run(
+                cmd, 
+                capture_output=True, 
+                text=True, 
+                encoding='utf-8', 
+                errors='replace', 
+                timeout=10,
+                creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0
+            )
+            
+            if result.returncode == 0:
+                for line in result.stdout.split('\n'):
+                    if 'mScreenLocked' in line:
+                        return 'false' in line.lower()  # false表示解锁状态
+            return False
+        except Exception:
+            return False
+    
+    def _wake_screen(self, device):
+        """点亮屏幕"""
+        try:
+            cmd = ["adb", "-s", device, "shell", "input", "keyevent", "224"]
+            subprocess.run(
+                cmd, 
+                capture_output=True, 
+                text=True, 
+                encoding='utf-8', 
+                errors='replace', 
+                timeout=10,
+                creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0
+            )
+        except Exception as e:
+            logger.exception(f"点亮屏幕失败: {e}")
+    
+    def _unlock_screen(self, device):
+        """解锁屏幕"""
+        try:
+            cmd = ["adb", "-s", device, "shell", "input", "keyevent", "82"]
+            subprocess.run(
+                cmd, 
+                capture_output=True, 
+                text=True, 
+                encoding='utf-8', 
+                errors='replace', 
+                timeout=10,
+                creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0
+            )
+        except Exception as e:
+            logger.exception(f"解锁屏幕失败: {e}")
+    
+    def _go_home(self, device):
+        """返回桌面"""
+        try:
+            cmd = ["adb", "-s", device, "shell", "input", "keyevent", "KEYCODE_HOME"]
+            subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                encoding='utf-8',
+                errors='replace',
+                timeout=10,
+                creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0
+            )
+            logger.debug("已返回桌面")
+        except Exception as e:
+            logger.exception(f"返回桌面失败: {e}")
+    
+    def _open_phone_app(self, device):
+        """打开Phone应用"""
+        try:
+            d = u2.connect(device)
+            
+            # 尝试查找Phone图标
+            phone_found = False
+            # 方法1: 通过content-desc查找"Phone"
+            try:
+                phone_elements = d(description="Phone")
+                if phone_elements.exists:
+                    phone_elements.click()
+                    phone_found = True
+                    logger.debug("通过content-desc='Phone'找到并点击")
+            except Exception:
+                pass
+            
+            # 方法2: 通过content-desc查找"电话"
+            if not phone_found:
+                try:
+                    phone_elements = d(description="电话")
+                    if phone_elements.exists:
+                        phone_elements.click()
+                        phone_found = True
+                        logger.debug("通过content-desc='电话'找到并点击")
+                except Exception:
+                    pass
+            
+            # 方法3: 通过class name查找所有元素，查找可能的phone图标
+            if not phone_found:
+                try:
+                    # 尝试查找包含phone关键词的元素
+                    all_elements = d(className="android.widget.ImageView")
+                    for element in all_elements:
+                        try:
+                            desc = element.info.get('contentDescription', '').lower()
+                            if 'phone' in desc or '电话' in desc:
+                                element.click()
+                                phone_found = True
+                                logger.debug(f"通过ImageView找到phone图标: {desc}")
+                                break
+                        except Exception:
+                            continue
+                except Exception:
+                    pass
+            
+            if not phone_found:
+                raise Exception(self.tr("未找到Phone应用图标"))
+            
+            logger.debug("已打开Phone应用")
+        except Exception as e:
+            logger.exception(f"打开Phone应用失败: {e}")
+            raise
+    
+    def _get_current_package_name(self, device):
+        """获取当前应用的包名"""
+        try:
+            cmd = ["adb", "-s", device, "shell", "dumpsys", "window", "windows"]
+            result = subprocess.run(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                encoding='utf-8',
+                errors='replace',
+                timeout=10,
+                creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0
+            )
+            
+            # 查找mCurrentFocus行
+            for line in result.stdout.split('\n'):
+                if 'mCurrentFocus' in line:
+                    # 解析包名，格式类似于: Window{xxx u0 com.package.name/Activity}
+                    match = re.search(r'(com\.[a-z0-9_\.]+)', line)
+                    if match:
+                        package_name = match.group(1)
+                        logger.debug(f"解析到包名: {package_name}")
+                        return package_name
+            
+            return None
+        except Exception as e:
+            logger.exception(f"获取当前包名失败: {e}")
+            return None
+    
+    def _clear_input(self, device):
+        """清空输入 - 使用KEYCODE_DEL清空，避免触发UI状态"""
+        try:
+            # 简单粗暴：直接用DEL键清空，不调用任何可能触发UI状态的操作
+            cmd = ["adb", "-s", device, "shell", "input", "keyevent", "KEYCODE_DEL"]
+            for _ in range(15):  # 删除15次确保清空
+                subprocess.run(
+                    cmd,
+                    capture_output=True,
+                    text=True,
+                    timeout=1,
+                    creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0
+                )
+                time.sleep(0.05)
+            logger.debug("使用DEL键清空输入")
+        except Exception as e:
+            logger.exception(f"清空输入失败: {e}")
+    
+    def _open_dialpad_and_wait(self, device, package_name):
+        """检查并点击拨号盘，然后等待拨号盘完全加载"""
+        try:
+            d = u2.connect(device)
+            
+            # 根据包名选择对应的resource ID列表
+            dial_button_ids = []
+            dialpad_button_ids = []
+            
+            if package_name == "com.google.android.dialer":
+                dial_button_ids = ["com.google.android.dialer:id/dialpad_voice_call_button"]
+                dialpad_button_ids = ["com.google.android.dialer:id/tab_dialpad"]
+            elif package_name == "com.android.dialer":
+                dial_button_ids = ["com.android.dialer:id/dialpad_floating_action_button"]
+                dialpad_button_ids = ["com.android.dialer:id/fab"]
+            elif package_name == "com.samsung.android.dialer":
+                dial_button_ids = ["com.samsung.android.dialer:id/dialButton"]
+                dialpad_button_ids = ["com.samsung.android.dialer:id/tab_text_container"]
+            else:
+                # 未知包名，尝试所有可能的ID
+                dial_button_ids = [
+                    "com.google.android.dialer:id/dialpad_voice_call_button",
+                    "com.android.dialer:id/dialpad_floating_action_button",
+                    "com.samsung.android.dialer:id/dialButton",
+                ]
+                dialpad_button_ids = [
+                    "com.google.android.dialer:id/tab_dialpad",
+                    "com.android.dialer:id/fab",
+                    "com.samsung.android.dialer:id/tab_text_container",
+                ]
+            
+            # 先检查是否已经有拨号按钮（说明已经在拨号盘页面）
+            for dial_button_id in dial_button_ids:
+                button = d(resourceId=dial_button_id)
+                if button.exists:
+                    logger.debug(f"找到拨号按钮: {dial_button_id}，已位于拨号盘")
+                    # 如果是Google Dialer，需要点击输入框获取焦点
+                    if package_name == "com.google.android.dialer":
+                        # 方法1: 通过text="Phone Number"查找
+                        input_field = d(text="Phone Number")
+                        if not input_field.exists:
+                            # 方法2: 通过resourceId查找
+                            input_field = d(resourceId="com.google.android.dialer:id/digits")
+                        if not input_field.exists:
+                            # 方法3: 通过class查找第一个EditText
+                            all_edittexts = d(className="android.widget.EditText")
+                            if len(all_edittexts) > 0:
+                                input_field = all_edittexts[0]
+                        
+                        if input_field.exists:
+                            info = input_field.info
+                            bounds = info.get('bounds', {})
+                            logger.debug(f"找到 Google Dialer 输入框，bounds: {bounds}")
+                            logger.debug(f"info完整内容: {info}")
+                            
+                            # 计算点击位置 - 使用bounds的上半部分，避免点到电话号码显示区域
+                            left = bounds.get('left', 0)
+                            top = bounds.get('top', 0)
+                            right = bounds.get('right', 0)
+                            bottom = bounds.get('bottom', 0)
+                            
+                            # 点击左上角稍微偏下一点的位置
+                            click_x = (left + right) // 2
+                            click_y = top + (bottom - top) // 4  # 从上往下1/4处
+                            
+                            logger.debug(f"bounds: left={left}, top={top}, right={right}, bottom={bottom}")
+                            logger.debug(f"点击位置: ({click_x}, {click_y})")
+                            
+                            d.click(click_x, click_y)
+                            time.sleep(0.5)
+                            logger.debug("已点击 Google Dialer 输入框")
+                        else:
+                            logger.warning("未找到 Google Dialer 输入框")
+                    return True
+            
+            # 如果不在拨号盘，尝试点击拨号盘按钮
+            logger.debug(f"未在拨号盘，尝试点击拨号盘按钮。包名: {package_name}")
+            dialpad_button_found = False
+            for dialpad_button_id in dialpad_button_ids:
+                button = d(resourceId=dialpad_button_id)
+                if button.exists:
+                    button.click()
+                    logger.debug(f"已点击拨号盘按钮: {dialpad_button_id}")
+                    dialpad_button_found = True
+                    break
+            
+            if not dialpad_button_found:
+                logger.error(f"未找到拨号盘按钮。包名: {package_name}")
+                return False
+            
+            # 点击后，等待拨号按钮出现（最多2秒）
+            logger.debug("等待拨号盘加载...")
+            for dial_button_id in dial_button_ids:
+                try:
+                    button = d(resourceId=dial_button_id)
+                    button.wait(timeout=2.0)  # 等待元素出现，最多2秒
+                    if button.exists:
+                        logger.debug(f"拨号盘已加载，找到拨号按钮: {dial_button_id}")
+                        # 如果是Google Dialer，需要点击输入框获取焦点
+                        if package_name == "com.google.android.dialer":
+                            # 方法1: 通过text="Phone Number"查找
+                            input_field = d(text="Phone Number")
+                            if not input_field.exists:
+                                # 方法2: 通过resourceId查找
+                                input_field = d(resourceId="com.google.android.dialer:id/digits")
+                            if not input_field.exists:
+                                # 方法3: 通过class查找第一个EditText
+                                all_edittexts = d(className="android.widget.EditText")
+                                if len(all_edittexts) > 0:
+                                    input_field = all_edittexts[0]
+                            
+                            if input_field.exists:
+                                info = input_field.info
+                                bounds = info.get('bounds', {})
+                                logger.debug(f"找到 Google Dialer 输入框，bounds: {bounds}")
+                                logger.debug(f"info完整内容: {info}")
+                                
+                                # 计算点击位置 - 使用bounds的上半部分，避免点到电话号码显示区域
+                                left = bounds.get('left', 0)
+                                top = bounds.get('top', 0)
+                                right = bounds.get('right', 0)
+                                bottom = bounds.get('bottom', 0)
+                                
+                                # 点击左上角稍微偏下一点的位置
+                                click_x = (left + right) // 2
+                                click_y = top + (bottom - top) // 4  # 从上往下1/4处
+                                
+                                logger.debug(f"bounds: left={left}, top={top}, right={right}, bottom={bottom}")
+                                logger.debug(f"点击位置: ({click_x}, {click_y})")
+                                
+                                d.click(click_x, click_y)
+                                time.sleep(0.5)
+                                logger.debug("已点击 Google Dialer 输入框")
+                            else:
+                                logger.warning("未找到 Google Dialer 输入框")
+                        return True
+                except:
+                    continue
+            
+            logger.error("拨号盘加载超时")
+            return False
+            
+        except Exception as e:
+            logger.exception(f"打开拨号盘失败: {e}")
+            return False
+    
+    def _input_text(self, device, text):
+        """输入文本 - 使用input text，对特殊字符进行转义"""
+        try:
+            logger.debug(f"输入文本: {text}")
+            
+            # 转义特殊字符
+            # 空格用 %s，其他字符直接传递
+            processed_text = text.replace(' ', '%s')
+            
+            # 使用input text输入
+            cmd = ["adb", "-s", device, "shell", "input", "text", processed_text]
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                timeout=5,
+                creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0
+            )
+            
+            if result.returncode != 0:
+                logger.error(f"输入文本失败: {result.stderr}")
+                raise Exception(f"输入文本失败: {result.stderr}")
+            
+            logger.debug(f"已输入文本: {text}")
+        except Exception as e:
+            logger.exception(f"输入文本失败: {e}")
+            raise
     
     def add_category(self):
         """新增分类"""

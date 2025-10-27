@@ -43,6 +43,9 @@ class OtherTab(QWidget):
     # AT工具
     show_at_tool_dialog = pyqtSignal()
     
+    # 配置备份恢复
+    show_config_backup_dialog = pyqtSignal()
+    
     # 自定义界面管理
     show_unified_manager = pyqtSignal()
     
@@ -51,6 +54,9 @@ class OtherTab(QWidget):
     
     # 高通lock cell
     show_lock_cell_dialog = pyqtSignal()
+    
+    # 高通NV
+    show_qc_nv_dialog = pyqtSignal()
     
     def __init__(self, parent=None):
         try:
@@ -158,6 +164,10 @@ class OtherTab(QWidget):
             self.lock_cell_btn = QPushButton("📱 " + self.lang_manager.tr("高通lock cell"))
             self.lock_cell_btn.clicked.connect(self.show_lock_cell_dialog.emit)
             card_layout.addWidget(self.lock_cell_btn)
+            
+            self.qc_nv_btn = QPushButton("📊 " + self.lang_manager.tr("高通NV"))
+            self.qc_nv_btn.clicked.connect(self.show_qc_nv_dialog.emit)
+            card_layout.addWidget(self.qc_nv_btn)
                      
             card_layout.addStretch()
             
@@ -242,6 +252,20 @@ class OtherTab(QWidget):
         self.show_at_tool_btn = QPushButton("📡 " + self.lang_manager.tr("AT工具"))
         self.show_at_tool_btn.clicked.connect(self.show_at_tool_dialog.emit)
         card_layout.addWidget(self.show_at_tool_btn)
+        
+        self.config_backup_btn = QPushButton("💾 " + self.lang_manager.tr("配置备份恢复"))
+        self.config_backup_btn.clicked.connect(self.show_config_backup_dialog.emit)
+        self.config_backup_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #28a745;
+                color: white;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #218838;
+            }
+        """)
+        card_layout.addWidget(self.config_backup_btn)
         
         self.unified_manager_btn = QPushButton("⚙️ " + self.lang_manager.tr("自定义界面管理"))
         self.unified_manager_btn.clicked.connect(self.show_unified_manager.emit)
@@ -345,6 +369,8 @@ class OtherTab(QWidget):
             self.show_display_lines_btn.setText(self.lang_manager.tr("设置显示行数"))
         if hasattr(self, 'show_at_tool_btn'):
             self.show_at_tool_btn.setText("📡 " + self.lang_manager.tr("AT工具"))
+        if hasattr(self, 'config_backup_btn'):
+            self.config_backup_btn.setText("💾 " + self.lang_manager.tr("配置备份恢复"))
         if hasattr(self, 'custom_button_manager_btn'):
             self.custom_button_manager_btn.setText("🔧 " + self.lang_manager.tr("管理自定义按钮"))
         if hasattr(self, 'tab_manager_btn'):
@@ -353,6 +379,8 @@ class OtherTab(QWidget):
             self.secret_code_btn.setText("🔑 " + self.lang_manager.tr("暗码"))
         if hasattr(self, 'lock_cell_btn'):
             self.lock_cell_btn.setText("📱 " + self.lang_manager.tr("高通lock cell"))
+        if hasattr(self, 'qc_nv_btn'):
+            self.qc_nv_btn.setText("📊 " + self.lang_manager.tr("高通NV"))
 
         # 刷新log操作组按钮
         if hasattr(self, 'merge_mtklog_btn'):

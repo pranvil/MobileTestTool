@@ -104,6 +104,21 @@ class ATCommandDialog(QDialog):
         
         self.setup_ui()
     
+    def keyPressEvent(self, event):
+        """处理键盘事件，防止回车键清空显示区域"""
+        # 如果焦点在输入框，回车应该发送命令而不是关闭对话框
+        if event.key() == Qt.Key_Return or event.key() == Qt.Key_Enter:
+            # 获取当前焦点控件
+            focus_widget = self.focusWidget()
+            # 如果焦点在输入框，让输入框处理回车，而不是关闭对话框
+            if hasattr(self, 'command_input') and focus_widget == self.command_input:
+                # 不调用父类的方法，让returnPressed信号处理
+                # 只是阻止回车键的默认行为（关闭对话框）
+                event.accept()
+                return
+        # 其他情况调用父类方法
+        super().keyPressEvent(event)
+    
     def setup_ui(self):
         """设置UI"""
         main_layout = QVBoxLayout(self)
@@ -134,6 +149,9 @@ class ATCommandDialog(QDialog):
         self.output_text = QTextEdit()
         self.output_text.setReadOnly(True)
         self.output_text.setPlaceholderText(self.lang_manager.tr("AT命令输出将显示在这里..."))
+        
+        # 确保output_text不会响应回车键
+        self.output_text.setFocusPolicy(Qt.NoFocus)
         
         # 设置字体为等宽字体，更适合显示AT命令
         font = QFont("Consolas", 9)
@@ -173,6 +191,7 @@ class ATCommandDialog(QDialog):
         self.command_input = QLineEdit()
         self.command_input.setPlaceholderText(self.lang_manager.tr("输入AT命令..."))
         self.command_input.returnPressed.connect(self.send_command)
+        self.command_input.setFocus()  # 设置焦点以便可以使用回车键发送
         input_layout.addWidget(self.command_input)
         
         self.send_btn = QPushButton(self.lang_manager.tr("发送"))
@@ -254,9 +273,15 @@ class ATCommandDialog(QDialog):
         command = self.command_input.text().strip()
         if not command:
             return
+        
+        # 发送命令
         self.send_at_command_directly(command)
+        
         # 清空输入框
         self.command_input.clear()
+        
+        # 确保焦点回到输入框，方便连续输入
+        self.command_input.setFocus()
     
     def send_at_command_directly(self, command):
         """直接发送AT命令"""

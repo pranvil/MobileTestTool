@@ -550,9 +550,11 @@ class MainWindow(QMainWindow):
         self.other_tab.show_tools_config_dialog.connect(self._on_show_tools_config_dialog)
         self.other_tab.show_display_lines_dialog.connect(self._on_show_display_lines_dialog)
         self.other_tab.show_at_tool_dialog.connect(self._on_show_at_tool_dialog)
+        self.other_tab.show_config_backup_dialog.connect(self.show_config_backup_dialog)
         self.other_tab.show_unified_manager.connect(self.show_unified_manager_dialog)
         self.other_tab.show_secret_code_dialog.connect(self.show_secret_code_dialog)
         self.other_tab.show_lock_cell_dialog.connect(self.show_lock_cell_dialog)
+        self.other_tab.show_qc_nv_dialog.connect(self.show_qc_nv_dialog)
         
         # 连接Tab配置管理器信号
         self.tab_config_manager.tab_config_updated.connect(self._on_tab_config_updated)
@@ -2183,6 +2185,18 @@ class MainWindow(QMainWindow):
         except Exception as e:
             logger.exception(f"{self.lang_manager.tr('清除自定义按钮失败:')} {e}")
     
+    def show_config_backup_dialog(self):
+        """显示配置备份对话框"""
+        try:
+            from ui.config_backup_dialog import ConfigBackupDialog
+            
+            dialog = ConfigBackupDialog(parent=self)
+            dialog.exec_()
+            
+        except Exception as e:
+            logger.exception(f"{self.lang_manager.tr('显示配置备份对话框失败:')} {e}")
+            QMessageBox.critical(self, self.lang_manager.tr("错误"), f"{self.lang_manager.tr('打开配置备份失败')}：{str(e)}")
+    
     def show_unified_manager_dialog(self):
         """显示自定义界面管理对话框"""
         try:
@@ -2221,6 +2235,18 @@ class MainWindow(QMainWindow):
         except Exception as e:
             logger.exception(f"{self.lang_manager.tr('显示高通lock cell对话框失败:')} {e}")
             QMessageBox.critical(self, self.lang_manager.tr("错误"), f"{self.lang_manager.tr('打开高通lock cell失败')}：{str(e)}")
+    
+    def show_qc_nv_dialog(self):
+        """显示高通NV对话框"""
+        try:
+            from ui.qc_nv_dialog import QCNVDialog
+            
+            dialog = QCNVDialog(parent=self)
+            dialog.exec_()
+            
+        except Exception as e:
+            logger.exception(f"{self.lang_manager.tr('显示高通NV对话框失败:')} {e}")
+            QMessageBox.critical(self, self.lang_manager.tr("错误"), f"{self.lang_manager.tr('打开高通NV失败')}：{str(e)}")
     
     def _on_tab_moved(self, from_index, to_index):
         """Tab拖拽移动处理"""
@@ -2434,7 +2460,11 @@ class MainWindow(QMainWindow):
                 self.other_tab.show_tools_config_dialog.connect(self._on_show_tools_config_dialog)
                 self.other_tab.show_display_lines_dialog.connect(self._on_show_display_lines_dialog)
                 self.other_tab.show_at_tool_dialog.connect(self._on_show_at_tool_dialog)
+                self.other_tab.show_config_backup_dialog.connect(self.show_config_backup_dialog)
                 self.other_tab.show_unified_manager.connect(self.show_unified_manager_dialog)
+                self.other_tab.show_secret_code_dialog.connect(self.show_secret_code_dialog)
+                self.other_tab.show_lock_cell_dialog.connect(self.show_lock_cell_dialog)
+                self.other_tab.show_qc_nv_dialog.connect(self.show_qc_nv_dialog)
             
             # 连接 SIM Tab 信号
             if hasattr(self, 'sim_tab'):
