@@ -19,14 +19,6 @@ class OtherTab(QWidget):
     show_device_info_dialog = pyqtSignal()
     set_screen_timeout = pyqtSignal()
     
-    # MTKlog操作
-    merge_mtklog = pyqtSignal()
-    extract_pcap_from_mtklog = pyqtSignal()
-    
-    # PCAP操作
-    merge_pcap = pyqtSignal()
-    extract_pcap_from_qualcomm_log = pyqtSignal()
-    
     # 赫拉配置
     configure_hera = pyqtSignal()
     configure_collect_data = pyqtSignal()
@@ -104,9 +96,6 @@ class OtherTab(QWidget):
             hera_config_group = self.create_hera_config_group()
             first_row_layout.addWidget(hera_config_group)
             
-            log_ops_group = self.create_log_ops_group()
-            first_row_layout.addWidget(log_ops_group)
-            
             scroll_layout.addWidget(first_row_container)
             
             # 2. log操作组（合并PCAP和MTKlog操作）
@@ -154,6 +143,7 @@ class OtherTab(QWidget):
             card_layout.addWidget(self.show_device_info_btn)
             
             self.set_screen_timeout_btn = QPushButton(self.lang_manager.tr("设置灭屏时间"))
+            self.set_screen_timeout_btn.setToolTip(self.lang_manager.tr("设置灭屏时间 - 配置手机屏幕自动关闭的延迟时间"))
             self.set_screen_timeout_btn.clicked.connect(self.set_screen_timeout.emit)
             card_layout.addWidget(self.set_screen_timeout_btn)
 
@@ -162,6 +152,7 @@ class OtherTab(QWidget):
             card_layout.addWidget(self.secret_code_btn)
             
             self.lock_cell_btn = QPushButton("📱 " + self.lang_manager.tr("高通lock cell"))
+            self.lock_cell_btn.setToolTip(self.lang_manager.tr("高通lock cell - 锁定高通设备到指定的小区"))
             self.lock_cell_btn.clicked.connect(self.show_lock_cell_dialog.emit)
             card_layout.addWidget(self.lock_cell_btn)
             
@@ -206,6 +197,7 @@ class OtherTab(QWidget):
         card_layout.addWidget(self.configure_hera_btn)
         
         self.configure_collect_data_btn = QPushButton(self.lang_manager.tr("赫拉测试数据收集"))
+        self.configure_collect_data_btn.setToolTip(self.lang_manager.tr("赫拉测试数据收集 - 配置赫拉框架的测试数据收集功能"))
         self.configure_collect_data_btn.clicked.connect(self.configure_collect_data.emit)
         card_layout.addWidget(self.configure_collect_data_btn)
         
@@ -246,6 +238,7 @@ class OtherTab(QWidget):
         card_layout.addWidget(self.show_tools_config_btn)
         
         self.show_display_lines_btn = QPushButton(self.lang_manager.tr("设置显示行数"))
+        self.show_display_lines_btn.setToolTip(self.lang_manager.tr("设置显示行数 - 配置日志区域显示的最大行数"))
         self.show_display_lines_btn.clicked.connect(self.show_display_lines_dialog.emit)
         card_layout.addWidget(self.show_display_lines_btn)
         
@@ -254,6 +247,7 @@ class OtherTab(QWidget):
         card_layout.addWidget(self.show_at_tool_btn)
         
         self.config_backup_btn = QPushButton("💾 " + self.lang_manager.tr("配置备份恢复"))
+        self.config_backup_btn.setToolTip(self.lang_manager.tr("配置备份恢复 - 导出或导入工具配置"))
         self.config_backup_btn.clicked.connect(self.show_config_backup_dialog.emit)
         self.config_backup_btn.setStyleSheet("""
             QPushButton {
@@ -284,54 +278,6 @@ class OtherTab(QWidget):
 
         
         card_layout.addStretch()
-        
-        v.addWidget(card)
-        
-        return container
-        
-    def create_log_ops_group(self):
-        """创建log操作组（合并PCAP和MTKlog操作）"""
-        # 容器
-        container = QWidget()
-        v = QVBoxLayout(container)
-        v.setContentsMargins(0, 0, 0, 0)
-        v.setSpacing(4)
-        
-        # 标题
-        title = QLabel(self.lang_manager.tr("log操作"))
-        title.setProperty("class", "section-title")
-        v.addWidget(title)
-        
-        # 卡片
-        card = QFrame()
-        card.setObjectName("card")
-        add_card_shadow(card)
-        
-        card_layout = QVBoxLayout(card)
-        card_layout.setContentsMargins(10, 1, 10, 1)
-        card_layout.setSpacing(8)
-        
-        # 第一行：MTKlog操作
-        row1_layout = QHBoxLayout()
-        
-        self.merge_mtklog_btn = QPushButton(self.lang_manager.tr("合并MTKlog"))
-        self.merge_mtklog_btn.clicked.connect(self.merge_mtklog.emit)
-        row1_layout.addWidget(self.merge_mtklog_btn)
-        
-        self.extract_pcap_from_mtklog_btn = QPushButton(self.lang_manager.tr("MTKlog提取pcap"))
-        self.extract_pcap_from_mtklog_btn.clicked.connect(self.extract_pcap_from_mtklog.emit)
-        row1_layout.addWidget(self.extract_pcap_from_mtklog_btn)
-              
-        self.merge_pcap_btn = QPushButton(self.lang_manager.tr("合并PCAP"))
-        self.merge_pcap_btn.clicked.connect(self.merge_pcap.emit)
-        row1_layout.addWidget(self.merge_pcap_btn)
-        
-        self.extract_pcap_from_qualcomm_log_btn = QPushButton(self.lang_manager.tr("高通log提取pcap"))
-        self.extract_pcap_from_qualcomm_log_btn.clicked.connect(self.extract_pcap_from_qualcomm_log.emit)
-        row1_layout.addWidget(self.extract_pcap_from_qualcomm_log_btn)
-        
-        row1_layout.addStretch()
-        card_layout.addLayout(row1_layout)
         
         v.addWidget(card)
         
@@ -381,16 +327,6 @@ class OtherTab(QWidget):
             self.lock_cell_btn.setText("📱 " + self.lang_manager.tr("高通lock cell"))
         if hasattr(self, 'qc_nv_btn'):
             self.qc_nv_btn.setText("📊 " + self.lang_manager.tr("高通NV"))
-
-        # 刷新log操作组按钮
-        if hasattr(self, 'merge_mtklog_btn'):
-            self.merge_mtklog_btn.setText(self.lang_manager.tr("合并MTKlog"))
-        if hasattr(self, 'extract_pcap_from_mtklog_btn'):
-            self.extract_pcap_from_mtklog_btn.setText(self.lang_manager.tr("MTKlog提取pcap"))
-        if hasattr(self, 'merge_pcap_btn'):
-            self.merge_pcap_btn.setText(self.lang_manager.tr("合并PCAP"))
-        if hasattr(self, 'extract_pcap_from_qualcomm_log_btn'):
-            self.extract_pcap_from_qualcomm_log_btn.setText(self.lang_manager.tr("高通log提取pcap"))
     
     def _refresh_section_titles(self):
         """刷新组标题标签"""
@@ -404,5 +340,3 @@ class OtherTab(QWidget):
                 label.setText(self.lang_manager.tr("赫拉配置"))
             elif current_text in ["其他操作", "Other Operations"]:
                 label.setText(self.lang_manager.tr("其他操作"))
-            elif current_text in ["log操作", "Log Operations"]:
-                label.setText(self.lang_manager.tr("log操作"))

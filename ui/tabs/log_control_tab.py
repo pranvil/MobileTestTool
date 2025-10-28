@@ -45,6 +45,12 @@ class LogControlTab(QWidget):
     # TCPDUMP 相关
     tcpdump_show_dialog = pyqtSignal()
     
+    # Log操作相关
+    merge_mtklog = pyqtSignal()
+    extract_pcap_from_mtklog = pyqtSignal()
+    merge_pcap = pyqtSignal()
+    extract_pcap_from_qualcomm_log = pyqtSignal()
+    
     def __init__(self, parent=None):
         super().__init__(parent)
         # 从父窗口获取语言管理器
@@ -134,28 +140,45 @@ class LogControlTab(QWidget):
         self.mtklog_set_log_size_btn.clicked.connect(self.mtklog_set_log_size.emit)
         row1.addWidget(self.mtklog_set_log_size_btn)
         
-        row1.addStretch()
-        card_layout.addLayout(row1)
-        
-        # 第二行：模式切换
-        row2 = QHBoxLayout()
-        row2.addWidget(QLabel(self.lang_manager.tr("模式:")))
-        
+        # 在第一行添加模式相关的按钮（不要模式标签）
         self.mtklog_sd_mode_btn = QPushButton(self.lang_manager.tr("SD模式"))
         self.mtklog_sd_mode_btn.clicked.connect(self.mtklog_sd_mode.emit)
-        row2.addWidget(self.mtklog_sd_mode_btn)
+        row1.addWidget(self.mtklog_sd_mode_btn)
         
         self.mtklog_usb_mode_btn = QPushButton(self.lang_manager.tr("USB模式"))
         self.mtklog_usb_mode_btn.clicked.connect(self.mtklog_usb_mode.emit)
-        row2.addWidget(self.mtklog_usb_mode_btn)
+        row1.addWidget(self.mtklog_usb_mode_btn)
         
         self.mtklog_install_btn = QPushButton(self.lang_manager.tr("安装MTKLOGGER"))
         self.mtklog_install_btn.clicked.connect(self.mtklog_install.emit)
-        row2.addWidget(self.mtklog_install_btn)
+        row1.addWidget(self.mtklog_install_btn)
         
         self.telephony_btn = QPushButton(self.lang_manager.tr("启用Telephony日志"))
         self.telephony_btn.clicked.connect(self.telephony_enable.emit)
-        row2.addWidget(self.telephony_btn)
+        row1.addWidget(self.telephony_btn)
+        
+        row1.addStretch()
+        card_layout.addLayout(row1)
+        
+        # 第二行：log操作
+        row2 = QHBoxLayout()
+        row2.addWidget(QLabel(self.lang_manager.tr("log操作:")))
+        
+        self.merge_mtklog_btn = QPushButton(self.lang_manager.tr("合并MTKlog"))
+        self.merge_mtklog_btn.clicked.connect(self.merge_mtklog.emit)
+        row2.addWidget(self.merge_mtklog_btn)
+        
+        self.extract_pcap_from_mtklog_btn = QPushButton(self.lang_manager.tr("MTKlog提取pcap"))
+        self.extract_pcap_from_mtklog_btn.clicked.connect(self.extract_pcap_from_mtklog.emit)
+        row2.addWidget(self.extract_pcap_from_mtklog_btn)
+        
+        self.merge_pcap_btn = QPushButton(self.lang_manager.tr("合并PCAP"))
+        self.merge_pcap_btn.clicked.connect(self.merge_pcap.emit)
+        row2.addWidget(self.merge_pcap_btn)
+        
+        self.extract_pcap_from_qualcomm_log_btn = QPushButton(self.lang_manager.tr("高通log提取pcap"))
+        self.extract_pcap_from_qualcomm_log_btn.clicked.connect(self.extract_pcap_from_qualcomm_log.emit)
+        row2.addWidget(self.extract_pcap_from_qualcomm_log_btn)
         
         row2.addStretch()
         card_layout.addLayout(row2)

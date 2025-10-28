@@ -545,13 +545,15 @@ class MainWindow(QMainWindow):
         self.app_operations_tab.enable_app.connect(self._on_enable_app)
         self.app_operations_tab.disable_app.connect(self._on_disable_app)
         
+        # 连接 log_control Tab 信号（从其他Tab移过来的log操作按钮）
+        self.log_control_tab.merge_mtklog.connect(self._on_merge_mtklog)
+        self.log_control_tab.extract_pcap_from_mtklog.connect(self._on_extract_pcap_from_mtklog)
+        self.log_control_tab.merge_pcap.connect(self._on_merge_pcap)
+        self.log_control_tab.extract_pcap_from_qualcomm_log.connect(self._on_extract_pcap_from_qualcomm_log)
+        
         # 连接 其他 Tab 信号
         self.other_tab.show_device_info_dialog.connect(self._on_show_device_info_dialog)
         self.other_tab.set_screen_timeout.connect(self._on_set_screen_timeout)
-        self.other_tab.merge_mtklog.connect(self._on_merge_mtklog)
-        self.other_tab.extract_pcap_from_mtklog.connect(self._on_extract_pcap_from_mtklog)
-        self.other_tab.merge_pcap.connect(self._on_merge_pcap)
-        self.other_tab.extract_pcap_from_qualcomm_log.connect(self._on_extract_pcap_from_qualcomm_log)
         self.other_tab.configure_hera.connect(self._on_configure_hera)
         self.other_tab.configure_collect_data.connect(self._on_configure_collect_data)
         self.other_tab.show_input_text_dialog.connect(self._on_show_input_text_dialog)
@@ -2455,13 +2457,15 @@ class MainWindow(QMainWindow):
                 self.app_operations_tab.disable_app.connect(self._on_disable_app)
             
             # 连接 其他 Tab 信号
+            if hasattr(self, 'log_control_tab'):
+                self.log_control_tab.merge_mtklog.connect(self._on_merge_mtklog)
+                self.log_control_tab.extract_pcap_from_mtklog.connect(self._on_extract_pcap_from_mtklog)
+                self.log_control_tab.merge_pcap.connect(self._on_merge_pcap)
+                self.log_control_tab.extract_pcap_from_qualcomm_log.connect(self._on_extract_pcap_from_qualcomm_log)
+            
             if hasattr(self, 'other_tab'):
                 self.other_tab.show_device_info_dialog.connect(self._on_show_device_info_dialog)
                 self.other_tab.set_screen_timeout.connect(self._on_set_screen_timeout)
-                self.other_tab.merge_mtklog.connect(self._on_merge_mtklog)
-                self.other_tab.extract_pcap_from_mtklog.connect(self._on_extract_pcap_from_mtklog)
-                self.other_tab.merge_pcap.connect(self._on_merge_pcap)
-                self.other_tab.extract_pcap_from_qualcomm_log.connect(self._on_extract_pcap_from_qualcomm_log)
                 self.other_tab.configure_hera.connect(self._on_configure_hera)
                 self.other_tab.configure_collect_data.connect(self._on_configure_collect_data)
                 self.other_tab.show_input_text_dialog.connect(self._on_show_input_text_dialog)
