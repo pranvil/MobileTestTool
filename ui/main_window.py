@@ -215,7 +215,7 @@ class MainWindow(QMainWindow):
             self.loading_window.close()
             self.loading_window = None
         
-        # 显示主窗口
+        # 显示主窗口（最大化）
         self.showMaximized()
         
     def _init_managers(self):
@@ -300,7 +300,8 @@ class MainWindow(QMainWindow):
         """设置用户界面"""
         # 设置窗口属性
         self.setWindowTitle(self.lang_manager.tr("手机测试辅助工具 v0.92"))
-        self.setGeometry(100, 100, 900, 600)
+        # 注释掉固定大小设置，使用showMaximized()时会自动设置
+        # self.setGeometry(100, 100, 900, 600)
         
         # 设置窗口图标（任务栏图标）
         self._set_window_icon()
@@ -325,6 +326,9 @@ class MainWindow(QMainWindow):
         
         # Tab 区域
         self.tab_widget = QTabWidget()
+        
+        # 设置Tab内容区域最小高度
+        self.tab_widget.setMinimumHeight(100)
         
         # 启用Tab拖拽排序
         self.tab_widget.setMovable(True)
@@ -398,7 +402,11 @@ class MainWindow(QMainWindow):
         self.toolbar.reboot_clicked.connect(self._on_reboot_device)
         self.toolbar.root_remount_clicked.connect(self._on_root_remount)
         self.toolbar.theme_toggled.connect(self._on_theme_toggled)
-        self.toolbar.adb_command_executed.connect(self._on_adb_command_executed)
+        # 工具栏中的ADB命令输入框已移到日志显示区域下方
+        # self.toolbar.adb_command_executed.connect(self._on_adb_command_executed)
+        
+        # 连接日志查看器的ADB命令信号
+        self.log_viewer.adb_command_executed.connect(self._on_adb_command_executed)
         
         # 连接语言管理器信号
         self.lang_manager.language_changed.connect(self._on_language_changed)
@@ -2474,6 +2482,17 @@ class MainWindow(QMainWindow):
             
         except Exception as e:
             logger.exception(f"{self.tr('重新连接Tab信号槽失败:')} {e}")
+    
+    def keyPressEvent(self, event):
+        """处理键盘事件"""
+        # ESC键退出全屏模式
+        if event.key() == Qt.Key_Escape:
+            if self.isFullScreen():
+                self.showNormal()
+            else:
+                super().keyPressEvent(event)
+        else:
+            super().keyPressEvent(event)
     
     def closeEvent(self, event):
         """窗口关闭事件"""

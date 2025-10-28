@@ -1272,7 +1272,7 @@ class PullApkDialog(QDialog):
         layout.addWidget(self.package_entry)
         
         # 保存路径信息
-        storage_path = self.get_storage_path()
+        storage_path = self.manager.get_storage_path()
         save_info = QLabel(self.tr(f"文件将保存到: {storage_path}\\<包名>"))
         save_info.setStyleSheet("color: blue;")
         layout.addWidget(save_info)

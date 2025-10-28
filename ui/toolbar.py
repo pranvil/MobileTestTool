@@ -112,33 +112,6 @@ class DeviceToolBar(QToolBar):
         
         self.addWidget(quick_widget)
         
-        # 添加分隔符
-        self.addSeparator()
-        
-        # ADB命令输入区域
-        adb_widget = QWidget()
-        adb_layout = QHBoxLayout(adb_widget)
-        adb_layout.setContentsMargins(0, 0, 0, 0)
-        adb_layout.setSpacing(5)
-        
-        # ADB命令标签
-        adb_label = QLabel(self.lang_manager.tr("ADB命令:"))
-        adb_layout.addWidget(adb_label)
-        
-        # ADB命令输入框
-        self.adb_input = QLineEdit()
-        self.adb_input.setPlaceholderText(self.lang_manager.tr("快速执行adb命令（如: adb devices, adb shell getprop）"))
-        self.adb_input.setMinimumWidth(300)
-        self.adb_input.setToolTip(
-            self.lang_manager.tr("支持快速执行一次性ADB命令\n") +
-            self.lang_manager.tr("例如: adb devices, adb shell pm list packages 等\n") +
-            self.lang_manager.tr("不支持持续输出命令（logcat、top等），请使用对应功能")
-        )
-        self.adb_input.returnPressed.connect(self._on_adb_command_entered)
-        adb_layout.addWidget(self.adb_input)
-        
-        self.addWidget(adb_widget)
-        
         # 添加弹性空间
         self.addWidget(QWidget())
         
@@ -153,6 +126,34 @@ class DeviceToolBar(QToolBar):
         self.language_btn.setToolTip(self.lang_manager.tr("点击切换语言 / Click to switch language"))
         self.language_btn.clicked.connect(self._on_language_toggle)
         self.addWidget(self.language_btn)
+        
+        # 注释掉工具栏中的ADB命令输入框，已移到日志显示区域下方
+        # # 添加分隔符
+        # self.addSeparator()
+        # 
+        # # ADB命令输入区域
+        # adb_widget = QWidget()
+        # adb_layout = QHBoxLayout(adb_widget)
+        # adb_layout.setContentsMargins(0, 0, 0, 0)
+        # adb_layout.setSpacing(5)
+        # 
+        # # ADB命令标签
+        # adb_label = QLabel(self.lang_manager.tr("ADB命令:"))
+        # adb_layout.addWidget(adb_label)
+        # 
+        # # ADB命令输入框
+        # self.adb_input = QLineEdit()
+        # self.adb_input.setPlaceholderText(self.lang_manager.tr("快速执行adb命令（如: adb devices, adb shell getprop）"))
+        # self.adb_input.setMinimumWidth(300)
+        # self.adb_input.setToolTip(
+        #     self.lang_manager.tr("支持快速执行一次性ADB命令\n") +
+        #     self.lang_manager.tr("例如: adb devices, adb shell pm list packages 等\n") +
+        #     self.lang_manager.tr("不支持持续输出命令（logcat、top等），请使用对应功能")
+        # )
+        # self.adb_input.returnPressed.connect(self._on_adb_command_entered)
+        # adb_layout.addWidget(self.adb_input)
+        # 
+        # self.addWidget(adb_widget)
 
     def set_device_list(self, devices):
         """设置设备列表"""
@@ -230,17 +231,17 @@ class DeviceToolBar(QToolBar):
         self.reboot_btn.setText(self.lang_manager.tr("重启手机"))
         self.root_remount_btn.setText(self.lang_manager.tr("Root&&Remount"))
         
-        # 刷新ADB命令标签
-        adb_label = None
-        for widget in self.findChildren(QLabel):
-            if widget.text() == "ADB命令:":
-                adb_label = widget
-                break
-        if adb_label:
-            adb_label.setText(self.lang_manager.tr("ADB命令:"))
-        
-        # 刷新ADB输入框占位符
-        self.adb_input.setPlaceholderText(self.lang_manager.tr("快速执行adb命令（如: adb devices, adb shell getprop）"))
+        # ADB命令输入框已移到日志显示区域，不再需要刷新工具栏中的
+        # # 刷新ADB命令标签
+        # adb_label = None
+        # for widget in self.findChildren(QLabel):
+        #     if widget.text() == "ADB命令:":
+        #         adb_label = widget
+        #         break
+        # if adb_label:
+        #     adb_label.setText(self.lang_manager.tr("ADB命令:"))
+        # # 刷新ADB输入框占位符
+        # self.adb_input.setPlaceholderText(self.lang_manager.tr("快速执行adb命令（如: adb devices, adb shell getprop）"))
         
         # 刷新主题按钮
         current_theme = "dark"  # 默认主题

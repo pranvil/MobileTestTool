@@ -5,7 +5,8 @@
 """
 
 from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QTextEdit, QLabel,
-                             QHBoxLayout, QPushButton, QLineEdit, QCheckBox)
+                             QHBoxLayout, QPushButton, QLineEdit, QCheckBox,
+                             QSizePolicy, QFrame)
 from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtGui import QTextCharFormat, QColor, QTextCursor, QFont, QTextDocument
 
@@ -15,6 +16,7 @@ class LogViewer(QWidget):
     
     # 信号定义
     search_requested = pyqtSignal(str, bool)  # keyword, case_sensitive
+    adb_command_executed = pyqtSignal(str)  # 执行adb命令
     
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -25,11 +27,6 @@ class LogViewer(QWidget):
             # 如果没有父窗口或语言管理器，创建一个默认的
             from core.language_manager import LanguageManager
             self.lang_manager = LanguageManager()
-        self.setup_ui()
-    
-    def tr(self, text):
-        """安全地获取翻译文本"""
-        return self.lang_manager.tr(text) if self.lang_manager else text
         
         # 搜索相关
         self.search_keyword = ""
@@ -37,48 +34,32 @@ class LogViewer(QWidget):
         self.search_results = []
         self.current_search_index = -1
         
+        self.setup_ui()
+    
+    def tr(self, text):
+        """安全地获取翻译文本"""
+        return self.lang_manager.tr(text) if self.lang_manager else text
+        
     def setup_ui(self):
         """设置UI"""
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
         
-        # 日志显示标签
+        # 标题行：日志内容标签 + 搜索工具栏
+        title_layout = QHBoxLayout()
+        title_layout.setContentsMargins(5, 5, 5, 5)
+        
+        # 日志显示标签（左侧）
         label = QLabel(self.lang_manager.tr("日志内容"))
-        label.setStyleSheet("font-weight: bold; padding: 5px;")
-        layout.addWidget(label)
+        label.setStyleSheet("font-weight: bold;")
+        label.setSizePolicy(QSizePolicy.Maximum, QSizePolicy.Preferred)
+        title_layout.addWidget(label)
         
-        # 日志文本编辑框
-        self.text_edit = QTextEdit()
-        self.text_edit.setReadOnly(True)
-        self.text_edit.setFont(QFont("Cascadia Mono", 10))
-        self.text_edit.setStyleSheet("""
-            QTextEdit {
-                background-color: #1e1e1e;
-                color: #ffffff;
-                border: 1px solid #cccccc;
-                border-radius: 4px;
-            }
-        """)
-        
-        # 配置文本格式
-        self.default_format = QTextCharFormat()
-        self.default_format.setForeground(QColor("#ffffff"))
-        
-        # 关键字高亮格式（用于过滤时的高亮）
-        self.highlight_format = QTextCharFormat()
-        self.highlight_format.setForeground(QColor("#FF4444"))
-        self.highlight_format.setFontWeight(700)  # 加粗
-        
-        # 搜索高亮格式（用于搜索时的高亮）
-        self.search_highlight_format = QTextCharFormat()
-        self.search_highlight_format.setForeground(QColor("#00FF00"))  # 绿色字体
-        
-        layout.addWidget(self.text_edit)
-        
-        # 搜索工具栏
+        # 搜索工具栏（右侧）
         search_layout = QHBoxLayout()
-        search_layout.setContentsMargins(5, 5, 5, 5)
+        search_layout.setContentsMargins(0, 0, 0, 0)
+        search_layout.setSpacing(5)
         
         search_label = QLabel(self.lang_manager.tr("搜索:"))
         search_layout.addWidget(search_label)
@@ -111,7 +92,77 @@ class LogViewer(QWidget):
         self.clear_btn.clicked.connect(self.clear_logs)
         search_layout.addWidget(self.clear_btn)
         
-        layout.addLayout(search_layout)
+        # 在"日志内容"和搜索工具栏之间添加小间距
+        title_layout.addSpacing(10)
+        title_layout.addLayout(search_layout)
+        
+        # 添加弹性空间将搜索工具栏推到右侧
+        title_layout.addStretch()
+        
+        layout.addLayout(title_layout)
+        
+        # 日志文本编辑框
+        self.text_edit = QTextEdit()
+        self.text_edit.setReadOnly(True)
+        self.text_edit.setFont(QFont("Cascadia Mono", 10))
+        self.text_edit.setStyleSheet("""
+            QTextEdit {
+                background-color: #1e1e1e;
+                color: #ffffff;
+                border: 1px solid #cccccc;
+                border-radius: 4px;
+            }
+        """)
+        
+        # 配置文本格式
+        self.default_format = QTextCharFormat()
+        self.default_format.setForeground(QColor("#ffffff"))
+        
+        # 关键字高亮格式（用于过滤时的高亮）
+        self.highlight_format = QTextCharFormat()
+        self.highlight_format.setForeground(QColor("#FF4444"))
+        self.highlight_format.setFontWeight(700)  # 加粗
+        
+        # 搜索高亮格式（用于搜索时的高亮）
+        self.search_highlight_format = QTextCharFormat()
+        self.search_highlight_format.setForeground(QColor("#00FF00"))  # 绿色字体
+        
+        layout.addWidget(self.text_edit)
+        
+        # ADB命令输入区域（日志显示区域下方）
+        adb_frame = QFrame()
+        adb_frame.setStyleSheet("background-color: #2a2a2a; padding: 5px;")
+        adb_layout_h = QHBoxLayout(adb_frame)
+        adb_layout_h.setContentsMargins(5, 5, 5, 5)
+        adb_layout_h.setSpacing(5)
+        
+        adb_label = QLabel(self.lang_manager.tr("ADB命令:"))
+        adb_layout_h.addWidget(adb_label)
+        
+        self.adb_input = QLineEdit()
+        self.adb_input.setPlaceholderText(self.lang_manager.tr("快速执行adb命令（如: adb devices, adb shell getprop）"))
+        self.adb_input.setMinimumWidth(300)
+        self.adb_input.setToolTip(
+            self.lang_manager.tr("支持快速执行一次性ADB命令\n") +
+            self.lang_manager.tr("例如: adb devices, adb shell pm list packages 等\n") +
+            self.lang_manager.tr("不支持持续输出命令（logcat、top等），请使用对应功能")
+        )
+        self.adb_input.returnPressed.connect(self._on_adb_command_entered)
+        adb_layout_h.addWidget(self.adb_input)
+        
+        # 发送按钮
+        self.adb_send_btn = QPushButton(self.lang_manager.tr("发送"))
+        self.adb_send_btn.clicked.connect(self._on_adb_command_entered)
+        adb_layout_h.addWidget(self.adb_send_btn)
+        
+        layout.addWidget(adb_frame)
+        
+    def _on_adb_command_entered(self):
+        """处理ADB命令输入"""
+        command = self.adb_input.text().strip()
+        if command:
+            self.adb_command_executed.emit(command)
+            self.adb_input.clear()
         
     def append_log(self, text, color=None):
         """追加日志"""
