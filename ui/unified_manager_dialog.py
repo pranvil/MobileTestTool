@@ -32,6 +32,7 @@ class UnifiedManagerDialog(QDialog):
         self.setWindowTitle(self.tr("自定义界面管理"))
         self.setModal(True)
         self.resize(1000, 700)
+        self.setMinimumSize(800, 500)  # 设置最小尺寸，允许调整高度和宽度
         
         # 存储控件引用
         self.visibility_widgets = {}

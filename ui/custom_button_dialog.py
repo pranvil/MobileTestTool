@@ -24,6 +24,7 @@ class CustomButtonDialog(QDialog):
         self.setWindowTitle(self.tr("自定义按钮管理"))
         self.setModal(True)
         self.resize(900, 600)
+        self.setMinimumSize(600, 400)  # 设置最小尺寸，允许调整高度
         
         self.setup_ui()
         self.load_buttons()
