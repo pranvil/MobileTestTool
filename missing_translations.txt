@@ -1,0 +1,709 @@
+手机测试辅助工具
+正在初始化...
+个自定义按钮
+成功加载Tab配置
+Root&&Remount
+点击切换语言 / Click to switch language
+开始初始化所有Tab页面...
+启用Telephony日志
+log操作:
+连线log
+离线log
+自定义界面管理
+自定义Tab:
+创建自定义Card组:
+（按钮稍后添加）
+所有Tab页面初始化完成
+支持快速执行一次性ADB命令
+
+例如: adb devices, adb shell pm list packages 等
+
+不支持持续输出命令（logcat、top等），请使用对应功能
+拉取 Bugreport
+TCPDUMP
+Ping
+点击
+按钮获取网络信息
+中/EN
+开始为所有Tab加载自定义按钮...
+处理预制Tab:
+默认
+尝试向预制卡片
+注入
+个按钮
+找到
+个Frame
+找到匹配的预制卡片:
+直接使用QHBoxLayout作为按钮布局
+找到按钮布局，添加
+添加自定义按钮
+到
+处理自定义Tab...
+检查Tab:
+找到自定义Tab:
+为自定义Tab加载按钮:
+个自定义Card
+处理Card:
+查找按钮: Tab=
+Card=
+所有按钮配置:
+个
+Card
+有
+尝试向自定义Card添加按钮:
+个GroupBox
+找到匹配的GroupBox:
+个QHBoxLayout
+使用按钮布局添加
+到Card
+所有Tab的自定义按钮加载完成
+Tab显示控制
+应用
+自定义Tab管理
+添加Tab
+编辑Tab
+删除Tab
+自定义Card管理
+添加Card
+编辑Card
+删除Card
+adb命令会自动加上 'adb -s {device}' 前缀。
+刷新
+导出配置
+导入配置
+重置为默认
+此Tab不能隐藏
+ADB命令
+Python脚本
+打开文件
+运行程序
+系统命令
+Tab信息
+Tab名称:
+个自定义按钮配置
+检测到自定义按钮配置更新，重新加载...
+已清除所有自定义按钮
+刷新自定义Tab...
+重新创建自定义Tab:
+自定义Tab刷新完成
+自定义按钮已更新
+已更新
+个按钮的Tab名称:
+成功更新自定义Tab:
+Tab已更新
+Tab配置已保存
+检测到Tab配置更新，重新加载Tab...
+Tab信号槽重新连接完成
+Tab重新加载完成
+按钮删除成功！
+💡 提示：Card只能添加到自定义Tab中
+Card信息
+Card名称:
+所属Tab:
+Tab顺序已更新:
+内容...
+adb -s {{设备ID}}
+自定义按钮
+执行自定义按钮: 
+执行成功
+adb reboot（不需要加 'adb -s {device}'）
+可选：脚本描述或文件名（如：系统信息收集）
+例如：C:\Users\用户名\Desktop\文件.txt
+例如：C:\Program Files\Notepad++\notepad++.exe
+例如：dir 或 ls
+执行Python脚本:
+Python脚本执行错误:
+执行失败: 
+手机测试辅助工具
+正在初始化...
+个自定义按钮
+成功加载Tab配置
+Root&&Remount
+点击切换语言 / Click to switch language
+开始初始化所有Tab页面...
+启用Telephony日志
+log操作:
+连线log
+离线log
+自定义界面管理
+自定义Tab:
+创建自定义Card组:
+（按钮稍后添加）
+所有Tab页面初始化完成
+支持快速执行一次性ADB命令
+
+例如: adb devices, adb shell pm list packages 等
+
+不支持持续输出命令（logcat、top等），请使用对应功能
+拉取 Bugreport
+TCPDUMP
+Ping
+点击
+按钮获取网络信息
+中/EN
+开始为所有Tab加载自定义按钮...
+处理预制Tab:
+默认
+尝试向预制卡片
+注入
+个按钮
+找到
+个Frame
+找到匹配的预制卡片:
+直接使用QHBoxLayout作为按钮布局
+找到按钮布局，添加
+添加自定义按钮
+到
+处理自定义Tab...
+检查Tab:
+找到自定义Tab:
+为自定义Tab加载按钮:
+个自定义Card
+处理Card:
+查找按钮: Tab=
+Card=
+所有按钮配置:
+个
+Card
+有
+所有Tab的自定义按钮加载完成
+自定义按钮
+执行自定义按钮: 
+手机测试辅助工具
+正在初始化...
+个自定义按钮
+成功加载Tab配置
+Root&&Remount
+点击切换语言 / Click to switch language
+开始初始化所有Tab页面...
+启用Telephony日志
+log操作:
+连线log
+离线log
+自定义界面管理
+自定义Tab:
+创建自定义Card组:
+（按钮稍后添加）
+所有Tab页面初始化完成
+支持快速执行一次性ADB命令
+
+例如: adb devices, adb shell pm list packages 等
+
+不支持持续输出命令（logcat、top等），请使用对应功能
+拉取 Bugreport
+TCPDUMP
+Ping
+点击
+按钮获取网络信息
+中/EN
+开始为所有Tab加载自定义按钮...
+处理预制Tab:
+默认
+尝试向预制卡片
+注入
+个按钮
+找到
+个Frame
+找到匹配的预制卡片:
+直接使用QHBoxLayout作为按钮布局
+找到按钮布局，添加
+添加自定义按钮
+到
+处理自定义Tab...
+检查Tab:
+找到自定义Tab:
+为自定义Tab加载按钮:
+个自定义Card
+处理Card:
+查找按钮: Tab=
+Card=
+所有按钮配置:
+个
+Card
+有
+所有Tab的自定义按钮加载完成
+Tab显示控制
+应用
+自定义Tab管理
+添加Tab
+编辑Tab
+删除Tab
+自定义Card管理
+添加Card
+编辑Card
+删除Card
+adb命令会自动加上 'adb -s {device}' 前缀。
+刷新
+导出配置
+导入配置
+重置为默认
+此Tab不能隐藏
+ADB命令
+Python脚本
+打开文件
+运行程序
+系统命令
+内容...
+adb reboot（不需要加 'adb -s {device}'）
+可选：脚本描述或文件名（如：系统信息收集）
+例如：C:\Users\用户名\Desktop\文件.txt
+例如：C:\Program Files\Notepad++\notepad++.exe
+例如：dir 或 ls
+个自定义按钮配置
+检测到自定义按钮配置更新，重新加载...
+已清除所有自定义按钮
+刷新自定义Tab...
+重新创建自定义Tab:
+自定义Tab刷新完成
+自定义按钮已更新
+Tab信号槽重新连接完成
+Tab重新加载完成
+Tab配置已保存
+检测到Tab配置更新，重新加载Tab...
+自定义按钮
+执行自定义按钮: 
+Python脚本执行错误:
+执行失败: 
+手机测试辅助工具
+正在初始化...
+个自定义按钮
+成功加载Tab配置
+Root&&Remount
+点击切换语言 / Click to switch language
+开始初始化所有Tab页面...
+启用Telephony日志
+log操作:
+连线log
+离线log
+自定义界面管理
+自定义Tab:
+创建自定义Card组:
+（按钮稍后添加）
+所有Tab页面初始化完成
+支持快速执行一次性ADB命令
+
+例如: adb devices, adb shell pm list packages 等
+
+不支持持续输出命令（logcat、top等），请使用对应功能
+拉取 Bugreport
+TCPDUMP
+Ping
+点击
+按钮获取网络信息
+中/EN
+开始为所有Tab加载自定义按钮...
+处理预制Tab:
+默认
+尝试向预制卡片
+注入
+个按钮
+找到
+个Frame
+找到匹配的预制卡片:
+直接使用QHBoxLayout作为按钮布局
+找到按钮布局，添加
+添加自定义按钮
+到
+处理自定义Tab...
+检查Tab:
+找到自定义Tab:
+为自定义Tab加载按钮:
+个自定义Card
+处理Card:
+查找按钮: Tab=
+Card=
+所有按钮配置:
+个
+Card
+有
+所有Tab的自定义按钮加载完成
+Tab显示控制
+应用
+自定义Tab管理
+添加Tab
+编辑Tab
+删除Tab
+自定义Card管理
+添加Card
+编辑Card
+删除Card
+adb命令会自动加上 'adb -s {device}' 前缀。
+刷新
+导出配置
+导入配置
+重置为默认
+此Tab不能隐藏
+ADB命令
+Python脚本
+打开文件
+运行程序
+系统命令
+Tab信号槽重新连接完成
+Tab重新加载完成
+Tab配置已保存
+检测到Tab配置更新，重新加载Tab...
+自定义按钮
+执行自定义按钮: 
+Python脚本执行错误:
+执行失败: 
+内容...
+adb reboot（不需要加 'adb -s {device}'）
+可选：脚本描述或文件名（如：系统信息收集）
+例如：C:\Users\用户名\Desktop\文件.txt
+例如：C:\Program Files\Notepad++\notepad++.exe
+例如：dir 或 ls
+个自定义按钮配置
+检测到自定义按钮配置更新，重新加载...
+已清除所有自定义按钮
+刷新自定义Tab...
+重新创建自定义Tab:
+自定义Tab刷新完成
+自定义按钮已更新
+输出:
+执行成功
+手机测试辅助工具
+正在初始化...
+个自定义按钮
+成功加载Tab配置
+Root&&Remount
+点击切换语言 / Click to switch language
+开始初始化所有Tab页面...
+启用Telephony日志
+log操作:
+连线log
+离线log
+自定义界面管理
+自定义Tab:
+创建自定义Card组:
+（按钮稍后添加）
+所有Tab页面初始化完成
+支持快速执行一次性ADB命令
+
+例如: adb devices, adb shell pm list packages 等
+
+不支持持续输出命令（logcat、top等），请使用对应功能
+拉取 Bugreport
+TCPDUMP
+Ping
+点击
+按钮获取网络信息
+中/EN
+开始为所有Tab加载自定义按钮...
+处理预制Tab:
+默认
+尝试向预制卡片
+注入
+个按钮
+找到
+个Frame
+找到匹配的预制卡片:
+直接使用QHBoxLayout作为按钮布局
+找到按钮布局，添加
+添加自定义按钮
+到
+处理自定义Tab...
+检查Tab:
+找到自定义Tab:
+为自定义Tab加载按钮:
+个自定义Card
+处理Card:
+查找按钮: Tab=
+Card=
+所有按钮配置:
+个
+Card
+有
+所有Tab的自定义按钮加载完成
+自定义按钮
+执行自定义按钮: 
+输出:
+执行成功
+Tab显示控制
+应用
+自定义Tab管理
+添加Tab
+编辑Tab
+删除Tab
+自定义Card管理
+添加Card
+编辑Card
+删除Card
+adb命令会自动加上 'adb -s {device}' 前缀。
+刷新
+导出配置
+导入配置
+重置为默认
+此Tab不能隐藏
+ADB命令
+Python脚本
+打开文件
+运行程序
+系统命令
+Tab信号槽重新连接完成
+Tab重新加载完成
+Tab配置已保存
+检测到Tab配置更新，重新加载Tab...
+配置备份与恢复
+🔄 配置备份与恢复
+此功能可以一键导出所有配置，包括：
+• Tab配置管理
+• 自定义按钮
+• AT命令
+• 暗码数据
+• 高通NV数据
+• Log关键字
+导出所有配置
+导入所有配置
+状态信息将显示在这里...
+开始导出配置...
+✓ 已加载Tab配置
+✓ 已加载自定义按钮配置
+✓ 已加载Log关键字配置
+✓ 已加载暗码配置
+MobileTestTool 全量配置导出
+✓ 配置已导出到: C:/Users/min.yang.na/Desktop/MobileTestTool_All_Config_20251030_161928.json
+✓ 共导出 4 个配置项
+导出成功
+配置已成功导出到：
+C:/Users/min.yang.na/Desktop/MobileTestTool_All_Config_20251030_161928.json
+个自定义按钮配置
+检测到自定义按钮配置更新，重新加载...
+已清除所有自定义按钮
+刷新自定义Tab...
+重新创建自定义Tab:
+自定义Tab刷新完成
+自定义按钮已更新
+按钮删除成功！
+确认导入配置
+⚠️ 导入配置将完全覆盖当前所有设置！
+
+
+确定要继续导入吗？
+开始导入配置...
+✓ Tab配置导入成功
+✓ 自定义按钮配置导入成功
+✓ Log关键字配置导入成功
+✓ 暗码配置导入成功
+
+导入完成：成功 4，失败 0
+✓ 已通知主窗口重新加载
+导入完成
+共导入 4 个配置项
+失败 0 个
+执行失败: 
+内容...
+adb -s {{设备ID}}
+adb reboot（不需要加 'adb -s {device}'）
+可选：脚本描述或文件名（如：系统信息收集）
+例如：C:\Users\用户名\Desktop\文件.txt
+例如：C:\Program Files\Notepad++\notepad++.exe
+例如：dir 或 ls
+设备 
+ 未连接或连接异常
+Tab顺序已更新:
+💡 提示：Card只能添加到自定义Tab中
+Card信息
+Card名称:
+所属Tab:
+Card已更新
+尝试向自定义Card添加按钮:
+个GroupBox
+找到匹配的GroupBox:
+个QHBoxLayout
+使用按钮布局添加
+到Card
+安装 MTKLOGGER...
+选择MTKLOGGER APK文件
+在QVBoxLayout中找到子QHBoxLayout作为按钮布局
+请输入灭屏时间(秒，0表示永不灭屏):
+秒
+灭屏时间已设置为: 
+自定义Tab
+Tab信息
+Tab名称:
+成功创建自定义Tab:
+Tab已创建
+暂无自定义Card，请在Tab管理中创建
+自定义Card
+成功创建自定义Card:
+Card已创建
+手机测试辅助工具
+正在初始化...
+个自定义按钮
+成功加载Tab配置
+Root&&Remount
+点击切换语言 / Click to switch language
+开始初始化所有Tab页面...
+启用Telephony日志
+log操作:
+连线log
+离线log
+自定义界面管理
+自定义Tab:
+创建自定义Card组:
+（按钮稍后添加）
+所有Tab页面初始化完成
+支持快速执行一次性ADB命令
+
+例如: adb devices, adb shell pm list packages 等
+
+不支持持续输出命令（logcat、top等），请使用对应功能
+拉取 Bugreport
+TCPDUMP
+Ping
+点击
+按钮获取网络信息
+中/EN
+开始为所有Tab加载自定义按钮...
+处理预制Tab:
+默认
+尝试向预制卡片
+注入
+个按钮
+找到
+个Frame
+找到匹配的预制卡片:
+在QVBoxLayout中找到子QHBoxLayout作为按钮布局
+找到按钮布局，添加
+添加自定义按钮
+到
+直接使用QHBoxLayout作为按钮布局
+处理自定义Tab...
+检查Tab:
+找到自定义Tab:
+为自定义Tab加载按钮:
+个自定义Card
+处理Card:
+查找按钮: Tab=
+Card=
+所有按钮配置:
+个
+Card
+有
+尝试向自定义Card添加按钮:
+个GroupBox
+找到匹配的GroupBox:
+个QHBoxLayout
+使用按钮布局添加
+到Card
+所有Tab的自定义按钮加载完成
+手机测试辅助工具
+正在初始化...
+个自定义按钮
+成功加载Tab配置
+Root&&Remount
+点击切换语言 / Click to switch language
+开始初始化所有Tab页面...
+启用Telephony日志
+log操作:
+连线log
+离线log
+自定义界面管理
+自定义Tab:
+创建自定义Card组:
+（按钮稍后添加）
+所有Tab页面初始化完成
+支持快速执行一次性ADB命令
+
+例如: adb devices, adb shell pm list packages 等
+
+不支持持续输出命令（logcat、top等），请使用对应功能
+拉取 Bugreport
+TCPDUMP
+Ping
+点击
+按钮获取网络信息
+中/EN
+开始为所有Tab加载自定义按钮...
+处理预制Tab:
+默认
+尝试向预制卡片
+注入
+个按钮
+找到
+个Frame
+找到匹配的预制卡片:
+在QVBoxLayout中找到子QHBoxLayout作为按钮布局
+找到按钮布局，添加
+添加自定义按钮
+到
+直接使用QHBoxLayout作为按钮布局
+处理自定义Tab...
+检查Tab:
+找到自定义Tab:
+为自定义Tab加载按钮:
+个自定义Card
+处理Card:
+查找按钮: Tab=
+Card=
+所有按钮配置:
+个
+Card
+有
+尝试向自定义Card添加按钮:
+个GroupBox
+找到匹配的GroupBox:
+个QHBoxLayout
+使用按钮布局添加
+到Card
+所有Tab的自定义按钮加载完成
+手机测试辅助工具
+正在初始化...
+个自定义按钮
+成功加载Tab配置
+Root&&Remount
+点击切换语言 / Click to switch language
+开始初始化所有Tab页面...
+启用Telephony日志
+log操作:
+连线log
+离线log
+自定义界面管理
+自定义Tab:
+创建自定义Card组:
+（按钮稍后添加）
+所有Tab页面初始化完成
+支持快速执行一次性ADB命令
+
+例如: adb devices, adb shell pm list packages 等
+
+不支持持续输出命令（logcat、top等），请使用对应功能
+拉取 Bugreport
+TCPDUMP
+Ping
+点击
+按钮获取网络信息
+中/EN
+开始为所有Tab加载自定义按钮...
+处理预制Tab:
+默认
+尝试向预制卡片
+注入
+个按钮
+找到
+个Frame
+找到匹配的预制卡片:
+在QVBoxLayout中找到子QHBoxLayout作为按钮布局
+找到按钮布局，添加
+添加自定义按钮
+到
+直接使用QHBoxLayout作为按钮布局
+处理自定义Tab...
+检查Tab:
+找到自定义Tab:
+为自定义Tab加载按钮:
+个自定义Card
+处理Card:
+查找按钮: Tab=
+Card=
+所有按钮配置:
+个
+Card
+有
+尝试向自定义Card添加按钮:
+个GroupBox
+找到匹配的GroupBox:
+个QHBoxLayout
+使用按钮布局添加
+到Card
+所有Tab的自定义按钮加载完成
