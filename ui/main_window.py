@@ -1973,6 +1973,9 @@ class MainWindow(QMainWindow):
             
             found_card = False
             for frame in frames:
+                # 仅处理我们定义的卡片Frame
+                if frame.objectName() != "card":
+                    continue
                 # 检查Frame上方是否有对应的标题Label
                 parent_widget = frame.parent()
                 if parent_widget:
@@ -1988,10 +1991,20 @@ class MainWindow(QMainWindow):
                             
                             # 找到了对应的卡片
                             layout = frame.layout()
+                            if not layout:
+                                logger.debug(f"{self.lang_manager.tr('Frame没有直接布局，尝试查找子部件布局')} ...")
+                                # 回退：在该Frame下寻找首个带布局的子部件
+                                for child in frame.findChildren(QWidget):
+                                    if child.layout():
+                                        layout = child.layout()
+                                        logger.debug(f"{self.lang_manager.tr('使用子部件布局作为按钮布局')} -> {type(layout).__name__}")
+                                        break
                             if layout:
                                 # 使用统一的按钮添加逻辑
                                 self._add_buttons_to_layout(layout, buttons, card_name)
                                 break
+                            else:
+                                logger.warning(f"{self.lang_manager.tr('未能获取到卡片布局')} '{card_name}'")
                     
                     if found_card:
                         break
@@ -2005,20 +2018,55 @@ class MainWindow(QMainWindow):
     def _add_buttons_to_layout(self, layout, buttons, card_name):
         """向布局中添加按钮（统一逻辑）"""
         try:
-            from PyQt5.QtWidgets import QPushButton, QHBoxLayout
+            from PyQt5.QtWidgets import QPushButton, QHBoxLayout, QVBoxLayout, QGridLayout, QWidget
             
             # 查找合适的按钮布局
             button_layout = None
             
-            if isinstance(layout, QVBoxLayout):
+            if isinstance(layout, QHBoxLayout):
+                button_layout = layout
+                logger.debug(f"{self.lang_manager.tr('直接使用QHBoxLayout作为按钮布局')}")
+            elif isinstance(layout, QVBoxLayout):
                 # 查找最后一个QHBoxLayout
                 for i in range(layout.count() - 1, -1, -1):
                     item = layout.itemAt(i)
-                    if item and item.layout() and isinstance(item.layout(), QHBoxLayout):
-                        button_layout = item.layout()
-                        break
-            elif isinstance(layout, QHBoxLayout):
-                button_layout = layout
+                    if item:
+                        # 情况1：子项本身是一个layout
+                        if item.layout() and isinstance(item.layout(), QHBoxLayout):
+                            button_layout = item.layout()
+                            logger.debug(f"{self.lang_manager.tr('在QVBoxLayout中找到子QHBoxLayout作为按钮布局')}")
+                            break
+                        # 情况2：子项是一个widget，widget自带layout
+                        if item.widget() and item.widget().layout() and isinstance(item.widget().layout(), QHBoxLayout):
+                            button_layout = item.widget().layout()
+                            logger.debug(f"{self.lang_manager.tr('在QVBoxLayout的子Widget中找到QHBoxLayout作为按钮布局')}")
+                            break
+                        # 进一步向下查找嵌套
+                        if item.layout() and isinstance(item.layout(), QVBoxLayout):
+                            nested = item.layout()
+                            for j in range(nested.count() - 1, -1, -1):
+                                sub = nested.itemAt(j)
+                                if sub and sub.layout() and isinstance(sub.layout(), QHBoxLayout):
+                                    button_layout = sub.layout()
+                                    logger.debug(f"{self.lang_manager.tr('在嵌套QVBoxLayout中找到子QHBoxLayout作为按钮布局')}")
+                                    break
+                            if button_layout:
+                                break
+            elif isinstance(layout, QGridLayout):
+                # 遍历格子内的layout/widget以寻找QHBoxLayout
+                for i in range(layout.count() - 1, -1, -1):
+                    item = layout.itemAt(i)
+                    if item:
+                        if item.layout() and isinstance(item.layout(), QHBoxLayout):
+                            button_layout = item.layout()
+                            logger.debug(f"{self.lang_manager.tr('在QGridLayout中找到子QHBoxLayout作为按钮布局')}")
+                            break
+                        if item.widget() and isinstance(item.widget(), QWidget) and item.widget().layout():
+                            sub_layout = item.widget().layout()
+                            if isinstance(sub_layout, QHBoxLayout):
+                                button_layout = sub_layout
+                                logger.debug(f"{self.lang_manager.tr('在QGridLayout的子Widget中找到QHBoxLayout作为按钮布局')}")
+                                break
             
             if button_layout:
                 logger.debug(f"{self.lang_manager.tr('找到按钮布局，添加')} {len(buttons)} {self.lang_manager.tr('个按钮')}")
