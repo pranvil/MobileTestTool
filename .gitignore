@@ -122,6 +122,7 @@ logs/
 c:\log\
 *.tmp
 *.temp
+missing_translations.txt
 
 # Build artifacts
 build/

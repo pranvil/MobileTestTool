@@ -11,6 +11,7 @@ import datetime
 import time
 import re
 import sys
+import shutil
 from PyQt5.QtCore import QObject, pyqtSignal, QThread, QMutex
 from PyQt5.QtWidgets import QMessageBox, QInputDialog, QFileDialog, QDialog, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton, QDialogButtonBox
 
@@ -385,7 +386,109 @@ class MTKLogWorker(QThread):
         try:
             print(f"[DEBUG] {self.tr('开始停止并导出MTKLOG操作，设备:')} {self.device}{self.tr(', 日志名称:')} {log_name}{self.tr(', 导出媒体:')} {export_media}")
             
-            # 1. 确保屏幕亮屏且解锁
+            # 1. 检查并停止screenrecord进程（通过video_manager）
+            self.progress.emit(2, self.tr("检查并停止视频录制进程..."))
+            try:
+                # 首先尝试通过video_manager停止录制
+                # MTKLogWorker的parent是PyQtMTKLogManager，PyQtMTKLogManager的parent是主窗口
+                mtklog_manager = self.parent()
+                video_manager = None
+                if mtklog_manager and hasattr(mtklog_manager, 'get_video_manager'):
+                    video_manager = mtklog_manager.get_video_manager()
+                
+                if video_manager and video_manager.is_recording:
+                    print(f"[DEBUG] {self.tr('检测到video_manager正在录制，调用stop_recording()停止录制')}")
+                    video_manager.stop_recording()
+                    # 记录video_manager的引用，后续用于移动视频文件
+                    self._video_manager = video_manager
+                    
+                    # 智能等待视频保存完成
+                    print(f"[DEBUG] {self.tr('等待视频保存完成...')}")
+                    video_storage_path = video_manager.get_storage_path()
+                    default_video_dir = os.path.join(video_storage_path, "video")
+                    
+                    # 等待录制状态变为False（最多等待3秒）
+                    check_interval = 0.5
+                    waited_time = 0
+                    while video_manager.is_recording and waited_time < 3:
+                        time.sleep(check_interval)
+                        waited_time += check_interval
+                    
+                    # 等待视频文件出现在目录中，并检查文件大小是否稳定
+                    max_wait_seconds = 30
+                    waited_time = 0
+                    video_files_found = False
+                    
+                    while waited_time < max_wait_seconds:
+                        if os.path.exists(default_video_dir):
+                            video_files = [f for f in os.listdir(default_video_dir) if f.endswith('.mp4')]
+                            if video_files:
+                                # 检查文件大小是否稳定（连续两次检查文件大小不变）
+                                time.sleep(1)
+                                file_stable = True
+                                file_sizes = {}
+                                for filename in video_files:
+                                    file_path = os.path.join(default_video_dir, filename)
+                                    if os.path.exists(file_path):
+                                        file_sizes[filename] = os.path.getsize(file_path)
+                                
+                                # 再等待1秒，检查文件大小是否变化
+                                time.sleep(1)
+                                for filename, size_before in file_sizes.items():
+                                    file_path = os.path.join(default_video_dir, filename)
+                                    if os.path.exists(file_path):
+                                        size_after = os.path.getsize(file_path)
+                                        if size_before != size_after:
+                                            file_stable = False
+                                            break
+                                    else:
+                                        file_stable = False
+                                        break
+                                
+                                if file_stable:
+                                    video_files_found = True
+                                    print(f"[DEBUG] {self.tr('检测到视频文件已保存完成:')} {len(video_files)} {self.tr('个文件')}")
+                                    break
+                        
+                        time.sleep(check_interval)
+                        waited_time += check_interval
+                        if int(waited_time) % 5 == 0 and waited_time > 0:
+                            print(f"[DEBUG] {self.tr('等待视频保存中...')} ({int(waited_time)}s)")
+                    
+                    if not video_files_found:
+                        print(f"[DEBUG] {self.tr('等待视频保存超时，继续执行后续流程')}")
+                else:
+                    # 如果没有通过video_manager管理，检查是否有screenrecord进程，使用kill停止
+                    ps_cmd = ["adb", "-s", self.device, "shell", "ps", "-A"]
+                    result = subprocess.run(ps_cmd, capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=30,
+                                          creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0)
+                    
+                    if result.returncode == 0:
+                        lines = result.stdout.strip().split('\n')
+                        screenrecord_found = False
+                        for line in lines:
+                            if 'screenrecord' in line and 'grep' not in line:
+                                parts = line.split()
+                                if len(parts) >= 2:
+                                    pid = parts[1]
+                                    screenrecord_found = True
+                                    print(f"[DEBUG] {self.tr('找到screenrecord进程，但video_manager未管理，使用kill停止 PID:')} {pid}")
+                                    kill_cmd = ["adb", "-s", self.device, "shell", "kill", "-9", pid]
+                                    kill_result = subprocess.run(kill_cmd, capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=30,
+                                                              creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0)
+                                    if kill_result.returncode == 0:
+                                        print(f"[DEBUG] {self.tr('成功停止screenrecord进程 PID:')} {pid}")
+                                    else:
+                                        print(f"[DEBUG] {self.tr('停止screenrecord进程 PID')} {pid} {self.tr('失败:')} {kill_result.stderr.strip()}")
+                                    time.sleep(1)
+                        
+                        if not screenrecord_found:
+                            print(f"[DEBUG] {self.tr('未检测到screenrecord进程')}")
+            except Exception as e:
+                print(f"[DEBUG] {self.tr('检查screenrecord进程时出错:')} {str(e)}")
+                # 继续执行，不因检查失败而中断
+            
+            # 2. 确保屏幕亮屏且解锁
             self.progress.emit(5, self.tr("检查屏幕状态..."))
             if not self.device_manager.ensure_screen_unlocked(self.device):
                 raise Exception(self.lang_manager.tr("无法确保屏幕状态"))
@@ -432,7 +535,7 @@ class MTKLogWorker(QThread):
             else:
                 print(f"[DEBUG] {self.tr('Logger未在运行，跳过停止操作')}")
             
-            # 7. 创建日志目录
+            # 8. 创建日志目录
             self.progress.emit(40, self.tr("创建日志目录..."))
             curredate = datetime.datetime.now().strftime("%Y%m%d")
             if self.storage_path_func:
@@ -455,7 +558,61 @@ class MTKLogWorker(QThread):
             else:
                 print(f"[DEBUG] {self.tr('日志文件夹已存在:')} {log_folder}")
             
-            # 8. 执行adb pull命令序列
+            # 8.1 如果有视频录制，将视频文件移动到log文件夹
+            if hasattr(self, '_video_manager') and self._video_manager:
+                try:
+                    self.progress.emit(42, self.tr("移动视频文件到log文件夹..."))
+                    # 获取默认的视频目录
+                    video_storage_path = self._video_manager.get_storage_path()
+                    default_video_dir = os.path.join(video_storage_path, "video")
+                    
+                    # 目标视频目录（在log文件夹内）
+                    target_video_dir = os.path.join(log_folder, "video")
+                    
+                    if os.path.exists(default_video_dir):
+                        # 查找所有视频文件
+                        video_files = []
+                        for filename in os.listdir(default_video_dir):
+                            if filename.endswith('.mp4'):
+                                video_files.append(filename)
+                        
+                        if video_files:
+                            # 创建目标视频目录
+                            if not os.path.exists(target_video_dir):
+                                os.makedirs(target_video_dir)
+                                print(f"[DEBUG] {self.tr('创建目标视频目录:')} {target_video_dir}")
+                            
+                            # 移动视频文件
+                            moved_count = 0
+                            for filename in video_files:
+                                source_path = os.path.join(default_video_dir, filename)
+                                target_path = os.path.join(target_video_dir, filename)
+                                try:
+                                    shutil.move(source_path, target_path)
+                                    print(f"[DEBUG] {self.tr('移动视频文件:')} {filename} -> {target_path}")
+                                    moved_count += 1
+                                except Exception as e:
+                                    print(f"[DEBUG] {self.tr('移动视频文件失败:')} {filename}, {str(e)}")
+                            
+                            if moved_count > 0:
+                                print(f"[DEBUG] {self.tr('成功移动')} {moved_count} {self.tr('个视频文件到log文件夹')}")
+                            
+                            # 如果源目录为空，尝试删除
+                            try:
+                                if not os.listdir(default_video_dir):
+                                    os.rmdir(default_video_dir)
+                                    print(f"[DEBUG] {self.tr('删除空的视频目录:')} {default_video_dir}")
+                            except:
+                                pass
+                        else:
+                            print(f"[DEBUG] {self.tr('默认视频目录中没有找到视频文件')}")
+                    else:
+                        print(f"[DEBUG] {self.tr('默认视频目录不存在，跳过移动操作')}")
+                except Exception as e:
+                    print(f"[DEBUG] {self.tr('移动视频文件时出错:')} {str(e)}")
+                    # 不影响后续流程，继续执行
+            
+            # 9. 执行adb pull命令序列
             pull_commands = [
                 ("/sdcard/TCTReport", "TCTReport"),
                 ("/data/user_de/0/com.android.shell/files/bugreports/", "bugreports"),
@@ -636,6 +793,12 @@ class PyQtMTKLogManager(QObject):
         self.lang_manager = parent.lang_manager if parent and hasattr(parent, 'lang_manager') else None
         self.worker = None
         self.is_running = False
+    
+    def get_video_manager(self):
+        """获取视频管理器"""
+        if self.parent() and hasattr(self.parent(), 'video_manager'):
+            return self.parent().video_manager
+        return None
     
     def get_storage_path(self):
         """获取存储路径，优先使用用户配置的路径"""
@@ -931,6 +1094,21 @@ class PyQtMTKLogManager(QObject):
         self.is_running = False
         if success:
             self.mtklog_started.emit()
+            # 询问用户是否需要录制视频
+            video_manager = self.get_video_manager()
+            if video_manager:
+                reply = QMessageBox.question(
+                    None,
+                    self.lang_manager.tr("开始录制视频"),
+                    (self.lang_manager.tr("MTKLOG已成功启动。\n\n") +
+                     self.lang_manager.tr("是否开始录制视频？\n\n") +
+                     self.lang_manager.tr("注意：录制视频过程中USB连接不能断开。")),
+                    QMessageBox.Yes | QMessageBox.No,
+                    QMessageBox.No
+                )
+                if reply == QMessageBox.Yes:
+                    # 开始录制视频
+                    video_manager.start_recording()
         self.status_message.emit(message)
         
     def _on_mtklog_stopped(self, success, message):
