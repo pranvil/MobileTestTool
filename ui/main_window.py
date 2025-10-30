@@ -2113,7 +2113,7 @@ class MainWindow(QMainWindow):
             if success:
                 self.append_log.emit(f"✅ {self.tr('执行成功')}\n", "#28a745")
                 if output:
-                    self.append_log.emit(f"{output}\n", "#6c757d")
+                    self.append_log.emit(f"{output}\n", "#9370DB")
             else:
                 self.append_log.emit(f"❌ {self.tr('执行失败: ')}{output}\n", "#dc3545")
             
