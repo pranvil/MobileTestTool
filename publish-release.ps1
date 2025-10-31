@@ -41,7 +41,6 @@ try {
 if ($tagExists) {
     Write-Host "Tag v$Version exists. Recreate it."
     git tag -d ("v{0}" -f $Version)
-    git push origin --delete ("refs/tags/v{0}" -f $Version) 2>$null
 }
 git tag -a ("v{0}" -f $Version) -m ("Release v{0}" -f $Version)
 git push origin ("v{0}" -f $Version)
