@@ -442,7 +442,16 @@ adb version
 
 ## 📝 更新日志
 
-### v0.10 (当前版本)
+### v0.10.1 (当前版本)
+- 🔧 **修复打包问题**: 修复SIM Reader在EXE环境下的模块导入问题
+  - 修复 `pyserial` 模块打包问题，添加自定义hook确保正确包含
+  - 修复 `concurrent.futures` 模块缺失问题
+  - 隐藏控制台窗口，解决EXE运行时黑色控制台闪烁问题
+- ✨ **改进端口管理**: 
+  - 将"Reconnect Port"改为"Refresh Port"，仅刷新端口列表，不自动连接
+  - 优化端口刷新功能和用户提示
+
+### v0.10
 - 🆕 **SIM卡工具集成**: 集成SIM APDU解析器和SIM卡读写工具
   - **SIM APDU解析器**: 专业的SIM卡APDU消息解析工具
     - 支持MTK原始日志、MTK表格格式和通用APDU文本格式
