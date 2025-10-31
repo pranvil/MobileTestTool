@@ -34,6 +34,7 @@ from core.tcpdump_manager import PyQtTCPDumpManager
 from core.log_utilities import PyQtBugreportManager
 from core.aee_log_manager import PyQtAEELogManager
 from core.google_log_manager import PyQtGoogleLogManager
+from core.qualcomm_sms_parser import QualcommSMSParser
 from core.enable_telephony_manager import PyQtTelephonyManager
 from core.tmo_cc_manager import PyQtTMOCCManager
 from core.echolocate_manager import PyQtEcholocateManager
@@ -244,6 +245,10 @@ class MainWindow(QMainWindow):
         
         # 初始化录制管理器
         self.video_manager = VideoManager(self.device_manager, self)
+        
+        # 初始化高通SMS解析管理器
+        self.qualcomm_sms_parser = QualcommSMSParser(self)
+        self.qualcomm_sms_parser.status_message.connect(self._on_qualcomm_sms_status)
         
         # 初始化其他管理器
         self.tcpdump_manager = PyQtTCPDumpManager(self.device_manager, self)
@@ -550,6 +555,7 @@ class MainWindow(QMainWindow):
         self.log_control_tab.extract_pcap_from_mtklog.connect(self._on_extract_pcap_from_mtklog)
         self.log_control_tab.merge_pcap.connect(self._on_merge_pcap)
         self.log_control_tab.extract_pcap_from_qualcomm_log.connect(self._on_extract_pcap_from_qualcomm_log)
+        self.log_control_tab.parse_qualcomm_sms.connect(self._on_parse_qualcomm_sms)
         
         # 连接 其他 Tab 信号
         self.other_tab.show_device_info_dialog.connect(self._on_show_device_info_dialog)
@@ -1586,6 +1592,27 @@ class MainWindow(QMainWindow):
     def _on_extract_pcap_from_qualcomm_log(self):
         """高通log提取pcap"""
         self.other_operations_manager.extract_pcap_from_qualcomm_log()
+    
+    def _on_parse_qualcomm_sms(self):
+        """高通SMS解析"""
+        from ui.dialogs.sms_parser_dialog import SMSParserDialog
+        from PyQt5.QtWidgets import QDialog, QMessageBox
+        
+        dialog = SMSParserDialog(self)
+        if dialog.exec_() == QDialog.Accepted:
+            messages = dialog.get_inputs()
+            try:
+                success, message = self.qualcomm_sms_parser.parse_sms_multiple(messages)
+                if success:
+                    QMessageBox.information(self, self.tr("成功"), message)
+                else:
+                    QMessageBox.warning(self, self.tr("失败"), message)
+            except Exception as e:
+                QMessageBox.critical(self, self.tr("错误"), self.tr("SMS解析失败: {}").format(str(e)))
+    
+    def _on_qualcomm_sms_status(self, message):
+        """高通SMS解析状态消息"""
+        self.update_status.emit(message)
         
     def _on_configure_hera(self):
         """赫拉配置"""
@@ -2510,6 +2537,7 @@ class MainWindow(QMainWindow):
                 self.log_control_tab.extract_pcap_from_mtklog.connect(self._on_extract_pcap_from_mtklog)
                 self.log_control_tab.merge_pcap.connect(self._on_merge_pcap)
                 self.log_control_tab.extract_pcap_from_qualcomm_log.connect(self._on_extract_pcap_from_qualcomm_log)
+                self.log_control_tab.parse_qualcomm_sms.connect(self._on_parse_qualcomm_sms)
             
             if hasattr(self, 'other_tab'):
                 self.other_tab.show_device_info_dialog.connect(self._on_show_device_info_dialog)
