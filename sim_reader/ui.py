@@ -287,9 +287,9 @@ class SimEditorUI(QMainWindow):
         
         # 按钮区域
         button_layout = QHBoxLayout()
-        update_button = QPushButton("Reconnect Port")
-        update_button.clicked.connect(self.on_reconnect_button_clicked)
-        button_layout.addWidget(update_button)
+        refresh_port_button = QPushButton("Refresh Port")
+        refresh_port_button.clicked.connect(self.on_refresh_port_button_clicked)
+        button_layout.addWidget(refresh_port_button)
 
         refresh_button = QPushButton("Refresh SIM")
         refresh_button.clicked.connect(self.on_refresh_button_clicked)
@@ -327,7 +327,7 @@ class SimEditorUI(QMainWindow):
         is_connected, msg = self.check_connection_before_operation()
         if not is_connected:
             logging.error("批量读取前连接检查失败: %s", msg)
-            QMessageBox.warning(self, "连接错误", f"连接检查失败: {msg}\n请点击'Reconnect Port'重新连接")
+            QMessageBox.warning(self, "连接错误", f"连接检查失败: {msg}\n请先选择端口并连接")
             return
         
         os.makedirs("json_data", exist_ok=True)
@@ -748,7 +748,7 @@ class SimEditorUI(QMainWindow):
             is_connected, msg = self.check_connection_before_operation()
             if not is_connected:
                 logging.error("读取前连接检查失败: %s", msg)
-                self.show_message.emit("error", f"连接检查失败: {msg}\n请点击'Reconnect Port'重新连接")
+                self.show_message.emit("error", f"连接检查失败: {msg}\n请先选择端口并连接")
                 return
             
             with self.comm_lock:
@@ -907,7 +907,7 @@ class SimEditorUI(QMainWindow):
             is_connected, msg = self.check_connection_before_operation()
             if not is_connected:
                 logging.error("更新前连接检查失败: %s", msg)
-                self.show_message.emit("error", f"连接检查失败: {msg}\n请点击'Reconnect Port'重新连接")
+                self.show_message.emit("error", f"连接检查失败: {msg}\n请先选择端口并连接")
                 return
             
             with self.comm_lock:
@@ -1102,7 +1102,7 @@ class SimEditorUI(QMainWindow):
             is_connected, msg = self.check_connection_before_operation()
             if not is_connected:
                 logging.error("批量写入前连接检查失败: %s", msg)
-                self.json_load_done.emit(False, f"连接检查失败: {msg}\n请点击'Reconnect Port'重新连接")
+                self.json_load_done.emit(False, f"连接检查失败: {msg}\n请先选择端口并连接")
                 return
             
             with self.comm_lock:
@@ -1202,52 +1202,32 @@ class SimEditorUI(QMainWindow):
         elif message_type == "error":
             QMessageBox.critical(self, "error", message)
 
-    def on_reconnect_button_clicked(self):
-        """重新连接选中的串口
-        验证串口可用性并尝试重新建立连接
+    def on_refresh_port_button_clicked(self):
+        """刷新端口列表
+        更新端口下拉菜单，不进行连接操作
         """
-        selected_port = self.port_combo.currentText()
-        if not selected_port:
-            logging.warning("未选择串口")
-            QMessageBox.warning(self, "错误", "请先选择一个端口")
-            return
-
-        # 如果已经是当前端口，先测试连接状态
-        if self.comm.port == selected_port:
-            try:
-                # 简单的连接测试
-                response = self.comm.send_command('AT')
-                if 'OK' in response:
-                    logging.info("当前串口连接正常: %s", selected_port)
-                    QMessageBox.information(self, "成功", f"端口 {selected_port} 连接正常")
-                    return
-                else:
-                    logging.warning("当前串口响应异常: %s", response)
-            except Exception as e:
-                logging.warning("当前串口测试失败: %s", e)
-
-        logging.info("开始重新连接串口: %s", selected_port)
-        
-        # 测试端口是否支持AT命令
-        if not self.comm.test_port(selected_port):
-            logging.error("串口不支持AT命令或不可用: %s", selected_port)
-            QMessageBox.warning(self, "错误", f"端口 {selected_port} 不支持AT命令或不可用,请切换端口重试")
-            return
-
+        logging.info("刷新端口列表")
         try:
-            if self.comm.switch_port(selected_port):
-                logging.info("串口重连成功: %s", selected_port)
-                QMessageBox.information(self, "成功", f"已成功连接到端口 {selected_port}")
-                self.update_port_list()
+            # 直接调用更新端口列表方法
+            self.update_port_list()
+            # 显示提示信息
+            port_count = self.port_combo.count()
+            if port_count > 1:  # 大于1是因为有占位项
+                QMessageBox.information(
+                    self, 
+                    "刷新完成", 
+                    f"端口列表已刷新\n发现 {port_count - 1} 个可用端口"
+                )
             else:
-                logging.error("串口重连失败: %s", selected_port)
-                QMessageBox.critical(self, "错误", f"连接到端口 {selected_port} 失败")
-                self.update_port_list()
+                QMessageBox.information(
+                    self, 
+                    "刷新完成", 
+                    "端口列表已刷新\n未发现可用端口"
+                )
         except Exception as e:
-            error_msg = f"串口重连异常: {str(e)}"
+            error_msg = f"刷新端口列表失败: {str(e)}"
             logging.error(error_msg)
             QMessageBox.critical(self, "错误", error_msg)
-            self.update_port_list()
 
     def on_psim_button_clicked(self):
         """切换到pSIM

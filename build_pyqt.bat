@@ -31,7 +31,7 @@ if exist dist rmdir /s /q dist
 
 echo.
 echo 开始打包 (onedir模式 - 文件夹形式)...
-pyinstaller --clean MobileTestTool_pyqt.spec
+pyinstaller --clean --noconfirm MobileTestTool_pyqt.spec
 
 if %errorlevel% neq 0 (
     echo.

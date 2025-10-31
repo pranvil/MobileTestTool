@@ -8,6 +8,14 @@
 import sys
 import os
 
+# 在打包环境中，提前导入必要的模块以确保PyInstaller包含它们
+try:
+    import serial
+    import serial.tools.list_ports
+    from concurrent.futures import ThreadPoolExecutor  # sim_reader需要
+except ImportError:
+    pass  # 如果未安装相关模块，继续运行（某些功能可能不可用）
+
 # 检测是否在PyInstaller打包环境中运行
 def is_pyinstaller():
     """检测是否在PyInstaller打包环境中运行"""
