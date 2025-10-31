@@ -137,6 +137,33 @@ pyinstaller --clean MobileTestTool_pyqt.spec
 2. 点击"开始获取网络信息"
 3. 实时查看蜂窝网络和WiFi信息
 
+### 🆕 在线更新
+1. 在工具栏点击右侧的“检查更新”按钮可手动检测新版本，工具会在背景线程中拉取 `latest.json` 并显示下载进度。
+2. 首次使用前，请在“工具配置”对话框中填写版本描述 URL、可选的下载目录以及网络超时时间，支持下载完成后自动启动安装包。
+3. 下载成功时会显示保存路径和 SHA-256 校验值，可选择自动打开安装包或在资源管理器中定位文件。
+
+#### 版本描述 `latest.json` 示例
+`config/latest.json.example` 提供了一个完整示例，可直接复制后按需修改：
+
+```json
+{
+  "version": "0.9.4",
+  "download_url": "https://example.com/releases/MobileTestTool_0.9.4.exe",
+  "sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+  "file_name": "MobileTestTool_0.9.4.exe",
+  "file_size": 123456789,
+  "release_notes": "- 修复已知问题\n- 优化日志处理性能",
+  "published_at": "2025-10-31T08:00:00Z",
+  "mandatory": false
+}
+```
+
+#### 发布流程建议
+- 将最新安装包上传至可公开访问的静态存储（如对象存储、Nginx 静态站点、GitHub Releases）。
+- 更新 `latest.json` 的 `version`、`download_url`、`sha256` 等字段并上传到同一静态位置。
+- 推荐在发布流程中生成安装包的 SHA-256 校验值，填写至 `latest.json`，以便客户端完成完整性校验。
+- 如需灰度或版本存档，可在静态目录中同时保留历史版本的 JSON 与安装包。
+
 ### 🆕 SIM APDU解析器
 1. 在"SIM"标签页点击"启动 APDU 解析器"按钮
 2. **加载数据**：

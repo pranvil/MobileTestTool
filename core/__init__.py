@@ -10,7 +10,9 @@ from .mtklog_manager import PyQtMTKLogManager
 from .adblog_manager import PyQtADBLogManager
 from .log_processor import PyQtLogProcessor
 from .network_info_manager import PyQtNetworkInfoManager
+from .update_manager import UpdateManager
+from .version import APP_VERSION
 
 __all__ = ['PyQtDeviceManager', 'PyQtMTKLogManager', 'PyQtADBLogManager', 
-           'PyQtLogProcessor', 'PyQtNetworkInfoManager']
+           'PyQtLogProcessor', 'PyQtNetworkInfoManager', 'UpdateManager', 'APP_VERSION']
 

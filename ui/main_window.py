@@ -6,12 +6,22 @@
 
 import os
 import subprocess
+import sys
+from typing import Optional
 from PyQt5.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, 
-                              QSplitter, QTabWidget, QMessageBox)
+                              QSplitter, QTabWidget, QMessageBox, QProgressDialog)
 from PyQt5.QtCore import Qt, pyqtSignal, QThread
 from ui.menu_bar import DisplayLinesDialog
 from ui.tools_config_dialog import ToolsConfigDialog
 from core.debug_logger import logger
+
+from core.update_manager import (
+    UpdateManager,
+    DownloadResult,
+    UpdateError,
+)
+from core.update_manifest import LatestManifest
+from core.version import APP_VERSION
 
 from ui.toolbar import DeviceToolBar
 from ui.widgets.log_viewer import LogViewer
@@ -127,6 +137,65 @@ class RootRemountWorker(QThread):
             self.finished.emit(False, error_msg, False, self.device)
 
 
+class UpdateWorker(QThread):
+    """在后台执行更新检查与下载"""
+
+    status_message = pyqtSignal(str)
+    progress_changed = pyqtSignal(int, int)  # downloaded, total (-1 表示未知)
+    update_not_required = pyqtSignal(str)
+    download_finished = pyqtSignal(LatestManifest, DownloadResult)
+    update_failed = pyqtSignal(str)
+
+    def __init__(self, update_manager: UpdateManager, lang_manager=None):
+        super().__init__()
+        self._manager = update_manager
+        self._lang_manager = lang_manager
+        self._cancel_requested = False
+
+    def _tr(self, text: str) -> str:
+        if self._lang_manager:
+            try:
+                return self._lang_manager.tr(text)
+            except Exception:
+                return text
+        return text
+
+    def request_cancel(self) -> None:
+        """请求取消当前操作"""
+
+        self._cancel_requested = True
+        try:
+            self._manager.cancel_download()
+        except Exception:
+            pass
+
+    def run(self) -> None:
+        try:
+            self.status_message.emit(self._tr("正在检查更新..."))
+            manifest = self._manager.fetch_latest_manifest()
+
+            if not self._manager.is_update_available(manifest):
+                self.update_not_required.emit(self._tr("当前已是最新版本"))
+                return
+
+            self.status_message.emit(self._tr("检测到新版本，开始下载安装包..."))
+
+            def _on_progress(downloaded: int, total: Optional[int]) -> None:
+                self.progress_changed.emit(downloaded, total if total is not None else -1)
+
+            result = self._manager.download_release(manifest, progress_callback=_on_progress)
+
+            if self._cancel_requested:
+                self.update_failed.emit(self._tr("下载已取消"))
+                return
+
+            self.download_finished.emit(manifest, result)
+
+        except UpdateError as exc:
+            self.update_failed.emit(str(exc))
+        except Exception as exc:  # pragma: no cover - 防御性捕获
+            self.update_failed.emit(str(exc))
+
 class MainWindow(QMainWindow):
     """主窗口类"""
     
@@ -141,6 +210,11 @@ class MainWindow(QMainWindow):
         # 初始化变量
         self.selected_device = ""
         self._root_remount_worker = None
+        self._update_worker = None
+        self._update_progress_dialog = None
+        self._update_status_text = ""
+        self._update_progress_extra = ""
+        self.app_version = APP_VERSION
         
         # 初始化语言管理器
         self.lang_manager = LanguageManager(self)
@@ -270,7 +344,7 @@ class MainWindow(QMainWindow):
         """)
         
         # 版本信息
-        version_label = QLabel("v0.9.3")
+        version_label = QLabel(f"v{self.app_version}")
         version_label.setAlignment(Qt.AlignCenter)
         version_label.setStyleSheet("color: #888888; font-size: 12px;")
         
@@ -380,7 +454,7 @@ class MainWindow(QMainWindow):
     def setup_ui(self):
         """设置用户界面"""
         # 设置窗口属性
-        self.setWindowTitle(self.lang_manager.tr("手机测试辅助工具 v0.9.3"))
+        self.setWindowTitle(f"{self.lang_manager.tr('手机测试辅助工具')} v{self.app_version}")
         # 注释掉固定大小设置，使用showMaximized()时会自动设置
         # self.setGeometry(100, 100, 900, 600)
         
@@ -483,6 +557,7 @@ class MainWindow(QMainWindow):
         self.toolbar.reboot_clicked.connect(self._on_reboot_device)
         self.toolbar.root_remount_clicked.connect(self._on_root_remount)
         self.toolbar.theme_toggled.connect(self._on_theme_toggled)
+        self.toolbar.check_update_clicked.connect(self._on_check_update_clicked)
         # 工具栏中的ADB命令输入框已移到日志显示区域下方
         # self.toolbar.adb_command_executed.connect(self._on_adb_command_executed)
         
@@ -961,6 +1036,235 @@ class MainWindow(QMainWindow):
                 self.device_utilities.reboot_device(self, confirm=False)
             else:
                 self.append_log.emit(f"{self.lang_manager.tr('用户取消重启')}\n", None)
+
+    def _on_check_update_clicked(self):
+        """触发手动检查更新"""
+
+        self._start_manual_update()
+
+    def _start_manual_update(self):
+        """启动手动检查更新流程"""
+
+        if self._update_worker and self._update_worker.isRunning():
+            QMessageBox.information(self, self.tr("在线更新"), self.tr("更新正在进行，请稍候..."))
+            return
+
+        feed_url = (self.tool_config.get("update_feed_url") or "").strip()
+        if not feed_url:
+            QMessageBox.warning(
+                self,
+                self.tr("在线更新"),
+                self.tr("未配置版本描述 URL，请先在“工具配置”中设置。"),
+            )
+            return
+
+        try:
+            update_manager = UpdateManager(
+                current_version=self.app_version,
+                tool_config=self.tool_config,
+                logger=logger.info,
+            )
+        except Exception as exc:
+            logger.exception("初始化更新模块失败: %s", exc)
+            QMessageBox.critical(
+                self,
+                self.tr("在线更新"),
+                f"{self.tr('初始化更新模块失败:')} {exc}",
+            )
+            return
+
+        self.toolbar.set_update_enabled(False)
+        self._update_status_text = self.tr("正在检查更新...")
+        self._update_progress_extra = ""
+        self._show_update_progress_dialog(self._update_status_text)
+
+        self._update_worker = UpdateWorker(update_manager, self.lang_manager)
+        self._update_worker.status_message.connect(self._on_update_status_message)
+        self._update_worker.progress_changed.connect(self._on_update_progress_changed)
+        self._update_worker.update_not_required.connect(self._on_update_not_required)
+        self._update_worker.download_finished.connect(self._on_update_download_finished)
+        self._update_worker.update_failed.connect(self._on_update_failed)
+        self._update_worker.finished.connect(self._cleanup_update_worker)
+        self._update_worker.start()
+
+        self.append_log.emit(f"[更新] {self.tr('开始检查软件更新...')}\n", None)
+
+    def _show_update_progress_dialog(self, message: str) -> None:
+        """显示更新进度对话框"""
+
+        if self._update_progress_dialog:
+            try:
+                self._update_progress_dialog.close()
+            except Exception:
+                pass
+            self._update_progress_dialog.deleteLater()
+
+        dialog = QProgressDialog(message, self.tr("取消"), 0, 0, self)
+        dialog.setWindowTitle(self.tr("在线更新"))
+        dialog.setWindowModality(Qt.WindowModal)
+        dialog.setAutoReset(False)
+        dialog.setAutoClose(False)
+        dialog.setMinimumDuration(0)
+        dialog.setMinimumWidth(420)
+        dialog.canceled.connect(self._on_update_cancel_requested)
+        dialog.show()
+        self._update_progress_dialog = dialog
+
+    def _refresh_update_progress_label(self) -> None:
+        if not self._update_progress_dialog:
+            return
+
+        parts = []
+        if self._update_status_text:
+            parts.append(self._update_status_text)
+        if self._update_progress_extra:
+            parts.append(self._update_progress_extra)
+        label_text = "\n".join(parts) if parts else ""
+        if label_text:
+            self._update_progress_dialog.setLabelText(label_text)
+
+    def _on_update_status_message(self, message: str) -> None:
+        self._update_status_text = message
+        self._refresh_update_progress_label()
+        self.append_log.emit(f"[更新] {message}\n", None)
+
+    def _on_update_progress_changed(self, downloaded: int, total: int) -> None:
+        if not self._update_progress_dialog:
+            return
+
+        if total <= 0:
+            self._update_progress_dialog.setRange(0, 0)
+            self._update_progress_extra = self.tr("正在下载安装包...")
+        else:
+            if self._update_progress_dialog.maximum() != total:
+                self._update_progress_dialog.setRange(0, total)
+            safe_downloaded = max(0, min(downloaded, total))
+            self._update_progress_dialog.setValue(safe_downloaded)
+            mb_downloaded = safe_downloaded / (1024 * 1024)
+            mb_total = total / (1024 * 1024)
+            self._update_progress_extra = (
+                f"{self.tr('下载进度')}: {mb_downloaded:.1f}/{mb_total:.1f} MB"
+            )
+
+        self._refresh_update_progress_label()
+
+    def _on_update_not_required(self, message: str) -> None:
+        self._close_update_progress_dialog()
+        QMessageBox.information(self, self.tr("在线更新"), message)
+        self.append_log.emit(f"[更新] {message}\n", "#4CAF50")
+
+    def _on_update_download_finished(self, manifest: LatestManifest, result: DownloadResult) -> None:
+        self._close_update_progress_dialog()
+
+        success_message = f"{self.tr('安装包下载完成')} - {manifest.version}"
+        detail_lines = [
+            f"{self.tr('保存路径')}: {result.file_path}",
+            f"SHA-256: {result.sha256}",
+        ]
+        self.append_log.emit(f"[更新] ✅ {success_message}\n", "#00FF00")
+
+        auto_launch = bool(self.tool_config.get("update_auto_launch_installer", True))
+        if auto_launch:
+            launched = self._try_launch_installer(result.file_path)
+            if launched:
+                QMessageBox.information(
+                    self,
+                    self.tr("在线更新"),
+                    "\n".join([success_message] + detail_lines + [self.tr("已尝试打开安装包，请按向导完成更新。")]),
+                )
+            else:
+                QMessageBox.information(
+                    self,
+                    self.tr("在线更新"),
+                    "\n".join([success_message] + detail_lines + [self.tr("请手动运行安装包完成更新。")]),
+                )
+        else:
+            reply = QMessageBox.question(
+                self,
+                self.tr("在线更新"),
+                "\n".join([success_message] + detail_lines + [self.tr("是否打开下载位置？")]),
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.Yes,
+            )
+            if reply == QMessageBox.Yes:
+                self._reveal_in_file_manager(result.file_path)
+
+    def _on_update_failed(self, message: str) -> None:
+        self._close_update_progress_dialog()
+        logger.error("在线更新失败: %s", message)
+        self.append_log.emit(f"[更新] ❌ {message}\n", "#FF0000")
+        QMessageBox.critical(self, self.tr("在线更新"), message)
+
+    def _on_update_cancel_requested(self) -> None:
+        if self._update_worker and self._update_worker.isRunning():
+            self._update_worker.request_cancel()
+            if self._update_progress_dialog:
+                try:
+                    self._update_progress_dialog.setCancelButtonText(self.tr("已取消"))
+                except Exception:
+                    pass
+                self._update_progress_dialog.setEnabled(False)
+                self._update_progress_dialog.setLabelText(self.tr("正在取消下载，请稍候..."))
+
+    def _close_update_progress_dialog(self) -> None:
+        if not self._update_progress_dialog:
+            return
+
+        dialog = self._update_progress_dialog
+        self._update_progress_dialog = None
+        try:
+            dialog.close()
+        except Exception:
+            pass
+        dialog.deleteLater()
+
+    def _cleanup_update_worker(self) -> None:
+        if self._update_worker:
+            self._update_worker.deleteLater()
+            self._update_worker = None
+
+        self.toolbar.set_update_enabled(True)
+        self._update_status_text = ""
+        self._update_progress_extra = ""
+
+    def _try_launch_installer(self, file_path: str) -> bool:
+        if not file_path:
+            return False
+
+        if not os.path.exists(file_path):
+            QMessageBox.warning(self, self.tr("在线更新"), self.tr("安装包文件不存在。"))
+            return False
+
+        try:
+            if sys.platform.startswith("win"):
+                os.startfile(file_path)  # type: ignore[attr-defined]
+            elif sys.platform == "darwin":
+                subprocess.Popen(["open", file_path])
+            else:
+                subprocess.Popen(["xdg-open", file_path])
+            return True
+        except Exception as exc:
+            logger.exception("启动安装包失败: %s", exc)
+            return False
+
+    def _reveal_in_file_manager(self, file_path: str) -> None:
+        if not file_path:
+            return
+
+        if not os.path.exists(file_path):
+            QMessageBox.warning(self, self.tr("在线更新"), self.tr("安装包文件不存在。"))
+            return
+
+        try:
+            if sys.platform.startswith("win"):
+                subprocess.Popen(["explorer", f"/select,{file_path}"])
+            elif sys.platform == "darwin":
+                subprocess.Popen(["open", "-R", file_path])
+            else:
+                subprocess.Popen(["xdg-open", os.path.dirname(file_path)])
+        except Exception as exc:
+            logger.exception("打开文件位置失败: %s", exc)
+            QMessageBox.warning(self, self.tr("在线更新"), self.tr("无法打开文件所在位置，请手动查找。"))
     
     def _on_theme_toggled(self):
         """主题切换处理"""
@@ -979,7 +1283,7 @@ class MainWindow(QMainWindow):
         """刷新所有UI文本"""
         try:
             # 刷新窗口标题
-            self.setWindowTitle(self.lang_manager.tr("手机测试辅助工具 v0.9.3"))
+            self.setWindowTitle(f"{self.lang_manager.tr('手机测试辅助工具')} v{self.app_version}")
             
             # 刷新所有Tab标题和内容
             if hasattr(self, 'tab_widget'):

@@ -765,22 +765,30 @@ class PyQtOtherOperationsManager(QObject):
         
     def _load_tool_config(self):
         """加载工具配置"""
-        try:
-            if os.path.exists(self.config_file):
-                with open(self.config_file, 'r', encoding='utf-8') as f:
-                    return json.load(f)
-        except Exception:
-            pass
-        
-        return {
+        defaults = {
             "mtk_tools": [],
             "qualcomm_tools": [],
             "wireshark_path": "",
             "storage_path": "",
             "last_used_mtk": "",
             "last_used_qualcomm": "",
-            "last_used_wireshark": ""
+            "last_used_wireshark": "",
+            "update_feed_url": "",
+            "update_download_dir": "",
+            "update_auto_launch_installer": True,
+            "update_timeout": 15
         }
+
+        try:
+            if os.path.exists(self.config_file):
+                with open(self.config_file, 'r', encoding='utf-8') as f:
+                    stored_config = json.load(f)
+                    if isinstance(stored_config, dict):
+                        defaults.update(stored_config)
+        except Exception:
+            pass
+
+        return defaults
     
     def _save_tool_config(self):
         """保存工具配置"""

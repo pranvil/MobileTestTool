@@ -24,6 +24,7 @@ class DeviceToolBar(QToolBar):
     theme_toggled = pyqtSignal()
     adb_command_executed = pyqtSignal(str)  # 执行adb命令
     language_changed = pyqtSignal(str)  # 语言切换信号
+    check_update_clicked = pyqtSignal()
     
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -110,6 +111,10 @@ class DeviceToolBar(QToolBar):
         self.root_remount_btn.clicked.connect(self.root_remount_clicked.emit)
         quick_layout.addWidget(self.root_remount_btn)
         
+        self.check_update_btn = QPushButton(self.lang_manager.tr("检查更新"))
+        self.check_update_btn.clicked.connect(self.check_update_clicked.emit)
+        quick_layout.addWidget(self.check_update_btn)
+
         self.addWidget(quick_widget)
         
         # 添加弹性空间
@@ -230,6 +235,7 @@ class DeviceToolBar(QToolBar):
         self.record_btn.setText(self.lang_manager.tr("开始录制"))
         self.reboot_btn.setText(self.lang_manager.tr("重启手机"))
         self.root_remount_btn.setText(self.lang_manager.tr("Root&&Remount"))
+        self.check_update_btn.setText(self.lang_manager.tr("检查更新"))
         
         # ADB命令输入框已移到日志显示区域，不再需要刷新工具栏中的
         # # 刷新ADB命令标签
@@ -252,4 +258,10 @@ class DeviceToolBar(QToolBar):
         
         # 更新语言按钮
         self._update_language_button()
+
+    def set_update_enabled(self, enabled: bool):
+        """设置检查更新按钮可用状态"""
+
+        if hasattr(self, 'check_update_btn') and self.check_update_btn:
+            self.check_update_btn.setEnabled(enabled)
 
