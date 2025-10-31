@@ -249,3 +249,4 @@ class SMSParserDialog(QDialog):
                 'hex_data': inputs['hex_data']
             })
         return messages
+

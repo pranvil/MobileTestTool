@@ -1595,7 +1595,7 @@ class MainWindow(QMainWindow):
     
     def _on_parse_qualcomm_sms(self):
         """高通SMS解析"""
-        from ui.dialogs.sms_parser_dialog import SMSParserDialog
+        from ui.sms_parser_dialog import SMSParserDialog
         from PyQt5.QtWidgets import QDialog, QMessageBox
         
         dialog = SMSParserDialog(self)
