@@ -102,7 +102,8 @@ $manifest = [ordered]@{
     mandatory     = $false
 }
 
-$manifest | ConvertTo-Json -Depth 3 | Out-File $manifestPath -Encoding UTF8
+$manifestJson = $manifest | ConvertTo-Json -Depth 3
+[System.IO.File]::WriteAllText($manifestPath, $manifestJson + "`n", (New-Object System.Text.UTF8Encoding($false)))
 Write-Host ("Manifest written to: {0}" -f $manifestPath)
 
 Write-Host "=== step 5: summary ==="
