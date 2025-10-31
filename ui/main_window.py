@@ -5,9 +5,10 @@
 """
 
 import os
+import subprocess
 from PyQt5.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, 
                               QSplitter, QTabWidget, QMessageBox)
-from PyQt5.QtCore import Qt, pyqtSignal
+from PyQt5.QtCore import Qt, pyqtSignal, QThread
 from ui.menu_bar import DisplayLinesDialog
 from ui.tools_config_dialog import ToolsConfigDialog
 from core.debug_logger import logger
@@ -52,6 +53,80 @@ from core.language_manager import LanguageManager
 from core.tab_config_manager import TabConfigManager
 
 
+class RootRemountWorker(QThread):
+    """在后台执行 adb root & remount"""
+
+    log_message = pyqtSignal(str, str)
+    finished = pyqtSignal(bool, str, bool, str)  # success, message, reboot_required, device
+
+    def __init__(self, device, lang_manager=None):
+        super().__init__()
+        self.device = device
+        self.lang_manager = lang_manager
+
+    def _tr(self, text):
+        return self.lang_manager.tr(text) if self.lang_manager else text
+
+    def _run_command(self, args, timeout):
+        return subprocess.run(
+            args,
+            shell=False,
+            capture_output=True,
+            text=True,
+            encoding='utf-8',
+            errors='replace',
+            timeout=timeout,
+            creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0
+        )
+
+    def _forward_output(self, result):
+        if result.stdout:
+            self.log_message.emit(result.stdout, None)
+        if result.stderr:
+            self.log_message.emit(result.stderr, None)
+
+    def run(self):
+        try:
+            # Step 1: adb root
+            self.log_message.emit(self._tr("执行 adb root...") + "\n", None)
+            root_result = self._run_command(["adb", "-s", self.device, "root"], timeout=10)
+            self._forward_output(root_result)
+
+            if root_result.returncode != 0:
+                error_msg = root_result.stderr.strip() or self._tr("执行 adb root 失败")
+                self.log_message.emit(f"❌ {error_msg}\n", "#FF0000")
+                self.finished.emit(False, error_msg, False, self.device)
+                return
+
+            # Step 2: adb remount
+            self.log_message.emit(self._tr("执行 adb remount...") + "\n", None)
+            remount_result = self._run_command(["adb", "-s", self.device, "remount"], timeout=10)
+            self._forward_output(remount_result)
+
+            if remount_result.returncode != 0:
+                error_msg = remount_result.stderr.strip() or self._tr("执行 adb remount 失败")
+                self.log_message.emit(f"❌ {error_msg}\n", "#FF0000")
+                self.finished.emit(False, error_msg, False, self.device)
+                return
+
+            combined_output = (remount_result.stdout or "") + (remount_result.stderr or "")
+            reboot_required = "reboot" in combined_output.lower()
+
+            success_message = self._tr("Root&remount 完成")
+            self.log_message.emit(f"✅ {success_message}\n", "#00FF00")
+            self.finished.emit(True, success_message, reboot_required, self.device)
+
+        except subprocess.TimeoutExpired as timeout_error:
+            stage = self._tr("adb remount" if "remount" in str(timeout_error.cmd or []) else "adb root")
+            warning_msg = f"{stage} {self._tr('执行超时')}"
+            self.log_message.emit(f"⚠️ {warning_msg}\n", "#FFA500")
+            self.finished.emit(False, warning_msg, False, self.device)
+        except Exception as e:
+            error_msg = f"{self._tr('执行 Root&remount 时发生错误:')} {e}"
+            self.log_message.emit(f"❌ {error_msg}\n", "#FF0000")
+            self.finished.emit(False, error_msg, False, self.device)
+
+
 class MainWindow(QMainWindow):
     """主窗口类"""
     
@@ -65,6 +140,7 @@ class MainWindow(QMainWindow):
         
         # 初始化变量
         self.selected_device = ""
+        self._root_remount_worker = None
         
         # 初始化语言管理器
         self.lang_manager = LanguageManager(self)
@@ -194,7 +270,7 @@ class MainWindow(QMainWindow):
         """)
         
         # 版本信息
-        version_label = QLabel("v0.92")
+        version_label = QLabel("v0.9.3")
         version_label.setAlignment(Qt.AlignCenter)
         version_label.setStyleSheet("color: #888888; font-size: 12px;")
         
@@ -304,7 +380,7 @@ class MainWindow(QMainWindow):
     def setup_ui(self):
         """设置用户界面"""
         # 设置窗口属性
-        self.setWindowTitle(self.lang_manager.tr("手机测试辅助工具 v0.92"))
+        self.setWindowTitle(self.lang_manager.tr("手机测试辅助工具 v0.9.3"))
         # 注释掉固定大小设置，使用showMaximized()时会自动设置
         # self.setGeometry(100, 100, 900, 600)
         
@@ -834,99 +910,57 @@ class MainWindow(QMainWindow):
             self.append_log.emit(f"❌ {message}\n", "#FF0000")
             self.statusBar().showMessage(self.lang_manager.tr("设备重启失败"))
     
+    def _handle_root_remount_log(self, text, color):
+        """转发后台Root&remount日志到主界面"""
+        self.append_log.emit(text, color)
+    
     def _on_root_remount(self):
-        """Root&remount处理"""
-        import subprocess
-        
+        """Root&remount处理（异步执行）"""
         device = self.device_manager.selected_device
         if not device:
             self.append_log.emit(self.lang_manager.tr("未选择设备") + "\n", "#FFA500")
             return
-        
-        # 步骤1: 执行 adb root
-        self.append_log.emit(self.lang_manager.tr("执行 adb root...") + "\n", None)
-        try:
-            result = subprocess.run(
-                ["adb", "-s", device, "root"],
-                shell=True,
-                capture_output=True,
-                text=True,
-                encoding='utf-8',
-                errors='replace',
-                timeout=10,
-                creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0
-            )
-            
-            if result.stdout:
-                self.append_log.emit(result.stdout, None)
-            if result.stderr:
-                self.append_log.emit(result.stderr, None)
-                
-        except subprocess.TimeoutExpired:
-            self.append_log.emit(f"⚠️ {self.lang_manager.tr('adb root 执行超时')}\n", "#FFA500")
+
+        if self._root_remount_worker and self._root_remount_worker.isRunning():
+            self.append_log.emit(f"⚠️ {self.lang_manager.tr('Root&remount 正在执行，请稍候...')}\n", "#FFA500")
             return
-        except Exception as e:
-            self.append_log.emit("❌ " + self.tr("执行 adb root 失败: ") + str(e) + "\n", "#FF0000")
+
+        self.statusBar().showMessage(self.lang_manager.tr("正在执行 Root&remount..."))
+
+        self._root_remount_worker = RootRemountWorker(device, self.lang_manager)
+        self._root_remount_worker.log_message.connect(self._handle_root_remount_log)
+        self._root_remount_worker.finished.connect(self._on_root_remount_finished)
+        self._root_remount_worker.start()
+
+    def _on_root_remount_finished(self, success, message, reboot_required, device):
+        """Root&remount完成回调"""
+        if self._root_remount_worker:
+            self._root_remount_worker.deleteLater()
+            self._root_remount_worker = None
+
+        if success:
+            self.statusBar().showMessage(self.lang_manager.tr("Root&remount 执行完成"))
+        else:
+            self.statusBar().showMessage(message)
+
+        if not success:
             return
-        
-        # 步骤2: 执行 adb remount
-        self.append_log.emit(self.lang_manager.tr("执行 adb remount...") + "\n", None)
-        try:
-            result = subprocess.run(
-                ["adb", "-s", device, "remount"],
-                shell=True,
-                capture_output=True,
-                text=True,
-                encoding='utf-8',
-                errors='replace',
-                timeout=10,
-                creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0
+
+        if reboot_required:
+            reply = QMessageBox.question(
+                self,
+                self.lang_manager.tr('需要重启设备'),
+                '检测到需要重启设备才能使设置生效。\n\n是否立即重启设备？',
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.Yes
             )
-            
-            remount_output = ""
-            if result.stdout:
-                remount_output += result.stdout
-                self.append_log.emit(result.stdout, None)
-            if result.stderr:
-                remount_output += result.stderr
-                self.append_log.emit(result.stderr, None)
-            
-            # 步骤3: 检查输出是否包含"reboot"
-            if "reboot" in remount_output.lower():
-                # 弹出提示询问用户是否要重启
-                reply = QMessageBox.question(
-                    self,
-                    self.lang_manager.tr('需要重启设备'),
-                    '检测到需要重启设备才能使设置生效。\n\n是否立即重启设备？',
-                    QMessageBox.Yes | QMessageBox.No,
-                    QMessageBox.Yes
-                )
-                
-                if reply == QMessageBox.Yes:
-                    self.append_log.emit(f"{self.lang_manager.tr('执行 adb reboot...')}\n", None)
-                    try:
-                        subprocess.run(
-                            ["adb", "-s", device, "reboot"],
-                            shell=True,
-                            capture_output=True,
-                            text=True,
-                            encoding='utf-8',
-                            errors='replace',
-                            timeout=5,
-                            creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0
-                        )
-                        self.append_log.emit(self.tr("设备 ") + device + self.tr(" 重启命令已执行") + "\n", None)
-                    except Exception as e:
-                        self.append_log.emit("❌ " + self.tr("执行 adb reboot 失败: ") + str(e) + "\n", "#FF0000")
-                else:
-                    self.append_log.emit(f"{self.lang_manager.tr('用户取消重启')}\n", None)
-            # else:
-            #     self.append_log.emit(f"{self.lang_manager.tr('Root&remount 完成')}\n", None)
-                    
-        except subprocess.TimeoutExpired:
-            self.append_log.emit(f"⚠️ {self.lang_manager.tr('adb remount 执行超时')}\n", "#FFA500")
-        except Exception as e:
-            self.append_log.emit("❌ " + self.tr("执行 adb remount 失败: ") + str(e) + "\n", "#FF0000")
+
+            if reply == QMessageBox.Yes:
+                self.append_log.emit(f"{self.lang_manager.tr('执行 adb reboot...')}\n", None)
+                # 直接异步重启，跳过重复确认
+                self.device_utilities.reboot_device(self, confirm=False)
+            else:
+                self.append_log.emit(f"{self.lang_manager.tr('用户取消重启')}\n", None)
     
     def _on_theme_toggled(self):
         """主题切换处理"""
@@ -945,7 +979,7 @@ class MainWindow(QMainWindow):
         """刷新所有UI文本"""
         try:
             # 刷新窗口标题
-            self.setWindowTitle(self.lang_manager.tr("手机测试辅助工具 v0.92"))
+            self.setWindowTitle(self.lang_manager.tr("手机测试辅助工具 v0.9.3"))
             
             # 刷新所有Tab标题和内容
             if hasattr(self, 'tab_widget'):
@@ -988,12 +1022,96 @@ class MainWindow(QMainWindow):
         }
         
         # 检查是否包含黑名单命令
-        cmd_lower = command.lower()
-        for blocked_cmd, hint in BLOCKED_COMMANDS.items():
-            if blocked_cmd in cmd_lower:
-                self.append_log.emit(f"{self.tr('⚠️ 不支持命令: ')}{command}\n", "#FFA500")
-                self.append_log.emit(f"{self.tr('💡 提示: ')}{hint}\n", "#17a2b8")
-                return
+        import shlex
+
+        try:
+            tokens = shlex.split(command, posix=False)
+        except ValueError:
+            tokens = []
+
+        blocked_hint = None
+
+        if tokens:
+            tokens_lower = [token.lower() for token in tokens]
+
+            def _requires_value(original_token, lower_token):
+                if original_token.startswith('--'):
+                    return lower_token != '--help'
+                if lower_token in {'-s', '-p', '-h', '-l'}:
+                    # -h 无需参数，-H 需要参数
+                    if lower_token == '-h' and original_token == '-h':
+                        return False
+                    return True
+                return False
+
+            # 首个命令（非 adb）直接判断
+            first_token = tokens_lower[0]
+            if first_token in BLOCKED_COMMANDS:
+                blocked_hint = BLOCKED_COMMANDS[first_token]
+            elif first_token == 'adb':
+                # 解析 adb 子命令
+                idx = 1
+                expect_value = False
+
+                while idx < len(tokens_lower):
+                    tok_lower = tokens_lower[idx]
+                    tok_original = tokens[idx]
+
+                    if expect_value:
+                        expect_value = False
+                        idx += 1
+                        continue
+
+                    if _requires_value(tok_original, tok_lower):
+                        expect_value = True
+                        idx += 1
+                        continue
+
+                    if tok_original.startswith('-'):
+                        idx += 1
+                        continue
+
+                    break
+
+                if idx < len(tokens_lower):
+                    subcmd_lower = tokens_lower[idx]
+
+                    if subcmd_lower == 'shell':
+                        idx += 1
+                        expect_value = False
+
+                        while idx < len(tokens_lower):
+                            shell_tok_lower = tokens_lower[idx]
+                            shell_tok_original = tokens[idx]
+
+                            if expect_value:
+                                expect_value = False
+                                idx += 1
+                                continue
+
+                            if _requires_value(shell_tok_original, shell_tok_lower):
+                                expect_value = True
+                                idx += 1
+                                continue
+
+                            if shell_tok_original.startswith('-'):
+                                idx += 1
+                                continue
+
+                            primary_cmd = shell_tok_lower.split()[0]
+
+                            if primary_cmd in BLOCKED_COMMANDS:
+                                blocked_hint = BLOCKED_COMMANDS[primary_cmd]
+                            break
+                    else:
+                        primary_cmd = subcmd_lower.split()[0]
+                        if primary_cmd in BLOCKED_COMMANDS:
+                            blocked_hint = BLOCKED_COMMANDS[primary_cmd]
+
+        if blocked_hint:
+            self.append_log.emit(f"{self.tr('⚠️ 不支持命令: ')}{command}\n", "#FFA500")
+            self.append_log.emit(f"{self.tr('💡 提示: ')}{blocked_hint}\n", "#17a2b8")
+            return
         
         # 显示命令
         self.append_log.emit(f"{self.tr('执行命令: ')}{command}\n", None)

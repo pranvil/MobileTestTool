@@ -66,22 +66,27 @@ class DeviceUtilities(QObject):
         """安全地获取翻译文本"""
         return self.lang_manager.tr(text) if self.lang_manager else text
     
-    def reboot_device(self, parent_widget=None):
-        """重启设备（异步执行）"""
+    def reboot_device(self, parent_widget=None, confirm=True):
+        """重启设备（异步执行）
+
+        :param parent_widget: 用于显示提示框的父控件
+        :param confirm: 是否在执行前弹出确认对话框
+        """
         device = self.device_manager.validate_device_selection()
         if not device:
             return False
         
-        reply = QMessageBox.question(
-            parent_widget,
-            self.tr("确认重启"),
-            f"{self.tr('确定要重启设备')} {device} {self.tr('吗？')}\n\n{self.tr('这将执行')} 'adb reboot' {self.tr('命令')}",
-            QMessageBox.Yes | QMessageBox.No,
-            QMessageBox.No
-        )
-        
-        if reply != QMessageBox.Yes:
-            return False
+        if confirm:
+            reply = QMessageBox.question(
+                parent_widget,
+                self.tr("确认重启"),
+                f"{self.tr('确定要重启设备')} {device} {self.tr('吗？')}\n\n{self.tr('这将执行')} 'adb reboot' {self.tr('命令')}",
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.No
+            )
+            
+            if reply != QMessageBox.Yes:
+                return False
         
         # 创建并启动异步Worker
         self.reboot_worker = RebootDeviceWorker(device, self.lang_manager)

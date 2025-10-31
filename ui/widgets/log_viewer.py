@@ -11,6 +11,40 @@ from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtGui import QTextCharFormat, QColor, QTextCursor, QFont, QTextDocument
 
 
+class FileDropLineEdit(QLineEdit):
+    """支持拖拽文件路径的输入框"""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.setAcceptDrops(True)
+
+    def dragEnterEvent(self, event):
+        if event.mimeData().hasUrls():
+            event.acceptProposedAction()
+        else:
+            super().dragEnterEvent(event)
+
+    def dragMoveEvent(self, event):
+        if event.mimeData().hasUrls():
+            event.acceptProposedAction()
+        else:
+            super().dragMoveEvent(event)
+
+    def dropEvent(self, event):
+        if event.mimeData().hasUrls():
+            urls = event.mimeData().urls()
+            if urls:
+                local_path = urls[0].toLocalFile()
+                if local_path:
+                    # Windows 控制台会自动为含空格的路径加引号，这里保持一致
+                    if ' ' in local_path:
+                        local_path = f'"{local_path}"'
+                    self.insert(local_path)
+            event.acceptProposedAction()
+        else:
+            super().dropEvent(event)
+
+
 class LogViewer(QWidget):
     """日志查看器控件"""
     
@@ -139,7 +173,7 @@ class LogViewer(QWidget):
         adb_label = QLabel(self.lang_manager.tr("ADB命令:"))
         adb_layout_h.addWidget(adb_label)
         
-        self.adb_input = QLineEdit()
+        self.adb_input = FileDropLineEdit()
         self.adb_input.setPlaceholderText(self.lang_manager.tr("快速执行adb命令（如: adb devices, adb shell getprop）"))
         self.adb_input.setMinimumWidth(300)
         self.adb_input.setToolTip(
