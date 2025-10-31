@@ -50,7 +50,7 @@ class LogControlTab(QWidget):
     extract_pcap_from_mtklog = pyqtSignal()
     merge_pcap = pyqtSignal()
     extract_pcap_from_qualcomm_log = pyqtSignal()
-    parse_qualcomm_sms = pyqtSignal()
+    parse_3gpp_message = pyqtSignal()
     
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -181,9 +181,9 @@ class LogControlTab(QWidget):
         self.extract_pcap_from_qualcomm_log_btn.clicked.connect(self.extract_pcap_from_qualcomm_log.emit)
         row2.addWidget(self.extract_pcap_from_qualcomm_log_btn)
         
-        self.parse_qualcomm_sms_btn = QPushButton(self.lang_manager.tr("高通SMS解析"))
-        self.parse_qualcomm_sms_btn.clicked.connect(self.parse_qualcomm_sms.emit)
-        row2.addWidget(self.parse_qualcomm_sms_btn)
+        self.parse_3gpp_btn = QPushButton(self.lang_manager.tr("3GPP解码器"))
+        self.parse_3gpp_btn.clicked.connect(self.parse_3gpp_message.emit)
+        row2.addWidget(self.parse_3gpp_btn)
         
         row2.addStretch()
         card_layout.addLayout(row2)

@@ -1,18 +1,55 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-高通SMS解析对话框（支持多条消息）
+3GPP RRC/NAS/SMS 消息解码对话框（支持多条消息）
 """
 
 from PyQt5.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel, 
                               QComboBox, QLineEdit, QTextEdit, QPushButton, 
                               QDialogButtonBox, QMessageBox, QScrollArea, 
-                              QWidget, QFrame, QGroupBox)
+                              QWidget, QFrame)
 from PyQt5.QtCore import Qt
 
 
-class SMSMessageWidget(QFrame):
-    """单条SMS消息输入组件"""
+# 协议列表（根据技术类型）
+PROTOCOLS = {
+    'SMS': ['MO SMS', 'MT SMS'],
+    'LTE': [
+        'NAS-EPS',
+        'NAS-EPS_plain',
+        'LTE-RRC.BCCH.BCH',
+        'LTE-RRC.BCCH.DL.SCH',
+        'LTE-RRC.BCCH.DL.SCH.BR',
+        'LTE-RRC.DL.CCCH',
+        'LTE-RRC.DL.DCCH',
+        'LTE-RRC.PCCH',
+        'LTE-RRC.RRCConnectionReconfiguration',
+        'LTE-RRC.SC.MCCH',
+        'LTE-RRC.UE-EUTRA-Capability',
+        'LTE-RRC.UECapabilityInformation',
+        'LTE-RRC.UL.CCCH',
+        'LTE-RRC.UL.DCCH',
+    ],
+    '5G': [
+        'NAS-5GS',
+        'NR-RRC.BCCH.BCH',
+        'NR-RRC.BCCH.DL.SCH',
+        'NR-RRC.DL.CCCH',
+        'NR-RRC.DL.DCCH',
+        'NR-RRC.PCCH',
+        'NR-RRC.UL.CCCH',
+        'NR-RRC.UL.DCCH',
+        'NR-RRC.CellGroupConfig',
+        'NR-RRC.HandoverCommand',
+        'NR-RRC.HandoverPreparationInformation',
+        'NR-RRC.MeasConfig',
+        'NR-RRC.MeasGapConfig',
+    ]
+}
+
+
+class RRC3GPPMessageWidget(QFrame):
+    """单条3GPP消息输入组件"""
     
     def __init__(self, index, lang_manager, parent=None):
         super().__init__(parent)
@@ -54,50 +91,83 @@ class SMSMessageWidget(QFrame):
         header_layout.addWidget(self.delete_btn)
         layout.addLayout(header_layout)
         
-        # SMS类型选择
-        type_layout = QHBoxLayout()
-        type_layout.addWidget(QLabel(self.tr("SMS类型:")))
-        self.sms_type_combo = QComboBox()
-        self.sms_type_combo.addItems(["MO SMS", "MT SMS"])
-        type_layout.addWidget(self.sms_type_combo)
-        type_layout.addStretch()
-        layout.addLayout(type_layout)
+        # 技术类型选择
+        tech_layout = QHBoxLayout()
+        tech_layout.addWidget(QLabel(self.tr("技术类型:")))
+        self.technology_combo = QComboBox()
+        self.technology_combo.addItems(['SMS', 'LTE', '5G'])
+        self.technology_combo.currentTextChanged.connect(self.on_technology_changed)
+        tech_layout.addWidget(self.technology_combo)
+        tech_layout.addStretch()
+        layout.addLayout(tech_layout)
         
-        # 数据长度输入
-        length_layout = QHBoxLayout()
-        length_layout.addWidget(QLabel(self.tr("数据长度:")))
+        # 协议选择
+        protocol_layout = QHBoxLayout()
+        protocol_layout.addWidget(QLabel(self.tr("协议:")))
+        self.protocol_combo = QComboBox()
+        self.protocol_combo.addItems(PROTOCOLS['SMS'])  # 默认SMS
+        protocol_layout.addWidget(self.protocol_combo)
+        protocol_layout.addStretch()
+        layout.addLayout(protocol_layout)
+        
+        # 数据长度输入（仅SMS显示）
+        self.length_layout = QHBoxLayout()
+        self.length_label = QLabel(self.tr("数据长度:"))
         self.length_edit = QLineEdit()
         self.length_edit.setPlaceholderText(self.tr("请输入数据长度（十进制）"))
-        length_layout.addWidget(self.length_edit)
-        length_layout.addStretch()
-        layout.addLayout(length_layout)
+        self.length_layout.addWidget(self.length_label)
+        self.length_layout.addWidget(self.length_edit)
+        self.length_layout.addStretch()
+        layout.addLayout(self.length_layout)
         
         # 十六进制数据输入
-        data_label = QLabel(self.tr("SMS 16进制数据:"))
+        data_label = QLabel(self.tr("16进制数据:"))
         layout.addWidget(data_label)
         
         self.hex_data_edit = QTextEdit()
-        self.hex_data_edit.setPlaceholderText(self.tr("请输入SMS的16进制数据（可以包含空格、制表符、换行符）"))
+        self.hex_data_edit.setPlaceholderText(self.tr("请输入16进制数据（可以包含空格、制表符、换行符）"))
         self.hex_data_edit.setMinimumHeight(120)
         layout.addWidget(self.hex_data_edit)
     
+    def on_technology_changed(self, technology):
+        """技术类型改变时更新协议列表"""
+        self.protocol_combo.clear()
+        if technology in PROTOCOLS:
+            self.protocol_combo.addItems(PROTOCOLS[technology])
+        
+        # 显示/隐藏长度输入框（仅SMS需要）
+        if technology == 'SMS':
+            self.length_label.setVisible(True)
+            self.length_edit.setVisible(True)
+        else:
+            self.length_label.setVisible(False)
+            self.length_edit.setVisible(False)
+    
     def get_inputs(self):
         """获取用户输入"""
-        return {
-            'sms_type': self.sms_type_combo.currentText(),
-            'length': self.length_edit.text().strip(),
-            'hex_data': self.hex_data_edit.toPlainText()
+        technology = self.technology_combo.currentText()
+        protocol = self.protocol_combo.currentText()
+        hex_data = self.hex_data_edit.toPlainText()
+        
+        result = {
+            'technology': technology,
+            'protocol': protocol,
+            'hex_data': hex_data
         }
+        
+        # 只有SMS才需要length
+        if technology == 'SMS':
+            length_str = self.length_edit.text().strip()
+            result['length'] = int(length_str) if length_str else None
+        else:
+            result['length'] = None
+        
+        return result
     
     def validate(self):
         """验证输入"""
-        # 验证数据长度
-        try:
-            length = int(self.length_edit.text().strip())
-            if length <= 0:
-                return False, self.tr("数据长度必须大于0")
-        except ValueError:
-            return False, self.tr("请输入有效的数字作为数据长度")
+        technology = self.technology_combo.currentText()
+        protocol = self.protocol_combo.currentText()
         
         # 验证十六进制数据
         hex_data = self.hex_data_edit.toPlainText().strip()
@@ -111,19 +181,28 @@ class SMSMessageWidget(QFrame):
         except ValueError:
             return False, self.tr("输入的16进制数据格式不正确")
         
+        # SMS需要验证数据长度
+        if technology == 'SMS':
+            try:
+                length = int(self.length_edit.text().strip())
+                if length <= 0:
+                    return False, self.tr("数据长度必须大于0")
+            except ValueError:
+                return False, self.tr("请输入有效的数字作为数据长度")
+        
         return True, None
 
 
-class SMSParserDialog(QDialog):
-    """SMS解析对话框（支持多条消息）"""
+class RRC3GPPDecoderDialog(QDialog):
+    """3GPP消息解码对话框（支持多条消息）"""
     
     def __init__(self, parent=None):
         super().__init__(parent)
         self.lang_manager = parent.lang_manager if parent and hasattr(parent, 'lang_manager') else None
         self.message_widgets = []
-        self.setWindowTitle(self.tr("高通SMS解析"))
+        self.setWindowTitle(self.tr("3GPP消息解码器"))
         self.setModal(True)
-        self.resize(700, 600)
+        self.resize(750, 650)
         self.setup_ui()
     
     def tr(self, text):
@@ -187,7 +266,7 @@ class SMSParserDialog(QDialog):
     def add_message(self):
         """添加一条消息输入组"""
         index = len(self.message_widgets)
-        widget = SMSMessageWidget(index, self.lang_manager, self)
+        widget = RRC3GPPMessageWidget(index, self.lang_manager, self)
         widget.delete_btn.clicked.connect(lambda checked, w=widget: self.remove_message(w))
         
         self.message_widgets.append(widget)
@@ -243,10 +322,6 @@ class SMSParserDialog(QDialog):
         messages = []
         for widget in self.message_widgets:
             inputs = widget.get_inputs()
-            messages.append({
-                'sms_type': inputs['sms_type'],
-                'length': int(inputs['length']),
-                'hex_data': inputs['hex_data']
-            })
+            messages.append(inputs)
         return messages
 

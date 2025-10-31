@@ -34,7 +34,7 @@ from core.tcpdump_manager import PyQtTCPDumpManager
 from core.log_utilities import PyQtBugreportManager
 from core.aee_log_manager import PyQtAEELogManager
 from core.google_log_manager import PyQtGoogleLogManager
-from core.qualcomm_sms_parser import QualcommSMSParser
+from core.rrc3gpp_decoder import RRC3GPPDecoder
 from core.enable_telephony_manager import PyQtTelephonyManager
 from core.tmo_cc_manager import PyQtTMOCCManager
 from core.echolocate_manager import PyQtEcholocateManager
@@ -246,9 +246,9 @@ class MainWindow(QMainWindow):
         # 初始化录制管理器
         self.video_manager = VideoManager(self.device_manager, self)
         
-        # 初始化高通SMS解析管理器
-        self.qualcomm_sms_parser = QualcommSMSParser(self)
-        self.qualcomm_sms_parser.status_message.connect(self._on_qualcomm_sms_status)
+        # 初始化3GPP消息解码器
+        self.rrc3gpp_decoder = RRC3GPPDecoder(self)
+        self.rrc3gpp_decoder.status_message.connect(self._on_3gpp_decoder_status)
         
         # 初始化其他管理器
         self.tcpdump_manager = PyQtTCPDumpManager(self.device_manager, self)
@@ -555,7 +555,7 @@ class MainWindow(QMainWindow):
         self.log_control_tab.extract_pcap_from_mtklog.connect(self._on_extract_pcap_from_mtklog)
         self.log_control_tab.merge_pcap.connect(self._on_merge_pcap)
         self.log_control_tab.extract_pcap_from_qualcomm_log.connect(self._on_extract_pcap_from_qualcomm_log)
-        self.log_control_tab.parse_qualcomm_sms.connect(self._on_parse_qualcomm_sms)
+        self.log_control_tab.parse_3gpp_message.connect(self._on_parse_3gpp_message)
         
         # 连接 其他 Tab 信号
         self.other_tab.show_device_info_dialog.connect(self._on_show_device_info_dialog)
@@ -1593,25 +1593,25 @@ class MainWindow(QMainWindow):
         """高通log提取pcap"""
         self.other_operations_manager.extract_pcap_from_qualcomm_log()
     
-    def _on_parse_qualcomm_sms(self):
-        """高通SMS解析"""
-        from ui.sms_parser_dialog import SMSParserDialog
+    def _on_parse_3gpp_message(self):
+        """3GPP消息解码"""
+        from ui.rrc3gpp_decoder_dialog import RRC3GPPDecoderDialog
         from PyQt5.QtWidgets import QDialog, QMessageBox
         
-        dialog = SMSParserDialog(self)
+        dialog = RRC3GPPDecoderDialog(self)
         if dialog.exec_() == QDialog.Accepted:
             messages = dialog.get_inputs()
             try:
-                success, message = self.qualcomm_sms_parser.parse_sms_multiple(messages)
+                success, message = self.rrc3gpp_decoder.decode_messages(messages)
                 if success:
                     QMessageBox.information(self, self.tr("成功"), message)
                 else:
                     QMessageBox.warning(self, self.tr("失败"), message)
             except Exception as e:
-                QMessageBox.critical(self, self.tr("错误"), self.tr("SMS解析失败: {}").format(str(e)))
+                QMessageBox.critical(self, self.tr("错误"), self.tr("3GPP消息解码失败: {}").format(str(e)))
     
-    def _on_qualcomm_sms_status(self, message):
-        """高通SMS解析状态消息"""
+    def _on_3gpp_decoder_status(self, message):
+        """3GPP消息解码状态消息"""
         self.update_status.emit(message)
         
     def _on_configure_hera(self):
@@ -2537,7 +2537,7 @@ class MainWindow(QMainWindow):
                 self.log_control_tab.extract_pcap_from_mtklog.connect(self._on_extract_pcap_from_mtklog)
                 self.log_control_tab.merge_pcap.connect(self._on_merge_pcap)
                 self.log_control_tab.extract_pcap_from_qualcomm_log.connect(self._on_extract_pcap_from_qualcomm_log)
-                self.log_control_tab.parse_qualcomm_sms.connect(self._on_parse_qualcomm_sms)
+                self.log_control_tab.parse_3gpp_message.connect(self._on_parse_3gpp_message)
             
             if hasattr(self, 'other_tab'):
                 self.other_tab.show_device_info_dialog.connect(self._on_show_device_info_dialog)
