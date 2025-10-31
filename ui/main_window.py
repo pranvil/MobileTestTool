@@ -1054,7 +1054,7 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(
                 self,
                 self.tr("在线更新"),
-                self.tr("未配置版本描述 URL，请先在“工具配置”中设置。"),
+                self.tr('未配置版本描述 URL，请先在"工具配置"中设置。'),
             )
             return
 
@@ -1191,7 +1191,7 @@ class MainWindow(QMainWindow):
 
     def _on_update_failed(self, message: str) -> None:
         self._close_update_progress_dialog()
-        logger.error("在线更新失败: %s", message)
+        logger.error(f"在线更新失败: {message}")
         self.append_log.emit(f"[更新] ❌ {message}\n", "#FF0000")
         QMessageBox.critical(self, self.tr("在线更新"), message)
 

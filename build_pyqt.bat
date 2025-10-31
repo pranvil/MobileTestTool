@@ -54,5 +54,5 @@ echo 1. onedir模式会生成一个包含所有依赖的文件夹
 echo 2. 请将整个 MobileTestTool_PyQt5 文件夹分发给用户
 echo 3. 此版本已优化exe环境下的MTKlogger兼容性
 echo.
-pause
+
 

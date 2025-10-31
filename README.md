@@ -142,6 +142,12 @@ pyinstaller --clean MobileTestTool_pyqt.spec
 2. 首次使用前，请在“工具配置”对话框中填写版本描述 URL、可选的下载目录以及网络超时时间，支持下载完成后自动启动安装包。
 3. 下载成功时会显示保存路径和 SHA-256 校验值，可选择自动打开安装包或在资源管理器中定位文件。
 
+#### 客户端配置示例
+- 版本描述 URL：`https://raw.githubusercontent.com/pranvil/MobileTestTool/main/releases/latest.json`
+- 下载目录：留空使用系统临时目录，或自定义为固定路径。
+- 下载完成后自动打开安装包：勾选后尝试直接运行下载文件。
+- 网络超时 (秒)：根据网络状况在 5~300 秒之间调整，默认 15 秒。
+
 #### 版本描述 `latest.json` 示例
 `config/latest.json.example` 提供了一个完整示例，可直接复制后按需修改：
 
@@ -163,6 +169,25 @@ pyinstaller --clean MobileTestTool_pyqt.spec
 - 更新 `latest.json` 的 `version`、`download_url`、`sha256` 等字段并上传到同一静态位置。
 - 推荐在发布流程中生成安装包的 SHA-256 校验值，填写至 `latest.json`，以便客户端完成完整性校验。
 - 如需灰度或版本存档，可在静态目录中同时保留历史版本的 JSON 与安装包。
+
+#### 版本打包与发布脚本
+为减少人工操作，可使用项目根目录的 PowerShell 脚本：
+
+##### `release.ps1`
+```powershell
+.\release.ps1 -Version "0.9.4"              # 打包 + 生成 latest.json + 提交并发布
+.\release.ps1 -Version "0.9.4" -SkipPublish # 仅生成包与 manifest
+.\release.ps1 -Version "0.9.4" -NotesFile ".\notes.md" # 指定发布说明
+```
+- 自动执行 `build_pyqt.bat`、压缩 onedir 目录、计算 SHA256 并生成 `releases/latest.json`。
+- 默认会 `git add/commit/push`、创建 `v<版本>` 标签并调用 GitHub CLI 发布 Release。
+- 需预先安装并登录 GitHub CLI；`-SkipPublish` 可跳过推送与发布，`-NotesFile` 可读取外部 Markdown 作为 release notes。
+
+##### `publish-release.ps1`
+兼容旧流程的入口，内部会转调 `release.ps1`：
+```powershell
+.\publish-release.ps1 -Version "0.9.4"
+```
 
 ### 🆕 SIM APDU解析器
 1. 在"SIM"标签页点击"启动 APDU 解析器"按钮
