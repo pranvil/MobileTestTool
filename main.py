@@ -120,6 +120,101 @@ def main():
         logger.info("程序启动")
         logger.info("=" * 60)
         
+        # 检测CLI参数（在创建QApplication之前）
+        # 如果检测到 -w、-p、--help 或 -h 参数，执行CLI模式
+        if len(sys.argv) > 1:
+            cli_args = sys.argv[1:]
+            # 检查是否是帮助请求
+            is_help_request = any(arg in ['--help', '-h'] for arg in cli_args)
+            # 检查是否有实际的CLI参数
+            has_cli_args = any(arg in ['-w', '-p'] for arg in cli_args)
+            
+            if has_cli_args or is_help_request:
+                if is_help_request:
+                    logger.info("检测到帮助请求，显示CLI帮助信息")
+                else:
+                    logger.info("检测到CLI参数，进入CLI模式")
+                
+                try:
+                    # 处理 sim_reader 模块导入的路径问题
+                    project_root = os.path.dirname(os.path.abspath(__file__))
+                    sim_reader_path = os.path.join(project_root, "sim_reader")
+                    
+                    # 保存原始路径和模块状态
+                    original_sys_path = sys.path.copy()
+                    normalized_project_root = os.path.normpath(os.path.abspath(project_root))
+                    normalized_sim_reader_path = os.path.normpath(os.path.abspath(sim_reader_path))
+                    
+                    # 关键：需要项目根目录在 sys.path 中才能导入 sim_reader 包
+                    # 但需要确保 sim_reader 目录在项目根目录之前，这样 core 会优先从 sim_reader 导入
+                    if project_root not in sys.path:
+                        sys.path.insert(0, project_root)
+                    
+                    # 将 sim_reader 目录也添加到路径最前面（用于相对导入）
+                    if sim_reader_path in sys.path:
+                        sys.path.remove(sim_reader_path)
+                    sys.path.insert(0, sim_reader_path)
+                    
+                    # 清除可能冲突的模块缓存（只清除项目根目录的 core，保留 sim_reader 的）
+                    saved_modules = {}
+                    for mod_name in ['core', 'tree_manager', 'parser_dispatcher']:
+                        if mod_name in sys.modules:
+                            mod = sys.modules[mod_name]
+                            if hasattr(mod, '__file__') and mod.__file__:
+                                mod_file = os.path.normpath(os.path.abspath(mod.__file__))
+                                # 如果模块来自项目根目录（但不是 sim_reader），保存并移除
+                                if normalized_project_root in mod_file and normalized_sim_reader_path not in mod_file:
+                                    saved_modules[mod_name] = mod
+                                    del sys.modules[mod_name]
+                    
+                    # 清除 core 的子模块缓存（只清除项目根目录的）
+                    modules_to_remove = [mod for mod in list(sys.modules.keys()) if mod.startswith('core.')]
+                    for mod in modules_to_remove:
+                        mod_obj = sys.modules[mod]
+                        if hasattr(mod_obj, '__file__') and mod_obj.__file__:
+                            mod_file = os.path.normpath(os.path.abspath(mod_obj.__file__))
+                            if normalized_project_root in mod_file and normalized_sim_reader_path not in mod_file:
+                                saved_modules[mod] = mod_obj
+                                del sys.modules[mod]
+                    
+                    try:
+                        # 导入并执行CLI功能
+                        # argparse 会自动处理 --help 和 -h，打印帮助信息后会抛出 SystemExit(0)
+                        # 使用 importlib 动态导入，确保从正确的路径导入
+                        import importlib
+                        sim_reader_cli = importlib.import_module('sim_reader.cli')
+                        cli_main = sim_reader_cli.main
+                        
+                        try:
+                            cli_main()
+                            # 如果执行到这里（非帮助请求），说明CLI执行完成
+                            if not is_help_request:
+                                logger.info("CLI模式执行完成")
+                            # CLI模式执行完成后直接退出，不启动GUI
+                            sys.exit(0)
+                        except SystemExit as e:
+                            # argparse 在处理 --help 时会抛出 SystemExit(0)，这是正常的
+                            # 直接传播这个异常即可
+                            raise
+                    finally:
+                        # 恢复模块和路径
+                        for mod_name, mod in saved_modules.items():
+                            sys.modules[mod_name] = mod
+                        sys.path = original_sys_path.copy()
+                        
+                except Exception as e:
+                    logger.exception("CLI模式执行失败")
+                    # 尝试显示错误消息框（如果有GUI环境）
+                    try:
+                        QApplication.setAttribute(Qt.AA_EnableHighDpiScaling, True)
+                        QApplication.setAttribute(Qt.AA_UseHighDpiPixmaps, True)
+                        app = QApplication(sys.argv)
+                        from PyQt5.QtWidgets import QMessageBox
+                        QMessageBox.critical(None, "CLI执行失败", f"CLI模式执行失败：\n{str(e)}\n\n详细信息请查看日志文件。")
+                    except:
+                        pass
+                    sys.exit(1)
+        
         # 在创建QApplication之前启用高DPI缩放（Qt 5.6+）
         QApplication.setAttribute(Qt.AA_EnableHighDpiScaling, True)
         QApplication.setAttribute(Qt.AA_UseHighDpiPixmaps, True)

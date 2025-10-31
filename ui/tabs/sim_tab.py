@@ -63,8 +63,12 @@ class SimTab(QWidget):
         scroll_layout.setSpacing(1)
         
         # SIM APDU 解析器控制组
-        sim_group = self.create_sim_group()
-        scroll_layout.addWidget(sim_group)
+        sim_apdu_group = self.create_sim_apdu_group()
+        scroll_layout.addWidget(sim_apdu_group)
+        
+        # SIM 卡读写工具控制组
+        sim_reader_group = self.create_sim_reader_group()
+        scroll_layout.addWidget(sim_reader_group)
         
         # 添加弹性空间
         scroll_layout.addStretch()
@@ -72,7 +76,7 @@ class SimTab(QWidget):
         scroll.setWidget(scroll_content)
         main_layout.addWidget(scroll)
     
-    def create_sim_group(self):
+    def create_sim_apdu_group(self):
         """创建 SIM APDU 解析器控制组（现代结构：QLabel + QFrame）"""
         # 容器
         container = QWidget()
@@ -96,11 +100,46 @@ class SimTab(QWidget):
         
         # 按钮行
         row = QHBoxLayout()
-        # row.addWidget(QLabel("APDU解析器:"))
         
-        self.launch_btn = QPushButton("启动 APDU 解析器")
-        self.launch_btn.clicked.connect(self.launch_apdu_parser)
-        row.addWidget(self.launch_btn)
+        self.launch_apdu_btn = QPushButton("启动 APDU 解析器")
+        self.launch_apdu_btn.clicked.connect(self.launch_apdu_parser)
+        row.addWidget(self.launch_apdu_btn)
+        
+        row.addStretch()
+        card_layout.addLayout(row)
+        
+        v.addWidget(card)
+        
+        return container
+    
+    def create_sim_reader_group(self):
+        """创建 SIM 卡读写工具控制组（现代结构：QLabel + QFrame）"""
+        # 容器
+        container = QWidget()
+        v = QVBoxLayout(container)
+        v.setContentsMargins(0, 0, 0, 0)
+        v.setSpacing(4)  # 紧凑的标题和卡片之间的间距
+        
+        # 标题
+        title = QLabel("SIM 卡读写工具")
+        title.setProperty("class", "section-title")
+        v.addWidget(title)
+        
+        # 卡片
+        card = QFrame()
+        card.setObjectName("card")
+        add_card_shadow(card)
+        
+        card_layout = QVBoxLayout(card)
+        card_layout.setContentsMargins(10, 1, 10, 1)
+        card_layout.setSpacing(8)
+        
+        # 按钮行
+        row = QHBoxLayout()
+        
+        self.launch_reader_btn = QPushButton("启动 SIM 卡读写工具")
+        self.launch_reader_btn.clicked.connect(self.launch_sim_reader)
+        row.addWidget(self.launch_reader_btn)
         
         row.addStretch()
         card_layout.addLayout(row)
@@ -121,3 +160,19 @@ class SimTab(QWidget):
         except Exception as e:
             QMessageBox.critical(self, "错误", f"启动失败：\n{str(e)}")
             self.status_message.emit(f"APDU 解析器启动失败：{str(e)}")
+    
+    def launch_sim_reader(self):
+        """启动 SIM 卡读写工具"""
+        try:
+            # 导入并打开SIM卡读写工具对话框
+            from ui.sim_reader_dialog import SimReaderDialog
+            dialog = SimReaderDialog.get_instance(self)
+            dialog.show()
+            dialog.raise_()
+            dialog.activateWindow()
+            
+            self.status_message.emit("SIM 卡读写工具已启动")
+                
+        except Exception as e:
+            QMessageBox.critical(self, "错误", f"启动失败：\n{str(e)}")
+            self.status_message.emit(f"SIM 卡读写工具启动失败：{str(e)}")
