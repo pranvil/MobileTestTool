@@ -494,7 +494,7 @@ adb version
 
 ## 📝 更新日志
 
-### v0.9.3 (当前版本)
+### v0.9.4 (当前版本)
 - 🔧 **修复打包问题**: 修复SIM Reader在EXE环境下的模块导入问题
   - 修复 `pyserial` 模块打包问题，添加自定义hook确保正确包含
   - 修复 `concurrent.futures` 模块缺失问题

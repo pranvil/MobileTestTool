@@ -7,9 +7,11 @@
 import os
 import glob
 import subprocess
-from PyQt5.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel, 
+from PyQt5.QtCore import Qt
+from PyQt5.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel,
                              QPushButton, QLineEdit, QGroupBox, QCheckBox,
-                             QMessageBox, QFileDialog, QSpinBox)
+                             QMessageBox, QFileDialog, QSpinBox, QScrollArea,
+                             QWidget)
 
 
 class ToolsConfigDialog(QDialog):
@@ -36,13 +38,26 @@ class ToolsConfigDialog(QDialog):
         
     def setup_ui(self):
         """设置UI"""
-        layout = QVBoxLayout(self)
-        layout.setSpacing(15)
+        main_layout = QVBoxLayout(self)
+        main_layout.setSpacing(10)
+
+        scroll_area = QScrollArea()
+        scroll_area.setWidgetResizable(True)
+        scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+
+        content_widget = QWidget()
+        content_layout = QVBoxLayout(content_widget)
+        content_layout.setSpacing(15)
+        content_layout.setContentsMargins(10, 10, 10, 10)
+
+        scroll_area.setWidget(content_widget)
+
+        main_layout.addWidget(scroll_area)
         
         # 标题
-        title_label = QLabel(self.tr("工具路径配置"))
+        title_label = QLabel(self.tr("工具配置"))
         title_label.setStyleSheet("font-size: 16px; font-weight: bold;")
-        layout.addWidget(title_label)
+        content_layout.addWidget(title_label)
         
         # 存储路径配置框架
         storage_group = QGroupBox(self.tr("存储路径配置"))
@@ -61,7 +76,7 @@ class ToolsConfigDialog(QDialog):
         storage_path_layout.addWidget(browse_storage_btn)
         
         storage_layout.addLayout(storage_path_layout)
-        layout.addWidget(storage_group)
+        content_layout.addWidget(storage_group)
         
         # 更新配置
         update_group = QGroupBox(self.tr("更新配置"))
@@ -100,7 +115,7 @@ class ToolsConfigDialog(QDialog):
 
         update_layout.addLayout(timeout_layout)
 
-        layout.addWidget(update_group)
+        content_layout.addWidget(update_group)
 
         # MTK工具配置框架
         mtk_group = QGroupBox(self.tr("ELT路径配置"))
@@ -123,7 +138,7 @@ class ToolsConfigDialog(QDialog):
         
         mtk_layout.addLayout(mtk_path_layout)
         
-        layout.addWidget(mtk_group)
+        content_layout.addWidget(mtk_group)
         
         # Wireshark配置框架
         wireshark_group = QGroupBox(self.tr("Wireshark配置"))
@@ -145,7 +160,7 @@ class ToolsConfigDialog(QDialog):
         
         wireshark_layout.addLayout(wireshark_path_layout)
         
-        layout.addWidget(wireshark_group)
+        content_layout.addWidget(wireshark_group)
         
         # 高通工具配置框架
         qualcomm_group = QGroupBox(self.tr("高通工具配置"))
@@ -168,7 +183,9 @@ class ToolsConfigDialog(QDialog):
         
         qualcomm_layout.addLayout(qualcomm_path_layout)
         
-        layout.addWidget(qualcomm_group)
+        content_layout.addWidget(qualcomm_group)
+
+        content_layout.addStretch()
         
         # 按钮框架
         button_layout = QHBoxLayout()
@@ -182,7 +199,7 @@ class ToolsConfigDialog(QDialog):
         cancel_btn.clicked.connect(self.reject)
         button_layout.addWidget(cancel_btn)
         
-        layout.addLayout(button_layout)
+        main_layout.addLayout(button_layout)
         
         # 初始化显示
         self._refresh_mtk_entry()
