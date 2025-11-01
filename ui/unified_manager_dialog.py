@@ -121,10 +121,11 @@ class UnifiedManagerDialog(QDialog):
         self.setMinimumSize(800, 500)  # 设置最小尺寸，允许调整高度和宽度
         
         # 存储控件引用
-        self.visibility_widgets = {}
-        self.custom_tab_list = None
+        self.tab_list_widget = None
         self.custom_card_list = None
         self.button_table = None
+        self.current_selected_tab_id = None
+        self.is_selected_custom_tab = False
         
         self.setup_ui()
         self.load_all_configs()
@@ -181,27 +182,42 @@ class UnifiedManagerDialog(QDialog):
         """创建Tab管理控件"""
         widget = QWidget()
         layout = QVBoxLayout(widget)
-        
-        # Tab显示控制
-        visibility_group = QGroupBox(self.tr("Tab显示控制"))
-        visibility_main_layout = QHBoxLayout(visibility_group)
-        
-        # 左侧：滚动区域
-        scroll_area = QScrollArea()
-        scroll_widget = QWidget()
-        scroll_layout = QVBoxLayout(scroll_widget)
-        
-        self.visibility_scroll_layout = scroll_layout
-        scroll_area.setWidget(scroll_widget)
-        scroll_area.setWidgetResizable(True)
-        scroll_area.setMinimumHeight(200)
-        scroll_area.setMaximumHeight(300)
-        visibility_main_layout.addWidget(scroll_area)
-        
-        # 右侧：应用按钮
-        apply_layout = QVBoxLayout()
-        apply_layout.addStretch()
-        
+
+        tab_group = QGroupBox(self.tr("Tab管理"))
+        tab_layout = QVBoxLayout(tab_group)
+
+        self.tab_list_widget = QListWidget()
+        self.tab_list_widget.setSelectionMode(QListWidget.SingleSelection)
+        self.tab_list_widget.itemSelectionChanged.connect(self.on_tab_selection_changed)
+        self.tab_list_widget.setFocusPolicy(Qt.NoFocus)
+        self.tab_list_widget.setStyleSheet("""
+            QListWidget::item {
+                padding: 4px;
+                border: none;
+            }
+            QListWidget::item:selected {
+                padding: 4px;
+                border: none;
+                background: rgba(74, 163, 255, 45%);
+            }
+        """)
+        tab_layout.addWidget(self.tab_list_widget)
+
+        tab_button_layout = QHBoxLayout()
+        self.add_tab_btn = QPushButton("➕ " + self.tr("添加Tab"))
+        self.add_tab_btn.clicked.connect(self.show_add_tab_dialog)
+        tab_button_layout.addWidget(self.add_tab_btn)
+
+        self.edit_tab_btn = QPushButton("✏️ " + self.tr("编辑Tab"))
+        self.edit_tab_btn.clicked.connect(self.edit_custom_tab)
+        tab_button_layout.addWidget(self.edit_tab_btn)
+
+        self.delete_tab_btn = QPushButton("🗑️ " + self.tr("删除Tab"))
+        self.delete_tab_btn.clicked.connect(self.delete_custom_tab)
+        tab_button_layout.addWidget(self.delete_tab_btn)
+
+        tab_button_layout.addStretch()
+
         self.apply_btn = QPushButton("✅ " + self.tr("应用"))
         self.apply_btn.clicked.connect(self.apply_tab_visibility)
         self.apply_btn.setStyleSheet("""
@@ -215,37 +231,11 @@ class UnifiedManagerDialog(QDialog):
                 background-color: #218838;
             }
         """)
-        apply_layout.addWidget(self.apply_btn)
-        
-        visibility_main_layout.addLayout(apply_layout)
-        layout.addWidget(visibility_group)
-        
-        # 自定义Tab管理
-        custom_tab_group = QGroupBox(self.tr("自定义Tab管理"))
-        custom_tab_main_layout = QHBoxLayout(custom_tab_group)
-        
-        # 左侧：Tab列表
-        self.custom_tab_list = QListWidget()
-        self.custom_tab_list.setMaximumHeight(120)
-        custom_tab_main_layout.addWidget(self.custom_tab_list)
-        
-        # 右侧：Tab按钮（垂直排列）
-        custom_tab_btn_layout = QVBoxLayout()
-        self.add_tab_btn = QPushButton("➕ " + self.tr("添加Tab"))
-        self.add_tab_btn.clicked.connect(self.show_add_tab_dialog)
-        custom_tab_btn_layout.addWidget(self.add_tab_btn)
-        
-        self.edit_tab_btn = QPushButton("✏️ " + self.tr("编辑Tab"))
-        self.edit_tab_btn.clicked.connect(self.edit_custom_tab)
-        custom_tab_btn_layout.addWidget(self.edit_tab_btn)
-        
-        self.delete_tab_btn = QPushButton("🗑️ " + self.tr("删除Tab"))
-        self.delete_tab_btn.clicked.connect(self.delete_custom_tab)
-        custom_tab_btn_layout.addWidget(self.delete_tab_btn)
-        
-        custom_tab_main_layout.addLayout(custom_tab_btn_layout)
-        layout.addWidget(custom_tab_group)
-        
+        tab_button_layout.addWidget(self.apply_btn)
+
+        tab_layout.addLayout(tab_button_layout)
+        layout.addWidget(tab_group)
+
         # 自定义Card管理
         custom_card_group = QGroupBox(self.tr("自定义Card管理"))
         custom_card_main_layout = QHBoxLayout(custom_card_group)
@@ -352,66 +342,128 @@ class UnifiedManagerDialog(QDialog):
     def load_all_configs(self):
         """加载所有配置"""
         self.load_tab_config()
-        self.load_custom_tabs()
         self.load_custom_cards()
         self.load_buttons()
+        self.update_tab_buttons_state()
     
+    def update_tab_buttons_state(self):
+        """根据选择状态更新Tab相关按钮"""
+        has_custom_selection = self.is_selected_custom_tab and self.current_selected_tab_id is not None
+        if hasattr(self, 'edit_tab_btn') and self.edit_tab_btn:
+            self.edit_tab_btn.setEnabled(has_custom_selection)
+        if hasattr(self, 'delete_tab_btn') and self.delete_tab_btn:
+            self.delete_tab_btn.setEnabled(has_custom_selection)
+
     def load_tab_config(self):
         """加载Tab配置"""
         try:
-            # 加载Tab显示控制
-            self.visibility_widgets.clear()
-            
-            # 清除现有控件
-            for i in reversed(range(self.visibility_scroll_layout.count())):
-                child = self.visibility_scroll_layout.itemAt(i).widget()
-                if child:
-                    child.setParent(None)
-            
-            # 获取所有Tab
+            preserve_tab_id = self.current_selected_tab_id
+            if self.tab_list_widget:
+                self.tab_list_widget.blockSignals(True)
+                self.tab_list_widget.clear()
+
             all_tabs = self.tab_config_manager.get_all_tabs()
-            
+            found_preserved = False
+
             for tab in all_tabs:
-                checkbox = QCheckBox(tab['name'])
-                checkbox.setChecked(tab.get('visible', True))
-                checkbox.setProperty('tab_id', tab['id'])
-                
-                # 检查Tab是否可以隐藏
-                if not self.tab_config_manager.can_hide_tab(tab['id']):
-                    checkbox.setEnabled(False)
-                    checkbox.setToolTip(self.tr("此Tab不能隐藏"))
-                
-                self.visibility_widgets[tab['id']] = checkbox
-                self.visibility_scroll_layout.addWidget(checkbox)
-            
+                item = QListWidgetItem()
+                data = {
+                    'id': tab['id'],
+                    'name': tab['name'],
+                    'custom': tab.get('custom', False)
+                }
+                item.setData(Qt.UserRole, data)
+                widget = self._create_tab_item_widget(tab)
+                item.setSizeHint(widget.sizeHint())
+                self.tab_list_widget.addItem(item)
+                self.tab_list_widget.setItemWidget(item, widget)
+
+                if preserve_tab_id and tab['id'] == preserve_tab_id:
+                    item.setSelected(True)
+                    found_preserved = True
+
+            if self.tab_list_widget:
+                if not found_preserved:
+                    self.tab_list_widget.clearSelection()
+                    self.current_selected_tab_id = None
+                    self.is_selected_custom_tab = False
+                self.tab_list_widget.blockSignals(False)
+
+            self.on_tab_selection_changed()
+
         except Exception as e:
             logger.exception(f"{self.tr('加载Tab配置失败:')} {e}")
             QMessageBox.critical(self, self.tr("错误"), f"{self.tr('加载Tab配置失败:')} {str(e)}")
     
-    def load_custom_tabs(self):
-        """加载自定义Tab列表"""
-        try:
-            self.custom_tab_list.clear()
-            for tab in self.tab_config_manager.custom_tabs:
-                item = QListWidgetItem(tab['name'])
-                item.setData(Qt.UserRole, tab['id'])
-                self.custom_tab_list.addItem(item)
-        except Exception as e:
-            logger.exception(f"{self.tr('加载自定义Tab失败:')} {e}")
-    
+    def _create_tab_item_widget(self, tab_info):
+        """为Tab列表创建条目控件"""
+        tab_id = tab_info['id']
+        container = QWidget()
+        layout = QHBoxLayout(container)
+        layout.setContentsMargins(12, 6, 12, 6)
+        layout.setSpacing(10)
+
+        checkbox = QCheckBox()
+        checkbox.setChecked(tab_info.get('visible', True))
+        checkbox.setEnabled(self.tab_config_manager.can_hide_tab(tab_id))
+        if not checkbox.isEnabled():
+            checkbox.setToolTip(self.tr("此Tab不能隐藏"))
+        checkbox.setFixedSize(20, 20)
+        layout.addWidget(checkbox)
+
+        label = QLabel(tab_info['name'])
+        label.setAttribute(Qt.WA_TransparentForMouseEvents, True)
+        if tab_info.get('custom'):
+            label.setStyleSheet("color: #ffd166;")
+        label.setMinimumWidth(140)
+        layout.addWidget(label)
+        layout.addStretch()
+
+        container.checkbox = checkbox
+        container.tab_id = tab_id
+
+        return container
+
+    def on_tab_selection_changed(self):
+        """Tab列表选择变化处理"""
+        if not self.tab_list_widget:
+            return
+
+        item = self.tab_list_widget.currentItem()
+        if item is None:
+            self.current_selected_tab_id = None
+            self.is_selected_custom_tab = False
+        else:
+            data = item.data(Qt.UserRole) or {}
+            self.current_selected_tab_id = data.get('id')
+            self.is_selected_custom_tab = data.get('custom', False)
+
+        self.update_tab_buttons_state()
+        self.load_custom_cards()
+
     def load_custom_cards(self):
         """加载自定义Card列表"""
         try:
+            if self.custom_card_list is None:
+                return
             self.custom_card_list.clear()
-            for card in self.tab_config_manager.custom_cards:
-                # 获取Card所属的Tab名称
-                tab_name = "未知Tab"
-                for tab in self.tab_config_manager.custom_tabs:
-                    if tab['id'] == card.get('tab_id'):
-                        tab_name = tab['name']
-                        break
-                
-                item_text = f"{card['name']} ({tab_name})"
+
+            if self.current_selected_tab_id is None:
+                cards = self.tab_config_manager.custom_cards
+            elif self.is_selected_custom_tab and self.current_selected_tab_id:
+                cards = [card for card in self.tab_config_manager.custom_cards if card.get('tab_id') == self.current_selected_tab_id]
+            else:
+                cards = []
+
+            for card in cards:
+                associated_tab = next((tab for tab in self.tab_config_manager.custom_tabs if tab['id'] == card.get('tab_id')), None)
+                tab_name = associated_tab['name'] if associated_tab else card.get('tab_id', '')
+
+                if self.is_selected_custom_tab and self.current_selected_tab_id:
+                    item_text = card['name']
+                else:
+                    item_text = f"{card['name']} ({tab_name})"
+
                 item = QListWidgetItem(item_text)
                 item.setData(Qt.UserRole, card['id'])
                 self.custom_card_list.addItem(item)
@@ -475,9 +527,17 @@ class UnifiedManagerDialog(QDialog):
     def save_config(self):
         """保存配置"""
         try:
-            # 保存Tab可见性
-            for tab_id, checkbox in self.visibility_widgets.items():
-                self.tab_config_manager.tab_visibility[tab_id] = checkbox.isChecked()
+            if self.tab_list_widget:
+                for index in range(self.tab_list_widget.count()):
+                    item = self.tab_list_widget.item(index)
+                    widget = self.tab_list_widget.itemWidget(item)
+                    if not widget:
+                        continue
+                    tab_id = getattr(widget, 'tab_id', None)
+                    checkbox = getattr(widget, 'checkbox', None)
+                    if tab_id is None or checkbox is None:
+                        continue
+                    self.tab_config_manager.tab_visibility[tab_id] = checkbox.isChecked()
             
             self.tab_config_manager.save_config()
             
@@ -684,31 +744,30 @@ class UnifiedManagerDialog(QDialog):
         from ui.tab_manager_dialog import CustomTabDialog
         dialog = CustomTabDialog(self.tab_config_manager, parent=self)
         if dialog.exec_() == QDialog.Accepted:
-            self.load_custom_tabs()
             self.load_tab_config()
+            self.load_custom_cards()
     
     def edit_custom_tab(self):
         """编辑自定义Tab"""
-        current_item = self.custom_tab_list.currentItem()
-        if not current_item:
-            QMessageBox.warning(self, self.tr("警告"), self.tr("请选择要编辑的Tab"))
+        if not self.is_selected_custom_tab or not self.current_selected_tab_id:
+            QMessageBox.warning(self, self.tr("警告"), self.tr("请选择要编辑的自定义Tab"))
             return
         
-        tab_id = current_item.data(Qt.UserRole)
+        tab_id = self.current_selected_tab_id
         from ui.tab_manager_dialog import CustomTabDialog
         dialog = CustomTabDialog(self.tab_config_manager, tab_id=tab_id, parent=self)
         if dialog.exec_() == QDialog.Accepted:
-            self.load_custom_tabs()
             self.load_tab_config()
     
     def delete_custom_tab(self):
         """删除自定义Tab"""
-        current_item = self.custom_tab_list.currentItem()
-        if not current_item:
-            QMessageBox.warning(self, self.tr("警告"), self.tr("请选择要删除的Tab"))
+        if not self.is_selected_custom_tab or not self.current_selected_tab_id:
+            QMessageBox.warning(self, self.tr("警告"), self.tr("请选择要删除的自定义Tab"))
             return
         
-        tab_name = current_item.text()
+        current_item = self.tab_list_widget.currentItem()
+        tab_data = current_item.data(Qt.UserRole) if current_item else {}
+        tab_name = tab_data.get('name', '')
         reply = QMessageBox.question(
             self, self.tr("确认删除"),
             f"{self.tr('确定要删除Tab')} '{tab_name}' {self.tr('吗？这将同时删除该Tab下的所有Card。')}",
@@ -717,9 +776,10 @@ class UnifiedManagerDialog(QDialog):
         )
         
         if reply == QMessageBox.Yes:
-            tab_id = current_item.data(Qt.UserRole)
+            tab_id = self.current_selected_tab_id
             if self.tab_config_manager.delete_custom_tab(tab_id):
-                self.load_custom_tabs()
+                self.current_selected_tab_id = None
+                self.is_selected_custom_tab = False
                 self.load_custom_cards()
                 self.load_tab_config()
                 QMessageBox.information(self, self.tr("成功"), self.tr("Tab已删除"))
