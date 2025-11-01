@@ -63,6 +63,20 @@ class LatestManifest:
             mandatory=bool(data.get("mandatory", False)),
         )
 
+    def to_dict(self) -> dict:
+        """转换为可序列化的字典"""
+
+        return {
+            "version": self.version,
+            "download_url": self.download_url,
+            "sha256": self.sha256,
+            "file_name": self.file_name,
+            "file_size": self.file_size,
+            "release_notes": self.release_notes,
+            "published_at": self.published_at,
+            "mandatory": self.mandatory,
+        }
+
 
 __all__ = [
     "DEFAULT_MANIFEST_FILENAME",

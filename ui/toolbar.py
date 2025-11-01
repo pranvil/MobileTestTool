@@ -5,7 +5,7 @@
 """
 
 from PyQt5.QtWidgets import (QToolBar, QWidget, QHBoxLayout, QLabel, 
-                              QComboBox, QPushButton, QFrame, QLineEdit)
+                              QComboBox, QPushButton, QFrame, QLineEdit, QSizePolicy)
 from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtGui import QIcon
 from core.resource_utils import get_icon_path
@@ -111,26 +111,36 @@ class DeviceToolBar(QToolBar):
         self.root_remount_btn.clicked.connect(self.root_remount_clicked.emit)
         quick_layout.addWidget(self.root_remount_btn)
         
-        self.check_update_btn = QPushButton(self.lang_manager.tr("检查更新"))
-        self.check_update_btn.clicked.connect(self.check_update_clicked.emit)
-        quick_layout.addWidget(self.check_update_btn)
-
         self.addWidget(quick_widget)
         
-        # 添加弹性空间
-        self.addWidget(QWidget())
-        
+        # 添加弹性空间，将右侧按钮推到最右
+        spacer = QWidget()
+        spacer.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
+        self.addWidget(spacer)
+
+        # 右侧按钮区域
+        right_widget = QWidget()
+        right_layout = QHBoxLayout(right_widget)
+        right_layout.setContentsMargins(0, 0, 0, 0)
+        right_layout.setSpacing(5)
+
+        self.check_update_btn = QPushButton(self.lang_manager.tr("检查更新"))
+        self.check_update_btn.clicked.connect(self.check_update_clicked.emit)
+        right_layout.addWidget(self.check_update_btn)
+
         # 主题切换按钮
         self.theme_btn = QPushButton(self.lang_manager.tr("暗色主题"))
         self.theme_btn.setIcon(self.theme_dark_icon)
         self.theme_btn.clicked.connect(self.theme_toggled.emit)
-        self.addWidget(self.theme_btn)
+        right_layout.addWidget(self.theme_btn)
         
         # 语言切换按钮（放置在右侧）
         self.language_btn = QPushButton("🌐 中/EN")
         self.language_btn.setToolTip(self.lang_manager.tr("点击切换语言 / Click to switch language"))
         self.language_btn.clicked.connect(self._on_language_toggle)
-        self.addWidget(self.language_btn)
+        right_layout.addWidget(self.language_btn)
+
+        self.addWidget(right_widget)
         
         # 注释掉工具栏中的ADB命令输入框，已移到日志显示区域下方
         # # 添加分隔符

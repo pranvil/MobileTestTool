@@ -1,8 +1,8 @@
 {
-  "version": "0.9.4",
-  "download_url": "https://example.com/releases/MobileTestTool_0.9.4.exe",
+  "version": "0.9.3",
+  "download_url": "https://example.com/releases/MobileTestTool_0.9.3.exe",
   "sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
-  "file_name": "MobileTestTool_0.9.4.exe",
+  "file_name": "MobileTestTool_0.9.3.exe",
   "file_size": 123456789,
   "release_notes": "- 修复已知问题\n- 优化日志处理性能",
   "published_at": "2025-10-31T08:00:00Z",

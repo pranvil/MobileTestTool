@@ -1,7 +1,7 @@
 # MobileTestTool Release Notes
 
 ## 版本信息
-- 版本号：0.9.4
+- 版本号：0.9.3
 - 发布日期：填写日期
 
 ## 本次更新摘要

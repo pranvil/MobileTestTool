@@ -8,11 +8,13 @@ import os
 import subprocess
 import sys
 import json
+import time
+import threading
 from typing import Optional
 from PyQt5.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, 
                               QSplitter, QTabWidget, QMessageBox, QProgressDialog,
                               QHBoxLayout, QPushButton, QSizePolicy, QApplication)
-from PyQt5.QtCore import Qt, pyqtSignal, QThread, QMimeData
+from PyQt5.QtCore import Qt, pyqtSignal, QThread, QMimeData, QTimer
 from PyQt5.QtGui import QDrag
 from ui.menu_bar import DisplayLinesDialog
 from ui.tools_config_dialog import ToolsConfigDialog
@@ -333,6 +335,7 @@ class UpdateWorker(QThread):
     status_message = pyqtSignal(str)
     progress_changed = pyqtSignal(int, int)  # downloaded, total (-1 表示未知)
     update_not_required = pyqtSignal(str)
+    update_available = pyqtSignal(dict)
     download_finished = pyqtSignal(LatestManifest, DownloadResult)
     update_failed = pyqtSignal(str)
 
@@ -341,6 +344,8 @@ class UpdateWorker(QThread):
         self._manager = update_manager
         self._lang_manager = lang_manager
         self._cancel_requested = False
+        self._decision_event = threading.Event()
+        self._should_download = False
 
     def _tr(self, text: str) -> str:
         if self._lang_manager:
@@ -354,18 +359,46 @@ class UpdateWorker(QThread):
         """请求取消当前操作"""
 
         self._cancel_requested = True
+        self._decision_event.set()
         try:
             self._manager.cancel_download()
         except Exception:
             pass
 
+    def allow_download(self) -> None:
+        logger.debug("UpdateWorker: allow_download called")
+        self._should_download = True
+        self._decision_event.set()
+
+    def reject_download(self) -> None:
+        logger.debug("UpdateWorker: reject_download called")
+        self._should_download = False
+        self._decision_event.set()
+
     def run(self) -> None:
+        logger.debug("UpdateWorker: run start")
+        self._cancel_requested = False
+        self._decision_event.clear()
+        self._should_download = False
+
         try:
             self.status_message.emit(self._tr("正在检查更新..."))
             manifest = self._manager.fetch_latest_manifest()
+            logger.debug(f"UpdateWorker: manifest fetched -> {manifest.version}")
 
             if not self._manager.is_update_available(manifest):
+                logger.debug("UpdateWorker: no update available")
                 self.update_not_required.emit(self._tr("当前已是最新版本"))
+                return
+
+            logger.debug("UpdateWorker: update available, wait for decision")
+            self.update_available.emit(manifest.to_dict())
+            self._decision_event.wait()
+            logger.debug(f"UpdateWorker: decision event set, should_download={self._should_download} cancel={self._cancel_requested}")
+
+            if self._cancel_requested or not self._should_download:
+                logger.debug("UpdateWorker: decision -> cancel")
+                self.update_failed.emit(self._tr("用户取消更新"))
                 return
 
             self.status_message.emit(self._tr("检测到新版本，开始下载安装包..."))
@@ -376,14 +409,18 @@ class UpdateWorker(QThread):
             result = self._manager.download_release(manifest, progress_callback=_on_progress)
 
             if self._cancel_requested:
+                logger.debug("UpdateWorker: cancel after download started")
                 self.update_failed.emit(self._tr("下载已取消"))
                 return
 
+            logger.debug("UpdateWorker: download finished")
             self.download_finished.emit(manifest, result)
 
         except UpdateError as exc:
+            logger.debug(f"UpdateWorker: UpdateError -> {exc}")
             self.update_failed.emit(str(exc))
         except Exception as exc:  # pragma: no cover - 防御性捕获
+            logger.debug(f"UpdateWorker: Exception -> {exc}")
             self.update_failed.emit(str(exc))
 
 class MainWindow(QMainWindow):
@@ -405,6 +442,12 @@ class MainWindow(QMainWindow):
         self._update_status_text = ""
         self._update_progress_extra = ""
         self.app_version = APP_VERSION
+        self._update_request_origin = "manual"
+        self._update_check_interval_seconds = 24 * 60 * 60
+        self._auto_update_timer = QTimer(self)
+        self._auto_update_timer.setSingleShot(True)
+        self._auto_update_timer.timeout.connect(self._on_auto_update_timer)
+        self._suppress_progress_cancel = False
         
         # 初始化语言管理器
         self.lang_manager = LanguageManager(self)
@@ -443,8 +486,9 @@ class MainWindow(QMainWindow):
         self._hide_loading_screen()
         
         # 异步刷新设备列表，避免阻塞UI显示
-        from PyQt5.QtCore import QTimer
         QTimer.singleShot(100, self.device_manager.refresh_devices)
+
+        self._initialize_auto_update_schedule()
     
     def tr(self, text):
         """安全地获取翻译文本"""
@@ -1230,23 +1274,29 @@ class MainWindow(QMainWindow):
     def _on_check_update_clicked(self):
         """触发手动检查更新"""
 
-        self._start_manual_update()
+        self._start_manual_update(source="manual")
 
-    def _start_manual_update(self):
+    def _start_manual_update(self, source: str = "manual"):
         """启动手动检查更新流程"""
 
         if self._update_worker and self._update_worker.isRunning():
-            QMessageBox.information(self, self.tr("在线更新"), self.tr("更新正在进行，请稍候..."))
+            if source == "manual":
+                QMessageBox.information(self, self.tr("在线更新"), self.tr("更新正在进行，请稍候..."))
             return
 
         feed_url = (self.tool_config.get("update_feed_url") or "").strip()
         if not feed_url:
-            QMessageBox.warning(
-                self,
-                self.tr("在线更新"),
-                self.tr('未配置版本描述 URL，请先在"工具配置"中设置。'),
-            )
+            if source == "manual":
+                QMessageBox.warning(
+                    self,
+                    self.tr("在线更新"),
+                    self.tr('未配置版本描述 URL，请先在"工具配置"中设置。'),
+                )
+            else:
+                logger.info("跳过自动检查更新：未配置版本描述 URL")
             return
+
+        self._update_request_origin = source
 
         try:
             update_manager = UpdateManager(
@@ -1256,28 +1306,41 @@ class MainWindow(QMainWindow):
             )
         except Exception as exc:
             logger.exception("初始化更新模块失败: %s", exc)
-            QMessageBox.critical(
-                self,
-                self.tr("在线更新"),
-                f"{self.tr('初始化更新模块失败:')} {exc}",
-            )
+            if source == "manual":
+                QMessageBox.critical(
+                    self,
+                    self.tr("在线更新"),
+                    f"{self.tr('初始化更新模块失败:')} {exc}",
+                )
             return
 
+        if source == "manual":
+            self._update_status_text = self.tr("正在检查更新...")
+            self._update_progress_extra = ""
+            self._show_update_progress_dialog(self._update_status_text)
+        else:
+            self._update_status_text = ""
+            self._update_progress_extra = ""
+
+        if source == "auto":
+            self._schedule_next_auto_check(self._update_check_interval_seconds)
+
         self.toolbar.set_update_enabled(False)
-        self._update_status_text = self.tr("正在检查更新...")
-        self._update_progress_extra = ""
-        self._show_update_progress_dialog(self._update_status_text)
 
         self._update_worker = UpdateWorker(update_manager, self.lang_manager)
         self._update_worker.status_message.connect(self._on_update_status_message)
         self._update_worker.progress_changed.connect(self._on_update_progress_changed)
         self._update_worker.update_not_required.connect(self._on_update_not_required)
+        self._update_worker.update_available.connect(self._on_update_available)
         self._update_worker.download_finished.connect(self._on_update_download_finished)
         self._update_worker.update_failed.connect(self._on_update_failed)
         self._update_worker.finished.connect(self._cleanup_update_worker)
         self._update_worker.start()
 
-        self.append_log.emit(f"[更新] {self.tr('开始检查软件更新...')}\n", None)
+        if source == "manual":
+            self.append_log.emit(f"[更新] {self.tr('开始检查软件更新...')}\n", None)
+        elif source == "auto":
+            logger.info("开始自动检查更新")
 
     def _show_update_progress_dialog(self, message: str) -> None:
         """显示更新进度对话框"""
@@ -1340,7 +1403,11 @@ class MainWindow(QMainWindow):
 
     def _on_update_not_required(self, message: str) -> None:
         self._close_update_progress_dialog()
-        QMessageBox.information(self, self.tr("在线更新"), message)
+        self._record_update_check_timestamp()
+        if self._update_request_origin == "manual":
+            QMessageBox.information(self, self.tr("在线更新"), message)
+        else:
+            logger.info("自动检查更新结果: %s", message)
         self.append_log.emit(f"[更新] {message}\n", "#4CAF50")
 
     def _on_update_download_finished(self, manifest: LatestManifest, result: DownloadResult) -> None:
@@ -1379,12 +1446,23 @@ class MainWindow(QMainWindow):
                 self._reveal_in_file_manager(result.file_path)
 
     def _on_update_failed(self, message: str) -> None:
+        logger.debug(f"MainWindow: update failed -> {message}")
         self._close_update_progress_dialog()
+        if message == self.tr("用户取消更新"):
+            logger.info("用户取消更新流程")
+            self.append_log.emit(f"[更新] {message}\n", "#FFA500")
+            return
+
         logger.error(f"在线更新失败: {message}")
         self.append_log.emit(f"[更新] ❌ {message}\n", "#FF0000")
-        QMessageBox.critical(self, self.tr("在线更新"), message)
+        if self._update_request_origin == "manual":
+            QMessageBox.critical(self, self.tr("在线更新"), message)
+        else:
+            logger.error("自动检查更新失败: %s", message)
 
     def _on_update_cancel_requested(self) -> None:
+        if self._suppress_progress_cancel:
+            return
         if self._update_worker and self._update_worker.isRunning():
             self._update_worker.request_cancel()
             if self._update_progress_dialog:
@@ -1402,9 +1480,12 @@ class MainWindow(QMainWindow):
         dialog = self._update_progress_dialog
         self._update_progress_dialog = None
         try:
+            self._suppress_progress_cancel = True
             dialog.close()
         except Exception:
             pass
+        finally:
+            self._suppress_progress_cancel = False
         dialog.deleteLater()
 
     def _cleanup_update_worker(self) -> None:
@@ -3260,4 +3341,84 @@ class MainWindow(QMainWindow):
         except Exception as e:
             print(f"{self.lang_manager.tr('Close event error:')} {e}")
             event.accept()
+
+    def _schedule_next_auto_check(self, delay_seconds: float) -> None:
+        if not hasattr(self, "_auto_update_timer") or self._auto_update_timer is None:
+            return
+        delay_seconds = max(0.0, float(delay_seconds))
+        self._auto_update_timer.start(int(delay_seconds * 1000))
+
+    def _initialize_auto_update_schedule(self) -> None:
+        feed_url = (self.tool_config.get("update_feed_url") or "").strip()
+        if not feed_url:
+            return
+
+        interval = self._update_check_interval_seconds
+        last_checked = float(self.tool_config.get("update_last_checked_at") or 0)
+        now = time.time()
+        elapsed = now - last_checked
+
+        if elapsed >= interval:
+            QTimer.singleShot(2000, lambda: self._start_manual_update(source="auto"))
+            self._schedule_next_auto_check(interval)
+        else:
+            self._schedule_next_auto_check(interval - elapsed)
+
+    def _on_auto_update_timer(self) -> None:
+        self._start_manual_update(source="auto")
+
+    def _record_update_check_timestamp(self) -> None:
+        timestamp = time.time()
+        self.tool_config["update_last_checked_at"] = float(timestamp)
+        try:
+            self.other_operations_manager.tool_config["update_last_checked_at"] = float(timestamp)
+            self.other_operations_manager._save_tool_config()
+        except Exception as exc:
+            logger.warning("保存自动更新检查时间失败: %s", exc)
+        self._schedule_next_auto_check(self._update_check_interval_seconds)
+
+    def _on_update_available(self, manifest_data: dict) -> None:
+        logger.debug(f"MainWindow: update available signal, worker={self._update_worker}")
+        self._close_update_progress_dialog()
+        version = manifest_data.get("version", "?")
+        notes = manifest_data.get("release_notes") or ""
+        file_size = manifest_data.get("file_size")
+
+        details = [self.tr("检测到新版本: {version}").format(version=version)]
+        if file_size:
+            try:
+                mb = float(file_size) / (1024 * 1024)
+                details.append(self.tr("文件大小: {size:.1f} MB").format(size=mb))
+            except Exception:
+                pass
+        if notes:
+            details.append(self.tr("更新说明:"))
+            details.append(notes)
+        details.append(self.tr("是否立即下载？"))
+
+        reply = QMessageBox.question(
+            self,
+            self.tr("在线更新"),
+            "\n\n".join(details),
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.Yes,
+        )
+
+        self._record_update_check_timestamp()
+
+        if reply == QMessageBox.Yes:
+            logger.debug("MainWindow: user chose YES")
+            self._update_status_text = self.tr("正在下载安装包...")
+            self._update_progress_extra = ""
+            self._show_update_progress_dialog(self._update_status_text)
+            if self._update_worker:
+                self._update_worker.allow_download()
+            self.append_log.emit(f"[更新] {self.tr('确认下载版本')}: {version}\n", None)
+        else:
+            logger.debug("MainWindow: user chose NO")
+            self.append_log.emit(f"[更新] {self.tr('用户已取消更新')}\n", "#FFA500")
+            if self._update_worker:
+                self._update_worker.reject_download()
+            else:
+                logger.debug("MainWindow: no worker instance when rejecting download")
 

@@ -153,10 +153,10 @@ pyinstaller --clean MobileTestTool_pyqt.spec
 
 ```json
 {
-  "version": "0.9.4",
-  "download_url": "https://example.com/releases/MobileTestTool_0.9.4.exe",
+  "version": "0.9.3",
+  "download_url": "https://example.com/releases/MobileTestTool_0.9.3.exe",
   "sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
-  "file_name": "MobileTestTool_0.9.4.exe",
+  "file_name": "MobileTestTool_0.9.3.exe",
   "file_size": 123456789,
   "release_notes": "- 修复已知问题\n- 优化日志处理性能",
   "published_at": "2025-10-31T08:00:00Z",
@@ -175,9 +175,9 @@ pyinstaller --clean MobileTestTool_pyqt.spec
 
 ##### `release.ps1`
 ```powershell
-.\release.ps1 -Version "0.9.4"              # 打包 + 生成 latest.json + 提交并发布
-.\release.ps1 -Version "0.9.4" -SkipPublish # 仅生成包与 manifest
-.\release.ps1 -Version "0.9.4" -NotesFile ".\notes.md" # 指定发布说明
+.\release.ps1 -Version "0.9.3"              # 打包 + 生成 latest.json + 提交并发布
+.\release.ps1 -Version "0.9.3" -SkipPublish # 仅生成包与 manifest
+.\release.ps1 -Version "0.9.3" -NotesFile ".\notes.md" # 指定发布说明
 ```
 - 自动执行 `build_pyqt.bat`、压缩 onedir 目录、计算 SHA256 并生成 `releases/latest.json`。
 - 默认会 `git add/commit/push`、创建 `v<版本>` 标签并调用 GitHub CLI 发布 Release。
@@ -186,7 +186,7 @@ pyinstaller --clean MobileTestTool_pyqt.spec
 ##### `publish-release.ps1`
 兼容旧流程的入口，内部会转调 `release.ps1`：
 ```powershell
-.\publish-release.ps1 -Version "0.9.4"
+.\publish-release.ps1 -Version "0.9.3"
 ```
 
 ### 🆕 SIM APDU解析器
@@ -494,7 +494,7 @@ adb version
 
 ## 📝 更新日志
 
-### v0.9.4 (当前版本)
+### v0.9.3 (当前版本)
 - 🔧 **修复打包问题**: 修复SIM Reader在EXE环境下的模块导入问题
   - 修复 `pyserial` 模块打包问题，添加自定义hook确保正确包含
   - 修复 `concurrent.futures` 模块缺失问题

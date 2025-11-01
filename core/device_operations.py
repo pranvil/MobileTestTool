@@ -777,7 +777,8 @@ class PyQtOtherOperationsManager(QObject):
             "last_used_wireshark": "",
             "update_feed_url": DEFAULT_UPDATE_FEED_URL,
             "update_auto_launch_installer": True,
-            "update_timeout": 15
+            "update_timeout": 15,
+            "update_last_checked_at": 0
         }
 
         try:
@@ -791,6 +792,7 @@ class PyQtOtherOperationsManager(QObject):
             pass
 
         defaults["update_feed_url"] = defaults.get("update_feed_url") or DEFAULT_UPDATE_FEED_URL
+        defaults["update_last_checked_at"] = float(defaults.get("update_last_checked_at") or 0)
 
         return defaults
     
