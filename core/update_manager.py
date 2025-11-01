@@ -7,7 +7,6 @@ from __future__ import annotations
 import hashlib
 import json
 import os
-import tempfile
 import threading
 import urllib.error
 import urllib.parse
@@ -18,6 +17,8 @@ from typing import Any, Callable, Optional, Tuple, Union
 from core.update_manifest import LatestManifest
 
 ProgressCallback = Callable[[int, Optional[int]], None]
+
+DEFAULT_UPDATE_FEED_URL: str = "https://raw.githubusercontent.com/pranvil/MobileTestTool/main/releases/latest.json"
 
 
 class UpdateError(RuntimeError):
@@ -80,7 +81,7 @@ class UpdateManager:
     def fetch_latest_manifest(self) -> LatestManifest:
         """从配置的 URL 拉取最新版本描述"""
 
-        url = self.tool_config.get("update_feed_url", "").strip()
+        url = (self.tool_config.get("update_feed_url") or DEFAULT_UPDATE_FEED_URL).strip()
         if not url:
             raise ManifestFetchError("未配置更新版本描述 URL")
 
@@ -236,12 +237,11 @@ class UpdateManager:
     def _resolve_download_dir(self) -> str:
         """获取下载目录，没有配置则使用临时目录"""
 
-        configured_dir = self.tool_config.get("update_download_dir", "").strip()
+        configured_dir = (self.tool_config.get("update_download_dir") or "").strip()
         if configured_dir:
             return configured_dir
 
-        temp_dir = tempfile.gettempdir()
-        return os.path.join(temp_dir, "MobileTestTool", "updates")
+        return os.path.abspath(os.getcwd())
 
     def _determine_filename(self, manifest: LatestManifest) -> str:
         """根据 manifest 和 URL 推断文件名"""
@@ -278,6 +278,7 @@ class UpdateManager:
 
 __all__ = [
     "UpdateManager",
+    "DEFAULT_UPDATE_FEED_URL",
     "DownloadResult",
     "UpdateError",
     "ManifestFetchError",

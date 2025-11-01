@@ -12,6 +12,8 @@ import json
 from PyQt5.QtCore import QObject, pyqtSignal, QThread
 from PyQt5.QtWidgets import QMessageBox, QFileDialog, QInputDialog, QDialog
 
+from core.update_manager import DEFAULT_UPDATE_FEED_URL
+
 
 class PyQtBackgroundDataManager(QObject):
     """背景数据管理器 - 使用完整实现"""
@@ -773,8 +775,7 @@ class PyQtOtherOperationsManager(QObject):
             "last_used_mtk": "",
             "last_used_qualcomm": "",
             "last_used_wireshark": "",
-            "update_feed_url": "",
-            "update_download_dir": "",
+            "update_feed_url": DEFAULT_UPDATE_FEED_URL,
             "update_auto_launch_installer": True,
             "update_timeout": 15
         }
@@ -784,9 +785,12 @@ class PyQtOtherOperationsManager(QObject):
                 with open(self.config_file, 'r', encoding='utf-8') as f:
                     stored_config = json.load(f)
                     if isinstance(stored_config, dict):
+                        stored_config.pop("update_download_dir", None)
                         defaults.update(stored_config)
         except Exception:
             pass
+
+        defaults["update_feed_url"] = defaults.get("update_feed_url") or DEFAULT_UPDATE_FEED_URL
 
         return defaults
     

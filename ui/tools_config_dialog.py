@@ -13,6 +13,8 @@ from PyQt5.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel,
                              QMessageBox, QFileDialog, QSpinBox, QScrollArea,
                              QWidget)
 
+from core.update_manager import DEFAULT_UPDATE_FEED_URL
+
 
 class ToolsConfigDialog(QDialog):
     """工具配置对话框"""
@@ -21,8 +23,8 @@ class ToolsConfigDialog(QDialog):
         super().__init__(parent)
         self.tool_config = tool_config
         self.temp_config = tool_config.copy()
-        self.temp_config.setdefault("update_feed_url", "")
-        self.temp_config.setdefault("update_download_dir", "")
+        if not self.temp_config.get("update_feed_url"):
+            self.temp_config["update_feed_url"] = DEFAULT_UPDATE_FEED_URL
         self.temp_config.setdefault("update_auto_launch_installer", True)
         self.temp_config.setdefault("update_timeout", 15)
         # 从父窗口获取语言管理器
@@ -90,17 +92,10 @@ class ToolsConfigDialog(QDialog):
         update_url_layout.addWidget(self.update_url_entry)
         update_layout.addLayout(update_url_layout)
 
-        update_download_layout = QHBoxLayout()
-        update_download_layout.addWidget(QLabel(self.tr("下载目录:")))
-
-        self.update_download_entry = QLineEdit()
-        self.update_download_entry.setPlaceholderText(self.tr("留空使用系统临时目录"))
-        update_download_layout.addWidget(self.update_download_entry)
-
-        browse_update_download_btn = QPushButton(self.tr("浏览"))
-        browse_update_download_btn.clicked.connect(self._browse_update_download_dir)
-        update_download_layout.addWidget(browse_update_download_btn)
-        update_layout.addLayout(update_download_layout)
+        # download_dir_hint = QLabel(self.tr("下载目录: 程序当前目录（不可修改）"))
+        # download_dir_hint.setWordWrap(True)
+        # download_dir_hint.setStyleSheet("color: #666666;")
+        # update_layout.addWidget(download_dir_hint)
 
         self.update_auto_launch_checkbox = QCheckBox(self.tr("下载完成后自动打开安装包"))
         update_layout.addWidget(self.update_auto_launch_checkbox)
@@ -206,8 +201,7 @@ class ToolsConfigDialog(QDialog):
         self._refresh_qualcomm_entry()
         self.wireshark_entry.setText(self.temp_config.get("wireshark_path", ""))
         self.storage_entry.setText(self.temp_config.get("storage_path", ""))
-        self.update_url_entry.setText(self.temp_config.get("update_feed_url", ""))
-        self.update_download_entry.setText(self.temp_config.get("update_download_dir", ""))
+        self.update_url_entry.setText(self.temp_config.get("update_feed_url", DEFAULT_UPDATE_FEED_URL))
         self.update_auto_launch_checkbox.setChecked(self.temp_config.get("update_auto_launch_installer", True))
         timeout_value = int(self.temp_config.get("update_timeout", 15) or 15)
         timeout_value = max(self.update_timeout_spin.minimum(), min(self.update_timeout_spin.maximum(), timeout_value))
@@ -410,15 +404,6 @@ class ToolsConfigDialog(QDialog):
         except Exception as e:
             QMessageBox.critical(self, self.tr("错误"), f"{self.tr('选择Wireshark路径失败')}: {str(e)}")
     
-    def _browse_update_download_dir(self):
-        """选择更新下载目录"""
-        try:
-            path = QFileDialog.getExistingDirectory(self, self.tr("选择下载目录"))
-            if path:
-                self.update_download_entry.setText(path)
-        except Exception as e:
-            QMessageBox.critical(self, self.tr("错误"), f"{self.tr('选择下载目录失败')}: {str(e)}")
-
     def _detect_qualcomm_tools(self):
         """检测高通工具"""
         try:
@@ -531,21 +516,9 @@ class ToolsConfigDialog(QDialog):
                 self.temp_config.pop("storage_path", None)
 
             # 保存更新 URL
-            update_feed_url = self.update_url_entry.text().strip()
+            update_feed_url = self.update_url_entry.text().strip() or DEFAULT_UPDATE_FEED_URL
             self.temp_config["update_feed_url"] = update_feed_url
-
-            # 保存下载目录
-            update_download_dir = self.update_download_entry.text().strip()
-            if update_download_dir:
-                if not os.path.exists(update_download_dir):
-                    try:
-                        os.makedirs(update_download_dir)
-                    except Exception as e:
-                        QMessageBox.critical(self, self.tr("错误"), f"{self.tr('无法创建下载目录')}: {str(e)}")
-                        return
-                self.temp_config["update_download_dir"] = update_download_dir
-            else:
-                self.temp_config.pop("update_download_dir", None)
+            self.temp_config.pop("update_download_dir", None)
 
             self.temp_config["update_auto_launch_installer"] = self.update_auto_launch_checkbox.isChecked()
             self.temp_config["update_timeout"] = int(self.update_timeout_spin.value())

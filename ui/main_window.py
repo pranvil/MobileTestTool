@@ -1156,33 +1156,32 @@ class MainWindow(QMainWindow):
     def _on_update_download_finished(self, manifest: LatestManifest, result: DownloadResult) -> None:
         self._close_update_progress_dialog()
 
-        success_message = f"{self.tr('安装包下载完成')} - {manifest.version}"
+        success_message = f"{self.tr('更新包下载完成')} - {manifest.version}"
         detail_lines = [
             f"{self.tr('保存路径')}: {result.file_path}",
             f"SHA-256: {result.sha256}",
         ]
         self.append_log.emit(f"[更新] ✅ {success_message}\n", "#00FF00")
 
+        instruction_text = self.tr("请解压更新包并覆盖原有程序文件，以完成更新。")
         auto_launch = bool(self.tool_config.get("update_auto_launch_installer", True))
         if auto_launch:
             launched = self._try_launch_installer(result.file_path)
+            info_lines = [success_message] + detail_lines
             if launched:
-                QMessageBox.information(
-                    self,
-                    self.tr("在线更新"),
-                    "\n".join([success_message] + detail_lines + [self.tr("已尝试打开安装包，请按向导完成更新。")]),
-                )
+                info_lines.append(self.tr("已尝试打开更新包，请按照提示完成解压并覆盖。"))
             else:
-                QMessageBox.information(
-                    self,
-                    self.tr("在线更新"),
-                    "\n".join([success_message] + detail_lines + [self.tr("请手动运行安装包完成更新。")]),
-                )
+                info_lines.append(instruction_text)
+            QMessageBox.information(
+                self,
+                self.tr("在线更新"),
+                "\n".join(info_lines),
+            )
         else:
             reply = QMessageBox.question(
                 self,
                 self.tr("在线更新"),
-                "\n".join([success_message] + detail_lines + [self.tr("是否打开下载位置？")]),
+                "\n".join([success_message] + detail_lines + [instruction_text, self.tr("是否打开下载位置？")]),
                 QMessageBox.Yes | QMessageBox.No,
                 QMessageBox.Yes,
             )
