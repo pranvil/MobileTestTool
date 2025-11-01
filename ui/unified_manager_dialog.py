@@ -13,11 +13,97 @@ from PyQt5.QtWidgets import (QDialog, QTabWidget, QVBoxLayout, QHBoxLayout,
                              QListWidget, QListWidgetItem, QCheckBox, QScrollArea, QWidget,
                              QTableWidget, QTableWidgetItem, QHeaderView,
                              QFormLayout, QLineEdit, QTextEdit, QComboBox,
-                             QLabel, QSplitter, QFrame)
+                             QLabel, QSplitter, QFrame, QAbstractItemView)
 from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtGui import QFont
 
 from core.debug_logger import logger
+
+
+class DragDropButtonTable(QTableWidget):
+    """支持拖拽排序的按钮表格"""
+
+    rows_reordered = pyqtSignal(list)
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setDragEnabled(True)
+        self.setAcceptDrops(True)
+        self.viewport().setAcceptDrops(True)
+        self.setDropIndicatorShown(True)
+        self.setDragDropMode(QAbstractItemView.InternalMove)
+        self.setDragDropOverwriteMode(False)
+        self.setDefaultDropAction(Qt.MoveAction)
+        self.setSelectionBehavior(QAbstractItemView.SelectRows)
+        self.setSelectionMode(QAbstractItemView.SingleSelection)
+
+    def dragEnterEvent(self, event):
+        if event.source() == self:
+            event.acceptProposedAction()
+        else:
+            super().dragEnterEvent(event)
+
+    def dragMoveEvent(self, event):
+        if event.source() == self:
+            event.acceptProposedAction()
+        else:
+            super().dragMoveEvent(event)
+
+    def dropEvent(self, event):
+        if event.source() != self:
+            super().dropEvent(event)
+            return
+
+        source_row = self.currentRow()
+        if source_row < 0:
+            event.ignore()
+            return
+
+        target_index = self.indexAt(event.pos())
+        if target_index.isValid():
+            target_row = target_index.row()
+            indicator = self.dropIndicatorPosition()
+            if indicator == QAbstractItemView.BelowItem:
+                target_row += 1
+        else:
+            target_row = self.rowCount()
+
+        if target_row > source_row:
+            target_row -= 1
+
+        if target_row == source_row or target_row < 0:
+            event.ignore()
+            return
+
+        if target_row > self.rowCount():
+            target_row = self.rowCount()
+
+        row_items = []
+        for col in range(self.columnCount()):
+            item = self.item(source_row, col)
+            row_items.append(item.clone() if item else QTableWidgetItem())
+
+        self.removeRow(source_row)
+
+        if target_row < 0:
+            target_row = 0
+
+        self.insertRow(target_row)
+        for col, item in enumerate(row_items):
+            self.setItem(target_row, col, item)
+
+        self.selectRow(target_row)
+        self.resizeRowsToContents()
+        event.acceptProposedAction()
+
+        ordered_ids = []
+        for row in range(self.rowCount()):
+            item = self.item(row, 0)
+            if item:
+                ordered_ids.append(item.data(Qt.UserRole))
+
+        if ordered_ids:
+            self.rows_reordered.emit(ordered_ids)
 
 
 class UnifiedManagerDialog(QDialog):
@@ -42,6 +128,8 @@ class UnifiedManagerDialog(QDialog):
         
         self.setup_ui()
         self.load_all_configs()
+
+        self.custom_button_manager.buttons_updated.connect(self.load_buttons)
     
     def tr(self, text):
         """安全地获取翻译文本"""
@@ -184,6 +272,14 @@ class UnifiedManagerDialog(QDialog):
         self.delete_card_btn = QPushButton("🗑️ " + self.tr("删除Card"))
         self.delete_card_btn.clicked.connect(self.delete_custom_card)
         custom_card_btn_layout.addWidget(self.delete_card_btn)
+
+        self.card_up_btn = QPushButton("⬆️ " + self.tr("上移"))
+        self.card_up_btn.clicked.connect(lambda: self.move_custom_card(-1))
+        custom_card_btn_layout.addWidget(self.card_up_btn)
+
+        self.card_down_btn = QPushButton("⬇️ " + self.tr("下移"))
+        self.card_down_btn.clicked.connect(lambda: self.move_custom_card(1))
+        custom_card_btn_layout.addWidget(self.card_down_btn)
         
         custom_card_main_layout.addLayout(custom_card_btn_layout)
         layout.addWidget(custom_card_group)
@@ -205,7 +301,7 @@ class UnifiedManagerDialog(QDialog):
         layout.addWidget(info_label)
         
         # 按钮列表表格
-        self.button_table = QTableWidget()
+        self.button_table = DragDropButtonTable()
         self.button_table.setColumnCount(7)
         self.button_table.setHorizontalHeaderLabels([
             self.tr('名称'), self.tr('类型'), self.tr('命令'), 
@@ -224,6 +320,7 @@ class UnifiedManagerDialog(QDialog):
         
         self.button_table.setSelectionBehavior(QTableWidget.SelectRows)
         self.button_table.setSelectionMode(QTableWidget.SingleSelection)
+        self.button_table.rows_reordered.connect(self.on_button_rows_reordered)
         layout.addWidget(self.button_table)
         
         # 按钮操作
@@ -324,6 +421,7 @@ class UnifiedManagerDialog(QDialog):
     def load_buttons(self):
         """加载按钮到表格"""
         try:
+            self.button_table.setSortingEnabled(False)
             self.button_table.setRowCount(0)
             buttons = self.custom_button_manager.get_all_buttons()
             
@@ -352,6 +450,8 @@ class UnifiedManagerDialog(QDialog):
                 
                 # 存储按钮ID
                 self.button_table.item(row, 0).setData(Qt.UserRole, btn.get('id'))
+
+            self.button_table.resizeRowsToContents()
         except Exception as e:
             logger.exception(f"{self.tr('加载按钮失败:')} {e}")
     
@@ -673,6 +773,34 @@ class UnifiedManagerDialog(QDialog):
             if self.tab_config_manager.delete_custom_card(card_id):
                 self.load_custom_cards()
                 QMessageBox.information(self, self.tr("成功"), self.tr("Card已删除"))
+
+    def move_custom_card(self, step):
+        """调整自定义Card的顺序"""
+        count = self.custom_card_list.count()
+        if count == 0:
+            return
+
+        current_row = self.custom_card_list.currentRow()
+        if current_row < 0:
+            QMessageBox.warning(self, self.tr("提示"), self.tr("请先选择要移动的Card"))
+            return
+
+        new_row = current_row + step
+        if new_row < 0 or new_row >= count:
+            return
+
+        item = self.custom_card_list.takeItem(current_row)
+        self.custom_card_list.insertItem(new_row, item)
+        self.custom_card_list.setCurrentRow(new_row)
+
+        ordered_ids = []
+        for idx in range(self.custom_card_list.count()):
+            ordered_ids.append(self.custom_card_list.item(idx).data(Qt.UserRole))
+
+        if not self.tab_config_manager.reorder_custom_cards(ordered_ids):
+            QMessageBox.warning(self, self.tr("失败"), self.tr("Card排序保存失败，请检查日志"))
+        else:
+            logger.info(self.tr("自定义Card顺序已更新"))
     
     # 按钮管理相关方法
     def add_button(self):
@@ -731,6 +859,17 @@ class UnifiedManagerDialog(QDialog):
             else:
                 QMessageBox.warning(self, self.tr("失败"), self.tr("按钮删除失败，请检查日志"))
     
+    def on_button_rows_reordered(self, ordered_ids):
+        """处理按钮拖拽排序"""
+        if not ordered_ids:
+            return
+
+        if not self.custom_button_manager.reorder_buttons(ordered_ids):
+            QMessageBox.warning(self, self.tr("失败"), self.tr("按钮排序保存失败，请检查日志"))
+        else:
+            # 重新加载以确保显示与数据一致
+            self.load_buttons()
+
     def closeEvent(self, event):
         """关闭事件"""
         try:

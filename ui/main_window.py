@@ -7,10 +7,13 @@
 import os
 import subprocess
 import sys
+import json
 from typing import Optional
 from PyQt5.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, 
-                              QSplitter, QTabWidget, QMessageBox, QProgressDialog)
-from PyQt5.QtCore import Qt, pyqtSignal, QThread
+                              QSplitter, QTabWidget, QMessageBox, QProgressDialog,
+                              QHBoxLayout, QPushButton, QSizePolicy, QApplication)
+from PyQt5.QtCore import Qt, pyqtSignal, QThread, QMimeData
+from PyQt5.QtGui import QDrag
 from ui.menu_bar import DisplayLinesDialog
 from ui.tools_config_dialog import ToolsConfigDialog
 from core.debug_logger import logger
@@ -61,6 +64,193 @@ from core.custom_button_manager import CustomButtonManager
 from core.log_keyword_manager import LogKeywordManager
 from core.language_manager import LanguageManager
 from core.tab_config_manager import TabConfigManager
+
+
+CUSTOM_BUTTON_MIME_TYPE = "application/x-custom-button"
+
+
+class DraggableCustomButton(QPushButton):
+    """支持在主界面拖拽排序的自定义按钮"""
+
+    def __init__(self, button_data, container):
+        super().__init__(button_data.get('name', ''))
+        self.button_data = button_data
+        self.container = container
+        self._drag_start_pos = None
+
+        tooltip = button_data.get('description') or button_data.get('command', '')
+        if tooltip:
+            self.setToolTip(tooltip)
+
+        self.setProperty('custom_button', True)
+        self.setCursor(Qt.OpenHandCursor)
+
+    def update_display(self, button_data):
+        """更新按钮展示信息"""
+        self.button_data = button_data
+        self.setText(button_data.get('name', ''))
+        tooltip = button_data.get('description') or button_data.get('command', '')
+        if tooltip:
+            self.setToolTip(tooltip)
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.LeftButton:
+            self._drag_start_pos = event.pos()
+        super().mousePressEvent(event)
+
+    def mouseMoveEvent(self, event):
+        if (event.buttons() & Qt.LeftButton) and self._drag_start_pos is not None:
+            if (event.pos() - self._drag_start_pos).manhattanLength() >= QApplication.startDragDistance():
+                self._start_drag()
+                return
+        super().mouseMoveEvent(event)
+
+    def mouseReleaseEvent(self, event):
+        super().mouseReleaseEvent(event)
+        self._drag_start_pos = None
+
+    def _start_drag(self):
+        button_id = self.button_data.get('id')
+        if not button_id:
+            return
+
+        drag = QDrag(self)
+        mime = QMimeData()
+        payload = {
+            'button_id': button_id,
+            'tab': self.container.tab_name,
+            'card': self.container.card_name
+        }
+        mime.setData(CUSTOM_BUTTON_MIME_TYPE, json.dumps(payload).encode('utf-8'))
+        drag.setMimeData(mime)
+        drag.exec_(Qt.MoveAction)
+
+
+class CustomButtonContainer(QWidget):
+    """承载自定义按钮并处理拖拽排序的容器"""
+
+    order_changed = pyqtSignal(str, str, list)
+
+    def __init__(self, main_window, tab_name, card_name, parent=None):
+        super().__init__(parent)
+        self.main_window = main_window
+        self.tab_name = tab_name
+        self.card_name = card_name
+        self._button_widgets = {}
+
+        self.setAcceptDrops(True)
+        self.setProperty('custom_button_container', True)
+        self.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Fixed)
+
+        self._layout = QHBoxLayout(self)
+        self._layout.setContentsMargins(0, 0, 0, 0)
+        self._layout.setSpacing(6)
+        self._layout.addStretch()
+
+    def update_context(self, tab_name, card_name):
+        self.tab_name = tab_name
+        self.card_name = card_name
+
+    def clear_buttons(self):
+        for widget in list(self._button_widgets.values()):
+            self._layout.removeWidget(widget)
+            widget.setParent(None)
+            widget.deleteLater()
+        self._button_widgets.clear()
+
+    def add_custom_button(self, button_data):
+        button = DraggableCustomButton(button_data, self)
+        button.clicked.connect(lambda checked=False, data=button_data: self.main_window.execute_custom_button_command(data))
+
+        insert_pos = max(0, self._layout.count() - 1)
+        self._layout.insertWidget(insert_pos, button)
+        self._button_widgets[button_data.get('id')] = button
+        return button
+
+    def dragEnterEvent(self, event):
+        if self._accepts_event(event.mimeData()):
+            event.acceptProposedAction()
+        else:
+            event.ignore()
+
+    def dragMoveEvent(self, event):
+        if self._accepts_event(event.mimeData()):
+            event.acceptProposedAction()
+        else:
+            event.ignore()
+
+    def dropEvent(self, event):
+        payload = self._parse_payload(event.mimeData())
+        if not payload:
+            event.ignore()
+            return
+
+        button_id = payload.get('button_id')
+        button = self._button_widgets.get(button_id)
+        if button is None:
+            event.ignore()
+            return
+
+        buttons = self._ordered_buttons()
+        if len(buttons) <= 1:
+            event.ignore()
+            return
+
+        source_index = buttons.index(button)
+        target_index = self._determine_target_index(event.pos(), buttons)
+
+        if target_index == source_index or target_index == source_index + 1:
+            event.ignore()
+            return
+
+        self._layout.removeWidget(button)
+
+        if target_index > source_index:
+            target_index -= 1
+
+        target_index = max(0, min(target_index, self._layout.count()))
+        self._layout.insertWidget(target_index, button)
+        event.acceptProposedAction()
+
+        ordered_ids = self._current_button_ids()
+        self.order_changed.emit(self.tab_name, self.card_name, ordered_ids)
+
+    def _ordered_buttons(self):
+        buttons = []
+        for i in range(self._layout.count()):
+            item = self._layout.itemAt(i)
+            widget = item.widget()
+            if isinstance(widget, DraggableCustomButton):
+                buttons.append(widget)
+        return buttons
+
+    def _current_button_ids(self):
+        return [btn.button_data.get('id') for btn in self._ordered_buttons() if btn.button_data.get('id')]
+
+    def _determine_target_index(self, pos, buttons):
+        target_index = len(buttons)
+        for index, btn in enumerate(buttons):
+            center_x = btn.geometry().center().x()
+            if pos.x() < center_x:
+                target_index = index
+                break
+        return target_index
+
+    def _accepts_event(self, mime_data):
+        payload = self._parse_payload(mime_data)
+        if not payload:
+            return False
+        return payload.get('tab') == self.tab_name and payload.get('card') == self.card_name
+
+    def _parse_payload(self, mime_data):
+        if not mime_data or not mime_data.hasFormat(CUSTOM_BUTTON_MIME_TYPE):
+            return None
+        try:
+            data = bytes(mime_data.data(CUSTOM_BUTTON_MIME_TYPE)).decode('utf-8')
+            return json.loads(data)
+        except Exception as exc:
+            logger.warning(f"解析拖拽数据失败: {exc}")
+            return None
 
 
 class RootRemountWorker(QThread):
@@ -836,7 +1026,7 @@ class MainWindow(QMainWindow):
             layout = QVBoxLayout(widget)
             
             # 添加Tab标题和描述
-            title_label = QLabel(f"{self.tr('自定义Tab:')} {custom_tab['name']}")
+            title_label = QLabel(f"{custom_tab['name']}")
             title_label.setProperty("class", "section-title")
             title_label.setStyleSheet("font-size: 16px; font-weight: bold; margin: 10px 0;")
             layout.addWidget(title_label)
@@ -2319,15 +2509,17 @@ class MainWindow(QMainWindow):
                 
                 if buttons:
                     # 查找对应的Card GroupBox并添加按钮
-                    self._add_buttons_to_custom_card(tab_widget, card['name'], buttons)
+                    self._add_buttons_to_custom_card(tab_widget, tab_name, card['name'], buttons)
+                else:
+                    self._clear_button_container(tab_widget, tab_name, card['name'])
             
         except Exception as e:
             logger.exception(f"{self.lang_manager.tr('为自定义Tab加载按钮失败:')} {e}")
     
-    def _add_buttons_to_custom_card(self, tab_widget, card_name, buttons):
+    def _add_buttons_to_custom_card(self, tab_widget, tab_name, card_name, buttons):
         """向自定义Card添加按钮"""
         try:
-            from PyQt5.QtWidgets import QGroupBox, QPushButton, QHBoxLayout
+            from PyQt5.QtWidgets import QGroupBox, QHBoxLayout
             
             logger.debug(f"{self.lang_manager.tr('尝试向自定义Card添加按钮:')} '{card_name}'")
             
@@ -2339,31 +2531,15 @@ class MainWindow(QMainWindow):
                 if group_box.title() == card_name:
                     logger.debug(f"{self.lang_manager.tr('找到匹配的GroupBox:')} '{card_name}'")
                     
-                    # 查找按钮布局
                     button_layouts = group_box.findChildren(QHBoxLayout)
                     logger.debug(f"{self.lang_manager.tr('找到')} {len(button_layouts)} {self.lang_manager.tr('个QHBoxLayout')}")
                     
                     if button_layouts:
-                        button_layout = button_layouts[0]  # 使用第一个水平布局
-                        logger.debug(f"{self.lang_manager.tr('使用按钮布局添加')} {len(buttons)} {self.lang_manager.tr('个按钮')}")
-                        
+                        button_layout = button_layouts[0]
+                        container = self._get_or_create_button_container(tab_widget, button_layout, tab_name, card_name)
+                        container.clear_buttons()
                         for btn_data in buttons:
-                            custom_btn = QPushButton(btn_data['name'])
-                            custom_btn.setToolTip(btn_data.get('description', btn_data['command']))
-                            custom_btn.setProperty('custom_button', True)
-                            
-                            custom_btn.clicked.connect(
-                                lambda checked=False, data=btn_data: self.execute_custom_button_command(data)
-                            )
-                            
-                            # 在stretch之前插入
-                            count = button_layout.count()
-                            if count > 0:
-                                insert_pos = count - 1 if button_layout.itemAt(count - 1).spacerItem() else count
-                                button_layout.insertWidget(insert_pos, custom_btn)
-                            else:
-                                button_layout.addWidget(custom_btn)
-                            
+                            container.add_custom_button(btn_data)
                             logger.debug(f"{self.lang_manager.tr('添加按钮')} '{btn_data['name']}' {self.lang_manager.tr('到Card')} '{card_name}'")
                     else:
                         logger.warning(f"{self.lang_manager.tr('未找到按钮布局')}")
@@ -2399,13 +2575,14 @@ class MainWindow(QMainWindow):
             
             if buttons:
                 # 尝试找到对应的卡片容器并添加按钮
-                self._inject_custom_buttons_to_card(tab_instance, card_name, buttons)
+                self._inject_custom_buttons_to_card(tab_instance, tab_name, card_name, buttons)
+            else:
+                self._clear_button_container(tab_instance, tab_name, card_name)
     
-    def _inject_custom_buttons_to_card(self, tab_instance, card_name, buttons):
+    def _inject_custom_buttons_to_card(self, tab_instance, tab_name, card_name, buttons):
         """向指定卡片注入自定义按钮（仅处理预制Card）"""
         try:
-            from PyQt5.QtWidgets import QFrame, QPushButton, QHBoxLayout, QVBoxLayout, QWidget, QLabel
-            from PyQt5.QtCore import Qt
+            from PyQt5.QtWidgets import QFrame, QHBoxLayout, QVBoxLayout, QWidget, QLabel
             
             logger.debug(f"{self.lang_manager.tr('尝试向预制卡片')} '{card_name}' {self.lang_manager.tr('注入')} {len(buttons)} {self.lang_manager.tr('个按钮')}")
             
@@ -2449,7 +2626,7 @@ class MainWindow(QMainWindow):
                                         break
                             if layout:
                                 # 使用统一的按钮添加逻辑
-                                self._add_buttons_to_layout(layout, buttons, card_name)
+                                self._populate_button_layout(tab_instance, tab_name, card_name, layout, buttons)
                                 break
                             else:
                                 logger.warning(f"{self.lang_manager.tr('未能获取到卡片布局')} '{card_name}'")
@@ -2463,33 +2640,28 @@ class MainWindow(QMainWindow):
         except Exception as e:
             logger.exception(f"{self.lang_manager.tr('向预制卡片')} '{card_name}' {self.lang_manager.tr('注入自定义按钮失败:')} {e}")
     
-    def _add_buttons_to_layout(self, layout, buttons, card_name):
-        """向布局中添加按钮（统一逻辑）"""
+    def _populate_button_layout(self, tab_instance, tab_name, card_name, layout, buttons):
+        """在指定布局中填充自定义按钮容器"""
         try:
-            from PyQt5.QtWidgets import QPushButton, QHBoxLayout, QVBoxLayout, QGridLayout, QWidget
+            from PyQt5.QtWidgets import QHBoxLayout, QVBoxLayout, QGridLayout, QWidget
             
-            # 查找合适的按钮布局
             button_layout = None
             
             if isinstance(layout, QHBoxLayout):
                 button_layout = layout
                 logger.debug(f"{self.lang_manager.tr('直接使用QHBoxLayout作为按钮布局')}")
             elif isinstance(layout, QVBoxLayout):
-                # 查找最后一个QHBoxLayout
                 for i in range(layout.count() - 1, -1, -1):
                     item = layout.itemAt(i)
                     if item:
-                        # 情况1：子项本身是一个layout
                         if item.layout() and isinstance(item.layout(), QHBoxLayout):
                             button_layout = item.layout()
                             logger.debug(f"{self.lang_manager.tr('在QVBoxLayout中找到子QHBoxLayout作为按钮布局')}")
                             break
-                        # 情况2：子项是一个widget，widget自带layout
                         if item.widget() and item.widget().layout() and isinstance(item.widget().layout(), QHBoxLayout):
                             button_layout = item.widget().layout()
                             logger.debug(f"{self.lang_manager.tr('在QVBoxLayout的子Widget中找到QHBoxLayout作为按钮布局')}")
                             break
-                        # 进一步向下查找嵌套
                         if item.layout() and isinstance(item.layout(), QVBoxLayout):
                             nested = item.layout()
                             for j in range(nested.count() - 1, -1, -1):
@@ -2501,7 +2673,6 @@ class MainWindow(QMainWindow):
                             if button_layout:
                                 break
             elif isinstance(layout, QGridLayout):
-                # 遍历格子内的layout/widget以寻找QHBoxLayout
                 for i in range(layout.count() - 1, -1, -1):
                     item = layout.itemAt(i)
                     if item:
@@ -2517,25 +2688,13 @@ class MainWindow(QMainWindow):
                                 break
             
             if button_layout:
-                logger.debug(f"{self.lang_manager.tr('找到按钮布局，添加')} {len(buttons)} {self.lang_manager.tr('个按钮')}")
-                
+                logger.debug(f"{self.lang_manager.tr('找到按钮布局，准备填充')} {len(buttons)} {self.lang_manager.tr('个按钮')}")
+                container = self._get_or_create_button_container(tab_instance, button_layout, tab_name, card_name)
+                if container is None:
+                    return
+                container.clear_buttons()
                 for btn_data in buttons:
-                    custom_btn = QPushButton(btn_data['name'])
-                    custom_btn.setToolTip(btn_data.get('description', btn_data['command']))
-                    custom_btn.setProperty('custom_button', True)
-                    
-                    custom_btn.clicked.connect(
-                        lambda checked=False, data=btn_data: self.execute_custom_button_command(data)
-                    )
-                    
-                    # 在stretch之前插入
-                    count = button_layout.count()
-                    if count > 0:
-                        insert_pos = count - 1 if button_layout.itemAt(count - 1).spacerItem() else count
-                        button_layout.insertWidget(insert_pos, custom_btn)
-                    else:
-                        button_layout.addWidget(custom_btn)
-                    
+                    container.add_custom_button(btn_data)
                     logger.debug(f"{self.lang_manager.tr('添加自定义按钮')} '{btn_data['name']}' {self.lang_manager.tr('到')} '{card_name}'")
             else:
                 logger.warning(f"{self.lang_manager.tr('未找到合适的按钮布局')}")
@@ -2543,6 +2702,68 @@ class MainWindow(QMainWindow):
         except Exception as e:
             logger.exception(f"{self.lang_manager.tr('向布局添加按钮失败:')} {e}")
     
+    def _get_or_create_button_container(self, tab_instance, base_layout, tab_name, card_name):
+        """获取或创建用于承载自定义按钮的容器"""
+        try:
+            if not hasattr(tab_instance, 'custom_buttons_containers'):
+                tab_instance.custom_buttons_containers = {}
+
+            key = (tab_name, card_name)
+            container = tab_instance.custom_buttons_containers.get(key)
+
+            if container is None or container.parent() is None:
+                self._remove_legacy_custom_buttons(base_layout)
+                container = CustomButtonContainer(self, tab_name, card_name)
+                container.order_changed.connect(self._on_custom_button_order_changed)
+                tab_instance.custom_buttons_containers[key] = container
+
+                insert_pos = base_layout.count()
+                if insert_pos > 0 and base_layout.itemAt(insert_pos - 1).spacerItem():
+                    insert_pos -= 1
+                base_layout.insertWidget(insert_pos, container)
+            else:
+                container.update_context(tab_name, card_name)
+
+            return container
+
+        except Exception as e:
+            logger.exception(f"{self.lang_manager.tr('创建按钮容器失败:')} {e}")
+            return None
+
+    def _remove_legacy_custom_buttons(self, layout):
+        """移除旧版本遗留的自定义按钮控件"""
+        try:
+            for index in range(layout.count() - 1, -1, -1):
+                item = layout.itemAt(index)
+                widget = item.widget() if item else None
+                if widget and isinstance(widget, QPushButton) and widget.property('custom_button'):
+                    layout.takeAt(index)
+                    widget.setParent(None)
+                    widget.deleteLater()
+        except Exception as e:
+            logger.warning(f"{self.lang_manager.tr('清理旧自定义按钮失败:')} {e}")
+
+    def _clear_button_container(self, tab_instance, tab_name, card_name):
+        """清空指定容器中的自定义按钮"""
+        try:
+            if hasattr(tab_instance, 'custom_buttons_containers'):
+                container = tab_instance.custom_buttons_containers.get((tab_name, card_name))
+                if container:
+                    container.clear_buttons()
+        except Exception as e:
+            logger.warning(f"{self.lang_manager.tr('清空按钮容器失败:')} {e}")
+
+    def _on_custom_button_order_changed(self, tab_name, card_name, ordered_ids):
+        """处理主界面拖拽排序后的保存逻辑"""
+        try:
+            if not ordered_ids:
+                return
+
+            if not self.custom_button_manager.reorder_buttons_in_location(tab_name, card_name, ordered_ids):
+                logger.warning(self.lang_manager.tr("保存自定义按钮排序失败"))
+        except Exception as e:
+            logger.exception(f"{self.lang_manager.tr('处理按钮排序更新失败:')} {e}")
+
     def execute_custom_button_command(self, button_data):
         """执行自定义按钮命令"""
         try:
@@ -2573,6 +2794,9 @@ class MainWindow(QMainWindow):
         """自定义按钮配置更新时的处理"""
         try:
             logger.info(self.lang_manager.tr("检测到自定义按钮配置更新，重新加载..."))
+            current_index = self.tab_widget.currentIndex()
+            current_widget = self.tab_widget.currentWidget() if current_index >= 0 else None
+            current_tab_id = getattr(current_widget, 'tab_id', None) if current_widget else None
             
             # 清除所有Tab中的自定义按钮
             self._clear_all_custom_buttons()
@@ -2585,6 +2809,8 @@ class MainWindow(QMainWindow):
             
             # 为新创建的自定义Tab加载按钮
             self.load_custom_buttons_for_all_tabs()
+
+            self._restore_tab_selection(current_tab_id, current_index)
             
             self.append_log.emit(self.lang_manager.tr("自定义按钮已更新") + "\n", "#00FF00")
             
@@ -2665,8 +2891,6 @@ class MainWindow(QMainWindow):
     def _clear_all_custom_buttons(self):
         """清除所有自定义按钮"""
         try:
-            from PyQt5.QtWidgets import QPushButton
-            
             tabs = [
                 self.log_control_tab,
                 self.log_filter_tab,
@@ -2679,6 +2903,10 @@ class MainWindow(QMainWindow):
             ]
             
             for tab in tabs:
+                if hasattr(tab, 'custom_buttons_containers'):
+                    for container in tab.custom_buttons_containers.values():
+                        container.clear_buttons()
+
                 # 找到所有标记为自定义按钮的QPushButton并删除
                 custom_buttons = tab.findChildren(QPushButton)
                 for btn in custom_buttons:
@@ -2686,10 +2914,22 @@ class MainWindow(QMainWindow):
                         btn.setParent(None)
                         btn.deleteLater()
             
-            logger.debug(self.lang_manager.tr("已清除所有自定义按钮"))
-            
         except Exception as e:
             logger.exception(f"{self.lang_manager.tr('清除自定义按钮失败:')} {e}")
+
+    def _restore_tab_selection(self, target_tab_id, fallback_index=None):
+        """根据tab_id恢复当前选中Tab"""
+        try:
+            if target_tab_id:
+                for i in range(self.tab_widget.count()):
+                    widget = self.tab_widget.widget(i)
+                    if getattr(widget, 'tab_id', None) == target_tab_id:
+                        self.tab_widget.setCurrentIndex(i)
+                        return
+            if fallback_index is not None and 0 <= fallback_index < self.tab_widget.count():
+                self.tab_widget.setCurrentIndex(fallback_index)
+        except Exception as e:
+            logger.warning(f"[MainWindow] restore tab selection failed: {e}")
     
     def show_config_backup_dialog(self):
         """显示配置备份对话框"""

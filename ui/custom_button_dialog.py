@@ -8,9 +8,98 @@ from PyQt5.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QPushButton,
                              QTableWidget, QTableWidgetItem, QHeaderView,
                              QMessageBox, QLabel, QLineEdit, QComboBox,
                              QTextEdit, QCheckBox, QFileDialog, QGroupBox,
-                             QFormLayout, QScrollArea, QWidget, QTextBrowser)
-from PyQt5.QtCore import Qt
+                             QFormLayout, QScrollArea, QWidget, QTextBrowser,
+                             QAbstractItemView)
+from PyQt5.QtCore import Qt, pyqtSignal
 from core.debug_logger import logger
+
+
+class DragDropButtonTable(QTableWidget):
+    """支持拖拽排序的按钮表格"""
+
+    rows_reordered = pyqtSignal(list)
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setDragEnabled(True)
+        self.setAcceptDrops(True)
+        self.viewport().setAcceptDrops(True)
+        self.setDropIndicatorShown(True)
+        self.setDragDropMode(QAbstractItemView.InternalMove)
+        self.setDragDropOverwriteMode(False)
+        self.setDefaultDropAction(Qt.MoveAction)
+        self.setSelectionBehavior(QAbstractItemView.SelectRows)
+        self.setSelectionMode(QAbstractItemView.SingleSelection)
+
+    def dragEnterEvent(self, event):
+        if event.source() == self:
+            event.acceptProposedAction()
+        else:
+            super().dragEnterEvent(event)
+
+    def dragMoveEvent(self, event):
+        if event.source() == self:
+            event.acceptProposedAction()
+        else:
+            super().dragMoveEvent(event)
+
+    def dropEvent(self, event):
+        if event.source() != self:
+            super().dropEvent(event)
+            return
+
+        source_row = self.currentRow()
+        if source_row < 0:
+            event.ignore()
+            return
+
+        target_index = self.indexAt(event.pos())
+        if target_index.isValid():
+            target_row = target_index.row()
+            indicator = self.dropIndicatorPosition()
+            if indicator == QAbstractItemView.BelowItem:
+                target_row += 1
+        else:
+            target_row = self.rowCount()
+
+        # 调整目标行，考虑源行删除后的偏移
+        if target_row > source_row:
+            target_row -= 1
+
+        if target_row == source_row or target_row < 0:
+            event.ignore()
+            return
+
+        if target_row > self.rowCount():
+            target_row = self.rowCount()
+
+        # 复制源行数据
+        row_items = []
+        for col in range(self.columnCount()):
+            item = self.item(source_row, col)
+            row_items.append(item.clone() if item else QTableWidgetItem())
+
+        self.removeRow(source_row)
+
+        if target_row < 0:
+            target_row = 0
+
+        self.insertRow(target_row)
+        for col, item in enumerate(row_items):
+            self.setItem(target_row, col, item)
+
+        self.selectRow(target_row)
+        self.resizeRowsToContents()
+        event.acceptProposedAction()
+
+        ordered_ids = []
+        for row in range(self.rowCount()):
+            item = self.item(row, 0)
+            if item:
+                ordered_ids.append(item.data(Qt.UserRole))
+
+        if ordered_ids:
+            self.rows_reordered.emit(ordered_ids)
 
 
 class CustomButtonDialog(QDialog):
@@ -27,6 +116,7 @@ class CustomButtonDialog(QDialog):
         self.setMinimumSize(600, 400)  # 设置最小尺寸，允许调整高度
         
         self.setup_ui()
+        self.button_manager.buttons_updated.connect(self.load_buttons)
         self.load_buttons()
     
     def tr(self, text):
@@ -47,7 +137,7 @@ class CustomButtonDialog(QDialog):
         layout.addWidget(info_label)
         
         # 按钮列表表格
-        self.table = QTableWidget()
+        self.table = DragDropButtonTable()
         self.table.setColumnCount(7)
         self.table.setHorizontalHeaderLabels([self.tr('名称'), self.tr('类型'), self.tr('命令'), self.tr('所在Tab'), self.tr('所在卡片'), self.tr('启用'), self.tr('描述')])
         
@@ -63,6 +153,7 @@ class CustomButtonDialog(QDialog):
         
         self.table.setSelectionBehavior(QTableWidget.SelectRows)
         self.table.setSelectionMode(QTableWidget.SingleSelection)
+        self.table.rows_reordered.connect(self.on_button_rows_reordered)
         layout.addWidget(self.table)
         
         # 底部按钮区
@@ -106,6 +197,7 @@ class CustomButtonDialog(QDialog):
     
     def load_buttons(self):
         """加载按钮到表格"""
+        self.table.setSortingEnabled(False)
         self.table.setRowCount(0)
         buttons = self.button_manager.get_all_buttons()
         
@@ -135,6 +227,16 @@ class CustomButtonDialog(QDialog):
             # 存储按钮ID
             self.table.item(row, 0).setData(Qt.UserRole, btn.get('id'))
     
+        self.table.resizeRowsToContents()
+
+    def on_button_rows_reordered(self, ordered_ids):
+        """处理拖拽排序事件"""
+        if not ordered_ids:
+            return
+
+        if not self.button_manager.reorder_buttons(ordered_ids):
+            QMessageBox.warning(self, self.tr("失败"), self.tr("按钮排序保存失败，请检查日志"))
+
     def add_button(self):
         """添加按钮"""
         dialog = ButtonEditDialog(self.button_manager, parent=self)

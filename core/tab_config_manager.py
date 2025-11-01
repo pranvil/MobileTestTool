@@ -365,6 +365,34 @@ class TabConfigManager(QObject):
             logger.exception(f"{self.tr('删除自定义Card失败:')} {e}")
             return False
     
+    def reorder_custom_cards(self, ordered_ids):
+        """根据ID顺序重新排列自定义Card"""
+        try:
+            if not ordered_ids:
+                logger.warning(self.tr("重新排序Card失败：ID列表为空"))
+                return False
+
+            id_to_card = {card['id']: card for card in self.custom_cards}
+            new_order = []
+
+            for card_id in ordered_ids:
+                if card_id in id_to_card:
+                    new_order.append(id_to_card.pop(card_id))
+
+            # 将未包含的Card附加到末尾，防止丢失
+            if id_to_card:
+                new_order.extend(id_to_card.values())
+
+            if new_order == self.custom_cards:
+                return True
+
+            self.custom_cards = new_order
+            return self.save_config()
+
+        except Exception as e:
+            logger.exception(f"{self.tr('重新排序自定义Card失败:')} {e}")
+            return False
+
     def get_config_info(self):
         """获取配置信息"""
         return {

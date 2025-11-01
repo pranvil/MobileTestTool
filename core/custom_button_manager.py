@@ -83,7 +83,7 @@ class CustomButtonManager(QObject):
             self.buttons = self._create_default_buttons()
             self.save_buttons()
     
-    def save_buttons(self):
+    def save_buttons(self, emit_signal=True):
         """保存按钮配置"""
         try:
             os.makedirs(os.path.dirname(self.config_file), exist_ok=True)
@@ -97,7 +97,8 @@ class CustomButtonManager(QObject):
                 json.dump(data, f, ensure_ascii=False, indent=2)
             
             logger.info(f"{self.lang_manager.tr('成功保存')} {len(self.buttons)} {self.lang_manager.tr('个自定义按钮配置')}")
-            self.buttons_updated.emit()
+            if emit_signal:
+                self.buttons_updated.emit()
             return True
             
         except Exception as e:
@@ -275,7 +276,88 @@ class CustomButtonManager(QObject):
         except Exception as e:
             logger.exception(f"{self.lang_manager.tr('删除按钮失败:')} {e}")
             return False
+
+    def reorder_buttons(self, ordered_ids):
+        """根据给定的按钮ID顺序重新排序按钮列表"""
+        try:
+            if not ordered_ids:
+                logger.warning(self.lang_manager.tr("重新排序按钮失败：ID列表为空"))
+                return False
+
+            id_to_button = {btn['id']: btn for btn in self.buttons}
+
+            # 按照新的顺序重建列表
+            new_order = []
+            for button_id in ordered_ids:
+                if button_id in id_to_button:
+                    new_order.append(id_to_button.pop(button_id))
+
+            # 将未出现在ordered_ids中的按钮追加在末尾，避免数据丢失
+            if id_to_button:
+                new_order.extend(id_to_button.values())
+
+            # 如果顺序无变化，则不触发保存
+            if len(new_order) != len(self.buttons):
+                logger.warning(self.lang_manager.tr("重新排序按钮时检测到ID数量不匹配，已自动修复"))
+
+            if new_order == self.buttons:
+                return True
+
+            self.buttons = new_order
+            return self.save_buttons()
+
+        except Exception as e:
+            logger.exception(f"{self.lang_manager.tr('重新排序按钮失败:')} {e}")
+            return False
     
+    def reorder_buttons_in_location(self, tab_name, card_name, ordered_ids):
+        """仅对指定Tab/Card下的按钮进行重新排序"""
+        try:
+            if not ordered_ids:
+                logger.warning(self.lang_manager.tr("重新排序按钮失败：ID列表为空"))
+                return False
+
+            location_buttons = [
+                btn for btn in self.buttons
+                if btn.get('tab') == tab_name and btn.get('card') == card_name
+            ]
+
+            if not location_buttons:
+                logger.debug(self.lang_manager.tr("指定位置没有可排序的按钮"))
+                return False
+
+            id_to_button = {btn['id']: btn for btn in location_buttons}
+            ordered_buttons = []
+
+            for button_id in ordered_ids:
+                button = id_to_button.pop(button_id, None)
+                if button:
+                    ordered_buttons.append(button)
+
+            # 追加未被包含的按钮，避免数据丢失
+            if id_to_button:
+                ordered_buttons.extend(id_to_button.values())
+
+            if ordered_buttons == location_buttons:
+                return True
+
+            new_buttons = []
+            ordered_iter = iter(ordered_buttons)
+            for btn in self.buttons:
+                if btn.get('tab') == tab_name and btn.get('card') == card_name:
+                    new_buttons.append(next(ordered_iter))
+                else:
+                    new_buttons.append(btn)
+
+            self.buttons = new_buttons
+            return self.save_buttons()
+            self.buttons = new_buttons
+            return self.save_buttons(emit_signal=False)
+
+        except Exception as e:
+            logger.exception(f"{self.lang_manager.tr('重新排序按钮失败:')} {e}")
+            return False
+
     def validate_command(self, command):
         """验证命令是否安全"""
         if not command or not command.strip():
