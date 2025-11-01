@@ -3163,6 +3163,7 @@ class MainWindow(QMainWindow):
             # 保存当前选中的tab
             current_index = self.tab_widget.currentIndex()
             current_widget = self.tab_widget.currentWidget() if current_index >= 0 else None
+            current_tab_id = getattr(current_widget, 'tab_id', None) if current_widget else None
             
             # 清除所有tab
             while self.tab_widget.count() > 0:
@@ -3178,11 +3179,7 @@ class MainWindow(QMainWindow):
             self.load_custom_buttons_for_all_tabs()
             
             # 尝试恢复之前选中的tab
-            if current_widget:
-                for i in range(self.tab_widget.count()):
-                    if self.tab_widget.widget(i) == current_widget:
-                        self.tab_widget.setCurrentIndex(i)
-                        break
+            self._restore_tab_selection(current_tab_id, current_index)
             
             logger.info(self.tr("Tab重新加载完成"))
             

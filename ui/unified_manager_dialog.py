@@ -13,7 +13,7 @@ from PyQt5.QtWidgets import (QDialog, QTabWidget, QVBoxLayout, QHBoxLayout,
                              QListWidget, QListWidgetItem, QCheckBox, QScrollArea, QWidget,
                              QTableWidget, QTableWidgetItem, QHeaderView,
                              QFormLayout, QLineEdit, QTextEdit, QComboBox,
-                             QLabel, QSplitter, QFrame, QAbstractItemView)
+                             QLabel, QSplitter, QFrame, QAbstractItemView, QSizePolicy)
 from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtGui import QFont
 
@@ -126,6 +126,8 @@ class UnifiedManagerDialog(QDialog):
         self.button_table = None
         self.current_selected_tab_id = None
         self.is_selected_custom_tab = False
+        self.all_buttons_data = []  # 存储所有按钮数据用于搜索
+        self.search_filter_mode = 0  # 0=全局搜索, 1-7=按列搜索
         
         self.setup_ui()
         self.load_all_configs()
@@ -142,18 +144,42 @@ class UnifiedManagerDialog(QDialog):
         
         # 创建分割器
         splitter = QSplitter(Qt.Horizontal)
+        self.main_splitter = splitter
+        splitter.setObjectName("unified_manager_splitter")
+        splitter.setHandleWidth(12)
+        splitter.setChildrenCollapsible(False)
+        splitter.setStyleSheet(
+            "QSplitter#unified_manager_splitter::handle {"
+            "    background-color: rgba(255, 255, 255, 20);"
+            "}"
+            "QSplitter#unified_manager_splitter::handle:hover {"
+            "    background-color: rgba(74, 163, 255, 120);"
+            "}"
+        )
         layout.addWidget(splitter)
         
         # 左侧：Tab管理
         left_widget = self.create_tab_management_widget()
+        left_widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         splitter.addWidget(left_widget)
         
         # 右侧：按钮管理
         right_widget = self.create_button_management_widget()
+        right_widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         splitter.addWidget(right_widget)
+
+        splitter.setCollapsible(0, False)
+        splitter.setCollapsible(1, False)
         
         # 设置分割器比例
         splitter.setSizes([400, 600])
+        splitter.setStretchFactor(0, 1)
+        splitter.setStretchFactor(1, 2)
+
+        handle = splitter.handle(1)
+        if handle:
+            handle.setCursor(Qt.SplitHCursor)
+        splitter.splitterMoved.connect(self._on_splitter_moved)
         
         # 底部按钮
         button_layout = QHBoxLayout()
@@ -161,19 +187,27 @@ class UnifiedManagerDialog(QDialog):
         
         self.export_btn = QPushButton("📤 " + self.tr("导出配置"))
         self.export_btn.clicked.connect(self.export_config)
+        self.export_btn.setAutoDefault(False)
+        self.export_btn.setDefault(False)
         button_layout.addWidget(self.export_btn)
         
         self.import_btn = QPushButton("📥 " + self.tr("导入配置"))
         self.import_btn.clicked.connect(self.import_config)
+        self.import_btn.setAutoDefault(False)
+        self.import_btn.setDefault(False)
         button_layout.addWidget(self.import_btn)
         
         self.reset_btn = QPushButton("🔄 " + self.tr("重置为默认"))
         self.reset_btn.clicked.connect(self.reset_to_default)
+        self.reset_btn.setAutoDefault(False)
+        self.reset_btn.setDefault(False)
         self.reset_btn.setStyleSheet("QPushButton { background-color: #dc3545; color: white; }")
         button_layout.addWidget(self.reset_btn)
         
         self.close_btn = QPushButton("❌ " + self.tr("关闭"))
         self.close_btn.clicked.connect(self.accept)
+        self.close_btn.setAutoDefault(False)
+        self.close_btn.setDefault(False)
         button_layout.addWidget(self.close_btn)
         
         layout.addLayout(button_layout)
@@ -201,25 +235,43 @@ class UnifiedManagerDialog(QDialog):
                 background: rgba(74, 163, 255, 45%);
             }
         """)
-        tab_layout.addWidget(self.tab_list_widget)
 
-        tab_button_layout = QHBoxLayout()
+        tab_content_layout = QHBoxLayout()
+        tab_content_layout.addWidget(self.tab_list_widget)
+
+        tab_button_widget = QWidget()
+        tab_button_widget.setMinimumWidth(140)
+        tab_button_widget.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Expanding)
+        tab_button_layout = QVBoxLayout(tab_button_widget)
+        tab_button_layout.setContentsMargins(12, 0, 0, 0)
+        tab_button_layout.setSpacing(10)
+        tab_button_layout.setAlignment(Qt.AlignTop)
+
         self.add_tab_btn = QPushButton("➕ " + self.tr("添加Tab"))
         self.add_tab_btn.clicked.connect(self.show_add_tab_dialog)
+        self.add_tab_btn.setAutoDefault(False)
+        self.add_tab_btn.setDefault(False)
+        self.add_tab_btn.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         tab_button_layout.addWidget(self.add_tab_btn)
 
         self.edit_tab_btn = QPushButton("✏️ " + self.tr("编辑Tab"))
         self.edit_tab_btn.clicked.connect(self.edit_custom_tab)
+        self.edit_tab_btn.setAutoDefault(False)
+        self.edit_tab_btn.setDefault(False)
+        self.edit_tab_btn.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         tab_button_layout.addWidget(self.edit_tab_btn)
 
         self.delete_tab_btn = QPushButton("🗑️ " + self.tr("删除Tab"))
         self.delete_tab_btn.clicked.connect(self.delete_custom_tab)
+        self.delete_tab_btn.setAutoDefault(False)
+        self.delete_tab_btn.setDefault(False)
+        self.delete_tab_btn.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         tab_button_layout.addWidget(self.delete_tab_btn)
-
-        tab_button_layout.addStretch()
 
         self.apply_btn = QPushButton("✅ " + self.tr("应用"))
         self.apply_btn.clicked.connect(self.apply_tab_visibility)
+        self.apply_btn.setAutoDefault(False)
+        self.apply_btn.setDefault(False)
         self.apply_btn.setStyleSheet("""
             QPushButton {
                 background-color: #28a745;
@@ -231,9 +283,12 @@ class UnifiedManagerDialog(QDialog):
                 background-color: #218838;
             }
         """)
+        self.apply_btn.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         tab_button_layout.addWidget(self.apply_btn)
+        tab_button_layout.addStretch()
 
-        tab_layout.addLayout(tab_button_layout)
+        tab_content_layout.addWidget(tab_button_widget)
+        tab_layout.addLayout(tab_content_layout)
         layout.addWidget(tab_group)
 
         # 自定义Card管理
@@ -253,22 +308,32 @@ class UnifiedManagerDialog(QDialog):
         custom_card_btn_layout = QVBoxLayout()
         self.add_card_btn = QPushButton("➕ " + self.tr("添加Card"))
         self.add_card_btn.clicked.connect(self.show_add_card_dialog)
+        self.add_card_btn.setAutoDefault(False)
+        self.add_card_btn.setDefault(False)
         custom_card_btn_layout.addWidget(self.add_card_btn)
         
         self.edit_card_btn = QPushButton("✏️ " + self.tr("编辑Card"))
         self.edit_card_btn.clicked.connect(self.edit_custom_card)
+        self.edit_card_btn.setAutoDefault(False)
+        self.edit_card_btn.setDefault(False)
         custom_card_btn_layout.addWidget(self.edit_card_btn)
         
         self.delete_card_btn = QPushButton("🗑️ " + self.tr("删除Card"))
         self.delete_card_btn.clicked.connect(self.delete_custom_card)
+        self.delete_card_btn.setAutoDefault(False)
+        self.delete_card_btn.setDefault(False)
         custom_card_btn_layout.addWidget(self.delete_card_btn)
 
         self.card_up_btn = QPushButton("⬆️ " + self.tr("上移"))
         self.card_up_btn.clicked.connect(lambda: self.move_custom_card(-1))
+        self.card_up_btn.setAutoDefault(False)
+        self.card_up_btn.setDefault(False)
         custom_card_btn_layout.addWidget(self.card_up_btn)
 
         self.card_down_btn = QPushButton("⬇️ " + self.tr("下移"))
         self.card_down_btn.clicked.connect(lambda: self.move_custom_card(1))
+        self.card_down_btn.setAutoDefault(False)
+        self.card_down_btn.setDefault(False)
         custom_card_btn_layout.addWidget(self.card_down_btn)
         
         custom_card_main_layout.addLayout(custom_card_btn_layout)
@@ -300,38 +365,93 @@ class UnifiedManagerDialog(QDialog):
         
         # 设置列宽
         header = self.button_table.horizontalHeader()
-        header.setSectionResizeMode(0, QHeaderView.ResizeToContents)
-        header.setSectionResizeMode(1, QHeaderView.ResizeToContents)
-        header.setSectionResizeMode(2, QHeaderView.Stretch)
-        header.setSectionResizeMode(3, QHeaderView.ResizeToContents)
-        header.setSectionResizeMode(4, QHeaderView.ResizeToContents)
-        header.setSectionResizeMode(5, QHeaderView.ResizeToContents)
-        header.setSectionResizeMode(6, QHeaderView.Stretch)
+        header.setStretchLastSection(False)
+        header.setSectionsMovable(True)
+        header.setHighlightSections(False)
+        header.setMinimumSectionSize(40)
+        default_widths = [100, 80, 100, 80, 70, 50, 110]
+        for column, width in enumerate(default_widths):
+            header.setSectionResizeMode(column, QHeaderView.Interactive)
+            self.button_table.setColumnWidth(column, width)
         
         self.button_table.setSelectionBehavior(QTableWidget.SelectRows)
         self.button_table.setSelectionMode(QTableWidget.SingleSelection)
+        self.button_table.setWordWrap(False)
+        self.button_table.setTextElideMode(Qt.ElideRight)
+        self.button_table.setMinimumWidth(360)
+        self.button_table.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        self.button_table.setHorizontalScrollMode(QAbstractItemView.ScrollPerPixel)
         self.button_table.rows_reordered.connect(self.on_button_rows_reordered)
         layout.addWidget(self.button_table)
+        
+        # 搜索栏
+        search_layout = QHBoxLayout()
+        search_label = QLabel("🔍 " + self.tr("搜索:"))
+        search_layout.addWidget(search_label)
+        
+        self.search_input = QLineEdit()
+        self.search_input.setPlaceholderText(self.tr("输入关键词进行搜索..."))
+        self.search_input.setMinimumWidth(150)
+        self.search_input.returnPressed.connect(self.search_buttons)  # 按回车键搜索
+        search_layout.addWidget(self.search_input)
+        
+        self.search_scope_combo = QComboBox()
+        self.search_scope_combo.setObjectName("search_scope_combo")
+        self.search_scope_combo.setStyleSheet("QComboBox#search_scope_combo { min-width: 50px; }")
+        self.search_scope_combo.addItems([
+            self.tr("整个表格"),
+            self.tr("名称"),
+            self.tr("类型"),
+            self.tr("命令"),
+            self.tr("所在Tab"),
+            self.tr("所在卡片"),
+            self.tr("启用"),
+            self.tr("描述")
+        ])
+        search_layout.addWidget(self.search_scope_combo)
+        
+        self.search_btn = QPushButton("🔍 " + self.tr("搜索"))
+        self.search_btn.clicked.connect(self.search_buttons)
+        self.search_btn.setAutoDefault(False)
+        self.search_btn.setDefault(False)
+        search_layout.addWidget(self.search_btn)
+        
+        self.clear_search_btn = QPushButton("❌ " + self.tr("清除"))
+        self.clear_search_btn.clicked.connect(self.clear_search)
+        self.clear_search_btn.setAutoDefault(False)
+        self.clear_search_btn.setDefault(False)
+        search_layout.addWidget(self.clear_search_btn)
+        
+        search_layout.addStretch()
+        layout.addLayout(search_layout)
         
         # 按钮操作
         button_layout = QHBoxLayout()
         
         self.add_btn = QPushButton("➕ " + self.tr("添加"))
         self.add_btn.clicked.connect(self.add_button)
+        self.add_btn.setAutoDefault(False)
+        self.add_btn.setDefault(False)
         button_layout.addWidget(self.add_btn)
         
         self.edit_btn = QPushButton("✏️ " + self.tr("编辑"))
         self.edit_btn.clicked.connect(self.edit_button)
+        self.edit_btn.setAutoDefault(False)
+        self.edit_btn.setDefault(False)
         button_layout.addWidget(self.edit_btn)
         
         self.delete_btn = QPushButton("🗑️ " + self.tr("删除"))
         self.delete_btn.clicked.connect(self.delete_button)
+        self.delete_btn.setAutoDefault(False)
+        self.delete_btn.setDefault(False)
         button_layout.addWidget(self.delete_btn)
         
         button_layout.addStretch()
         
         self.refresh_btn = QPushButton("🔄 " + self.tr("刷新"))
-        self.refresh_btn.clicked.connect(self.load_buttons)
+        self.refresh_btn.clicked.connect(self.on_refresh_clicked)
+        self.refresh_btn.setAutoDefault(False)
+        self.refresh_btn.setDefault(False)
         button_layout.addWidget(self.refresh_btn)
         
         layout.addLayout(button_layout)
@@ -358,6 +478,7 @@ class UnifiedManagerDialog(QDialog):
         """加载Tab配置"""
         try:
             preserve_tab_id = self.current_selected_tab_id
+            logger.debug(f"加载Tab配置: preserve_tab_id={preserve_tab_id}, is_selected_custom_tab={self.is_selected_custom_tab}")
             if self.tab_list_widget:
                 self.tab_list_widget.blockSignals(True)
                 self.tab_list_widget.clear()
@@ -390,6 +511,7 @@ class UnifiedManagerDialog(QDialog):
                 self.tab_list_widget.blockSignals(False)
 
             self.on_tab_selection_changed()
+            logger.debug(f"加载Tab配置完成: current_selected_tab_id={self.current_selected_tab_id}, is_selected_custom_tab={self.is_selected_custom_tab}")
 
         except Exception as e:
             logger.exception(f"{self.tr('加载Tab配置失败:')} {e}")
@@ -440,6 +562,10 @@ class UnifiedManagerDialog(QDialog):
 
         self.update_tab_buttons_state()
         self.load_custom_cards()
+        logger.debug(f"Tab选择变化: current_selected_tab_id={self.current_selected_tab_id}, is_selected_custom_tab={self.is_selected_custom_tab}")
+
+    def _on_splitter_moved(self, pos, index):
+        logger.debug(f"分割线移动: pos={pos}, index={index}")
 
     def load_custom_cards(self):
         """加载自定义Card列表"""
@@ -477,6 +603,9 @@ class UnifiedManagerDialog(QDialog):
             self.button_table.setRowCount(0)
             buttons = self.custom_button_manager.get_all_buttons()
             
+            # 保存原始按钮数据
+            self.all_buttons_data = buttons
+            
             for btn in buttons:
                 row = self.button_table.rowCount()
                 self.button_table.insertRow(row)
@@ -506,6 +635,135 @@ class UnifiedManagerDialog(QDialog):
             self.button_table.resizeRowsToContents()
         except Exception as e:
             logger.exception(f"{self.tr('加载按钮失败:')} {e}")
+    
+    def search_buttons(self):
+        """搜索按钮"""
+        try:
+            logger.debug("search_buttons被调用")
+            keyword = self.search_input.text().strip()
+            if not keyword:
+                QMessageBox.information(self, self.tr("提示"), self.tr("请输入搜索关键词"))
+                return
+            
+            scope_index = self.search_scope_combo.currentIndex()
+            
+            # 清空表格
+            self.button_table.setRowCount(0)
+            
+            # 筛选按钮
+            filtered_buttons = []
+            for btn in self.all_buttons_data:
+                match = False
+                
+                if scope_index == 0:  # 整个表格
+                    # 检查所有列
+                    search_texts = [
+                        btn.get('name', ''),
+                        btn.get('command', ''),
+                        btn.get('tab', ''),
+                        btn.get('card', ''),
+                        btn.get('description', ''),
+                        '✓' if btn.get('enabled', True) else '✗'
+                    ]
+                    # 添加按钮类型
+                    button_type = btn.get('type', 'adb')
+                    type_map = {
+                        'adb': self.tr('ADB命令'),
+                        'python': self.tr('Python脚本'),
+                        'file': self.tr('打开文件'),
+                        'program': self.tr('运行程序'),
+                        'system': self.tr('系统命令')
+                    }
+                    search_texts.append(type_map.get(button_type, ''))
+                    
+                    for text in search_texts:
+                        if keyword.lower() in str(text).lower():
+                            match = True
+                            break
+                else:
+                    # 按列搜索
+                    if scope_index == 1:  # 名称
+                        search_text = btn.get('name', '')
+                    elif scope_index == 2:  # 类型
+                        button_type = btn.get('type', 'adb')
+                        type_map = {
+                            'adb': self.tr('ADB命令'),
+                            'python': self.tr('Python脚本'),
+                            'file': self.tr('打开文件'),
+                            'program': self.tr('运行程序'),
+                            'system': self.tr('系统命令')
+                        }
+                        search_text = type_map.get(button_type, '')
+                    elif scope_index == 3:  # 命令
+                        search_text = btn.get('command', '')
+                    elif scope_index == 4:  # 所在Tab
+                        search_text = btn.get('tab', '')
+                    elif scope_index == 5:  # 所在卡片
+                        search_text = btn.get('card', '')
+                    elif scope_index == 6:  # 启用
+                        search_text = '✓' if btn.get('enabled', True) else '✗'
+                    elif scope_index == 7:  # 描述
+                        search_text = btn.get('description', '')
+                    else:
+                        search_text = ''
+                    
+                    if keyword.lower() in str(search_text).lower():
+                        match = True
+                
+                if match:
+                    filtered_buttons.append(btn)
+            
+            # 显示筛选结果
+            for btn in filtered_buttons:
+                row = self.button_table.rowCount()
+                self.button_table.insertRow(row)
+                
+                button_type = btn.get('type', 'adb')
+                type_map = {
+                    'adb': self.tr('ADB命令'),
+                    'python': self.tr('Python脚本'),
+                    'file': self.tr('打开文件'),
+                    'program': self.tr('运行程序'),
+                    'system': self.tr('系统命令')
+                }
+                type_display = type_map.get(button_type, self.tr('ADB命令'))
+                
+                self.button_table.setItem(row, 0, QTableWidgetItem(btn.get('name', '')))
+                self.button_table.setItem(row, 1, QTableWidgetItem(type_display))
+                self.button_table.setItem(row, 2, QTableWidgetItem(btn.get('command', '')))
+                self.button_table.setItem(row, 3, QTableWidgetItem(btn.get('tab', '')))
+                self.button_table.setItem(row, 4, QTableWidgetItem(btn.get('card', '')))
+                self.button_table.setItem(row, 5, QTableWidgetItem('✓' if btn.get('enabled', True) else '✗'))
+                self.button_table.setItem(row, 6, QTableWidgetItem(btn.get('description', '')))
+                
+                self.button_table.item(row, 0).setData(Qt.UserRole, btn.get('id'))
+            
+            self.button_table.resizeRowsToContents()
+            
+            if len(filtered_buttons) == 0:
+                QMessageBox.information(self, self.tr("提示"), self.tr("未找到匹配的按钮"))
+                
+        except Exception as e:
+            logger.exception(f"{self.tr('搜索失败:')} {e}")
+            QMessageBox.critical(self, self.tr("错误"), f"{self.tr('搜索失败:')} {str(e)}")
+    
+    def clear_search(self):
+        """清除搜索，恢复显示所有按钮"""
+        try:
+            self.search_input.clear()
+            self.search_scope_combo.setCurrentIndex(0)
+            # 重新加载所有按钮
+            self.load_buttons()
+        except Exception as e:
+            logger.exception(f"{self.tr('清除搜索失败:')} {e}")
+    
+    def on_refresh_clicked(self):
+        """刷新按钮点击，清除搜索并重新加载"""
+        try:
+            # 清除搜索状态
+            self.clear_search()
+        except Exception as e:
+            logger.exception(f"{self.tr('刷新失败:')} {e}")
     
     def apply_tab_visibility(self):
         """应用Tab显示设置"""
@@ -870,7 +1128,7 @@ class UnifiedManagerDialog(QDialog):
         if dialog.exec_() == QDialog.Accepted:
             button_data = dialog.get_button_data()
             if self.custom_button_manager.add_button(button_data):
-                self.load_buttons()
+                self.clear_search()  # 清除搜索并刷新显示
                 QMessageBox.information(self, self.tr("成功"), self.tr("按钮添加成功！"))
             else:
                 QMessageBox.warning(self, self.tr("失败"), self.tr("按钮添加失败，请检查日志"))
@@ -892,7 +1150,7 @@ class UnifiedManagerDialog(QDialog):
             if dialog.exec_() == QDialog.Accepted:
                 updated_data = dialog.get_button_data()
                 if self.custom_button_manager.update_button(button_id, updated_data):
-                    self.load_buttons()
+                    self.clear_search()  # 清除搜索并刷新显示
                     QMessageBox.information(self, self.tr("成功"), self.tr("按钮更新成功！"))
                 else:
                     QMessageBox.warning(self, self.tr("失败"), self.tr("按钮更新失败，请检查日志"))
@@ -914,7 +1172,7 @@ class UnifiedManagerDialog(QDialog):
         if reply == QMessageBox.Yes:
             button_id = self.button_table.item(current_row, 0).data(Qt.UserRole)
             if self.custom_button_manager.delete_button(button_id):
-                self.load_buttons()
+                self.clear_search()  # 清除搜索并刷新显示
                 QMessageBox.information(self, self.tr("成功"), self.tr("按钮删除成功！"))
             else:
                 QMessageBox.warning(self, self.tr("失败"), self.tr("按钮删除失败，请检查日志"))
@@ -928,11 +1186,15 @@ class UnifiedManagerDialog(QDialog):
             QMessageBox.warning(self, self.tr("失败"), self.tr("按钮排序保存失败，请检查日志"))
         else:
             # 重新加载以确保显示与数据一致
-            self.load_buttons()
+            self.clear_search()  # 清除搜索并刷新显示
 
     def closeEvent(self, event):
         """关闭事件"""
         try:
+            logger.debug(
+                f"UnifiedManagerDialog关闭: current_selected_tab_id={self.current_selected_tab_id}, "
+                f"is_selected_custom_tab={self.is_selected_custom_tab}"
+            )
             # 保存当前配置
             self.save_config()
             event.accept()
