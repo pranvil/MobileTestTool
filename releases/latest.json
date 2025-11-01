@@ -1,10 +1,10 @@
 {
-    "version":  "0.9.4",
-    "download_url":  "https://github.com/pranvil/MobileTestTool/releases/download/v0.9.4/MobileTestTool_0.9.4.zip",
-    "sha256":  "333ea412a3b7c7a5c9926188a82520919e63f86e5c7ec4ed50f9c9838908fd70",
-    "file_name":  "MobileTestTool_0.9.4.zip",
-    "file_size":  101761473,
+    "version":  "0.9.5",
+    "download_url":  "https://github.com/pranvil/MobileTestTool/releases/download/v0.9.5/MobileTestTool_0.9.5.zip",
+    "sha256":  "8ff5e9767a260fda859b77e3504cdad38f427d3813214afdb57c9e607c4051a2",
+    "file_name":  "MobileTestTool_0.9.5.zip",
+    "file_size":  101775586,
     "release_notes":  "- Add release notes here",
-    "published_at":  "2025-11-01T00:19:00Z",
+    "published_at":  "2025-11-01T05:23:42Z",
     "mandatory":  false
 }
