@@ -2,7 +2,8 @@ param(
     [Parameter(Mandatory = $true)]
     [string]$Version,
     [string]$NotesFile = "",
-    [switch]$SkipPublish
+    [switch]$SkipPublish,
+    [switch]$SkipPackage
 )
 
 $ErrorActionPreference = "Stop"
@@ -62,18 +63,25 @@ $packagePath = Join-Path $packageDir $packageName
 $manifestDir = Join-Path $repoRoot "releases"
 $manifestPath = Join-Path $manifestDir "latest.json"
 
-Write-Host "=== step 1: run build_pyqt.bat ==="
-& (Join-Path $repoRoot "build_pyqt.bat")
+if (-not $SkipPackage) {
+    Write-Host "=== step 1: run build_pyqt.bat ==="
+    & (Join-Path $repoRoot "build_pyqt.bat")
 
-Write-Host "=== step 2: compress onedir folder ==="
-if (-not (Test-Path $buildDir)) {
-    throw ("Build directory not found: {0}" -f $buildDir)
+    Write-Host "=== step 2: compress onedir folder ==="
+    if (-not (Test-Path $buildDir)) {
+        throw ("Build directory not found: {0}" -f $buildDir)
+    }
+    if (Test-Path $packagePath) {
+        Remove-Item $packagePath
+    }
+    Compress-Archive -Path (Join-Path $buildDir "*") -DestinationPath $packagePath
+    Write-Host ("Created package: {0}" -f $packagePath)
+} else {
+    Write-Host "=== step 1 & 2 skipped (SkipPackage enabled) ==="
+    if (-not (Test-Path $packagePath)) {
+        throw ("Existing package not found: {0}. Cannot continue with -SkipPackage." -f $packagePath)
+    }
 }
-if (Test-Path $packagePath) {
-    Remove-Item $packagePath
-}
-Compress-Archive -Path (Join-Path $buildDir "*") -DestinationPath $packagePath
-Write-Host ("Created package: {0}" -f $packagePath)
 
 Write-Host "=== step 3: compute SHA256 ==="
 $sha256 = (Get-FileHash $packagePath -Algorithm SHA256).Hash.ToLower()

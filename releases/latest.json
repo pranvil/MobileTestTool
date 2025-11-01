@@ -1,10 +1,10 @@
 {
     "version":  "0.9.3",
     "download_url":  "https://github.com/pranvil/MobileTestTool/releases/download/v0.9.3/MobileTestTool_0.9.3.zip",
-    "sha256":  "8ff5e9767a260fda859b77e3504cdad38f427d3813214afdb57c9e607c4051a2",
+    "sha256":  "332075a11b13f49694d534bac1ea3a8fdd9846fd8949ab9f8678fd4d65f6f40f",
     "file_name":  "MobileTestTool_0.9.3.zip",
-    "file_size":  101775586,
-    "release_notes":  "- Add release notes here",
-    "published_at":  "2025-11-01T05:23:42Z",
+    "file_size":  101779670,
+    "release_notes":  "# MobileTestTool Release Notes\r\n\r\n## ç‰ˆæœ¬ä¿¡æ¯\r\n- ç‰ˆæœ¬å·ï¼š0.9.3\r\n- å‘å¸ƒæ—¥æœŸï¼š2025/11/1\r\n\r\n## æœ¬æ¬¡æ›´æ–°æ‘˜è¦\r\n- æ·»åŠ åœ¨çº¿æ›´æ–°åŠŸèƒ½\r\n- æ·»åŠ è‡ªå®šä¹‰æŒ‰é’®ï¼ŒcardæŽ’åºåŠŸèƒ½\r\n- ä¿®æ”¹adb å‘½ä»¤åˆ¤æ–­é”™è¯¯\r\n- ä¼˜åŒ–adb å‘½ä»¤è¾“å…¥æ–‡ä»¶è·¯å¾„æ–¹å¼\r\n\r\n\r\n## å·²çŸ¥é—®é¢˜\r\n- \r\n\r\n---\r\n\r\n\u003e æç¤ºï¼šå‘å¸ƒæ–°ç‰ˆæœ¬æ—¶ï¼Œå¯å¤åˆ¶æ­¤æ¨¡æ¿å¹¶æ›´æ–°ç‰ˆæœ¬å·ã€æ—¥æœŸåŠå˜æ›´å†…å®¹ã€‚",
+    "published_at":  "2025-11-01T18:23:14Z",
     "mandatory":  false
 }
