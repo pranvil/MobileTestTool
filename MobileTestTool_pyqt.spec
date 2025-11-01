@@ -121,7 +121,7 @@ exe = EXE(
     a.scripts,
     [],
     exclude_binaries=True,  # onedir 模式：排除二进制文件，放到单独的文件夹
-    name='MobileTestTool_PyQt5',
+    name='MobileTestTool',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
@@ -147,6 +147,6 @@ coll = COLLECT(
     strip=False,
     upx=True,
     upx_exclude=[],
-    name='MobileTestTool_PyQt5'
+    name='MobileTestTool'
 )
 

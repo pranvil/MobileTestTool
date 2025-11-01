@@ -47,7 +47,7 @@ build_pyqt.bat
 pyinstaller --clean MobileTestTool_pyqt.spec
 ```
 
-打包后的程序会生成在 `dist/MobileTestTool_PyQt5/` 目录中。
+打包后的程序会生成在 `dist/MobileTestTool/` 目录中。
 
 ---
 

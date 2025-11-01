@@ -46,12 +46,12 @@ echo ========================================
 echo 打包完成！
 echo ========================================
 echo.
-echo 程序文件夹位置: dist\MobileTestTool_PyQt5\
-echo 可执行文件位置: dist\MobileTestTool_PyQt5\MobileTestTool_PyQt5.exe
+echo 程序文件夹位置: dist\MobileTestTool\
+echo 可执行文件位置: dist\MobileTestTool\MobileTestTool.exe
 echo.
 echo 注意：
 echo 1. onedir模式会生成一个包含所有依赖的文件夹
-echo 2. 请将整个 MobileTestTool_PyQt5 文件夹分发给用户
+echo 2. 请将整个 MobileTestTool 文件夹分发给用户
 echo 3. 此版本已优化exe环境下的MTKlogger兼容性
 echo.
 

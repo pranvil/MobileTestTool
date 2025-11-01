@@ -55,7 +55,7 @@ function Invoke-GhReleaseCreate {
 }
 
 $repoRoot    = Split-Path -Parent $MyInvocation.MyCommand.Path
-$buildDir    = Join-Path $repoRoot "dist/MobileTestTool_PyQt5"
+$buildDir    = Join-Path $repoRoot "dist/MobileTestTool"
 $packageDir  = Join-Path $repoRoot "dist"
 $packageName = "MobileTestTool_$Version.zip"
 $packagePath = Join-Path $packageDir $packageName
