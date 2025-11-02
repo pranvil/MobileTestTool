@@ -308,16 +308,13 @@ class PyQtDeviceInfoManager(QObject):
             return
         
         try:
-            # 显示初始状态
-            self.status_message.emit(self.tr("正在获取设备信息，请稍候..."))
-            
             # 创建工作线程
             self._worker = DeviceInfoWorker(device, self.device_info_manager, self.lang_manager)
             self._worker.status_updated.connect(self.status_message.emit)
             self._worker.finished.connect(self._on_device_info_finished)
             self._worker.error_occurred.connect(self._on_device_info_error)
             
-            # 启动工作线程
+            # 启动工作线程（工作线程启动后会发送状态更新）
             self._worker.start()
             
         except Exception as e:
