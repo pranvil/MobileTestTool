@@ -128,6 +128,7 @@ class UnifiedManagerDialog(QDialog):
         self.is_selected_custom_tab = False
         self.all_buttons_data = []  # 存储所有按钮数据用于搜索
         self.search_filter_mode = 0  # 0=全局搜索, 1-7=按列搜索
+        self.column_filters = []  # 列级过滤器控件列表 (combo, col_idx, label_text) 元组
         
         self.setup_ui()
         self.load_all_configs()
@@ -183,7 +184,12 @@ class UnifiedManagerDialog(QDialog):
         
         # 底部按钮
         button_layout = QHBoxLayout()
-        button_layout.addStretch()
+        
+        self.import_btn = QPushButton("📥 " + self.tr("导入配置"))
+        self.import_btn.clicked.connect(self.import_config)
+        self.import_btn.setAutoDefault(False)
+        self.import_btn.setDefault(False)
+        button_layout.addWidget(self.import_btn)
         
         self.export_btn = QPushButton("📤 " + self.tr("导出配置"))
         self.export_btn.clicked.connect(self.export_config)
@@ -191,11 +197,11 @@ class UnifiedManagerDialog(QDialog):
         self.export_btn.setDefault(False)
         button_layout.addWidget(self.export_btn)
         
-        self.import_btn = QPushButton("📥 " + self.tr("导入配置"))
-        self.import_btn.clicked.connect(self.import_config)
-        self.import_btn.setAutoDefault(False)
-        self.import_btn.setDefault(False)
-        button_layout.addWidget(self.import_btn)
+        self.refresh_btn = QPushButton("🔄 " + self.tr("刷新"))
+        self.refresh_btn.clicked.connect(self.on_refresh_clicked)
+        self.refresh_btn.setAutoDefault(False)
+        self.refresh_btn.setDefault(False)
+        button_layout.addWidget(self.refresh_btn)
         
         self.reset_btn = QPushButton("🔄 " + self.tr("重置为默认"))
         self.reset_btn.clicked.connect(self.reset_to_default)
@@ -204,11 +210,25 @@ class UnifiedManagerDialog(QDialog):
         self.reset_btn.setStyleSheet("QPushButton { background-color: #dc3545; color: white; }")
         button_layout.addWidget(self.reset_btn)
         
-        self.close_btn = QPushButton("❌ " + self.tr("关闭"))
-        self.close_btn.clicked.connect(self.accept)
-        self.close_btn.setAutoDefault(False)
-        self.close_btn.setDefault(False)
-        button_layout.addWidget(self.close_btn)
+        button_layout.addStretch()
+        
+        self.add_btn = QPushButton("➕ " + self.tr("添加"))
+        self.add_btn.clicked.connect(self.add_button)
+        self.add_btn.setAutoDefault(False)
+        self.add_btn.setDefault(False)
+        button_layout.addWidget(self.add_btn)
+        
+        self.edit_btn = QPushButton("✏️ " + self.tr("编辑"))
+        self.edit_btn.clicked.connect(self.edit_button)
+        self.edit_btn.setAutoDefault(False)
+        self.edit_btn.setDefault(False)
+        button_layout.addWidget(self.edit_btn)
+        
+        self.delete_btn = QPushButton("🗑️ " + self.tr("删除"))
+        self.delete_btn.clicked.connect(self.delete_button)
+        self.delete_btn.setAutoDefault(False)
+        self.delete_btn.setDefault(False)
+        button_layout.addWidget(self.delete_btn)
         
         layout.addLayout(button_layout)
     
@@ -384,6 +404,32 @@ class UnifiedManagerDialog(QDialog):
         self.button_table.rows_reordered.connect(self.on_button_rows_reordered)
         layout.addWidget(self.button_table)
         
+        # 列级过滤器
+        filter_row_layout = QHBoxLayout()
+        filter_row_layout.addWidget(QLabel("🔽 " + self.tr("列过滤:")))
+        self.column_filters = []
+        
+        # 只创建4个过滤器：类型、Tab、卡片、启用
+        filter_configs = [
+            (1, self.tr("类型")),
+            (3, self.tr("Tab")),
+            (4, self.tr("卡片")),
+            (5, self.tr("启用"))
+        ]
+        
+        for col_idx, label_text in filter_configs:
+            # 组合框
+            combo = QComboBox()
+            combo.addItem(f"{self.tr('全部')}-{label_text}")  # 第一项显示"全部-类型"等
+            combo.setObjectName(f"column_filter_{col_idx}")
+            combo.setStyleSheet("QComboBox { max-width: 120px; }")
+            combo.currentIndexChanged.connect(lambda idx, c=col_idx: self.on_column_filter_changed(c))
+            self.column_filters.append((combo, col_idx, label_text))  # 存储组合框、列索引和列名称的对应关系
+            filter_row_layout.addWidget(combo)
+        
+        filter_row_layout.addStretch()
+        layout.addLayout(filter_row_layout)
+        
         # 搜索栏
         search_layout = QHBoxLayout()
         search_label = QLabel("🔍 " + self.tr("搜索:"))
@@ -424,37 +470,6 @@ class UnifiedManagerDialog(QDialog):
         
         search_layout.addStretch()
         layout.addLayout(search_layout)
-        
-        # 按钮操作
-        button_layout = QHBoxLayout()
-        
-        self.add_btn = QPushButton("➕ " + self.tr("添加"))
-        self.add_btn.clicked.connect(self.add_button)
-        self.add_btn.setAutoDefault(False)
-        self.add_btn.setDefault(False)
-        button_layout.addWidget(self.add_btn)
-        
-        self.edit_btn = QPushButton("✏️ " + self.tr("编辑"))
-        self.edit_btn.clicked.connect(self.edit_button)
-        self.edit_btn.setAutoDefault(False)
-        self.edit_btn.setDefault(False)
-        button_layout.addWidget(self.edit_btn)
-        
-        self.delete_btn = QPushButton("🗑️ " + self.tr("删除"))
-        self.delete_btn.clicked.connect(self.delete_button)
-        self.delete_btn.setAutoDefault(False)
-        self.delete_btn.setDefault(False)
-        button_layout.addWidget(self.delete_btn)
-        
-        button_layout.addStretch()
-        
-        self.refresh_btn = QPushButton("🔄 " + self.tr("刷新"))
-        self.refresh_btn.clicked.connect(self.on_refresh_clicked)
-        self.refresh_btn.setAutoDefault(False)
-        self.refresh_btn.setDefault(False)
-        button_layout.addWidget(self.refresh_btn)
-        
-        layout.addLayout(button_layout)
         
         return widget
     
@@ -633,58 +648,30 @@ class UnifiedManagerDialog(QDialog):
                 self.button_table.item(row, 0).setData(Qt.UserRole, btn.get('id'))
 
             self.button_table.resizeRowsToContents()
+            
+            # 填充列过滤器
+            self.populate_column_filters()
         except Exception as e:
             logger.exception(f"{self.tr('加载按钮失败:')} {e}")
     
-    def search_buttons(self):
-        """搜索按钮"""
+    def populate_column_filters(self):
+        """填充列过滤器的唯一值"""
         try:
-            logger.debug("search_buttons被调用")
-            keyword = self.search_input.text().strip()
-            if not keyword:
-                QMessageBox.information(self, self.tr("提示"), self.tr("请输入搜索关键词"))
+            if not self.column_filters:
                 return
             
-            scope_index = self.search_scope_combo.currentIndex()
-            
-            # 清空表格
-            self.button_table.setRowCount(0)
-            
-            # 筛选按钮
-            filtered_buttons = []
-            for btn in self.all_buttons_data:
-                match = False
+            # 收集每列的唯一值
+            for combo, col_idx, label_text in self.column_filters:
+                # 先清空（保留"全部"选项）
+                combo.blockSignals(True)
+                combo.clear()
+                combo.addItem(f"{self.tr('全部')}-{label_text}")
                 
-                if scope_index == 0:  # 整个表格
-                    # 检查所有列
-                    search_texts = [
-                        btn.get('name', ''),
-                        btn.get('command', ''),
-                        btn.get('tab', ''),
-                        btn.get('card', ''),
-                        btn.get('description', ''),
-                        '✓' if btn.get('enabled', True) else '✗'
-                    ]
-                    # 添加按钮类型
-                    button_type = btn.get('type', 'adb')
-                    type_map = {
-                        'adb': self.tr('ADB命令'),
-                        'python': self.tr('Python脚本'),
-                        'file': self.tr('打开文件'),
-                        'program': self.tr('运行程序'),
-                        'system': self.tr('系统命令')
-                    }
-                    search_texts.append(type_map.get(button_type, ''))
-                    
-                    for text in search_texts:
-                        if keyword.lower() in str(text).lower():
-                            match = True
-                            break
-                else:
-                    # 按列搜索
-                    if scope_index == 1:  # 名称
-                        search_text = btn.get('name', '')
-                    elif scope_index == 2:  # 类型
+                # 收集唯一值
+                unique_values = set()
+                for btn in self.all_buttons_data:
+                    value = ""
+                    if col_idx == 1:  # 类型
                         button_type = btn.get('type', 'adb')
                         type_map = {
                             'adb': self.tr('ADB命令'),
@@ -693,22 +680,146 @@ class UnifiedManagerDialog(QDialog):
                             'program': self.tr('运行程序'),
                             'system': self.tr('系统命令')
                         }
-                        search_text = type_map.get(button_type, '')
-                    elif scope_index == 3:  # 命令
-                        search_text = btn.get('command', '')
-                    elif scope_index == 4:  # 所在Tab
-                        search_text = btn.get('tab', '')
-                    elif scope_index == 5:  # 所在卡片
-                        search_text = btn.get('card', '')
-                    elif scope_index == 6:  # 启用
-                        search_text = '✓' if btn.get('enabled', True) else '✗'
-                    elif scope_index == 7:  # 描述
-                        search_text = btn.get('description', '')
-                    else:
-                        search_text = ''
+                        value = type_map.get(button_type, self.tr('ADB命令'))
+                    elif col_idx == 3:  # Tab
+                        value = btn.get('tab', '')
+                    elif col_idx == 4:  # 卡片
+                        value = btn.get('card', '')
+                    elif col_idx == 5:  # 启用
+                        value = '✓' if btn.get('enabled', True) else '✗'
                     
-                    if keyword.lower() in str(search_text).lower():
-                        match = True
+                    if value:
+                        unique_values.add(value)
+                
+                # 排序并添加到组合框
+                sorted_values = sorted(unique_values, key=lambda x: str(x))
+                for value in sorted_values:
+                    combo.addItem(str(value))
+                
+                combo.blockSignals(False)
+        except Exception as e:
+            logger.exception(f"{self.tr('填充列过滤器失败:')} {e}")
+    
+    def search_buttons(self):
+        """搜索按钮"""
+        try:
+            logger.debug("search_buttons被调用")
+            self.apply_filters()  # 统一使用apply_filters
+        except Exception as e:
+            logger.exception(f"{self.tr('搜索失败:')} {e}")
+            QMessageBox.critical(self, self.tr("错误"), f"{self.tr('搜索失败:')} {str(e)}")
+    
+    def on_column_filter_changed(self, column_idx):
+        """列过滤器改变事件"""
+        try:
+            logger.debug(f"列过滤器改变: column_idx={column_idx}")
+            self.apply_filters()
+        except Exception as e:
+            logger.exception(f"{self.tr('列过滤器改变失败:')} {e}")
+    
+    def apply_filters(self):
+        """应用所有过滤器（搜索 + 列过滤）"""
+        try:
+            keyword = self.search_input.text().strip()
+            scope_index = self.search_scope_combo.currentIndex()
+            
+            # 清空表格
+            self.button_table.setRowCount(0)
+            
+            # 筛选按钮
+            filtered_buttons = []
+            for btn in self.all_buttons_data:
+                match = True
+                
+                # 先应用列过滤器（AND逻辑）
+                for combo, col_idx, _ in self.column_filters:
+                    if combo.currentIndex() == 0:  # "(全部)"选项
+                        continue
+                    
+                    selected_value = combo.currentText()
+                    value = ""
+                    if col_idx == 1:  # 类型
+                        button_type = btn.get('type', 'adb')
+                        type_map = {
+                            'adb': self.tr('ADB命令'),
+                            'python': self.tr('Python脚本'),
+                            'file': self.tr('打开文件'),
+                            'program': self.tr('运行程序'),
+                            'system': self.tr('系统命令')
+                        }
+                        value = type_map.get(button_type, self.tr('ADB命令'))
+                    elif col_idx == 3:  # Tab
+                        value = btn.get('tab', '')
+                    elif col_idx == 4:  # 卡片
+                        value = btn.get('card', '')
+                    elif col_idx == 5:  # 启用
+                        value = '✓' if btn.get('enabled', True) else '✗'
+                    
+                    if str(value) != selected_value:
+                        match = False
+                        break
+                
+                if not match:
+                    continue
+                
+                # 再应用搜索过滤器（如果有搜索关键词）
+                if keyword:
+                    search_match = False
+                    
+                    if scope_index == 0:  # 整个表格
+                        search_texts = [
+                            btn.get('name', ''),
+                            btn.get('command', ''),
+                            btn.get('tab', ''),
+                            btn.get('card', ''),
+                            btn.get('description', ''),
+                            '✓' if btn.get('enabled', True) else '✗'
+                        ]
+                        button_type = btn.get('type', 'adb')
+                        type_map = {
+                            'adb': self.tr('ADB命令'),
+                            'python': self.tr('Python脚本'),
+                            'file': self.tr('打开文件'),
+                            'program': self.tr('运行程序'),
+                            'system': self.tr('系统命令')
+                        }
+                        search_texts.append(type_map.get(button_type, ''))
+                        
+                        for text in search_texts:
+                            if keyword.lower() in str(text).lower():
+                                search_match = True
+                                break
+                    else:
+                        # 按列搜索
+                        if scope_index == 1:  # 名称
+                            search_text = btn.get('name', '')
+                        elif scope_index == 2:  # 类型
+                            button_type = btn.get('type', 'adb')
+                            type_map = {
+                                'adb': self.tr('ADB命令'),
+                                'python': self.tr('Python脚本'),
+                                'file': self.tr('打开文件'),
+                                'program': self.tr('运行程序'),
+                                'system': self.tr('系统命令')
+                            }
+                            search_text = type_map.get(button_type, '')
+                        elif scope_index == 3:  # 命令
+                            search_text = btn.get('command', '')
+                        elif scope_index == 4:  # 所在Tab
+                            search_text = btn.get('tab', '')
+                        elif scope_index == 5:  # 所在卡片
+                            search_text = btn.get('card', '')
+                        elif scope_index == 6:  # 启用
+                            search_text = '✓' if btn.get('enabled', True) else '✗'
+                        elif scope_index == 7:  # 描述
+                            search_text = btn.get('description', '')
+                        else:
+                            search_text = ''
+                        
+                        if keyword.lower() in str(search_text).lower():
+                            search_match = True
+                    
+                    match = search_match
                 
                 if match:
                     filtered_buttons.append(btn)
@@ -740,28 +851,33 @@ class UnifiedManagerDialog(QDialog):
             
             self.button_table.resizeRowsToContents()
             
-            if len(filtered_buttons) == 0:
-                QMessageBox.information(self, self.tr("提示"), self.tr("未找到匹配的按钮"))
+            if len(filtered_buttons) == 0 and (keyword or any(combo.currentIndex() > 0 for combo, _, _ in self.column_filters)):
+                # 只有在有过滤条件时才提示
+                pass  # 不显示提示，让用户自己知道过滤结果
                 
         except Exception as e:
-            logger.exception(f"{self.tr('搜索失败:')} {e}")
-            QMessageBox.critical(self, self.tr("错误"), f"{self.tr('搜索失败:')} {str(e)}")
+            logger.exception(f"{self.tr('应用过滤器失败:')} {e}")
     
     def clear_search(self):
         """清除搜索，恢复显示所有按钮"""
         try:
             self.search_input.clear()
             self.search_scope_combo.setCurrentIndex(0)
+            # 重置所有列过滤器
+            for combo, _, _ in self.column_filters:
+                combo.setCurrentIndex(0)
             # 重新加载所有按钮
             self.load_buttons()
         except Exception as e:
             logger.exception(f"{self.tr('清除搜索失败:')} {e}")
     
     def on_refresh_clicked(self):
-        """刷新按钮点击，清除搜索并重新加载"""
+        """刷新按钮点击，保持过滤条件但重新加载数据"""
         try:
-            # 清除搜索状态
-            self.clear_search()
+            # 重新加载数据，但保持当前的搜索和过滤条件
+            self.load_buttons()
+            # 重新应用当前过滤条件
+            self.apply_filters()
         except Exception as e:
             logger.exception(f"{self.tr('刷新失败:')} {e}")
     
