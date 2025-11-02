@@ -47,11 +47,20 @@ function Invoke-GhReleaseCreate {
         & $ghPath release delete ("v{0}" -f $Version) --yes
     }
 
-    & $ghPath release create ("v{0}" -f $Version) $Package `
-        --title ("MobileTestTool v{0}" -f $Version) `
-        --notes $Notes
-    if ($LASTEXITCODE -ne 0) {
-        throw "gh release create failed"
+    # 将 notes 写入临时文件，以便正确处理多行文本和特殊字符
+    $tempNotesFile = [System.IO.Path]::GetTempFileName()
+    try {
+        [System.IO.File]::WriteAllText($tempNotesFile, $Notes, (New-Object System.Text.UTF8Encoding($false)))
+        & $ghPath release create ("v{0}" -f $Version) $Package `
+            --title ("MobileTestTool v{0}" -f $Version) `
+            --notes-file $tempNotesFile
+        if ($LASTEXITCODE -ne 0) {
+            throw "gh release create failed"
+        }
+    } finally {
+        if (Test-Path $tempNotesFile) {
+            Remove-Item $tempNotesFile -Force
+        }
     }
 }
 
