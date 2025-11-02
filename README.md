@@ -41,7 +41,7 @@ python main.py
 
 ```bash
 # 使用批处理文件打包（推荐）
-build_pyqt.bat
+scripts\build_pyqt.bat
 
 # 或手动打包
 pyinstaller --clean MobileTestTool_pyqt.spec
@@ -173,20 +173,20 @@ pyinstaller --clean MobileTestTool_pyqt.spec
 #### 版本打包与发布脚本
 为减少人工操作，可使用项目根目录的 PowerShell 脚本：
 
-##### `release.ps1`
+##### `scripts/release.ps1`
 ```powershell
-.\release.ps1 -Version "0.9.4"              # 打包 + 生成 latest.json + 提交并发布
-.\release.ps1 -Version "0.9.4" -SkipPublish # 仅生成包与 manifest
-.\release.ps1 -Version "0.9.4" -NotesFile ".\notes.md" # 指定发布说明
+.\scripts\release.ps1 -Version "0.9.4"              # 打包 + 生成 latest.json + 提交并发布
+.\scripts\release.ps1 -Version "0.9.4" -SkipPublish # 仅生成包与 manifest
+.\scripts\release.ps1 -Version "0.9.4" -NotesFile "docs\notes.md" # 指定发布说明
 ```
-- 自动执行 `build_pyqt.bat`、压缩 onedir 目录、计算 SHA256 并生成 `releases/latest.json`。
+- 自动执行 `scripts\build_pyqt.bat`、压缩 onedir 目录、计算 SHA256 并生成 `releases/latest.json`。
 - 默认会 `git add/commit/push`、创建 `v<版本>` 标签并调用 GitHub CLI 发布 Release。
 - 需预先安装并登录 GitHub CLI；`-SkipPublish` 可跳过推送与发布，`-NotesFile` 可读取外部 Markdown 作为 release notes。
 
-##### `publish-release.ps1`
+##### `scripts/publish-release.ps1`
 兼容旧流程的入口，内部会转调 `release.ps1`：
 ```powershell
-.\publish-release.ps1 -Version "0.9.4"
+.\scripts\publish-release.ps1 -Version "0.9.4"
 ```
 
 ### 🆕 SIM APDU解析器
@@ -286,7 +286,7 @@ python main.py -w data.json
    - 保存配置
 
 #### 详细文档
-- [Tab管理功能完整指南.md](Tab管理功能完整指南.md) - 完整功能指南和问题修复记录
+- [Tab管理功能完整指南.md](docs/Tab管理功能完整指南.md) - 完整功能指南和问题修复记录
 
 ### 🆕 自定义按钮功能
 
@@ -315,10 +315,10 @@ python main.py -w data.json
 - **📥 导入**: 从文件加载配置
 
 #### 详细文档
-- [自定义按钮功能完整指南.md](自定义按钮功能完整指南.md) - 完整功能指南
-- [Tab管理功能完整指南.md](Tab管理功能完整指南.md) - Tab管理功能
-- [Python脚本功能使用指南.md](Python脚本功能使用指南.md) - Python脚本
-- [MTKlogger_Debug_使用说明.md](MTKlogger_Debug_使用说明.md) - 调试说明
+- [自定义按钮功能完整指南.md](docs/自定义按钮功能完整指南.md) - 完整功能指南
+- [Tab管理功能完整指南.md](docs/Tab管理功能完整指南.md) - Tab管理功能
+- [Python脚本功能使用指南.md](docs/Python脚本功能使用指南.md) - Python脚本
+- [MTKlogger_Debug_使用说明.md](docs/MTKlogger_Debug_使用说明.md) - 调试说明
 
 ---
 
@@ -328,9 +328,18 @@ python main.py -w data.json
 MobileTestTool/
 ├── main.py                    # 程序入口
 ├── requirements_pyqt.txt      # Python依赖
-├── build_pyqt.bat            # 打包脚本
 ├── MobileTestTool_pyqt.spec  # PyInstaller配置
 ├── translations.json         # 多语言翻译文件
+├── scripts/                  # 构建和发布脚本
+│   ├── build_pyqt.bat        # 打包脚本
+│   ├── release.ps1           # 发布脚本
+│   └── publish-release.ps1   # 发布脚本（兼容入口）
+├── docs/                     # 项目文档
+│   ├── notes.md              # 发布说明
+│   ├── Tab管理功能完整指南.md
+│   ├── 自定义按钮功能完整指南.md
+│   ├── Python脚本功能使用指南.md
+│   └── MTKlogger_Debug_使用说明.md
 ├── config/                   # 配置文件
 │   └── language.conf         # 语言配置
 │
@@ -488,7 +497,7 @@ adb version
 - 查看错误提示中的状态码说明
 
 ### 调试模式
-如需调试，可参考 [MTKlogger_Debug_使用说明.md](MTKlogger_Debug_使用说明.md)
+如需调试，可参考 [MTKlogger_Debug_使用说明.md](docs/MTKlogger_Debug_使用说明.md)
 
 ---
 
