@@ -1,536 +1,17 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-自定义按钮配置对话框
+自定义按钮编辑对话框
 """
 
 from PyQt5.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QPushButton,
-                             QTableWidget, QTableWidgetItem, QHeaderView,
                              QMessageBox, QLabel, QLineEdit, QComboBox,
-                             QTextEdit, QCheckBox, QFileDialog, QGroupBox,
+                             QTextEdit, QCheckBox, QFileDialog,
                              QFormLayout, QScrollArea, QWidget, QTextBrowser,
-                             QAbstractItemView)
-from PyQt5.QtCore import Qt, pyqtSignal
+                             QSizePolicy, QFrame)
+from PyQt5.QtCore import Qt
 from core.debug_logger import logger
-
-
-class DragDropButtonTable(QTableWidget):
-    """支持拖拽排序的按钮表格"""
-
-    rows_reordered = pyqtSignal(list)
-
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self.setDragEnabled(True)
-        self.setAcceptDrops(True)
-        self.viewport().setAcceptDrops(True)
-        self.setDropIndicatorShown(True)
-        self.setDragDropMode(QAbstractItemView.InternalMove)
-        self.setDragDropOverwriteMode(False)
-        self.setDefaultDropAction(Qt.MoveAction)
-        self.setSelectionBehavior(QAbstractItemView.SelectRows)
-        self.setSelectionMode(QAbstractItemView.SingleSelection)
-
-    def dragEnterEvent(self, event):
-        if event.source() == self:
-            event.acceptProposedAction()
-        else:
-            super().dragEnterEvent(event)
-
-    def dragMoveEvent(self, event):
-        if event.source() == self:
-            event.acceptProposedAction()
-        else:
-            super().dragMoveEvent(event)
-
-    def dropEvent(self, event):
-        if event.source() != self:
-            super().dropEvent(event)
-            return
-
-        source_row = self.currentRow()
-        if source_row < 0:
-            event.ignore()
-            return
-
-        target_index = self.indexAt(event.pos())
-        if target_index.isValid():
-            target_row = target_index.row()
-            indicator = self.dropIndicatorPosition()
-            if indicator == QAbstractItemView.BelowItem:
-                target_row += 1
-        else:
-            target_row = self.rowCount()
-
-        # 调整目标行，考虑源行删除后的偏移
-        if target_row > source_row:
-            target_row -= 1
-
-        if target_row == source_row or target_row < 0:
-            event.ignore()
-            return
-
-        if target_row > self.rowCount():
-            target_row = self.rowCount()
-
-        # 复制源行数据
-        row_items = []
-        for col in range(self.columnCount()):
-            item = self.item(source_row, col)
-            row_items.append(item.clone() if item else QTableWidgetItem())
-
-        self.removeRow(source_row)
-
-        if target_row < 0:
-            target_row = 0
-
-        self.insertRow(target_row)
-        for col, item in enumerate(row_items):
-            self.setItem(target_row, col, item)
-
-        self.selectRow(target_row)
-        self.resizeRowsToContents()
-        event.acceptProposedAction()
-
-        ordered_ids = []
-        for row in range(self.rowCount()):
-            item = self.item(row, 0)
-            if item:
-                ordered_ids.append(item.data(Qt.UserRole))
-
-        if ordered_ids:
-            self.rows_reordered.emit(ordered_ids)
-
-
-class CustomButtonDialog(QDialog):
-    """自定义按钮管理对话框"""
-    
-    def __init__(self, button_manager, parent=None):
-        super().__init__(parent)
-        self.button_manager = button_manager
-        # 从父窗口获取语言管理器
-        self.lang_manager = parent.lang_manager if parent and hasattr(parent, 'lang_manager') else None
-        self.setWindowTitle(self.tr("自定义按钮管理"))
-        self.setModal(True)
-        self.resize(900, 600)
-        self.setMinimumSize(600, 400)  # 设置最小尺寸，允许调整高度
-        
-        self.setup_ui()
-        self.button_manager.buttons_updated.connect(self.load_buttons)
-        self.load_buttons()
-    
-    def tr(self, text):
-        """安全地获取翻译文本"""
-        return self.lang_manager.tr(text) if self.lang_manager else text
-    
-    def setup_ui(self):
-        """设置UI"""
-        layout = QVBoxLayout(self)
-        
-        # 顶部说明
-        info_text = (self.tr("💡 在此配置自定义命令按钮，按钮将显示在指定的Tab和卡片中。") +
-                    self.tr("adb命令会自动加上 'adb -s {device}' 前缀。"))
-        
-        info_label = QLabel(info_text)
-        info_label.setWordWrap(True)
-        info_label.setStyleSheet("color: #17a2b8; padding: 10px; background: #d1ecf1; border-radius: 4px;")
-        layout.addWidget(info_label)
-        
-        # 按钮列表表格
-        self.table = DragDropButtonTable()
-        self.table.setColumnCount(7)
-        self.table.setHorizontalHeaderLabels([self.tr('名称'), self.tr('类型'), self.tr('命令'), self.tr('所在Tab'), self.tr('所在卡片'), self.tr('启用'), self.tr('描述')])
-        
-        # 设置列宽
-        header = self.table.horizontalHeader()
-        header.setSectionResizeMode(0, QHeaderView.ResizeToContents)
-        header.setSectionResizeMode(1, QHeaderView.ResizeToContents)
-        header.setSectionResizeMode(2, QHeaderView.Stretch)
-        header.setSectionResizeMode(3, QHeaderView.ResizeToContents)
-        header.setSectionResizeMode(4, QHeaderView.ResizeToContents)
-        header.setSectionResizeMode(5, QHeaderView.ResizeToContents)
-        header.setSectionResizeMode(6, QHeaderView.Stretch)
-        
-        self.table.setSelectionBehavior(QTableWidget.SelectRows)
-        self.table.setSelectionMode(QTableWidget.SingleSelection)
-        self.table.rows_reordered.connect(self.on_button_rows_reordered)
-        layout.addWidget(self.table)
-        
-        # 底部按钮区
-        button_layout = QHBoxLayout()
-        
-        self.add_btn = QPushButton("➕ " + self.tr("添加"))
-        self.add_btn.clicked.connect(self.add_button)
-        button_layout.addWidget(self.add_btn)
-        
-        self.edit_btn = QPushButton("✏️ " + self.tr("编辑"))
-        self.edit_btn.clicked.connect(self.edit_button)
-        button_layout.addWidget(self.edit_btn)
-        
-        self.delete_btn = QPushButton("🗑️ " + self.tr("删除"))
-        self.delete_btn.clicked.connect(self.delete_button)
-        button_layout.addWidget(self.delete_btn)
-        
-        button_layout.addStretch()
-        
-        self.import_btn = QPushButton("📥 " + self.tr("导入"))
-        self.import_btn.clicked.connect(self.import_buttons)
-        button_layout.addWidget(self.import_btn)
-        
-        self.export_btn = QPushButton("📤 " + self.tr("导出"))
-        self.export_btn.clicked.connect(self.export_buttons)
-        button_layout.addWidget(self.export_btn)
-        
-        # 移除重复的备份/恢复按钮，只保留导入/导出
-        
-        button_layout.addStretch()
-        
-        self.help_btn = QPushButton("❓ " + self.tr("帮助"))
-        self.help_btn.clicked.connect(self.show_help)
-        button_layout.addWidget(self.help_btn)
-        
-        self.close_btn = QPushButton(self.tr("关闭"))
-        self.close_btn.clicked.connect(self.accept)
-        button_layout.addWidget(self.close_btn)
-        
-        layout.addLayout(button_layout)
-    
-    def load_buttons(self):
-        """加载按钮到表格"""
-        self.table.setSortingEnabled(False)
-        self.table.setRowCount(0)
-        buttons = self.button_manager.get_all_buttons()
-        
-        for btn in buttons:
-            row = self.table.rowCount()
-            self.table.insertRow(row)
-            
-            # 获取按钮类型显示名称
-            button_type = btn.get('type', 'adb')
-            type_map = {
-                'adb': self.tr('ADB命令'),
-                'python': self.tr('Python脚本'),
-                'file': self.tr('打开文件'),
-                'program': self.tr('运行程序'),
-                'system': self.tr('系统命令')
-            }
-            type_display = type_map.get(button_type, self.tr('ADB命令'))
-            
-            self.table.setItem(row, 0, QTableWidgetItem(btn.get('name', '')))
-            self.table.setItem(row, 1, QTableWidgetItem(type_display))
-            self.table.setItem(row, 2, QTableWidgetItem(btn.get('command', '')))
-            self.table.setItem(row, 3, QTableWidgetItem(btn.get('tab', '')))
-            self.table.setItem(row, 4, QTableWidgetItem(btn.get('card', '')))
-            self.table.setItem(row, 5, QTableWidgetItem('✓' if btn.get('enabled', True) else '✗'))
-            self.table.setItem(row, 6, QTableWidgetItem(btn.get('description', '')))
-            
-            # 存储按钮ID
-            self.table.item(row, 0).setData(Qt.UserRole, btn.get('id'))
-    
-        self.table.resizeRowsToContents()
-
-    def on_button_rows_reordered(self, ordered_ids):
-        """处理拖拽排序事件"""
-        if not ordered_ids:
-            return
-
-        if not self.button_manager.reorder_buttons(ordered_ids):
-            QMessageBox.warning(self, self.tr("失败"), self.tr("按钮排序保存失败，请检查日志"))
-
-    def add_button(self):
-        """添加按钮"""
-        dialog = ButtonEditDialog(self.button_manager, parent=self)
-        if dialog.exec_() == QDialog.Accepted:
-            button_data = dialog.get_button_data()
-            if self.button_manager.add_button(button_data):
-                self.load_buttons()
-                QMessageBox.information(self, self.tr("成功"), self.tr("按钮添加成功！"))
-            else:
-                QMessageBox.warning(self, self.tr("失败"), self.tr("按钮添加失败，请检查日志"))
-    
-    def edit_button(self):
-        """编辑按钮"""
-        current_row = self.table.currentRow()
-        if current_row < 0:
-            QMessageBox.warning(self, self.tr("提示"), self.tr("请先选择要编辑的按钮"))
-            return
-        
-        button_id = self.table.item(current_row, 0).data(Qt.UserRole)
-        buttons = self.button_manager.get_all_buttons()
-        button_data = next((btn for btn in buttons if btn['id'] == button_id), None)
-        
-        if button_data:
-            dialog = ButtonEditDialog(self.button_manager, button_data=button_data, parent=self)
-            if dialog.exec_() == QDialog.Accepted:
-                updated_data = dialog.get_button_data()
-                if self.button_manager.update_button(button_id, updated_data):
-                    self.load_buttons()
-                    QMessageBox.information(self, self.tr("成功"), self.tr("按钮更新成功！"))
-                else:
-                    QMessageBox.warning(self, self.tr("失败"), self.tr("按钮更新失败，请检查日志"))
-    
-    def delete_button(self):
-        """删除按钮"""
-        current_row = self.table.currentRow()
-        if current_row < 0:
-            QMessageBox.warning(self, self.tr("提示"), self.tr("请先选择要删除的按钮"))
-            return
-        
-        button_name = self.table.item(current_row, 0).text()
-        reply = QMessageBox.question(
-            self, self.tr("确认删除"),
-            f"{self.tr('确定要删除按钮')} '{button_name}' {self.tr('吗？')}",
-            QMessageBox.Yes | QMessageBox.No
-        )
-        
-        if reply == QMessageBox.Yes:
-            button_id = self.table.item(current_row, 0).data(Qt.UserRole)
-            if self.button_manager.delete_button(button_id):
-                self.load_buttons()
-
-            else:
-                QMessageBox.warning(self, self.tr("失败"), self.tr("按钮删除失败，请检查日志"))
-    
-    def import_buttons(self):
-        """导入按钮配置"""
-        file_path, _ = QFileDialog.getOpenFileName(
-            self, self.tr("导入按钮配置"), "",
-            self.tr("JSON文件 (*.json);;所有文件 (*.*)")
-        )
-        
-        if file_path:
-            if self.button_manager.import_buttons(file_path):
-                self.load_buttons()
-                QMessageBox.information(self, self.tr("成功"), self.tr("按钮配置导入成功！"))
-            else:
-                QMessageBox.warning(self, self.tr("失败"), self.tr("按钮配置导入失败，请检查文件格式"))
-    
-    def export_buttons(self):
-        """导出按钮配置"""
-        file_path, _ = QFileDialog.getSaveFileName(
-            self, self.tr("导出按钮配置"), "custom_buttons.json",
-            self.tr("JSON文件 (*.json);;所有文件 (*.*)")
-        )
-        
-        if file_path:
-            if self.button_manager.export_buttons(file_path):
-                QMessageBox.information(self, self.tr("导出成功"), f"{self.tr('按钮配置导出成功！')}\n{file_path}")
-            else:
-                QMessageBox.warning(self, self.tr("导出失败"), self.tr("按钮配置导出失败，请检查日志"))
-    
-    def show_help(self):
-        """显示帮助对话框"""
-        help_dialog = QDialog(self)
-        help_dialog.setWindowTitle("📖 " + self.tr("自定义按钮使用帮助"))
-        help_dialog.resize(800, 600)
-        
-        layout = QVBoxLayout(help_dialog)
-        
-        # 创建文本浏览器
-        browser = QTextBrowser()
-        browser.setOpenExternalLinks(True)
-        
-        # 帮助文档内容（与ButtonEditDialog中的相同）
-        help_text = """
-        <html>
-        <head>
-            <style>
-                body { font-family: "Microsoft YaHei", Arial, sans-serif; line-height: 1.6; }
-                h1 { color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 10px; }
-                h2 { color: #34495e; margin-top: 20px; }
-                h3 { 
-                    color: #3498db; 
-                    background-color: #2c3e50; 
-                    margin-top: 15px; 
-                    margin-bottom: 10px;
-                    padding: 8px 15px; 
-                    border-radius: 5px; 
-                    font-weight: bold;
-                    font-size: 1.1em;
-                }
-                .type-section { 
-                    background: #ecf0f1; 
-                    padding: 15px; 
-                    margin: 10px 0; 
-                    border-radius: 5px;
-                    border-left: 4px solid #3498db;
-                }
-                .example { 
-                    background: #f8f9fa; 
-                    color: #2c3e50;
-                    padding: 10px; 
-                    margin: 10px 0; 
-                    border-radius: 3px;
-                    border: 1px solid #dee2e6;
-                    font-family: "Consolas", monospace;
-                    font-weight: normal;
-                }
-                .warning { 
-                    background: #f8d7da; 
-                    color: #721c24;
-                    padding: 10px; 
-                    margin: 10px 0; 
-                    border-radius: 3px;
-                    border-left: 4px solid #dc3545;
-                }
-                .tip { 
-                    background: #d1ecf1; 
-                    color: #0c5460;
-                    padding: 10px; 
-                    margin: 10px 0; 
-                    border-radius: 3px;
-                    border-left: 4px solid #17a2b8;
-                }
-                ul { margin-left: 20px; }
-                li { margin: 5px 0; }
-            </style>
-        </head>
-        <body>
-            <h1>🔧 自定义按钮使用指南</h1>
-            
-            <div class="tip">
-                <strong>💡 提示：</strong>自定义按钮功能允许您创建各种类型的快捷操作按钮，支持ADB命令、Python脚本、打开文件等多种功能。
-            </div>
-            
-            <h2>📋 按钮类型说明</h2>
-            
-            <div class="type-section">
-                <h3>① ADB命令</h3>
-                <p><strong>用途：</strong>执行ADB命令来操作Android设备</p>
-                <p><strong>输入格式：</strong>直接输入ADB命令内容，<strong>不需要</strong>加 "adb -s {device}" 前缀</p>
-                <p><strong>示例：</strong></p>
-                <div class="example">
-                    命令/路径: adb reboot<br>
-                    说明: 重启设备<br><br>
-                    
-                    命令/路径: adb shell dumpsys battery<br>
-                    说明: 查看电池信息<br><br>
-                    
-                    命令/路径: logcat -c<br>
-                    说明: 清除logcat缓存
-                </div>
-                <div class="warning">
-                    <strong>⚠️ 注意：</strong>某些危险命令（如 push、pull、install、uninstall）被禁止使用，以确保系统安全。
-                </div>
-            </div>
-            
-            <div class="type-section">
-                <h3>② Python脚本</h3>
-                <p><strong>用途：</strong>执行自定义Python代码片段</p>
-                <p><strong>输入格式：</strong></p>
-                <ul>
-                    <li><strong>命令/路径：</strong>可选，用于描述脚本功能</li>
-                    <li><strong>Python脚本区域：</strong>必填，输入要执行的Python代码</li>
-                </ul>
-                <p><strong>可用模块：</strong>datetime、platform、os、json、math、random、time、subprocess</p>
-                <p><strong>可用变量和函数：</strong></p>
-                <ul>
-                    <li><code>DEVICE_ID</code> - 当前连接的设备ID</li>
-                    <li><code>adb_shell(cmd_list)</code> - 执行ADB shell命令，例如：<code>result = adb_shell(["shell", "getprop"])</code></li>
-                </ul>
-                <p><strong>示例：</strong></p>
-                <div class="example">
-                    # 执行ADB命令<br>
-                    import subprocess as sp<br>
-                    result = adb_shell(["shell", "getprop", "ro.product.model"])<br>
-                    print(f"设备型号: {result.stdout}")<br><br>
-                    
-                    # 获取设备ID<br>
-                    print(f"当前设备: {DEVICE_ID}")<br><br>
-                    
-                    # 获取当前时间<br>
-                    import datetime<br>
-                    print(f"当前时间: {datetime.datetime.now()}")
-                </div>
-                <div class="tip">
-                    <strong>💡 提示：</strong>Python脚本在沙箱环境中执行，输出会显示在日志区域。使用 <code>adb_shell()</code> 函数可以执行ADB命令，会自动添加设备参数。
-                </div>
-            </div>
-            
-            <div class="type-section">
-                <h3>③ 打开文件</h3>
-                <p><strong>用途：</strong>使用默认程序打开指定文件或文件夹</p>
-                <p><strong>输入格式：</strong>输入完整的文件路径，或点击self.tr("浏览文件")按钮选择</p>
-                <p><strong>示例：</strong></p>
-                <div class="example">
-                    C:\\Users\\用户名\\Desktop\\测试报告.docx<br>
-                    C:\\Users\\用户名\\Documents\\项目文档.pdf<br>
-                    D:\\工作文件夹
-                </div>
-            </div>
-            
-            <div class="type-section">
-                <h3>④ 运行程序</h3>
-                <p><strong>用途：</strong>启动指定的可执行程序或Python脚本</p>
-                <p><strong>输入格式：</strong>输入完整的程序路径，或点击self.tr("浏览文件")按钮选择</p>
-                <p><strong>Python脚本支持：</strong>如果运行.py文件，系统会自动传递设备ID作为命令行参数</p>
-                <p><strong>示例：</strong></p>
-                <div class="example">
-                    C:\\Program Files\\Notepad++\\notepad++.exe<br>
-                    C:\\Windows\\System32\\calc.exe<br>
-                    D:\\Tools\\script.py  ← Python脚本会自动收到设备ID参数
-                </div>
-                <div class="tip">
-                    <strong>💡 提示：</strong>Python脚本可以通过 <code>sys.argv[1]</code> 获取设备ID，例如：<br>
-                    <code>import sys<br>device_id = sys.argv[1] if len(sys.argv) > 1 else None</code>
-                </div>
-            </div>
-            
-            <div class="type-section">
-                <h3>⑤ 系统命令</h3>
-                <p><strong>用途：</strong>执行Windows/Linux/Mac系统命令</p>
-                <p><strong>输入格式：</strong>直接输入系统命令</p>
-                <p><strong>示例：</strong></p>
-                <div class="example">
-                    ipconfig /all<br>
-                    dir C:\\<br>
-                    ping 8.8.8.8 -n 4
-                </div>
-                <div class="warning">
-                    <strong>⚠️ 注意：</strong>系统命令会在30秒后超时，请避免使用长时间运行的命令。
-                </div>
-            </div>
-            
-            <h2>🎯 按钮配置说明</h2>
-            
-            <ul>
-                <li><strong>按钮名称：</strong>显示在界面上的按钮文字（必填）</li>
-                <li><strong>按钮类型：</strong>选择按钮执行的操作类型（必选）</li>
-                <li><strong>命令/路径：</strong>根据按钮类型填写相应内容（部分类型必填）</li>
-                <li><strong>描述：</strong>按钮的详细说明，鼠标悬停时显示（可选）</li>
-                <li><strong>所在Tab：</strong>按钮将显示在哪个选项卡（必选）</li>
-                <li><strong>所在卡片：</strong>按钮将显示在哪个功能卡片中（必选）</li>
-                <li><strong>启用此按钮：</strong>是否立即启用该按钮（可选）</li>
-            </ul>
-            
-            <h2>✨ 使用技巧</h2>
-            
-            <ul>
-                <li>为按钮起一个简洁明了的名称，方便快速识别</li>
-                <li>合理使用描述字段，提供更多操作说明</li>
-                <li>将相关功能的按钮放在同一个卡片中，便于管理</li>
-                <li>对于常用操作，可以创建多个快捷按钮</li>
-                <li>使用self.tr("导出")功能可以备份您的按钮配置</li>
-                <li>使用self.tr("导入")功能可以在不同设备间共享配置</li>
-            </ul>
-            
-            <div class="tip">
-                <strong>💡 小贴士：</strong>如果不确定按钮是否正确配置，可以先测试一次，查看日志区域的输出结果。
-            </div>
-            
-        </body>
-        </html>
-        """
-        
-        browser.setHtml(help_text)
-        layout.addWidget(browser)
-        
-        # 关闭按钮
-        close_btn = QPushButton(self.tr("关闭"))
-        close_btn.clicked.connect(help_dialog.accept)
-        layout.addWidget(close_btn)
-        
-        help_dialog.exec_()
+from ui.widgets.shadow_utils import add_card_shadow
 
 
 class ButtonEditDialog(QDialog):
@@ -798,14 +279,49 @@ class ButtonEditDialog(QDialog):
         scroll_layout = QVBoxLayout(scroll_content)
         scroll_layout.setContentsMargins(5, 5, 5, 5)
         
-        # 基本信息组
-        basic_group = QGroupBox(self.tr("基本信息"))
-        basic_layout = QFormLayout(basic_group)
+        # 基本信息组（使用与Tab界面一致的样式：QLabel + QFrame）
+        basic_container = QWidget()
+        basic_layout = QVBoxLayout(basic_container)
+        basic_layout.setContentsMargins(0, 0, 0, 0)
+        basic_layout.setSpacing(4)  # 与Tab界面一致的紧凑间距
         
+        # 标题
+        basic_title = QLabel(self.tr("基本信息"))
+        basic_title.setProperty("class", "section-title")
+        basic_layout.addWidget(basic_title)
+        
+        # 卡片容器
+        basic_card = QFrame()
+        basic_card.setObjectName("card")
+        add_card_shadow(basic_card)
+        basic_card_layout = QVBoxLayout(basic_card)
+        basic_card_layout.setContentsMargins(10, 1, 10, 1)
+        basic_card_layout.setSpacing(8)
+        
+        # 统一标签宽度，确保对齐
+        label_width = 85
+        
+        # 统一输入框和下拉框的固定宽度（像素值，不受对话框缩放影响）
+        input_width = 200  # 固定宽度200像素
+        
+        # 第一行：按钮名称和按钮类型
+        row1_layout = QHBoxLayout()
+        name_label = QLabel(self.tr("按钮名称*:"))
+        name_label.setFixedWidth(label_width)
+        name_label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)  # 左对齐
         self.name_edit = QLineEdit()
         self.name_edit.setPlaceholderText(self.tr("例如：重启设备"))
-        basic_layout.addRow(self.tr("按钮名称*:"), self.name_edit)
+        # 使用固定宽度，不会随对话框缩放而变化
+        self.name_edit.setFixedWidth(input_width)
+        # 设置大小策略为Fixed，确保宽度不会随窗口缩放改变
+        self.name_edit.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+        row1_layout.addWidget(name_label)
+        row1_layout.addWidget(self.name_edit)
+        row1_layout.addSpacing(20)  # 添加间距
         
+        type_label = QLabel(self.tr("按钮类型*:"))
+        type_label.setFixedWidth(label_width)
+        type_label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)  # 左对齐
         # 按钮类型选择
         self.type_combo = QComboBox()
         self.type_combo.addItems([
@@ -815,61 +331,134 @@ class ButtonEditDialog(QDialog):
             self.tr("运行程序"), 
             self.tr("系统命令")
         ])
+        self.type_combo.setCurrentIndex(0)  # 默认选择ADB命令
         self.type_combo.currentTextChanged.connect(self.on_type_changed)
-        basic_layout.addRow(self.tr("按钮类型*:"), self.type_combo)
+        # 统一QComboBox和QLineEdit的高度和宽度（固定宽度）
+        self.type_combo.setFixedHeight(self.name_edit.sizeHint().height())
+        self.type_combo.setFixedWidth(input_width)
+        # 设置大小策略为Fixed，确保宽度不会随窗口缩放改变
+        self.type_combo.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+        row1_layout.addWidget(type_label)
+        row1_layout.addWidget(self.type_combo)
+        basic_card_layout.addLayout(row1_layout)
         
-        self.command_edit = QLineEdit()
-        self.command_edit.setPlaceholderText(self.tr("adb reboot"))
-        basic_layout.addRow(self.tr("命令/路径*:"), self.command_edit)
-        
-        self.description_edit = QTextEdit()
-        self.description_edit.setPlaceholderText(self.tr("描述按钮的功能..."))
-        self.description_edit.setMaximumHeight(80)
-        basic_layout.addRow(self.tr("描述:"), self.description_edit)
-        
-        scroll_layout.addWidget(basic_group)
-        
-        # 高级设置组（用于Python脚本等）
-        self.advanced_group = QGroupBox(self.tr("高级设置"))
-        advanced_layout = QVBoxLayout(self.advanced_group)
-        
-        self.script_edit = QTextEdit()
-        self.script_edit.setPlaceholderText(self.tr("输入Python脚本代码..."))
-        self.script_edit.setMaximumHeight(200)  # 增加高度
-        self.script_edit.setVisible(False)
-        self.script_edit.textChanged.connect(self.update_preview)
-        advanced_layout.addWidget(self.script_edit)
-        
-        self.file_browse_btn = QPushButton(self.tr("浏览文件"))
-        self.file_browse_btn.clicked.connect(self.browse_file)
-        self.file_browse_btn.setVisible(False)
-        advanced_layout.addWidget(self.file_browse_btn)
-        
-        scroll_layout.addWidget(self.advanced_group)
-        
-        # 位置设置组
-        position_group = QGroupBox(self.tr("显示位置"))
-        position_layout = QFormLayout(position_group)
-        
+        # 第二行：所在Tab和所在卡片
+        row2_layout = QHBoxLayout()
+        tab_label = QLabel(self.tr("所在Tab*:"))
+        tab_label.setFixedWidth(label_width)
+        tab_label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)  # 左对齐
         self.tab_combo = QComboBox()
         self.tab_combo.currentTextChanged.connect(self.on_tab_changed)
-        position_layout.addRow(self.tr("所在Tab*:"), self.tab_combo)
+        # 统一高度和宽度（固定宽度）
+        self.tab_combo.setFixedHeight(self.name_edit.sizeHint().height())
+        self.tab_combo.setFixedWidth(input_width)
+        # 设置大小策略为Fixed，确保宽度不会随窗口缩放改变
+        self.tab_combo.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+        row2_layout.addWidget(tab_label)
+        row2_layout.addWidget(self.tab_combo)
+        row2_layout.addSpacing(20)  # 添加间距
         
+        card_label = QLabel(self.tr("所在卡片*:"))
+        card_label.setFixedWidth(label_width)
+        card_label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)  # 左对齐
         self.card_combo = QComboBox()
-        position_layout.addRow(self.tr("所在卡片*:"), self.card_combo)
+        # 统一高度和宽度（固定宽度）
+        self.card_combo.setFixedHeight(self.name_edit.sizeHint().height())
+        self.card_combo.setFixedWidth(input_width)
+        # 设置大小策略为Fixed，确保宽度不会随窗口缩放改变
+        self.card_combo.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+        row2_layout.addWidget(card_label)
+        row2_layout.addWidget(self.card_combo)
+        basic_card_layout.addLayout(row2_layout)
         
         # 在card_combo创建之后刷新Tab列表
         self.refresh_tab_list()
         
+        # 启用此按钮
         self.enabled_check = QCheckBox(self.tr("启用此按钮"))
         self.enabled_check.setChecked(True)
-        position_layout.addRow("", self.enabled_check)
+        basic_card_layout.addWidget(self.enabled_check)
         
-        scroll_layout.addWidget(position_group)
+        # 描述
+        description_label = QLabel(self.tr("描述:"))
+        # 固定标签高度，防止布局变化时被拉伸
+        label_height = description_label.sizeHint().height()
+        description_label.setFixedHeight(label_height)
+        description_label.setMaximumHeight(label_height)
+        self.description_edit = QTextEdit()
+        self.description_edit.setPlaceholderText(self.tr("描述按钮的功能..."))
+        self.description_edit.setMaximumHeight(52)
+        basic_card_layout.addWidget(description_label)
+        basic_card_layout.addWidget(self.description_edit)
         
-        # 命令预览
-        preview_group = QGroupBox(self.tr("命令预览"))
-        preview_layout = QVBoxLayout(preview_group)
+        basic_layout.addWidget(basic_card)
+        scroll_layout.addWidget(basic_container)
+        
+        # 高级设置组（用于脚本/命令输入或文件选择）（使用与Tab界面一致的样式）
+        advanced_container = QWidget()
+        advanced_layout = QVBoxLayout(advanced_container)
+        advanced_layout.setContentsMargins(0, 0, 0, 0)
+        advanced_layout.setSpacing(4)  # 与Tab界面一致的紧凑间距
+        
+        # 标题（保存引用以便动态修改）
+        self.advanced_title = QLabel(self.tr("高级设置"))
+        self.advanced_title.setProperty("class", "section-title")
+        advanced_layout.addWidget(self.advanced_title)
+        
+        # 卡片容器
+        self.advanced_card = QFrame()
+        self.advanced_card.setObjectName("card")
+        add_card_shadow(self.advanced_card)
+        advanced_card_layout = QVBoxLayout(self.advanced_card)
+        advanced_card_layout.setContentsMargins(10, 1, 10, 1)
+        advanced_card_layout.setSpacing(8)
+        
+        # 脚本/命令输入区域（用于ADB命令、系统命令、Python脚本）
+        self.script_edit = QTextEdit()
+        self.script_edit.setPlaceholderText(self.tr("输入Python脚本代码..."))
+        self.script_edit.setMaximumHeight(300)
+        self.script_edit.setVisible(False)
+        self.script_edit.textChanged.connect(self.update_preview)
+        advanced_card_layout.addWidget(self.script_edit)
+        
+        # 文件路径输入区域（用于打开文件和运行程序）
+        path_layout = QHBoxLayout()
+        self.path_edit = QLineEdit()
+        self.path_edit.setPlaceholderText(self.tr("输入文件路径或点击浏览按钮选择..."))
+        self.path_edit.setVisible(False)
+        self.path_edit.textChanged.connect(self.update_preview)
+        path_layout.addWidget(self.path_edit)
+        
+        self.file_browse_btn = QPushButton(self.tr("浏览文件"))
+        self.file_browse_btn.clicked.connect(self.browse_file)
+        self.file_browse_btn.setVisible(False)
+        path_layout.addWidget(self.file_browse_btn)
+        
+        advanced_card_layout.addLayout(path_layout)
+        advanced_layout.addWidget(self.advanced_card)
+        scroll_layout.addWidget(advanced_container)
+        
+        # 保存advanced_card引用，用于控制可见性
+        self.advanced_group = advanced_container
+        
+        # 命令预览（使用与Tab界面一致的样式）
+        preview_container = QWidget()
+        preview_layout = QVBoxLayout(preview_container)
+        preview_layout.setContentsMargins(0, 0, 0, 0)
+        preview_layout.setSpacing(4)  # 与Tab界面一致的紧凑间距
+        
+        # 标题
+        preview_title = QLabel(self.tr("命令预览"))
+        preview_title.setProperty("class", "section-title")
+        preview_layout.addWidget(preview_title)
+        
+        # 卡片容器
+        preview_card = QFrame()
+        preview_card.setObjectName("card")
+        add_card_shadow(preview_card)
+        preview_card_layout = QVBoxLayout(preview_card)
+        preview_card_layout.setContentsMargins(10, 1, 10, 1)
+        preview_card_layout.setSpacing(8)
         
         self.preview_label = QLabel()
         self.preview_label.setWordWrap(True)
@@ -878,11 +467,10 @@ class ButtonEditDialog(QDialog):
             "border: 1px solid #dee2e6; border-radius: 4px; "
             "font-family: 'Consolas', 'Monaco', monospace;"
         )
-        preview_layout.addWidget(self.preview_label)
+        preview_card_layout.addWidget(self.preview_label)
         
-        self.command_edit.textChanged.connect(self.update_preview)
-        
-        scroll_layout.addWidget(preview_group)
+        preview_layout.addWidget(preview_card)
+        scroll_layout.addWidget(preview_container)
         
         # 设置滚动区域的内容
         scroll_area.setWidget(scroll_content)
@@ -905,6 +493,9 @@ class ButtonEditDialog(QDialog):
         # 初始化Card列表（在card_combo创建之后）
         self.on_tab_changed(self.tab_combo.currentText())
         
+        # 初始化类型相关的UI（默认不选择类型，所以高级设置区域应该是隐藏的）
+        self.on_type_changed(self.type_combo.currentText())
+        
         # 初始预览
         self.update_preview()
     
@@ -926,6 +517,14 @@ class ButtonEditDialog(QDialog):
     
     def on_type_changed(self, type_text):
         """按钮类型改变时的处理"""
+        # 如果未选择类型（空字符串），隐藏高级设置区域
+        if not type_text or type_text.strip() == "":
+            self.script_edit.setVisible(False)
+            self.path_edit.setVisible(False)
+            self.file_browse_btn.setVisible(False)
+            self.advanced_group.setVisible(False)  # advanced_group现在是容器
+            return
+        
         type_map = {
             self.tr("ADB命令"): "adb",
             self.tr("Python脚本"): "python", 
@@ -934,33 +533,48 @@ class ButtonEditDialog(QDialog):
             self.tr("系统命令"): "system"
         }
         
-        button_type = type_map.get(type_text, "adb")
-        
-        # 更新输入框的占位符
-        placeholders = {
-            "adb": self.tr("adb reboot（不需要加 'adb -s {device}'）"),
-            "python": self.tr("可选：脚本描述或文件名（如：系统信息收集）"),
-            "file": self.tr("例如：C:\\Users\\用户名\\Desktop\\文件.txt"),
-            "program": self.tr("例如：C:\\Program Files\\Notepad++\\notepad++.exe"),
-            "system": self.tr("例如：dir 或 ls")
-        }
-        
-        self.command_edit.setPlaceholderText(placeholders.get(button_type, ""))
+        button_type = type_map.get(type_text, None)
+        if not button_type:
+            # 如果不是已知的类型，隐藏高级设置
+            self.script_edit.setVisible(False)
+            self.path_edit.setVisible(False)
+            self.file_browse_btn.setVisible(False)
+            self.advanced_group.setVisible(False)
+            return
         
         # 显示/隐藏高级设置
-        if button_type == "python":
+        if button_type in ["adb", "system", "python"]:
+            # ADB命令、系统命令、Python脚本：使用脚本/命令输入区域
             self.script_edit.setVisible(True)
-            self.script_edit.setMaximumHeight(300)  # 增加Python脚本编辑区域高度
+            self.script_edit.setMaximumHeight(300)
+            self.path_edit.setVisible(False)
             self.file_browse_btn.setVisible(False)
-            self.advanced_group.setTitle(self.tr("Python脚本"))
+            self.advanced_title.setText(self.tr("脚本\\命令"))  # 更新标题文本
             self.advanced_group.setVisible(True)
+            
+            # 设置占位符
+            if button_type == "adb":
+                self.script_edit.setPlaceholderText(self.tr("输入ADB命令（多行支持，不需要加 'adb -s {device}'）...\n例如：reboot\n例如：shell dumpsys battery"))
+            elif button_type == "system":
+                self.script_edit.setPlaceholderText(self.tr("输入系统命令（多行支持）...\n例如：dir\n例如：ipconfig /all"))
+            else:  # python
+                self.script_edit.setPlaceholderText(self.tr("输入Python脚本代码..."))
         elif button_type in ["file", "program"]:
+            # 打开文件和运行程序：使用路径输入和浏览按钮
             self.script_edit.setVisible(False)
+            self.path_edit.setVisible(True)
             self.file_browse_btn.setVisible(True)
-            self.advanced_group.setTitle(self.tr("文件选择"))
+            self.advanced_title.setText(self.tr("文件选择"))  # 更新标题文本
             self.advanced_group.setVisible(True)
+            
+            # 设置占位符
+            if button_type == "file":
+                self.path_edit.setPlaceholderText(self.tr("例如：C:\\Users\\用户名\\Desktop\\文件.txt"))
+            else:  # program
+                self.path_edit.setPlaceholderText(self.tr("例如：C:\\Program Files\\Notepad++\\notepad++.exe"))
         else:
             self.script_edit.setVisible(False)
+            self.path_edit.setVisible(False)
             self.file_browse_btn.setVisible(False)
             self.advanced_group.setVisible(False)
     
@@ -976,9 +590,10 @@ class ButtonEditDialog(QDialog):
                 self.tr("所有文件 (*.*)")
             )
         elif type_text == self.tr("运行程序"):
+            # Windows平台：支持.exe、.py、.bat、.cmd等
             file_path, _ = QFileDialog.getOpenFileName(
                 self, self.tr("选择要运行的程序"), "",
-                self.tr("可执行文件 (*.exe);;所有文件 (*.*)")
+                self.tr("可执行文件和脚本 (*.exe *.py *.bat *.cmd);;所有文件 (*.*)")
             )
         else:
             file_path, _ = QFileDialog.getOpenFileName(
@@ -987,22 +602,26 @@ class ButtonEditDialog(QDialog):
             )
         
         if file_path:
-            self.command_edit.setText(file_path)
+            self.path_edit.setText(file_path)
     
     def update_preview(self):
         """更新命令预览"""
-        command = self.command_edit.text().strip()
         button_type = self.type_combo.currentText()
         
-        if command:
-            if button_type == self.tr("ADB命令"):
-                # ADB命令预览
-                clean_command = command
+        # 如果未选择类型，显示提示
+        if not button_type or button_type.strip() == "":
+            self.preview_label.setText(self.tr("请先选择按钮类型..."))
+            return
+        
+        if button_type == self.tr("ADB命令"):
+            # ADB命令预览
+            command = self.script_edit.toPlainText().strip()
+            if command:
+                clean_command = command.split('\n')[0]  # 只显示第一行作为预览
                 if clean_command.lower().startswith('adb '):
                     clean_command = clean_command[4:].strip()
                 
                 preview = f"{self.tr('adb -s {{设备ID}}')} {clean_command}"
-                self.preview_label.setText(preview)
                 
                 # 检查ADB命令是否被阻止
                 if not self.button_manager.validate_command(command):
@@ -1023,45 +642,81 @@ class ButtonEditDialog(QDialog):
                         )
                         self.preview_label.setText(f"{self.tr('⚠️ 命令验证失败')}")
                         return
-            elif button_type == self.tr("Python脚本"):
-                # Python脚本预览
-                script = self.script_edit.toPlainText().strip()
-                if script:
-                    preview = f"{self.tr('执行Python脚本:')}\n{script[:100]}{'...' if len(script) > 100 else ''}"
-                else:
-                    preview = self.tr("Python脚本为空")
-            elif button_type == self.tr("打开文件"):
-                # 文件预览
+                
+                self.preview_label.setStyleSheet(
+                    "background: #f8f9fa; padding: 10px; "
+                    "border: 1px solid #dee2e6; border-radius: 4px; "
+                    "font-family: 'Consolas', 'Monaco', monospace;"
+                )
+                self.preview_label.setText(preview)
+            else:
+                self.preview_label.setText(self.tr("请输入ADB命令..."))
+        elif button_type == self.tr("Python脚本"):
+            # Python脚本预览
+            script = self.script_edit.toPlainText().strip()
+            if script:
+                preview = f"{self.tr('执行Python脚本:')}\n{script[:100]}{'...' if len(script) > 100 else ''}"
+                self.preview_label.setStyleSheet(
+                    "background: #f8f9fa; padding: 10px; "
+                    "border: 1px solid #dee2e6; border-radius: 4px; "
+                    "font-family: 'Consolas', 'Monaco', monospace;"
+                )
+                self.preview_label.setText(preview)
+            else:
+                self.preview_label.setText(self.tr("Python脚本为空"))
+        elif button_type == self.tr("打开文件"):
+            # 文件预览
+            command = self.path_edit.text().strip()
+            if command:
                 import os
                 if os.path.exists(command):
                     preview = f"✅ {self.tr('将打开文件:')}\n{command}"
                 else:
                     preview = f"⚠️ {self.tr('文件不存在:')}\n{command}"
-            elif button_type == self.tr("运行程序"):
-                # 程序预览
+                self.preview_label.setStyleSheet(
+                    "background: #f8f9fa; padding: 10px; "
+                    "border: 1px solid #dee2e6; border-radius: 4px; "
+                    "font-family: 'Consolas', 'Monaco', monospace;"
+                )
+                self.preview_label.setText(preview)
+            else:
+                self.preview_label.setText(self.tr("请选择要打开的文件..."))
+        elif button_type == self.tr("运行程序"):
+            # 程序预览
+            command = self.path_edit.text().strip()
+            if command:
                 import os
                 if os.path.exists(command):
                     preview = f"✅ {self.tr('将运行程序:')}\n{command}"
                 else:
                     preview = f"⚠️ {self.tr('程序不存在:')}\n{command}"
-            elif button_type == self.tr("系统命令"):
-                # 系统命令预览
-                preview = f"{self.tr('将执行系统命令:')}\n{command}"
-            
-            # 设置正常样式
-            self.preview_label.setStyleSheet(
-                "background: #f8f9fa; padding: 10px; "
-                "border: 1px solid #dee2e6; border-radius: 4px; "
-                "font-family: 'Consolas', 'Monaco', monospace;"
-            )
-            self.preview_label.setText(preview)
+                self.preview_label.setStyleSheet(
+                    "background: #f8f9fa; padding: 10px; "
+                    "border: 1px solid #dee2e6; border-radius: 4px; "
+                    "font-family: 'Consolas', 'Monaco', monospace;"
+                )
+                self.preview_label.setText(preview)
+            else:
+                self.preview_label.setText(self.tr("请选择要运行的程序..."))
+        elif button_type == self.tr("系统命令"):
+            # 系统命令预览
+            command = self.script_edit.toPlainText().strip()
+            if command:
+                preview = f"{self.tr('将执行系统命令:')}\n{command.split('\n')[0]}"  # 显示第一行
+                self.preview_label.setStyleSheet(
+                    "background: #f8f9fa; padding: 10px; "
+                    "border: 1px solid #dee2e6; border-radius: 4px; "
+                    "font-family: 'Consolas', 'Monaco', monospace;"
+                )
+                self.preview_label.setText(preview)
+            else:
+                self.preview_label.setText(self.tr("请输入系统命令..."))
         else:
             self.preview_label.setText(f"{self.tr('请输入')}{button_type}{self.tr('内容...')}")
     
     def load_data(self):
         """加载按钮数据"""
         self.name_edit.setText(self.button_data.get('name', ''))
-        self.command_edit.setText(self.button_data.get('command', ''))
         self.description_edit.setPlainText(self.button_data.get('description', ''))
         
         # 加载按钮类型
@@ -1074,14 +729,23 @@ class ButtonEditDialog(QDialog):
             'system': self.tr('系统命令')
         }
         type_text = type_map.get(button_type, self.tr('ADB命令'))
+        # 在ComboBox中查找，注意第一个选项是空字符串
         index = self.type_combo.findText(type_text)
         if index >= 0:
             self.type_combo.setCurrentIndex(index)
         
-        # 加载Python脚本
-        if button_type == 'python':
+        # 根据类型加载内容
+        command = self.button_data.get('command', '')
+        if button_type in ['adb', 'system']:
+            # ADB命令和系统命令：加载到script_edit
+            self.script_edit.setPlainText(command)
+        elif button_type == 'python':
+            # Python脚本：加载script字段到script_edit
             script = self.button_data.get('script', '')
             self.script_edit.setPlainText(script)
+        elif button_type in ['file', 'program']:
+            # 文件和程序：加载到path_edit
+            self.path_edit.setText(command)
         
         tab = self.button_data.get('tab', '')
         if tab:
@@ -1100,21 +764,24 @@ class ButtonEditDialog(QDialog):
     def save(self):
         """保存按钮"""
         name = self.name_edit.text().strip()
-        command = self.command_edit.text().strip()
         button_type = self.type_combo.currentText()
         
         if not name:
             QMessageBox.warning(self, self.tr("验证失败"), "请输入按钮名称")
             return
         
-        # 对于Python脚本，命令/路径字段是可选的（用作描述）
-        if button_type != self.tr("Python脚本") and not command:
-            QMessageBox.warning(self, self.tr("验证失败"), f"请输入{button_type}内容")
+        # 检查是否选择了按钮类型
+        if not button_type or button_type.strip() == "":
+            QMessageBox.warning(self, self.tr("验证失败"), "请选择按钮类型")
             return
         
         # 根据按钮类型进行不同的验证
         if button_type == self.tr("ADB命令"):
             # 验证ADB命令
+            command = self.script_edit.toPlainText().strip()
+            if not command:
+                QMessageBox.warning(self, self.tr("验证失败"), "请输入ADB命令")
+                return
             if not self.button_manager.validate_command(command):
                 reason = self.button_manager.get_blocked_reason(command)
                 QMessageBox.warning(
@@ -1123,14 +790,23 @@ class ButtonEditDialog(QDialog):
                 )
                 return
         elif button_type == self.tr("Python脚本"):
-            # 验证Python脚本 - 主要检查脚本区域，命令/路径作为描述
+            # 验证Python脚本
             script = self.script_edit.toPlainText().strip()
             if not script:
-                QMessageBox.warning(self, self.tr("验证失败"), "请在Python脚本区域输入代码")
+                QMessageBox.warning(self, self.tr("验证失败"), "请输入Python脚本代码")
                 return
-            # 命令/路径字段可以为空或用作描述
+        elif button_type == self.tr("系统命令"):
+            # 验证系统命令
+            command = self.script_edit.toPlainText().strip()
+            if not command:
+                QMessageBox.warning(self, self.tr("验证失败"), "请输入系统命令")
+                return
         elif button_type in [self.tr("打开文件"), self.tr("运行程序")]:
             # 验证文件路径
+            command = self.path_edit.text().strip()
+            if not command:
+                QMessageBox.warning(self, self.tr("验证失败"), "请输入文件或程序路径")
+                return
             import os
             if not os.path.exists(command):
                 QMessageBox.warning(
@@ -1144,6 +820,7 @@ class ButtonEditDialog(QDialog):
     def get_button_data(self):
         """获取按钮数据"""
         # 获取按钮类型
+        current_text = self.type_combo.currentText()
         type_map = {
             self.tr("ADB命令"): "adb",
             self.tr("Python脚本"): "python", 
@@ -1151,12 +828,23 @@ class ButtonEditDialog(QDialog):
             self.tr("运行程序"): "program",
             self.tr("系统命令"): "system"
         }
-        button_type = type_map.get(self.type_combo.currentText(), "adb")
+        button_type = type_map.get(current_text, "adb")
+        
+        # 根据类型获取command字段
+        if button_type in ['adb', 'system']:
+            # ADB命令和系统命令：从script_edit获取
+            command = self.script_edit.toPlainText().strip()
+        elif button_type in ['file', 'program']:
+            # 文件和程序：从path_edit获取
+            command = self.path_edit.text().strip()
+        else:
+            # Python脚本：command可以为空
+            command = ''
         
         data = {
             'name': self.name_edit.text().strip(),
             'type': button_type,
-            'command': self.command_edit.text().strip(),
+            'command': command,
             'tab': self.tab_combo.currentText(),
             'card': self.card_combo.currentText(),
             'enabled': self.enabled_check.isChecked(),

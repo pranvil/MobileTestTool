@@ -11,7 +11,7 @@ import datetime
 from PyQt5.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QPushButton, 
                              QTableWidget, QTableWidgetItem, QHeaderView,
                              QLineEdit, QMessageBox, QFileDialog, QLabel,
-                             QDialogButtonBox, QTextEdit, QGroupBox, QFormLayout,
+                             QDialogButtonBox, QTextEdit, QFormLayout,
                              QSplitter, QWidget)
 from PyQt5.QtCore import Qt
 from core.debug_logger import logger
@@ -32,7 +32,7 @@ class QCNVDialog(QDialog):
         
         self.setWindowTitle(self.tr("高通NV"))
         self.setModal(True)
-        self.resize(1000, 700)
+        self.resize(400,700)  # 默认大小减少一半，仍可手动调整
         
         # 数据存储
         self.nv_data = []  # 存储NV信息的列表 [{"nv_value": "...", "description": "..."}]
@@ -69,13 +69,35 @@ class QCNVDialog(QDialog):
         self.table.setColumnCount(2)
         self.table.setHorizontalHeaderLabels([self.tr("NV值"), self.tr("说明")])
         
-        # 设置列宽
+        # 启用网格线显示，确保列分隔线可见
+        self.table.setShowGrid(True)
+        
+        # 设置列宽（允许手动调整）
         header = self.table.horizontalHeader()
-        header.setSectionResizeMode(0, QHeaderView.ResizeToContents)
-        header.setSectionResizeMode(1, QHeaderView.Stretch)
+        header.setSectionResizeMode(0, QHeaderView.Interactive)  # 允许手动调整
+        header.setSectionResizeMode(1, QHeaderView.Interactive)  # 允许手动调整
+        # 设置初始列宽
+        self.table.setColumnWidth(0, 200)  # NV值列初始宽度
+        self.table.setColumnWidth(1, 350)  # 说明列初始宽度
         
         self.table.setSelectionBehavior(QTableWidget.SelectRows)
         self.table.setSelectionMode(QTableWidget.SingleSelection)
+        
+        # 设置表格样式，让列分隔线更明显
+        self.table.setStyleSheet("""
+            QTableWidget {
+                gridline-color: #666666;
+                border: 1px solid #555555;
+            }
+            QTableWidget::item {
+                border-right: 1px solid #666666;
+                border-bottom: 1px solid #666666;
+            }
+            QHeaderView::section {
+                border-right: 1px solid #666666;
+                border-bottom: 1px solid #666666;
+            }
+        """)
         
         # 双击事件
         self.table.itemDoubleClicked.connect(self.on_item_double_clicked)

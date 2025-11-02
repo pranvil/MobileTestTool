@@ -4,7 +4,7 @@
 Log控制 Tab
 """
 
-from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QGroupBox,
+from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout,
                               QPushButton, QLabel, QScrollArea, QFrame)
 from PyQt5.QtCore import pyqtSignal, Qt
 from ui.widgets.shadow_utils import add_card_shadow
@@ -85,7 +85,7 @@ class LogControlTab(QWidget):
         scroll_layout.setContentsMargins(0, 0, 0, 0)
         scroll_layout.setSpacing(1)
         
-        # 1. MTKLOG 控制组
+        # 1. LOG控制组
         mtklog_group = self.create_mtklog_group()
         scroll_layout.addWidget(mtklog_group)
         
@@ -100,7 +100,7 @@ class LogControlTab(QWidget):
         main_layout.addWidget(scroll)
         
     def create_mtklog_group(self):
-        """创建 MTKLOG 控制组（现代结构：QLabel + QFrame）"""
+        """创建 LOG控制组（现代结构：QLabel + QFrame）"""
         # 容器
         container = QWidget()
         v = QVBoxLayout(container)
@@ -108,7 +108,7 @@ class LogControlTab(QWidget):
         v.setSpacing(4)  # 紧凑的标题和卡片之间的间距
         
         # 标题
-        title = QLabel(self.lang_manager.tr("MTKLOG 控制"))
+        title = QLabel(self.lang_manager.tr("LOG控制"))
         title.setProperty("class", "section-title")
         v.addWidget(title)
         
@@ -355,8 +355,8 @@ class LogControlTab(QWidget):
         for label in self.findChildren(QLabel):
             current_text = label.text()
             # 根据当前文本匹配对应的翻译
-            if current_text in ["MTKLOG 控制", "MTKLOG Control"]:
-                label.setText(self.lang_manager.tr("MTKLOG 控制"))
+            if current_text in ["LOG控制", "MTKLOG Control"]:
+                label.setText(self.lang_manager.tr("LOG控制"))
             elif current_text in ["ADB Log 控制", "ADB Log Control"]:
                 label.setText(self.lang_manager.tr("ADB Log 控制"))
             elif current_text in ["模式:", "Mode:"]:

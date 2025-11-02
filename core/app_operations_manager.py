@@ -13,8 +13,11 @@ import threading
 from datetime import datetime
 from PyQt5.QtCore import QObject, pyqtSignal, QThread, Qt
 from PyQt5.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QPushButton, 
-                             QLabel, QCheckBox, QLineEdit, QGroupBox, 
-                             QRadioButton, QFileDialog, QMessageBox, QTextEdit)
+                             QLabel, QCheckBox, QLineEdit,
+                             QRadioButton, QFileDialog, QMessageBox, QTextEdit,
+                             QWidget, QFrame)
+
+from ui.widgets.shadow_utils import add_card_shadow
 
 
 class AppOperationsManager(QObject):
@@ -1069,9 +1072,22 @@ class PackageQueryDialog(QDialog):
         title.setStyleSheet("font-size: 14pt; font-weight: bold;")
         layout.addWidget(title)
         
-        # 参数选择组
-        params_group = QGroupBox(self.tr("查询参数"))
-        params_layout = QVBoxLayout()
+        # 参数选择组（使用与Tab界面一致的样式：QLabel + QFrame）
+        params_container = QWidget()
+        params_container_layout = QVBoxLayout(params_container)
+        params_container_layout.setContentsMargins(0, 0, 0, 0)
+        params_container_layout.setSpacing(4)
+        
+        params_title = QLabel(self.tr("查询参数"))
+        params_title.setProperty("class", "section-title")
+        params_container_layout.addWidget(params_title)
+        
+        params_card = QFrame()
+        params_card.setObjectName("card")
+        add_card_shadow(params_card)
+        params_layout = QVBoxLayout(params_card)
+        params_layout.setContentsMargins(10, 1, 10, 1)
+        params_layout.setSpacing(8)
         
         self.param_checkboxes = {}
         param_options = [
@@ -1088,12 +1104,25 @@ class PackageQueryDialog(QDialog):
             self.param_checkboxes[param] = cb
             params_layout.addWidget(cb)
         
-        params_group.setLayout(params_layout)
-        layout.addWidget(params_group)
+        params_container_layout.addWidget(params_card)
+        layout.addWidget(params_container)
         
-        # 过滤选项组
-        filter_group = QGroupBox(self.tr("过滤选项"))
-        filter_layout = QVBoxLayout()
+        # 过滤选项组（使用与Tab界面一致的样式：QLabel + QFrame）
+        filter_container = QWidget()
+        filter_container_layout = QVBoxLayout(filter_container)
+        filter_container_layout.setContentsMargins(0, 0, 0, 0)
+        filter_container_layout.setSpacing(4)
+        
+        filter_title = QLabel(self.tr("过滤选项"))
+        filter_title.setProperty("class", "section-title")
+        filter_container_layout.addWidget(filter_title)
+        
+        filter_card = QFrame()
+        filter_card.setObjectName("card")
+        add_card_shadow(filter_card)
+        filter_layout = QVBoxLayout(filter_card)
+        filter_layout.setContentsMargins(10, 1, 10, 1)
+        filter_layout.setSpacing(8)
         
         self.filter_enabled_cb = QCheckBox(self.tr("启用过滤"))
         filter_layout.addWidget(self.filter_enabled_cb)
@@ -1104,8 +1133,8 @@ class PackageQueryDialog(QDialog):
         filter_input_layout.addWidget(self.filter_entry)
         
         filter_layout.addLayout(filter_input_layout)
-        filter_group.setLayout(filter_layout)
-        layout.addWidget(filter_group)
+        filter_container_layout.addWidget(filter_card)
+        layout.addWidget(filter_container)
         
         # 按钮
         button_layout = QHBoxLayout()
@@ -1325,9 +1354,21 @@ class InstallApkDialog(QDialog):
         title.setStyleSheet("font-size: 14pt; font-weight: bold; margin-bottom: 10px;")
         layout.addWidget(title)
         
-        # 参数选择组
-        params_group = QGroupBox(self.tr("安装参数（可选）"))
-        params_layout = QVBoxLayout()
+        # 参数选择组（使用与Tab界面一致的样式：QLabel + QFrame）
+        params_container = QWidget()
+        params_container_layout = QVBoxLayout(params_container)
+        params_container_layout.setContentsMargins(0, 0, 0, 0)
+        params_container_layout.setSpacing(4)
+        
+        params_title = QLabel(self.tr("安装参数（可选）"))
+        params_title.setProperty("class", "section-title")
+        params_container_layout.addWidget(params_title)
+        
+        params_card = QFrame()
+        params_card.setObjectName("card")
+        add_card_shadow(params_card)
+        params_layout = QVBoxLayout(params_card)
+        params_layout.setContentsMargins(10, 1, 10, 1)
         params_layout.setSpacing(8)
         
         self.param_checkboxes = {}
@@ -1345,8 +1386,8 @@ class InstallApkDialog(QDialog):
             self.param_checkboxes[param] = cb
             params_layout.addWidget(cb)
         
-        params_group.setLayout(params_layout)
-        layout.addWidget(params_group)
+        params_container_layout.addWidget(params_card)
+        layout.addWidget(params_container)
         
         # 添加弹性空间
         layout.addStretch()
@@ -1401,9 +1442,22 @@ class ProcessViewDialog(QDialog):
         title.setStyleSheet("font-size: 14pt; font-weight: bold;")
         layout.addWidget(title)
         
-        # 参数选择组
-        params_group = QGroupBox(self.tr("查看参数"))
-        params_layout = QVBoxLayout()
+        # 参数选择组（使用与Tab界面一致的样式：QLabel + QFrame）
+        params_container = QWidget()
+        params_container_layout = QVBoxLayout(params_container)
+        params_container_layout.setContentsMargins(0, 0, 0, 0)
+        params_container_layout.setSpacing(4)
+        
+        params_title = QLabel(self.tr("查看参数"))
+        params_title.setProperty("class", "section-title")
+        params_container_layout.addWidget(params_title)
+        
+        params_card = QFrame()
+        params_card.setObjectName("card")
+        add_card_shadow(params_card)
+        params_layout = QVBoxLayout(params_card)
+        params_layout.setContentsMargins(10, 1, 10, 1)
+        params_layout.setSpacing(8)
         
         self.param_checkboxes = {}
         param_options = [
@@ -1419,12 +1473,25 @@ class ProcessViewDialog(QDialog):
             self.param_checkboxes[param] = cb
             params_layout.addWidget(cb)
         
-        params_group.setLayout(params_layout)
-        layout.addWidget(params_group)
+        params_container_layout.addWidget(params_card)
+        layout.addWidget(params_container)
         
-        # 过滤选项组
-        filter_group = QGroupBox(self.tr("过滤选项"))
-        filter_layout = QVBoxLayout()
+        # 过滤选项组（使用与Tab界面一致的样式：QLabel + QFrame）
+        filter_container = QWidget()
+        filter_container_layout = QVBoxLayout(filter_container)
+        filter_container_layout.setContentsMargins(0, 0, 0, 0)
+        filter_container_layout.setSpacing(4)
+        
+        filter_title = QLabel(self.tr("过滤选项"))
+        filter_title.setProperty("class", "section-title")
+        filter_container_layout.addWidget(filter_title)
+        
+        filter_card = QFrame()
+        filter_card.setObjectName("card")
+        add_card_shadow(filter_card)
+        filter_layout = QVBoxLayout(filter_card)
+        filter_layout.setContentsMargins(10, 1, 10, 1)
+        filter_layout.setSpacing(8)
         
         self.filter_enabled_cb = QCheckBox(self.tr("启用过滤"))
         filter_layout.addWidget(self.filter_enabled_cb)
@@ -1435,8 +1502,8 @@ class ProcessViewDialog(QDialog):
         filter_input_layout.addWidget(self.filter_entry)
         
         filter_layout.addLayout(filter_input_layout)
-        filter_group.setLayout(filter_layout)
-        layout.addWidget(filter_group)
+        filter_container_layout.addWidget(filter_card)
+        layout.addWidget(filter_container)
         
         # 按钮
         button_layout = QHBoxLayout()
@@ -1494,20 +1561,45 @@ class DumpAppDialog(QDialog):
         title.setStyleSheet("font-size: 14pt; font-weight: bold; margin-bottom: 10px;")
         layout.addWidget(title)
         
-        # 包名输入组
-        package_group = QGroupBox(self.tr("应用包名"))
-        package_layout = QVBoxLayout()
+        # 包名输入组（使用与Tab界面一致的样式：QLabel + QFrame）
+        package_container = QWidget()
+        package_container_layout = QVBoxLayout(package_container)
+        package_container_layout.setContentsMargins(0, 0, 0, 0)
+        package_container_layout.setSpacing(4)
+        
+        package_title = QLabel(self.tr("应用包名"))
+        package_title.setProperty("class", "section-title")
+        package_container_layout.addWidget(package_title)
+        
+        package_card = QFrame()
+        package_card.setObjectName("card")
+        add_card_shadow(package_card)
+        package_layout = QVBoxLayout(package_card)
+        package_layout.setContentsMargins(10, 1, 10, 1)
+        package_layout.setSpacing(8)
         
         self.package_entry = QLineEdit()
         self.package_entry.setPlaceholderText(self.tr("例如: com.google.android.apps.messaging"))
         package_layout.addWidget(self.package_entry)
         
-        package_group.setLayout(package_layout)
-        layout.addWidget(package_group)
+        package_container_layout.addWidget(package_card)
+        layout.addWidget(package_container)
         
-        # 过滤选项组
-        filter_group = QGroupBox(self.tr("过滤选项（可选）"))
-        filter_layout = QVBoxLayout()
+        # 过滤选项组（使用与Tab界面一致的样式：QLabel + QFrame）
+        filter_container = QWidget()
+        filter_container_layout = QVBoxLayout(filter_container)
+        filter_container_layout.setContentsMargins(0, 0, 0, 0)
+        filter_container_layout.setSpacing(4)
+        
+        filter_title = QLabel(self.tr("过滤选项（可选）"))
+        filter_title.setProperty("class", "section-title")
+        filter_container_layout.addWidget(filter_title)
+        
+        filter_card = QFrame()
+        filter_card.setObjectName("card")
+        add_card_shadow(filter_card)
+        filter_layout = QVBoxLayout(filter_card)
+        filter_layout.setContentsMargins(10, 1, 10, 1)
         filter_layout.setSpacing(8)
         
         # 预定义过滤选项（单选）
@@ -1541,8 +1633,8 @@ class DumpAppDialog(QDialog):
         custom_filter_layout.addWidget(self.regex_cb)
         
         filter_layout.addLayout(custom_filter_layout)
-        filter_group.setLayout(filter_layout)
-        layout.addWidget(filter_group)
+        filter_container_layout.addWidget(filter_card)
+        layout.addWidget(filter_container)
         
         # 添加弹性空间
         layout.addStretch()
@@ -1723,16 +1815,29 @@ class PushApkDialog(QDialog):
         title.setStyleSheet("font-size: 14pt; font-weight: bold;")
         layout.addWidget(title)
         
-        # 目标路径输入组
-        path_group = QGroupBox(self.tr("设备目标路径"))
-        path_layout = QVBoxLayout()
+        # 目标路径输入组（使用与Tab界面一致的样式：QLabel + QFrame）
+        path_container = QWidget()
+        path_container_layout = QVBoxLayout(path_container)
+        path_container_layout.setContentsMargins(0, 0, 0, 0)
+        path_container_layout.setSpacing(4)
+        
+        path_title = QLabel(self.tr("设备目标路径"))
+        path_title.setProperty("class", "section-title")
+        path_container_layout.addWidget(path_title)
+        
+        path_card = QFrame()
+        path_card.setObjectName("card")
+        add_card_shadow(path_card)
+        path_layout = QVBoxLayout(path_card)
+        path_layout.setContentsMargins(10, 1, 10, 1)
+        path_layout.setSpacing(8)
         
         self.target_path_entry = QLineEdit()
         self.target_path_entry.setPlaceholderText(self.tr("例如: /system/app/ 或 /data/local/tmp/"))
         path_layout.addWidget(self.target_path_entry)
         
-        path_group.setLayout(path_layout)
-        layout.addWidget(path_group)
+        path_container_layout.addWidget(path_card)
+        layout.addWidget(path_container)
         
         # 按钮
         button_layout = QHBoxLayout()

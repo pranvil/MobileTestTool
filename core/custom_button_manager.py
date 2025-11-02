@@ -179,7 +179,7 @@ class CustomButtonManager(QObject):
         else:
             # 对于预制Tab，获取默认Card
             cards_map = {
-                self.lang_manager.tr('Log控制'): [self.lang_manager.tr('MTKLOG 控制'), self.lang_manager.tr('ADB Log 控制')],
+                self.lang_manager.tr('Log控制'): [self.lang_manager.tr('LOG控制'), self.lang_manager.tr('ADB Log 控制')],
                 self.lang_manager.tr('Log过滤'): [self.lang_manager.tr('过滤控制')],
                 self.lang_manager.tr('网络信息'): [self.lang_manager.tr('控制'), self.lang_manager.tr('网络信息')],
                 'TMO CC': [self.lang_manager.tr('CC配置'), self.lang_manager.tr('过滤操作')],

@@ -8,12 +8,13 @@ Tab管理对话框
 import os
 from PyQt5.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel, 
                              QPushButton, QListWidget, QListWidgetItem, 
-                             QCheckBox, QGroupBox, QTabWidget, QWidget,
+                             QCheckBox, QTabWidget, QWidget,
                              QLineEdit, QTextEdit, QMessageBox, QComboBox,
                              QSpinBox, QFormLayout, QScrollArea, QFrame)
 from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtGui import QFont
 from core.debug_logger import logger
+from ui.widgets.shadow_utils import add_card_shadow
 
 
 class TabManagerDialog(QDialog):
@@ -76,9 +77,22 @@ class TabManagerDialog(QDialog):
         widget = QWidget()
         layout = QVBoxLayout(widget)
         
-        # Tab排序
-        order_group = QGroupBox(self.tr("Tab排序"))
-        order_layout = QVBoxLayout(order_group)
+        # Tab排序（使用与Tab界面一致的样式：QLabel + QFrame）
+        order_container = QWidget()
+        order_container_layout = QVBoxLayout(order_container)
+        order_container_layout.setContentsMargins(0, 0, 0, 0)
+        order_container_layout.setSpacing(4)
+        
+        order_title = QLabel(self.tr("Tab排序"))
+        order_title.setProperty("class", "section-title")
+        order_container_layout.addWidget(order_title)
+        
+        order_card = QFrame()
+        order_card.setObjectName("card")
+        add_card_shadow(order_card)
+        order_layout = QVBoxLayout(order_card)
+        order_layout.setContentsMargins(10, 1, 10, 1)
+        order_layout.setSpacing(8)
         
         order_layout.addWidget(QLabel(self.tr("拖拽调整Tab顺序:")))
         
@@ -86,11 +100,25 @@ class TabManagerDialog(QDialog):
         self.tab_order_list.setDragDropMode(QListWidget.InternalMove)
         order_layout.addWidget(self.tab_order_list)
         
-        layout.addWidget(order_group)
+        order_container_layout.addWidget(order_card)
+        layout.addWidget(order_container)
         
-        # Tab显示控制
-        visibility_group = QGroupBox(self.tr("Tab显示控制"))
-        visibility_layout = QVBoxLayout(visibility_group)
+        # Tab显示控制（使用与Tab界面一致的样式：QLabel + QFrame）
+        visibility_container = QWidget()
+        visibility_container_layout = QVBoxLayout(visibility_container)
+        visibility_container_layout.setContentsMargins(0, 0, 0, 0)
+        visibility_container_layout.setSpacing(4)
+        
+        visibility_title = QLabel(self.tr("Tab显示控制"))
+        visibility_title.setProperty("class", "section-title")
+        visibility_container_layout.addWidget(visibility_title)
+        
+        visibility_card = QFrame()
+        visibility_card.setObjectName("card")
+        add_card_shadow(visibility_card)
+        visibility_layout = QVBoxLayout(visibility_card)
+        visibility_layout.setContentsMargins(10, 1, 10, 1)
+        visibility_layout.setSpacing(8)
         
         self.visibility_widgets = {}
         
@@ -105,7 +133,8 @@ class TabManagerDialog(QDialog):
         scroll_area.setMaximumHeight(200)
         
         visibility_layout.addWidget(scroll_area)
-        layout.addWidget(visibility_group)
+        visibility_container_layout.addWidget(visibility_card)
+        layout.addWidget(visibility_container)
         
         self.tab_widget.addTab(widget, self.tr("Tab排序和显示"))
     
@@ -114,9 +143,22 @@ class TabManagerDialog(QDialog):
         widget = QWidget()
         layout = QVBoxLayout(widget)
         
-        # 自定义Tab列表
-        list_group = QGroupBox(self.tr("自定义Tab列表"))
-        list_layout = QVBoxLayout(list_group)
+        # 自定义Tab列表（使用与Tab界面一致的样式：QLabel + QFrame）
+        list_container = QWidget()
+        list_container_layout = QVBoxLayout(list_container)
+        list_container_layout.setContentsMargins(0, 0, 0, 0)
+        list_container_layout.setSpacing(4)
+        
+        list_title = QLabel(self.tr("自定义Tab列表"))
+        list_title.setProperty("class", "section-title")
+        list_container_layout.addWidget(list_title)
+        
+        list_card = QFrame()
+        list_card.setObjectName("card")
+        add_card_shadow(list_card)
+        list_layout = QVBoxLayout(list_card)
+        list_layout.setContentsMargins(10, 1, 10, 1)
+        list_layout.setSpacing(8)
         
         self.custom_tab_list = QListWidget()
         list_layout.addWidget(self.custom_tab_list)
@@ -136,7 +178,8 @@ class TabManagerDialog(QDialog):
         btn_layout.addWidget(self.delete_tab_btn)
         
         list_layout.addLayout(btn_layout)
-        layout.addWidget(list_group)
+        list_container_layout.addWidget(list_card)
+        layout.addWidget(list_container)
         
         self.tab_widget.addTab(widget, self.tr("自定义Tab"))
     
@@ -145,9 +188,22 @@ class TabManagerDialog(QDialog):
         widget = QWidget()
         layout = QVBoxLayout(widget)
         
-        # Card列表
-        list_group = QGroupBox(self.tr("自定义Card列表"))
-        list_layout = QVBoxLayout(list_group)
+        # Card列表（使用与Tab界面一致的样式：QLabel + QFrame）
+        list_container = QWidget()
+        list_container_layout = QVBoxLayout(list_container)
+        list_container_layout.setContentsMargins(0, 0, 0, 0)
+        list_container_layout.setSpacing(4)
+        
+        list_title = QLabel(self.tr("自定义Card列表"))
+        list_title.setProperty("class", "section-title")
+        list_container_layout.addWidget(list_title)
+        
+        list_card = QFrame()
+        list_card.setObjectName("card")
+        add_card_shadow(list_card)
+        list_layout = QVBoxLayout(list_card)
+        list_layout.setContentsMargins(10, 1, 10, 1)
+        list_layout.setSpacing(8)
         
         self.custom_card_list = QListWidget()
         list_layout.addWidget(self.custom_card_list)
@@ -167,7 +223,8 @@ class TabManagerDialog(QDialog):
         btn_layout.addWidget(self.delete_card_btn)
         
         list_layout.addLayout(btn_layout)
-        layout.addWidget(list_group)
+        list_container_layout.addWidget(list_card)
+        layout.addWidget(list_container)
         
         self.tab_widget.addTab(widget, self.tr("自定义Card"))
     
@@ -384,9 +441,21 @@ class CustomTabDialog(QDialog):
         """设置UI"""
         layout = QVBoxLayout(self)
         
-        # Tab基本信息
-        info_group = QGroupBox(self.tr("Tab信息"))
-        info_layout = QFormLayout(info_group)
+        # Tab基本信息（使用与Tab界面一致的样式：QLabel + QFrame）
+        info_container = QWidget()
+        info_container_layout = QVBoxLayout(info_container)
+        info_container_layout.setContentsMargins(0, 0, 0, 0)
+        info_container_layout.setSpacing(4)
+        
+        info_title = QLabel(self.tr("Tab信息"))
+        info_title.setProperty("class", "section-title")
+        info_container_layout.addWidget(info_title)
+        
+        info_card = QFrame()
+        info_card.setObjectName("card")
+        add_card_shadow(info_card)
+        info_layout = QFormLayout(info_card)
+        info_layout.setContentsMargins(10, 1, 10, 1)
         
         self.name_edit = QLineEdit()
         info_layout.addRow(self.tr("Tab名称:"), self.name_edit)
@@ -395,7 +464,8 @@ class CustomTabDialog(QDialog):
         self.description_edit.setMaximumHeight(80)
         info_layout.addRow(self.tr("描述:"), self.description_edit)
         
-        layout.addWidget(info_group)
+        info_container_layout.addWidget(info_card)
+        layout.addWidget(info_container)
         
         # 按钮
         button_layout = QHBoxLayout()
@@ -487,9 +557,21 @@ class CustomCardDialog(QDialog):
         hint_label.setWordWrap(True)
         layout.addWidget(hint_label)
         
-        # Card基本信息
-        info_group = QGroupBox(self.tr("Card信息"))
-        info_layout = QFormLayout(info_group)
+        # Card基本信息（使用与Tab界面一致的样式：QLabel + QFrame）
+        info_container = QWidget()
+        info_container_layout = QVBoxLayout(info_container)
+        info_container_layout.setContentsMargins(0, 0, 0, 0)
+        info_container_layout.setSpacing(4)
+        
+        info_title = QLabel(self.tr("Card信息"))
+        info_title.setProperty("class", "section-title")
+        info_container_layout.addWidget(info_title)
+        
+        info_card = QFrame()
+        info_card.setObjectName("card")
+        add_card_shadow(info_card)
+        info_layout = QFormLayout(info_card)
+        info_layout.setContentsMargins(10, 1, 10, 1)
         
         self.name_edit = QLineEdit()
         info_layout.addRow(self.tr("Card名称:"), self.name_edit)
@@ -503,7 +585,8 @@ class CustomCardDialog(QDialog):
         self.load_tab_options()
         info_layout.addRow(self.tr("所属Tab:"), self.tab_combo)
         
-        layout.addWidget(info_group)
+        info_container_layout.addWidget(info_card)
+        layout.addWidget(info_container)
         
         # 按钮
         button_layout = QHBoxLayout()

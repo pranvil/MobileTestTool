@@ -239,6 +239,38 @@ class PyQtAppOperationsManager(QObject):
         self.app_ops_manager.disable_app()
 
 
+class DeviceInfoWorker(QThread):
+    """设备信息获取工作线程 - 避免阻塞UI"""
+    
+    finished = pyqtSignal(dict)  # 完成信号，返回设备信息字典
+    error_occurred = pyqtSignal(str)  # 错误信号
+    status_updated = pyqtSignal(str)  # 状态更新信号
+    
+    def __init__(self, device, device_info_manager, lang_manager=None):
+        super().__init__()
+        self.device = device
+        self.device_info_manager = device_info_manager
+        self.lang_manager = lang_manager
+    
+    def tr(self, text):
+        """安全地获取翻译文本"""
+        return self.lang_manager.tr(text) if self.lang_manager else text
+    
+    def run(self):
+        """在后台线程中执行设备信息获取"""
+        try:
+            self.status_updated.emit(self.tr("正在获取设备信息，请稍候..."))
+            
+            # 调用collect_device_info方法（这个操作比较耗时）
+            device_info = self.device_info_manager.collect_device_info(self.device)
+            
+            # 发送完成信号
+            self.finished.emit(device_info)
+            
+        except Exception as e:
+            self.error_occurred.emit(str(e))
+
+
 class PyQtDeviceInfoManager(QObject):
     """设备信息管理器"""
     
@@ -251,6 +283,8 @@ class PyQtDeviceInfoManager(QObject):
         self.lang_manager = parent.lang_manager if parent and hasattr(parent, 'lang_manager') else None
         # 初始化设备信息管理器
         self._init_device_info_manager()
+        # 工作线程引用
+        self._worker = None
     
     def tr(self, text):
         """安全地获取翻译文本"""
@@ -263,21 +297,39 @@ class PyQtDeviceInfoManager(QObject):
         self.device_info_manager = DeviceInfoManager()
         
     def show_device_info(self):
-        """显示手机信息"""
+        """显示手机信息 - 使用后台线程避免阻塞UI"""
         device = self.device_manager.validate_device_selection()
         if not device:
             return
         
+        # 如果已经有工作线程在运行，直接返回
+        if self._worker and self._worker.isRunning():
+            self.status_message.emit(self.tr("设备信息正在获取中，请稍候..."))
+            return
+        
         try:
-            self.status_message.emit(self.tr("获取手机信息..."))
+            # 显示初始状态
+            self.status_message.emit(self.tr("正在获取设备信息，请稍候..."))
             
-            # 调用原始的collect_device_info方法
-            device_info = self.device_info_manager.collect_device_info(device)
+            # 创建工作线程
+            self._worker = DeviceInfoWorker(device, self.device_info_manager, self.lang_manager)
+            self._worker.status_updated.connect(self.status_message.emit)
+            self._worker.finished.connect(self._on_device_info_finished)
+            self._worker.error_occurred.connect(self._on_device_info_error)
             
+            # 启动工作线程
+            self._worker.start()
+            
+        except Exception as e:
+            self.status_message.emit("❌ " + self.tr("启动设备信息获取失败: ") + str(e))
+    
+    def _on_device_info_finished(self, device_info):
+        """设备信息获取完成后的处理"""
+        try:
             # 格式化显示设备信息
             info_text = "=" * 60 + "\n"
-            info_text += self.tr("设备信息\n")
-            info_text += "=" * 60 + "\n\n"
+            # info_text += self.tr("设备信息\n")
+            # info_text += "=" * 60 + "\n\n"
             
             # 设备基本信息
             info_text += self.tr("设备基本信息:\n")
@@ -317,8 +369,22 @@ class PyQtDeviceInfoManager(QObject):
             # 显示在日志窗口
             self.status_message.emit(info_text)
             
+            # 清理工作线程引用
+            if self._worker:
+                self._worker.deleteLater()
+                self._worker = None
+            
         except Exception as e:
-            self.status_message.emit("❌ " + self.tr("获取手机信息失败: ") + str(e))
+            self.status_message.emit("❌ " + self.tr("格式化设备信息失败: ") + str(e))
+    
+    def _on_device_info_error(self, error_msg):
+        """设备信息获取错误处理"""
+        self.status_message.emit("❌ " + self.tr("获取手机信息失败: ") + error_msg)
+        
+        # 清理工作线程引用
+        if self._worker:
+            self._worker.deleteLater()
+            self._worker = None
     
     def set_screen_timeout(self):
         """设置灭屏时间"""

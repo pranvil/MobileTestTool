@@ -9,11 +9,12 @@ import glob
 import subprocess
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel,
-                             QPushButton, QLineEdit, QGroupBox, QCheckBox,
+                             QPushButton, QLineEdit, QCheckBox,
                              QMessageBox, QFileDialog, QSpinBox, QScrollArea,
-                             QWidget)
+                             QWidget, QFrame)
 
 from core.update_manager import DEFAULT_UPDATE_FEED_URL
+from ui.widgets.shadow_utils import add_card_shadow
 
 
 class ToolsConfigDialog(QDialog):
@@ -61,9 +62,22 @@ class ToolsConfigDialog(QDialog):
         title_label.setStyleSheet("font-size: 16px; font-weight: bold;")
         content_layout.addWidget(title_label)
         
-        # 存储路径配置框架
-        storage_group = QGroupBox(self.tr("存储路径配置"))
-        storage_layout = QVBoxLayout(storage_group)
+        # 存储路径配置框架（使用与Tab界面一致的样式：QLabel + QFrame）
+        storage_container = QWidget()
+        storage_container_layout = QVBoxLayout(storage_container)
+        storage_container_layout.setContentsMargins(0, 0, 0, 0)
+        storage_container_layout.setSpacing(4)
+        
+        storage_title = QLabel(self.tr("存储路径配置"))
+        storage_title.setProperty("class", "section-title")
+        storage_container_layout.addWidget(storage_title)
+        
+        storage_card = QFrame()
+        storage_card.setObjectName("card")
+        add_card_shadow(storage_card)
+        storage_layout = QVBoxLayout(storage_card)
+        storage_layout.setContentsMargins(10, 1, 10, 1)
+        storage_layout.setSpacing(8)
         
         # 存储路径显示
         storage_path_layout = QHBoxLayout()
@@ -78,11 +92,25 @@ class ToolsConfigDialog(QDialog):
         storage_path_layout.addWidget(browse_storage_btn)
         
         storage_layout.addLayout(storage_path_layout)
-        content_layout.addWidget(storage_group)
+        storage_container_layout.addWidget(storage_card)
+        content_layout.addWidget(storage_container)
         
-        # 更新配置
-        update_group = QGroupBox(self.tr("更新配置"))
-        update_layout = QVBoxLayout(update_group)
+        # 更新配置（使用与Tab界面一致的样式：QLabel + QFrame）
+        update_container = QWidget()
+        update_container_layout = QVBoxLayout(update_container)
+        update_container_layout.setContentsMargins(0, 0, 0, 0)
+        update_container_layout.setSpacing(4)
+        
+        update_title = QLabel(self.tr("更新配置"))
+        update_title.setProperty("class", "section-title")
+        update_container_layout.addWidget(update_title)
+        
+        update_card = QFrame()
+        update_card.setObjectName("card")
+        add_card_shadow(update_card)
+        update_layout = QVBoxLayout(update_card)
+        update_layout.setContentsMargins(10, 1, 10, 1)
+        update_layout.setSpacing(8)
 
         update_url_layout = QHBoxLayout()
         update_url_layout.addWidget(QLabel(self.tr("版本描述 URL:")))
@@ -109,12 +137,25 @@ class ToolsConfigDialog(QDialog):
         timeout_layout.addWidget(self.update_timeout_spin)
 
         update_layout.addLayout(timeout_layout)
+        update_container_layout.addWidget(update_card)
+        content_layout.addWidget(update_container)
 
-        content_layout.addWidget(update_group)
-
-        # MTK工具配置框架
-        mtk_group = QGroupBox(self.tr("ELT路径配置"))
-        mtk_layout = QVBoxLayout(mtk_group)
+        # MTK工具配置框架（使用与Tab界面一致的样式：QLabel + QFrame）
+        mtk_container = QWidget()
+        mtk_container_layout = QVBoxLayout(mtk_container)
+        mtk_container_layout.setContentsMargins(0, 0, 0, 0)
+        mtk_container_layout.setSpacing(4)
+        
+        mtk_title = QLabel(self.tr("ELT路径配置"))
+        mtk_title.setProperty("class", "section-title")
+        mtk_container_layout.addWidget(mtk_title)
+        
+        mtk_card = QFrame()
+        mtk_card.setObjectName("card")
+        add_card_shadow(mtk_card)
+        mtk_layout = QVBoxLayout(mtk_card)
+        mtk_layout.setContentsMargins(10, 1, 10, 1)
+        mtk_layout.setSpacing(8)
         
         # MTK工具路径显示
         mtk_path_layout = QHBoxLayout()
@@ -132,12 +173,25 @@ class ToolsConfigDialog(QDialog):
         mtk_path_layout.addWidget(manual_mtk_btn)
         
         mtk_layout.addLayout(mtk_path_layout)
+        mtk_container_layout.addWidget(mtk_card)
+        content_layout.addWidget(mtk_container)
         
-        content_layout.addWidget(mtk_group)
+        # Wireshark配置框架（使用与Tab界面一致的样式：QLabel + QFrame）
+        wireshark_container = QWidget()
+        wireshark_container_layout = QVBoxLayout(wireshark_container)
+        wireshark_container_layout.setContentsMargins(0, 0, 0, 0)
+        wireshark_container_layout.setSpacing(4)
         
-        # Wireshark配置框架
-        wireshark_group = QGroupBox(self.tr("Wireshark配置"))
-        wireshark_layout = QVBoxLayout(wireshark_group)
+        wireshark_title = QLabel(self.tr("Wireshark配置"))
+        wireshark_title.setProperty("class", "section-title")
+        wireshark_container_layout.addWidget(wireshark_title)
+        
+        wireshark_card = QFrame()
+        wireshark_card.setObjectName("card")
+        add_card_shadow(wireshark_card)
+        wireshark_layout = QVBoxLayout(wireshark_card)
+        wireshark_layout.setContentsMargins(10, 1, 10, 1)
+        wireshark_layout.setSpacing(8)
         
         wireshark_path_layout = QHBoxLayout()
         wireshark_path_layout.addWidget(QLabel(self.tr("Wireshark路径:")))
@@ -154,12 +208,25 @@ class ToolsConfigDialog(QDialog):
         wireshark_path_layout.addWidget(browse_wireshark_btn)
         
         wireshark_layout.addLayout(wireshark_path_layout)
+        wireshark_container_layout.addWidget(wireshark_card)
+        content_layout.addWidget(wireshark_container)
         
-        content_layout.addWidget(wireshark_group)
+        # 高通工具配置框架（使用与Tab界面一致的样式：QLabel + QFrame）
+        qualcomm_container = QWidget()
+        qualcomm_container_layout = QVBoxLayout(qualcomm_container)
+        qualcomm_container_layout.setContentsMargins(0, 0, 0, 0)
+        qualcomm_container_layout.setSpacing(4)
         
-        # 高通工具配置框架
-        qualcomm_group = QGroupBox(self.tr("高通工具配置"))
-        qualcomm_layout = QVBoxLayout(qualcomm_group)
+        qualcomm_title = QLabel(self.tr("高通工具配置"))
+        qualcomm_title.setProperty("class", "section-title")
+        qualcomm_container_layout.addWidget(qualcomm_title)
+        
+        qualcomm_card = QFrame()
+        qualcomm_card.setObjectName("card")
+        add_card_shadow(qualcomm_card)
+        qualcomm_layout = QVBoxLayout(qualcomm_card)
+        qualcomm_layout.setContentsMargins(10, 1, 10, 1)
+        qualcomm_layout.setSpacing(8)
         
         # 高通工具路径显示
         qualcomm_path_layout = QHBoxLayout()
@@ -177,8 +244,8 @@ class ToolsConfigDialog(QDialog):
         qualcomm_path_layout.addWidget(manual_qualcomm_btn)
         
         qualcomm_layout.addLayout(qualcomm_path_layout)
-        
-        content_layout.addWidget(qualcomm_group)
+        qualcomm_container_layout.addWidget(qualcomm_card)
+        content_layout.addWidget(qualcomm_container)
 
         content_layout.addStretch()
         

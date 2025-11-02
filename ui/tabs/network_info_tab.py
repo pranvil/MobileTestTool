@@ -5,7 +5,7 @@
 """
 
 from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, 
-                             QPushButton, QGroupBox, QTableWidget, 
+                             QPushButton, QTableWidget, 
                              QTableWidgetItem, QHeaderView, QFrame)
 from PyQt5.QtCore import pyqtSignal, Qt
 from ui.widgets.shadow_utils import add_card_shadow

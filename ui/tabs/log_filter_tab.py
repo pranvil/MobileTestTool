@@ -5,7 +5,7 @@ Log过滤 Tab
 """
 
 from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, 
-                             QLineEdit, QCheckBox, QPushButton, QGroupBox,
+                             QLineEdit, QCheckBox, QPushButton,
                              QScrollArea, QFrame)
 from PyQt5.QtCore import pyqtSignal, Qt
 from ui.widgets.shadow_utils import add_card_shadow

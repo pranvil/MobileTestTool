@@ -14,9 +14,10 @@ import re
 from PyQt5.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QPushButton, 
                              QTableWidget, QTableWidgetItem, QHeaderView,
                              QLineEdit, QMessageBox, QFileDialog, QSplitter,
-                             QWidget, QLabel, QGroupBox, QMenu)
+                             QWidget, QLabel, QMenu, QFrame)
 from PyQt5.QtCore import Qt, QPoint, pyqtSignal, QTimer
 from core.debug_logger import logger
+from ui.widgets.shadow_utils import add_card_shadow
 
 # 尝试导入 uiautomator2
 try:
@@ -145,9 +146,22 @@ class SecretCodeDialog(QDialog):
         widget = QWidget()
         layout = QVBoxLayout(widget)
         
-        # 搜索区域
-        search_group = QGroupBox(self.tr("搜索"))
-        search_layout = QHBoxLayout(search_group)
+        # 搜索区域（使用与Tab界面一致的样式：QLabel + QFrame）
+        search_container = QWidget()
+        search_container_layout = QVBoxLayout(search_container)
+        search_container_layout.setContentsMargins(0, 0, 0, 0)
+        search_container_layout.setSpacing(4)
+        
+        search_title = QLabel(self.tr("搜索"))
+        search_title.setProperty("class", "section-title")
+        search_container_layout.addWidget(search_title)
+        
+        search_card = QFrame()
+        search_card.setObjectName("card")
+        add_card_shadow(search_card)
+        search_layout = QHBoxLayout(search_card)
+        search_layout.setContentsMargins(10, 1, 10, 1)
+        search_layout.setSpacing(8)
         
         self.search_input = QLineEdit()
         self.search_input.setPlaceholderText(self.tr("输入搜索关键字..."))
@@ -161,7 +175,8 @@ class SecretCodeDialog(QDialog):
         clear_search_btn.clicked.connect(self.clear_search)
         search_layout.addWidget(clear_search_btn)
         
-        layout.addWidget(search_group)
+        search_container_layout.addWidget(search_card)
+        layout.addWidget(search_container)
         
         # 创建暗码表格
         self.code_table = QTableWidget()

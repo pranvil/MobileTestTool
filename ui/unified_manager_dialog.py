@@ -9,101 +9,17 @@ import os
 import json
 import datetime
 from PyQt5.QtWidgets import (QDialog, QTabWidget, QVBoxLayout, QHBoxLayout, 
-                             QPushButton, QMessageBox, QFileDialog, QGroupBox,
+                             QPushButton, QMessageBox, QFileDialog,
                              QListWidget, QListWidgetItem, QCheckBox, QScrollArea, QWidget,
                              QTableWidget, QTableWidgetItem, QHeaderView,
                              QFormLayout, QLineEdit, QTextEdit, QComboBox,
                              QLabel, QSplitter, QFrame, QAbstractItemView, QSizePolicy)
-from PyQt5.QtCore import Qt, pyqtSignal
+from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QFont
 
 from core.debug_logger import logger
-
-
-class DragDropButtonTable(QTableWidget):
-    """支持拖拽排序的按钮表格"""
-
-    rows_reordered = pyqtSignal(list)
-
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self.setDragEnabled(True)
-        self.setAcceptDrops(True)
-        self.viewport().setAcceptDrops(True)
-        self.setDropIndicatorShown(True)
-        self.setDragDropMode(QAbstractItemView.InternalMove)
-        self.setDragDropOverwriteMode(False)
-        self.setDefaultDropAction(Qt.MoveAction)
-        self.setSelectionBehavior(QAbstractItemView.SelectRows)
-        self.setSelectionMode(QAbstractItemView.SingleSelection)
-
-    def dragEnterEvent(self, event):
-        if event.source() == self:
-            event.acceptProposedAction()
-        else:
-            super().dragEnterEvent(event)
-
-    def dragMoveEvent(self, event):
-        if event.source() == self:
-            event.acceptProposedAction()
-        else:
-            super().dragMoveEvent(event)
-
-    def dropEvent(self, event):
-        if event.source() != self:
-            super().dropEvent(event)
-            return
-
-        source_row = self.currentRow()
-        if source_row < 0:
-            event.ignore()
-            return
-
-        target_index = self.indexAt(event.pos())
-        if target_index.isValid():
-            target_row = target_index.row()
-            indicator = self.dropIndicatorPosition()
-            if indicator == QAbstractItemView.BelowItem:
-                target_row += 1
-        else:
-            target_row = self.rowCount()
-
-        if target_row > source_row:
-            target_row -= 1
-
-        if target_row == source_row or target_row < 0:
-            event.ignore()
-            return
-
-        if target_row > self.rowCount():
-            target_row = self.rowCount()
-
-        row_items = []
-        for col in range(self.columnCount()):
-            item = self.item(source_row, col)
-            row_items.append(item.clone() if item else QTableWidgetItem())
-
-        self.removeRow(source_row)
-
-        if target_row < 0:
-            target_row = 0
-
-        self.insertRow(target_row)
-        for col, item in enumerate(row_items):
-            self.setItem(target_row, col, item)
-
-        self.selectRow(target_row)
-        self.resizeRowsToContents()
-        event.acceptProposedAction()
-
-        ordered_ids = []
-        for row in range(self.rowCount()):
-            item = self.item(row, 0)
-            if item:
-                ordered_ids.append(item.data(Qt.UserRole))
-
-        if ordered_ids:
-            self.rows_reordered.emit(ordered_ids)
+from ui.widgets.drag_drop_table import DragDropButtonTable
+from ui.widgets.shadow_utils import add_card_shadow
 
 
 class UnifiedManagerDialog(QDialog):
@@ -237,8 +153,24 @@ class UnifiedManagerDialog(QDialog):
         widget = QWidget()
         layout = QVBoxLayout(widget)
 
-        tab_group = QGroupBox(self.tr("Tab管理"))
-        tab_layout = QVBoxLayout(tab_group)
+        # Tab管理组（使用与Tab界面一致的样式：QLabel + QFrame）
+        tab_container = QWidget()
+        tab_container_layout = QVBoxLayout(tab_container)
+        tab_container_layout.setContentsMargins(0, 0, 0, 0)
+        tab_container_layout.setSpacing(4)  # 与Tab界面一致的紧凑间距
+        
+        # 标题
+        tab_title = QLabel(self.tr("Tab管理"))
+        tab_title.setProperty("class", "section-title")
+        tab_container_layout.addWidget(tab_title)
+        
+        # 卡片容器
+        tab_card = QFrame()
+        tab_card.setObjectName("card")
+        add_card_shadow(tab_card)
+        tab_layout = QVBoxLayout(tab_card)
+        tab_layout.setContentsMargins(10, 1, 10, 1)
+        tab_layout.setSpacing(8)
 
         self.tab_list_widget = QListWidget()
         self.tab_list_widget.setSelectionMode(QListWidget.SingleSelection)
@@ -309,11 +241,27 @@ class UnifiedManagerDialog(QDialog):
 
         tab_content_layout.addWidget(tab_button_widget)
         tab_layout.addLayout(tab_content_layout)
-        layout.addWidget(tab_group)
+        tab_container_layout.addWidget(tab_card)
+        layout.addWidget(tab_container)
 
-        # 自定义Card管理
-        custom_card_group = QGroupBox(self.tr("自定义Card管理"))
+        # 自定义Card管理（使用与Tab界面一致的样式：QLabel + QFrame）
+        custom_card_container = QWidget()
+        custom_card_container_layout = QVBoxLayout(custom_card_container)
+        custom_card_container_layout.setContentsMargins(0, 0, 0, 0)
+        custom_card_container_layout.setSpacing(4)  # 与Tab界面一致的紧凑间距
+        
+        # 标题
+        custom_card_title = QLabel(self.tr("自定义Card管理"))
+        custom_card_title.setProperty("class", "section-title")
+        custom_card_container_layout.addWidget(custom_card_title)
+        
+        # 卡片容器
+        custom_card_group = QFrame()
+        custom_card_group.setObjectName("card")
+        add_card_shadow(custom_card_group)
         custom_card_main_layout = QHBoxLayout(custom_card_group)
+        custom_card_main_layout.setContentsMargins(10, 1, 10, 1)
+        custom_card_main_layout.setSpacing(8)
         
         # 左侧：Card列表区域
         card_left_layout = QVBoxLayout()
@@ -357,7 +305,8 @@ class UnifiedManagerDialog(QDialog):
         custom_card_btn_layout.addWidget(self.card_down_btn)
         
         custom_card_main_layout.addLayout(custom_card_btn_layout)
-        layout.addWidget(custom_card_group)
+        custom_card_container_layout.addWidget(custom_card_group)
+        layout.addWidget(custom_card_container)
         
         return widget
     
@@ -434,6 +383,7 @@ class UnifiedManagerDialog(QDialog):
         self.button_table.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
         self.button_table.setHorizontalScrollMode(QAbstractItemView.ScrollPerPixel)
         self.button_table.rows_reordered.connect(self.on_button_rows_reordered)
+        self.button_table.itemDoubleClicked.connect(self.on_button_table_item_double_clicked)
         layout.addWidget(self.button_table)
         
         # 列级过滤器
@@ -1239,6 +1189,11 @@ class UnifiedManagerDialog(QDialog):
                 QMessageBox.information(self, self.tr("成功"), self.tr("按钮添加成功！"))
             else:
                 QMessageBox.warning(self, self.tr("失败"), self.tr("按钮添加失败，请检查日志"))
+    
+    def on_button_table_item_double_clicked(self, item):
+        """处理按钮表格项双击事件"""
+        if item:
+            self.edit_button()
     
     def edit_button(self):
         """编辑按钮"""

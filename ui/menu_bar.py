@@ -6,10 +6,12 @@
 
 from PyQt5.QtWidgets import (QMenuBar, QAction, QDialog, QVBoxLayout, 
                              QLabel, QLineEdit, QPushButton, QButtonGroup,
-                             QRadioButton, QHBoxLayout, QMessageBox, QGroupBox)
+                             QRadioButton, QHBoxLayout, QMessageBox,
+                             QWidget, QFrame)
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QIcon
 import os
+from ui.widgets.shadow_utils import add_card_shadow
 
 
 class MenuBar(QMenuBar):
@@ -80,9 +82,22 @@ class DisplayLinesDialog(QDialog):
         input_layout.addStretch()
         main_layout.addLayout(input_layout)
         
-        # 预设选项组
-        presets_group = QGroupBox(self.lang_manager.tr("快速选择"))
-        presets_layout = QVBoxLayout()
+        # 预设选项组（使用与Tab界面一致的样式：QLabel + QFrame）
+        presets_container = QWidget()
+        presets_container_layout = QVBoxLayout(presets_container)
+        presets_container_layout.setContentsMargins(0, 0, 0, 0)
+        presets_container_layout.setSpacing(4)
+        
+        presets_title = QLabel(self.lang_manager.tr("快速选择"))
+        presets_title.setProperty("class", "section-title")
+        presets_container_layout.addWidget(presets_title)
+        
+        presets_card = QFrame()
+        presets_card.setObjectName("card")
+        add_card_shadow(presets_card)
+        presets_layout = QVBoxLayout(presets_card)
+        presets_layout.setContentsMargins(10, 1, 10, 1)
+        presets_layout.setSpacing(8)
         
         self.presets_group = QButtonGroup()
         presets = [
@@ -101,8 +116,8 @@ class DisplayLinesDialog(QDialog):
             presets_layout.addWidget(radio)
             radio.toggled.connect(lambda checked, v=value: self._on_preset_selected(v) if checked else None)
         
-        presets_group.setLayout(presets_layout)
-        main_layout.addWidget(presets_group)
+        presets_container_layout.addWidget(presets_card)
+        main_layout.addWidget(presets_container)
         
         # 说明文本
         info_label = QLabel(self.lang_manager.tr("设置说明: 行数越多显示更多历史日志，建议范围: 1000-20000 行"))

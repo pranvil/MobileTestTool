@@ -7,9 +7,10 @@ Log关键字配置对话框
 from PyQt5.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QPushButton,
                              QTableWidget, QTableWidgetItem, QHeaderView,
                              QMessageBox, QLabel, QLineEdit, QTextEdit,
-                             QFileDialog, QGroupBox, QFormLayout)
+                             QFileDialog, QFormLayout, QWidget, QFrame)
 from PyQt5.QtCore import Qt
 from core.debug_logger import logger
+from ui.widgets.shadow_utils import add_card_shadow
 
 
 class LogKeywordDialog(QDialog):
@@ -240,9 +241,21 @@ class KeywordEditDialog(QDialog):
         """设置UI"""
         layout = QVBoxLayout(self)
         
-        # 基本信息组
-        basic_group = QGroupBox(self.tr("关键字信息"))
-        basic_layout = QFormLayout(basic_group)
+        # 基本信息组（使用与Tab界面一致的样式：QLabel + QFrame）
+        basic_container = QWidget()
+        basic_container_layout = QVBoxLayout(basic_container)
+        basic_container_layout.setContentsMargins(0, 0, 0, 0)
+        basic_container_layout.setSpacing(4)
+        
+        basic_title = QLabel(self.tr("关键字信息"))
+        basic_title.setProperty("class", "section-title")
+        basic_container_layout.addWidget(basic_title)
+        
+        basic_card = QFrame()
+        basic_card.setObjectName("card")
+        add_card_shadow(basic_card)
+        basic_layout = QFormLayout(basic_card)
+        basic_layout.setContentsMargins(10, 1, 10, 1)
         
         self.name_edit = QLineEdit()
         self.name_edit.setPlaceholderText(self.tr("例如：错误日志"))
@@ -257,7 +270,8 @@ class KeywordEditDialog(QDialog):
         self.description_edit.setMaximumHeight(100)
         basic_layout.addRow(self.tr("描述:"), self.description_edit)
         
-        layout.addWidget(basic_group)
+        basic_container_layout.addWidget(basic_card)
+        layout.addWidget(basic_container)
         
         # 提示信息
         tip_label = QLabel(

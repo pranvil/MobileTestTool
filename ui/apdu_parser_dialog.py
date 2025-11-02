@@ -9,11 +9,12 @@ import sys
 from typing import List, Optional
 from PyQt5.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QPushButton, 
                            QLabel, QTextEdit, QTreeWidget, QTreeWidgetItem,
-                           QFileDialog, QMessageBox, QSplitter, QGroupBox,
+                           QFileDialog, QMessageBox, QSplitter,
                            QProgressBar, QComboBox, QCheckBox, QLineEdit,
-                           QSizePolicy, QApplication)
+                           QSizePolicy, QApplication, QWidget, QFrame)
 from PyQt5.QtCore import Qt, QThread, pyqtSignal, QTimer
 from PyQt5.QtGui import QFont, QColor, QPalette
+from ui.widgets.shadow_utils import add_card_shadow
 
 # 延迟导入 SIM_APDU_Parser 核心模块
 APDU_PARSER_AVAILABLE = False
@@ -260,11 +261,22 @@ class ApduParserDialog(QDialog):
         # 主内容区域
         splitter = QSplitter(Qt.Horizontal)
         
-        # 左侧：APDU列表
-        left_widget = QGroupBox("APDU 事件列表")
-        left_widget.setContentsMargins(5, 5, 5, 5)  # 设置较小的边距
-        left_layout = QVBoxLayout(left_widget)
-        left_layout.setContentsMargins(5, 5, 5, 5)  # 设置较小的边距
+        # 左侧：APDU列表（使用与Tab界面一致的样式：QLabel + QFrame）
+        left_container = QWidget()
+        left_container_layout = QVBoxLayout(left_container)
+        left_container_layout.setContentsMargins(0, 0, 0, 0)
+        left_container_layout.setSpacing(4)
+        
+        left_title = QLabel("APDU 事件列表")
+        left_title.setProperty("class", "section-title")
+        left_container_layout.addWidget(left_title)
+        
+        left_card = QFrame()
+        left_card.setObjectName("card")
+        add_card_shadow(left_card)
+        left_layout = QVBoxLayout(left_card)
+        left_layout.setContentsMargins(10, 1, 10, 1)
+        left_layout.setSpacing(8)
         
         self.apdu_tree = QTreeWidget()
         self.apdu_tree.setHeaderLabels(["序号", "方向", "标题"])
@@ -276,13 +288,25 @@ class ApduParserDialog(QDialog):
         self.apdu_tree.customContextMenuRequested.connect(self.show_apdu_context_menu)
         left_layout.addWidget(self.apdu_tree, 1)  # 伸缩因子设为1
         
-        splitter.addWidget(left_widget)
+        left_container_layout.addWidget(left_card)
+        splitter.addWidget(left_container)
         
-        # 右侧：详细信息
-        right_widget = QGroupBox("APDU 详细信息")
-        right_widget.setContentsMargins(5, 5, 5, 5)  # 设置较小的边距
-        right_layout = QVBoxLayout(right_widget)
-        right_layout.setContentsMargins(5, 5, 5, 5)  # 设置较小的边距
+        # 右侧：详细信息（使用与Tab界面一致的样式：QLabel + QFrame）
+        right_container = QWidget()
+        right_container_layout = QVBoxLayout(right_container)
+        right_container_layout.setContentsMargins(0, 0, 0, 0)
+        right_container_layout.setSpacing(4)
+        
+        right_title = QLabel("APDU 详细信息")
+        right_title.setProperty("class", "section-title")
+        right_container_layout.addWidget(right_title)
+        
+        right_card = QFrame()
+        right_card.setObjectName("card")
+        add_card_shadow(right_card)
+        right_layout = QVBoxLayout(right_card)
+        right_layout.setContentsMargins(10, 1, 10, 1)
+        right_layout.setSpacing(8)
         
         # 解析结果树（移到上面）
         self.parse_tree = QTreeWidget()
@@ -305,7 +329,8 @@ class ApduParserDialog(QDialog):
         right_layout.addWidget(QLabel("原始数据:"))
         right_layout.addWidget(self.apdu_raw_text, 0)  # 伸缩因子设为0，保持固定高度
         
-        splitter.addWidget(right_widget)
+        right_container_layout.addWidget(right_card)
+        splitter.addWidget(right_container)
         
         # 设置分割比例
         splitter.setSizes([400, 800])
