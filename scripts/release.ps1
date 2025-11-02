@@ -82,7 +82,7 @@ function Get-ReleaseNotes {
     }
 
     if ($notesPath) {
-        $content = Get-Content $notesPath -Raw
+        $content = Get-Content $notesPath -Raw -Encoding UTF8
         if ($Trim) {
             return $content.Trim()
         } else {
