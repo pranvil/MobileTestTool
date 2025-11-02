@@ -49,11 +49,15 @@ class LogKeywordDialog(QDialog):
         self.table.setColumnCount(3)
         self.table.setHorizontalHeaderLabels([self.tr('名称'), self.tr('关键字'), self.tr('描述')])
         
-        # 设置列宽
+        # 设置列宽（允许手动调整）
         header = self.table.horizontalHeader()
-        header.setSectionResizeMode(0, QHeaderView.ResizeToContents)
-        header.setSectionResizeMode(1, QHeaderView.Stretch)
-        header.setSectionResizeMode(2, QHeaderView.Stretch)
+        header.setStretchLastSection(False)
+        header.setSectionResizeMode(0, QHeaderView.Interactive)
+        header.setSectionResizeMode(1, QHeaderView.Interactive)
+        header.setSectionResizeMode(2, QHeaderView.Interactive)
+        self.table.setColumnWidth(0, 150)  # 名称列初始宽度
+        self.table.setColumnWidth(1, 200)  # 关键字列初始宽度
+        self.table.setColumnWidth(2, 300)  # 描述列初始宽度
         
         self.table.setSelectionBehavior(QTableWidget.SelectRows)
         self.table.setSelectionMode(QTableWidget.SingleSelection)

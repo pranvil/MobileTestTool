@@ -176,7 +176,13 @@ class ATCommandDialog(QDialog):
             self.lang_manager.tr("命令名称"), 
             self.lang_manager.tr("AT命令")
         ])
-        self.commands_table.horizontalHeader().setStretchLastSection(True)
+        # 允许手动调整列宽
+        header = self.commands_table.horizontalHeader()
+        header.setStretchLastSection(False)
+        header.setSectionResizeMode(0, QHeaderView.Interactive)
+        header.setSectionResizeMode(1, QHeaderView.Interactive)
+        self.commands_table.setColumnWidth(0, 150)  # 命令名称列初始宽度
+        self.commands_table.setColumnWidth(1, 300)  # AT命令列初始宽度
         self.commands_table.setSelectionBehavior(QTableWidget.SelectRows)
         self.commands_table.setContextMenuPolicy(Qt.CustomContextMenu)
         self.commands_table.customContextMenuRequested.connect(self.show_context_menu)

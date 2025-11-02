@@ -329,6 +329,7 @@ QHeaderView::section {
     padding: 5px;
     border: none;
     border-bottom: 1px solid #555555;
+    border-right: 1px solid #666666;
 }
 
 /* 状态栏 */

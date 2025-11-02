@@ -3,7 +3,7 @@ from PyQt5.QtWidgets import (
     QLineEdit, QPushButton, QLabel, QDialog, QTableWidget, QMessageBox,QGridLayout,
     QTableWidgetItem, QSizePolicy, QAbstractItemView, QFormLayout,
     QProgressDialog, QApplication, QFileDialog, QInputDialog, QComboBox,
-    QScrollArea, QCheckBox
+    QScrollArea, QCheckBox, QHeaderView
 )   
 from PyQt5.QtCore import QThread, pyqtSignal, Qt, QEvent, QTimer, pyqtSlot
 from threading import Lock
@@ -791,6 +791,12 @@ class SimEditorUI(QMainWindow):
         self.read_data_display.setRowCount(len(data))
         self.read_data_display.setColumnCount(len(column_order))
         self.read_data_display.setHorizontalHeaderLabels(column_order)  # 设置表头
+        
+        # 允许手动调整所有列的列宽
+        header = self.read_data_display.horizontalHeader()
+        header.setStretchLastSection(False)
+        for i in range(len(column_order)):
+            header.setSectionResizeMode(i, QHeaderView.Interactive)
 
         # 按照列顺序填充数据
         for row_idx, row_dict in enumerate(data):

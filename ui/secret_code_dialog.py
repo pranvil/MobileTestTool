@@ -127,7 +127,11 @@ class SecretCodeDialog(QDialog):
         self.category_table = QTableWidget()
         self.category_table.setColumnCount(1)
         self.category_table.setHorizontalHeaderLabels([self.tr("分类名称")])
-        self.category_table.horizontalHeader().setStretchLastSection(True)
+        # 允许手动调整列宽
+        header = self.category_table.horizontalHeader()
+        header.setStretchLastSection(False)
+        header.setSectionResizeMode(0, QHeaderView.Interactive)
+        self.category_table.setColumnWidth(0, 200)  # 设置初始宽度
         self.category_table.setEditTriggers(QTableWidget.NoEditTriggers)
         self.category_table.setSelectionBehavior(QTableWidget.SelectRows)
         self.category_table.setSelectionMode(QTableWidget.SingleSelection)
@@ -182,7 +186,6 @@ class SecretCodeDialog(QDialog):
         self.code_table = QTableWidget()
         self.code_table.setColumnCount(2)
         self.code_table.setHorizontalHeaderLabels([self.tr("Code"), self.tr("描述")])
-        self.code_table.horizontalHeader().setStretchLastSection(True)
         self.code_table.setEditTriggers(QTableWidget.NoEditTriggers)
         self.code_table.setSelectionBehavior(QTableWidget.SelectRows)
         self.code_table.setSelectionMode(QTableWidget.SingleSelection)
@@ -190,9 +193,13 @@ class SecretCodeDialog(QDialog):
         # 双击事件
         self.code_table.itemDoubleClicked.connect(self.on_code_double_clicked)
         
+        # 允许手动调整列宽
         header = self.code_table.horizontalHeader()
-        header.setSectionResizeMode(0, QHeaderView.ResizeToContents)
-        header.setSectionResizeMode(1, QHeaderView.Stretch)
+        header.setStretchLastSection(False)
+        header.setSectionResizeMode(0, QHeaderView.Interactive)
+        header.setSectionResizeMode(1, QHeaderView.Interactive)
+        self.code_table.setColumnWidth(0, 200)  # Code列初始宽度
+        self.code_table.setColumnWidth(1, 300)  # 描述列初始宽度
         
         layout.addWidget(self.code_table)
         

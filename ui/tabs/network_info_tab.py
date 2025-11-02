@@ -143,9 +143,12 @@ class NetworkInfoTab(QWidget):
         self.network_table.setSelectionBehavior(QTableWidget.SelectRows)
         self.network_table.setEditTriggers(QTableWidget.NoEditTriggers)
         
-        # 设置列调整模式 - 允许手动调整列宽
-        self.network_table.horizontalHeader().setStretchLastSection(True)  # 最后一列自动拉伸
-        self.network_table.horizontalHeader().setSectionResizeMode(QHeaderView.Interactive)  # 允许手动调整
+        # 设置列调整模式 - 允许手动调整所有列的列宽
+        header = self.network_table.horizontalHeader()
+        header.setStretchLastSection(False)  # 禁用自动拉伸，允许手动调整
+        # 设置所有列为可手动调整
+        for i in range(16):
+            header.setSectionResizeMode(i, QHeaderView.Interactive)
         
         # 设置初始列宽
         self.network_table.setColumnWidth(0, 50)   # SIM
@@ -191,7 +194,9 @@ class NetworkInfoTab(QWidget):
                 background-color: #3a3a3a;
                 color: #ffffff;
                 padding: 4px;
-                border: 1px solid #555555;
+                border: none;
+                border-bottom: 1px solid #555555;
+                border-right: 1px solid #666666;
             }
             QScrollBar:horizontal {
                 background-color: white;
