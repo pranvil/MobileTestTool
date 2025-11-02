@@ -14024,3 +14024,56 @@ API级别:
 编译时间:
 [设备信息] 设备信息获取完成!
 
+手机测试辅助工具
+正在初始化...
+个自定义按钮
+成功加载Tab配置
+Root&&Remount
+检查更新
+点击切换语言 / Click to switch language
+开始初始化所有Tab页面...
+启用Telephony日志
+log操作:
+3GPP解码器
+连线log
+离线log
+日志区域行数
+自定义界面管理
+创建自定义Card组:
+（按钮稍后添加）
+所有Tab页面初始化完成
+支持快速执行一次性ADB命令
+
+例如: adb devices, adb shell pm list packages 等
+
+不支持持续输出命令（logcat、top等），请使用对应功能
+拉取 Bugreport
+TCPDUMP
+Ping
+点击
+按钮获取网络信息
+中/EN
+开始为所有Tab加载自定义按钮...
+处理预制Tab:
+默认
+处理自定义Tab...
+检查Tab:
+找到自定义Tab:
+为自定义Tab加载按钮:
+找到
+个自定义Card
+处理Card:
+查找按钮: Tab=
+Card=
+所有按钮配置:
+个
+Card
+有
+个按钮
+尝试向自定义Card添加按钮:
+个QFrame
+找到匹配的自定义Card:
+个QHBoxLayout
+到Card
+所有Tab的自定义按钮加载完成
+新增

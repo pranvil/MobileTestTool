@@ -34,6 +34,9 @@ a = Analysis(
         'PyQt5.QtGui',
         'PyQt5.QtWidgets',
         'PyQt5.QtNetwork',
+        # 入口模块
+        'gui_main',
+        'cli_main',
         # UI 模块
         'ui.widgets.shadow_utils',
         'ui.widgets.animations',
