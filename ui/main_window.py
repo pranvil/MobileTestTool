@@ -1062,28 +1062,26 @@ class MainWindow(QMainWindow):
     def _create_custom_tab_instance(self, custom_tab):
         """创建自定义Tab实例"""
         try:
-            from PyQt5.QtWidgets import QWidget, QVBoxLayout, QLabel, QGroupBox, QScrollArea, QFrame
+            from PyQt5.QtWidgets import QWidget, QVBoxLayout, QLabel, QScrollArea
             from PyQt5.QtCore import Qt
             
             widget = QWidget()
             widget.tab_id = custom_tab['id']  # 设置tab_id属性
-            layout = QVBoxLayout(widget)
             
-            # 添加Tab标题和描述
-            title_label = QLabel(f"{custom_tab['name']}")
-            title_label.setProperty("class", "section-title")
-            title_label.setStyleSheet("font-size: 16px; font-weight: bold; margin: 10px 0;")
-            layout.addWidget(title_label)
-            
-            if custom_tab.get('description'):
-                desc_label = QLabel(f"{self.tr('描述:')} {custom_tab['description']}")
-                desc_label.setWordWrap(True)
-                layout.addWidget(desc_label)
+            # 主布局
+            main_layout = QVBoxLayout(widget)
+            main_layout.setContentsMargins(10, 10, 10, 10)
+            main_layout.setSpacing(10)
             
             # 创建滚动区域
             scroll_area = QScrollArea()
+            scroll_area.setWidgetResizable(True)
+            scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+            
             scroll_widget = QWidget()
             scroll_layout = QVBoxLayout(scroll_widget)
+            scroll_layout.setContentsMargins(0, 0, 0, 0)
+            scroll_layout.setSpacing(1)  # 与大部分预置tab一致
             
             # 添加自定义Card
             custom_cards = self.tab_config_manager.get_custom_cards_for_tab(custom_tab['id'])
@@ -1100,8 +1098,7 @@ class MainWindow(QMainWindow):
             
             scroll_layout.addStretch()
             scroll_area.setWidget(scroll_widget)
-            scroll_area.setWidgetResizable(True)
-            layout.addWidget(scroll_area)
+            main_layout.addWidget(scroll_area)
             
             return widget
         except Exception as e:
@@ -1111,28 +1108,56 @@ class MainWindow(QMainWindow):
     def _create_custom_card_group(self, card):
         """创建自定义Card组（仅创建结构，按钮由统一方法添加）"""
         try:
-            from PyQt5.QtWidgets import QGroupBox, QVBoxLayout, QHBoxLayout, QLabel
+            from PyQt5.QtWidgets import QWidget, QFrame, QVBoxLayout, QHBoxLayout, QLabel
             from PyQt5.QtCore import Qt
+            from ui.widgets.shadow_utils import add_card_shadow
             
-            group = QGroupBox(card['name'])
-            group.setProperty('custom_card', True)  # 标记为自定义Card
-            layout = QVBoxLayout(group)
+            # 使用与预置tab一致的现代结构：QLabel + QFrame
+            # 容器
+            container = QWidget()
+            v = QVBoxLayout(container)
+            v.setContentsMargins(0, 0, 0, 0)
+            v.setSpacing(4)  # 与预置tab一致的间距
             
-            # 添加Card描述
+            # 标题
+            title = QLabel(card['name'])
+            title.setProperty("class", "section-title")
+            v.addWidget(title)
+            
+            # 卡片
+            card_frame = QFrame()
+            card_frame.setObjectName("card")
+            add_card_shadow(card_frame)
+            card_frame.setProperty('custom_card', True)  # 标记为自定义Card
+            
+            # 如果有描述，使用垂直布局；否则使用水平布局（与预置tab一致）
             if card.get('description'):
+                card_layout = QVBoxLayout(card_frame)
+                card_layout.setContentsMargins(10, 1, 10, 1)
+                card_layout.setSpacing(8)
+                
+                # 添加Card描述
                 desc_label = QLabel(card['description'])
                 desc_label.setWordWrap(True)
                 desc_label.setStyleSheet("color: #666; margin-bottom: 10px;")
-                layout.addWidget(desc_label)
+                card_layout.addWidget(desc_label)
+                
+                # 添加空的按钮布局（按钮由load_custom_buttons_for_all_tabs统一添加）
+                button_layout = QHBoxLayout()
+                button_layout.addStretch()  # 添加stretch，按钮会插入到stretch之前
+                card_layout.addLayout(button_layout)
+            else:
+                # 没有描述时，使用水平布局（与预置tab一致）
+                card_layout = QHBoxLayout(card_frame)
+                card_layout.setContentsMargins(10, 1, 10, 1)
+                card_layout.setSpacing(8)
+                card_layout.addStretch()  # 添加stretch，按钮会插入到stretch之前
             
-            # 添加空的按钮布局（按钮由load_custom_buttons_for_all_tabs统一添加）
-            button_layout = QHBoxLayout()
-            button_layout.addStretch()  # 添加stretch，按钮会插入到stretch之前
-            layout.addLayout(button_layout)
+            v.addWidget(card_frame)
             
             logger.debug(f"{self.tr('创建自定义Card组:')} '{card['name']}' {self.tr('（按钮稍后添加）')}")
             
-            return group
+            return container
         except Exception as e:
             logger.exception(f"{self.tr('创建自定义Card组失败:')} {e}")
             return None
@@ -2600,33 +2625,47 @@ class MainWindow(QMainWindow):
     def _add_buttons_to_custom_card(self, tab_widget, tab_name, card_name, buttons):
         """向自定义Card添加按钮"""
         try:
-            from PyQt5.QtWidgets import QGroupBox, QHBoxLayout
+            from PyQt5.QtWidgets import QFrame, QHBoxLayout, QLabel
             
             logger.debug(f"{self.lang_manager.tr('尝试向自定义Card添加按钮:')} '{card_name}'")
             
-            # 查找对应的GroupBox
-            group_boxes = tab_widget.findChildren(QGroupBox)
-            logger.debug(f"{self.lang_manager.tr('找到')} {len(group_boxes)} {self.lang_manager.tr('个GroupBox')}")
+            # 现在自定义Card使用QFrame+QLabel结构，与预置tab一致
+            # 查找对应的Frame（标记为custom_card）
+            frames = tab_widget.findChildren(QFrame)
+            logger.debug(f"{self.lang_manager.tr('找到')} {len(frames)} {self.lang_manager.tr('个QFrame')}")
             
-            for group_box in group_boxes:
-                if group_box.title() == card_name:
-                    logger.debug(f"{self.lang_manager.tr('找到匹配的GroupBox:')} '{card_name}'")
-                    
-                    button_layouts = group_box.findChildren(QHBoxLayout)
-                    logger.debug(f"{self.lang_manager.tr('找到')} {len(button_layouts)} {self.lang_manager.tr('个QHBoxLayout')}")
-                    
-                    if button_layouts:
-                        button_layout = button_layouts[0]
-                        container = self._get_or_create_button_container(tab_widget, button_layout, tab_name, card_name)
-                        container.clear_buttons()
-                        for btn_data in buttons:
-                            container.add_custom_button(btn_data)
-                            logger.debug(f"{self.lang_manager.tr('添加按钮')} '{btn_data['name']}' {self.lang_manager.tr('到Card')} '{card_name}'")
-                    else:
-                        logger.warning(f"{self.lang_manager.tr('未找到按钮布局')}")
-                    break
-            else:
-                logger.warning(f"{self.lang_manager.tr('未找到Card')} '{card_name}'")
+            for frame in frames:
+                # 仅处理自定义Card的Frame
+                if frame.property('custom_card') and frame.objectName() == "card":
+                    # 检查Frame上方是否有对应的标题Label
+                    parent_widget = frame.parent()
+                    if parent_widget:
+                        labels = parent_widget.findChildren(QLabel)
+                        for label in labels:
+                            label_text = label.text()
+                            label_class = label.property("class")
+                            
+                            if label_text == card_name and label_class == "section-title":
+                                logger.debug(f"{self.lang_manager.tr('找到匹配的自定义Card:')} '{card_name}'")
+                                
+                                button_layouts = frame.findChildren(QHBoxLayout)
+                                logger.debug(f"{self.lang_manager.tr('找到')} {len(button_layouts)} {self.lang_manager.tr('个QHBoxLayout')}")
+                                
+                                if button_layouts:
+                                    button_layout = button_layouts[0]
+                                    container = self._get_or_create_button_container(tab_widget, button_layout, tab_name, card_name)
+                                    container.clear_buttons()
+                                    for btn_data in buttons:
+                                        container.add_custom_button(btn_data)
+                                        logger.debug(f"{self.lang_manager.tr('添加按钮')} '{btn_data['name']}' {self.lang_manager.tr('到Card')} '{card_name}'")
+                                else:
+                                    logger.warning(f"{self.lang_manager.tr('未找到按钮布局')}")
+                                return
+                
+                elif frame.property('custom_card'):
+                    logger.debug(f"{self.lang_manager.tr('跳过，不是card对象名的Frame')}")
+            
+            logger.warning(f"{self.lang_manager.tr('未找到自定义Card')} '{card_name}'")
                 
         except Exception as e:
             logger.exception(f"{self.lang_manager.tr('向自定义Card添加按钮失败:')} {e}")

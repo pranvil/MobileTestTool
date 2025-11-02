@@ -232,20 +232,32 @@ class OtherTab(QWidget):
         self.show_input_text_btn = QPushButton(self.lang_manager.tr("输入文本"))
         self.show_input_text_btn.clicked.connect(self.show_input_text_dialog.emit)
         card_layout.addWidget(self.show_input_text_btn)
-        
-        self.show_tools_config_btn = QPushButton(self.lang_manager.tr("工具配置"))
-        self.show_tools_config_btn.clicked.connect(self.show_tools_config_dialog.emit)
-        card_layout.addWidget(self.show_tools_config_btn)
-        
-        self.show_display_lines_btn = QPushButton(self.lang_manager.tr("设置显示行数"))
-        self.show_display_lines_btn.setToolTip(self.lang_manager.tr("设置显示行数 - 配置日志区域显示的最大行数"))
-        self.show_display_lines_btn.clicked.connect(self.show_display_lines_dialog.emit)
-        card_layout.addWidget(self.show_display_lines_btn)
-        
+
         self.show_at_tool_btn = QPushButton("📡 " + self.lang_manager.tr("AT工具"))
         self.show_at_tool_btn.clicked.connect(self.show_at_tool_dialog.emit)
         card_layout.addWidget(self.show_at_tool_btn)
         
+        card_layout.addStretch()
+                 
+        self.show_display_lines_btn = QPushButton(self.lang_manager.tr("日志区域行数"))
+        self.show_display_lines_btn.setToolTip(self.lang_manager.tr("设置显示行数 - 配置日志区域显示的最大行数"))
+        self.show_display_lines_btn.clicked.connect(self.show_display_lines_dialog.emit)
+        card_layout.addWidget(self.show_display_lines_btn)
+         
+        self.show_tools_config_btn = QPushButton("🔧 " + self.lang_manager.tr("工具配置"))
+        self.show_tools_config_btn.clicked.connect(self.show_tools_config_dialog.emit)
+        self.show_tools_config_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #6f42c1;
+                color: white;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #5a32a3;
+            }
+        """)
+        card_layout.addWidget(self.show_tools_config_btn)
+      
         self.config_backup_btn = QPushButton("💾 " + self.lang_manager.tr("配置备份恢复"))
         self.config_backup_btn.setToolTip(self.lang_manager.tr("配置备份恢复 - 导出或导入工具配置"))
         self.config_backup_btn.clicked.connect(self.show_config_backup_dialog.emit)
@@ -274,10 +286,6 @@ class OtherTab(QWidget):
             }
         """)
         card_layout.addWidget(self.unified_manager_btn)
-        
-
-        
-        card_layout.addStretch()
         
         v.addWidget(card)
         
@@ -310,13 +318,15 @@ class OtherTab(QWidget):
         if hasattr(self, 'show_input_text_btn'):
             self.show_input_text_btn.setText(self.lang_manager.tr("输入文本"))
         if hasattr(self, 'show_tools_config_btn'):
-            self.show_tools_config_btn.setText(self.lang_manager.tr("工具配置"))
+            self.show_tools_config_btn.setText("🔧 " + self.lang_manager.tr("工具配置"))
         if hasattr(self, 'show_display_lines_btn'):
             self.show_display_lines_btn.setText(self.lang_manager.tr("设置显示行数"))
         if hasattr(self, 'show_at_tool_btn'):
             self.show_at_tool_btn.setText("📡 " + self.lang_manager.tr("AT工具"))
         if hasattr(self, 'config_backup_btn'):
             self.config_backup_btn.setText("💾 " + self.lang_manager.tr("配置备份恢复"))
+        if hasattr(self, 'unified_manager_btn'):
+            self.unified_manager_btn.setText("⚙️ " + self.lang_manager.tr("自定义界面管理"))
         if hasattr(self, 'custom_button_manager_btn'):
             self.custom_button_manager_btn.setText("🔧 " + self.lang_manager.tr("管理自定义按钮"))
         if hasattr(self, 'tab_manager_btn'):
