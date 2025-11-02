@@ -366,14 +366,46 @@ class UnifiedManagerDialog(QDialog):
         widget = QWidget()
         layout = QVBoxLayout(widget)
         
-        # 顶部说明
-        info_text = (self.tr("💡 在此配置自定义命令按钮，按钮将显示在指定的Tab和卡片中。") +
-                    self.tr("adb命令会自动加上 'adb -s {device}' 前缀。"))
+        # 搜索栏（移到顶部）
+        search_layout = QHBoxLayout()
+        search_label = QLabel("🔍 " + self.tr("搜索:"))
+        search_layout.addWidget(search_label)
         
-        info_label = QLabel(info_text)
-        info_label.setWordWrap(True)
-        info_label.setStyleSheet("color: #17a2b8; padding: 10px; background: #d1ecf1; border-radius: 4px;")
-        layout.addWidget(info_label)
+        self.search_input = QLineEdit()
+        self.search_input.setPlaceholderText(self.tr("输入关键词进行搜索..."))
+        self.search_input.setMinimumWidth(150)
+        self.search_input.returnPressed.connect(self.search_buttons)  # 按回车键搜索
+        search_layout.addWidget(self.search_input)
+        
+        self.search_scope_combo = QComboBox()
+        self.search_scope_combo.setObjectName("search_scope_combo")
+        self.search_scope_combo.setStyleSheet("QComboBox#search_scope_combo { min-width: 50px; }")
+        self.search_scope_combo.addItems([
+            self.tr("整个表格"),
+            self.tr("名称"),
+            self.tr("类型"),
+            self.tr("命令"),
+            self.tr("所在Tab"),
+            self.tr("所在卡片"),
+            self.tr("启用"),
+            self.tr("描述")
+        ])
+        search_layout.addWidget(self.search_scope_combo)
+        
+        self.search_btn = QPushButton("🔍 " + self.tr("搜索"))
+        self.search_btn.clicked.connect(self.search_buttons)
+        self.search_btn.setAutoDefault(False)
+        self.search_btn.setDefault(False)
+        search_layout.addWidget(self.search_btn)
+        
+        self.clear_search_btn = QPushButton("❌ " + self.tr("清除"))
+        self.clear_search_btn.clicked.connect(self.clear_search)
+        self.clear_search_btn.setAutoDefault(False)
+        self.clear_search_btn.setDefault(False)
+        search_layout.addWidget(self.clear_search_btn)
+        
+        search_layout.addStretch()
+        layout.addLayout(search_layout)
         
         # 按钮列表表格
         self.button_table = DragDropButtonTable()
@@ -429,47 +461,6 @@ class UnifiedManagerDialog(QDialog):
         
         filter_row_layout.addStretch()
         layout.addLayout(filter_row_layout)
-        
-        # 搜索栏
-        search_layout = QHBoxLayout()
-        search_label = QLabel("🔍 " + self.tr("搜索:"))
-        search_layout.addWidget(search_label)
-        
-        self.search_input = QLineEdit()
-        self.search_input.setPlaceholderText(self.tr("输入关键词进行搜索..."))
-        self.search_input.setMinimumWidth(150)
-        self.search_input.returnPressed.connect(self.search_buttons)  # 按回车键搜索
-        search_layout.addWidget(self.search_input)
-        
-        self.search_scope_combo = QComboBox()
-        self.search_scope_combo.setObjectName("search_scope_combo")
-        self.search_scope_combo.setStyleSheet("QComboBox#search_scope_combo { min-width: 50px; }")
-        self.search_scope_combo.addItems([
-            self.tr("整个表格"),
-            self.tr("名称"),
-            self.tr("类型"),
-            self.tr("命令"),
-            self.tr("所在Tab"),
-            self.tr("所在卡片"),
-            self.tr("启用"),
-            self.tr("描述")
-        ])
-        search_layout.addWidget(self.search_scope_combo)
-        
-        self.search_btn = QPushButton("🔍 " + self.tr("搜索"))
-        self.search_btn.clicked.connect(self.search_buttons)
-        self.search_btn.setAutoDefault(False)
-        self.search_btn.setDefault(False)
-        search_layout.addWidget(self.search_btn)
-        
-        self.clear_search_btn = QPushButton("❌ " + self.tr("清除"))
-        self.clear_search_btn.clicked.connect(self.clear_search)
-        self.clear_search_btn.setAutoDefault(False)
-        self.clear_search_btn.setDefault(False)
-        search_layout.addWidget(self.clear_search_btn)
-        
-        search_layout.addStretch()
-        layout.addLayout(search_layout)
         
         return widget
     
