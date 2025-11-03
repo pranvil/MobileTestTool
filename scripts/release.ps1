@@ -109,6 +109,31 @@ $packageName = "MobileTestTool_$Version.zip"
 $packagePath = Join-Path $packageDir $packageName
 $manifestDir = Join-Path $repoRoot "releases"
 $manifestPath = Join-Path $manifestDir "latest.json"
+$versionFile = Join-Path $repoRoot "core\version.py"
+
+# 更新版本号
+Write-Host "=== step 0: update version.py ==="
+if (-not (Test-Path $versionFile)) {
+    throw "Version file not found: $versionFile"
+}
+
+$versionContent = Get-Content $versionFile -Raw -Encoding UTF8
+$oldVersion = if ($versionContent -match 'APP_VERSION = "([^"]+)"') {
+    $matches[1]
+} else {
+    $null
+}
+
+if ($oldVersion -and $oldVersion -ne $Version) {
+    Write-Host "Updating version from $oldVersion to $Version"
+    $versionContent = $versionContent -replace 'APP_VERSION = "[^"]+"', "APP_VERSION = `"$Version`""
+    [System.IO.File]::WriteAllText($versionFile, $versionContent, (New-Object System.Text.UTF8Encoding($false)))
+    Write-Host "Version updated successfully"
+} elseif ($oldVersion -eq $Version) {
+    Write-Host "Version already matches: $Version"
+} else {
+    Write-Host "Warning: Could not find APP_VERSION in version.py, skipping update"
+}
 
 if (-not $SkipPackage) {
     Write-Host "=== step 1: run build_pyqt.bat ==="
@@ -170,7 +195,8 @@ Write-Host "=== step 6: git commit & push ==="
 $filesToStage = @(
     "scripts/release.ps1",
     "config/latest.json.example",
-    "releases/latest.json"
+    "releases/latest.json",
+    "core/version.py"
 )
 
 foreach ($file in $filesToStage) {

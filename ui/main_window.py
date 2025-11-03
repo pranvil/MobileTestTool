@@ -1445,6 +1445,19 @@ class MainWindow(QMainWindow):
         ]
         self.append_log.emit(f"[更新] ✅ {success_message}\n", "#00FF00")
 
+        # 检查是否启用自动更新
+        auto_update = bool(self.tool_config.get("update_auto_update", True))
+        
+        if auto_update:
+            # 尝试启动自动更新器
+            if self._try_launch_updater(result.file_path, manifest.version):
+                # 更新器已启动，主程序退出
+                self.append_log.emit(f"[更新] {self.tr('正在启动更新器，程序将自动退出...')}\n", "#FFA500")
+                # 直接退出，不显示消息框
+                QTimer.singleShot(100, self._exit_for_update)
+                return
+        
+        # 回退到手动更新流程
         instruction_text = self.tr("请解压更新包并覆盖原有程序文件，以完成更新。")
         auto_launch = bool(self.tool_config.get("update_auto_launch_installer", True))
         if auto_launch:
@@ -1560,6 +1573,137 @@ class MainWindow(QMainWindow):
         except Exception as exc:
             logger.exception("打开文件位置失败: %s", exc)
             QMessageBox.warning(self, self.tr("在线更新"), self.tr("无法打开文件所在位置，请手动查找。"))
+    
+    def _get_install_dir(self) -> str:
+        """获取程序安装目录"""
+        if getattr(sys, 'frozen', False):
+            # 打包后的exe运行目录
+            return os.path.dirname(os.path.abspath(sys.executable))
+        else:
+            # 开发环境：使用项目根目录
+            return os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    
+    def _get_updater_path(self) -> Optional[str]:
+        """获取更新器可执行文件路径"""
+        install_dir = self._get_install_dir()
+        
+        # 生产环境：查找 updater.exe
+        if getattr(sys, 'frozen', False):
+            # 优先在 _internal 目录中查找（更隐蔽）
+            internal_dir = os.path.join(install_dir, "_internal")
+            updater_exe = os.path.join(internal_dir, "updater.exe")
+            if os.path.exists(updater_exe):
+                return updater_exe
+            
+            # 回退到主目录查找（兼容旧版本）
+            updater_exe = os.path.join(install_dir, "updater.exe")
+            if os.path.exists(updater_exe):
+                return updater_exe
+        else:
+            # 开发环境：使用 Python 运行 updater.py
+            updater_py = os.path.join(install_dir, "core", "updater.py")
+            if os.path.exists(updater_py):
+                return sys.executable, updater_py
+        
+        return None
+    
+    def _try_launch_updater(self, zip_path: str, version: str) -> bool:
+        """尝试启动更新器
+        
+        策略：先将 updater.exe 复制到临时目录，然后从临时目录运行
+        这样可以避免 updater.exe 锁定 _internal 目录中的 DLL 文件
+        """
+        try:
+            updater_path = self._get_updater_path()
+            if not updater_path:
+                logger.warning("更新器未找到，无法执行自动更新")
+                return False
+            
+            install_dir = self._get_install_dir()
+            main_exe = os.path.join(install_dir, "MobileTestTool.exe")
+            
+            # 构建更新器命令
+            if isinstance(updater_path, tuple):
+                # 开发环境：Python脚本
+                python_exe, updater_script = updater_path
+                cmd = [
+                    python_exe,
+                    updater_script,
+                    zip_path,
+                    install_dir,
+                    "--main-exe", main_exe if os.path.exists(main_exe) else "main.py",
+                    "--process-name", "MobileTestTool.exe",
+                    "--wait-timeout", "30",
+                ]
+                # 开发环境直接运行，不需要复制
+                logger.info(f"启动更新器: {' '.join(cmd)}")
+                subprocess.Popen(cmd)
+                logger.info("更新器已启动")
+                return True
+            else:
+                # 生产环境：可执行文件
+                # 先复制到临时目录，避免锁定 _internal 目录中的 DLL
+                import tempfile
+                import shutil
+                
+                temp_dir = tempfile.gettempdir()
+                temp_updater = os.path.join(temp_dir, f"MobileTestTool_updater_{int(time.time())}.exe")
+                
+                try:
+                    # 复制更新器到临时目录
+                    logger.info(f"复制更新器到临时目录: {temp_updater}")
+                    shutil.copy2(updater_path, temp_updater)
+                    
+                    # 从临时目录运行更新器
+                    cmd = [
+                        temp_updater,
+                        zip_path,
+                        install_dir,
+                        "--main-exe", main_exe,
+                        "--process-name", "MobileTestTool.exe",
+                        "--wait-timeout", "30",
+                    ]
+                    
+                    logger.info(f"启动更新器: {' '.join(cmd)}")
+                    
+                    # 启动更新器（不等待它完成）
+                    # 注意：更新器需要显示控制台窗口，所以不使用 CREATE_NO_WINDOW
+                    subprocess.Popen(
+                        cmd,
+                        creationflags=0,  # 显示控制台窗口
+                        # 不重定向输出，让更新器直接显示在控制台
+                    )
+                    
+                    logger.info("更新器已启动（从临时目录运行）")
+                    
+                    # 注意：临时文件会在更新器完成后自行清理，或者由系统清理
+                    # 更新器可以在完成后删除自己的临时副本
+                    return True
+                    
+                except Exception as copy_error:
+                    logger.error(f"复制更新器到临时目录失败: {copy_error}")
+                    # 如果复制失败，尝试直接运行（可能仍会锁定文件，但至少可以尝试）
+                    logger.warning("尝试直接运行更新器（可能锁定 _internal 文件）")
+                    cmd = [
+                        updater_path,
+                        zip_path,
+                        install_dir,
+                        "--main-exe", main_exe,
+                        "--process-name", "MobileTestTool.exe",
+                        "--wait-timeout", "30",
+                    ]
+                    subprocess.Popen(cmd, creationflags=0)
+                    logger.info("更新器已启动（直接运行）")
+                    return True
+            
+        except Exception as exc:
+            logger.exception("启动更新器失败: %s", exc)
+            return False
+    
+    def _exit_for_update(self) -> None:
+        """为更新而退出程序"""
+        logger.info("程序即将退出以进行更新")
+        QApplication.instance().quit()
     
     def _on_theme_toggled(self):
         """主题切换处理"""
