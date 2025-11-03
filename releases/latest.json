@@ -1,10 +1,10 @@
 {
     "version":  "0.9.5.1",
     "download_url":  "https://github.com/pranvil/MobileTestTool/releases/download/v0.9.5.1/MobileTestTool_0.9.5.1.zip",
-    "sha256":  "7e96cbe2fd19b90c37a4b7a3d919e0c45956ca3ad14193c28f0c505c170aee22",
+    "sha256":  "1874a6becf867cfbb2f3507c883c34721df5592a63bf9812a5d184f71c49fd46",
     "file_name":  "MobileTestTool_0.9.5.1.zip",
-    "file_size":  109580460,
+    "file_size":  109578392,
     "release_notes":  "# MobileTestTool Release Notes\r\n\r\n## 版本信息\r\n- 版本号：0.9.5.1\r\n- 发布日期：2025/11/4\r\n\r\n## 本次更新摘要\r\n- ✅ 解决自定义按钮放在预置tab中加载不生效的问题\r\n- ✅ TMO CC, TMO echolocate,24小时背景数据 tab默认隐藏\r\n- ✅ 自定义命令异步执行\r\n- ✅ 导入备份提示更友好\r\n\r\n\r\n## 已知问题\r\n-",
-    "published_at":  "2025-11-03T23:00:07Z",
+    "published_at":  "2025-11-03T23:22:10Z",
     "mandatory":  false
 }
