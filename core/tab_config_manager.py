@@ -37,9 +37,9 @@ class TabConfigManager(QObject):
             {'id': 'log_control', 'name': 'Log控制', 'visible': True, 'custom': False},
             {'id': 'log_filter', 'name': 'Log过滤', 'visible': True, 'custom': False},
             {'id': 'network_info', 'name': '网络信息', 'visible': True, 'custom': False},
-            {'id': 'tmo_cc', 'name': 'TMO CC', 'visible': True, 'custom': False},
-            {'id': 'tmo_echolocate', 'name': 'TMO Echolocate', 'visible': True, 'custom': False},
-            {'id': 'background_data', 'name': '24小时背景数据', 'visible': True, 'custom': False},
+            {'id': 'tmo_cc', 'name': 'TMO CC', 'visible': False, 'custom': False},
+            {'id': 'tmo_echolocate', 'name': 'TMO Echolocate', 'visible': False, 'custom': False},
+            {'id': 'background_data', 'name': '24小时背景数据', 'visible': False, 'custom': False},
             {'id': 'app_operations', 'name': 'APP操作', 'visible': True, 'custom': False},
             {'id': 'sim', 'name': 'SIM', 'visible': True, 'custom': False},
             {'id': 'other', 'name': '其他', 'visible': True, 'custom': False}
