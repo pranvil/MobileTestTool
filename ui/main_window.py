@@ -255,6 +255,42 @@ class CustomButtonContainer(QWidget):
             return None
 
 
+class ButtonCommandWorker(QThread):
+    """在后台执行自定义按钮命令"""
+    
+    finished = pyqtSignal(bool, str, str)  # success, output, button_name
+    log_message = pyqtSignal(str, str)  # message, color
+    
+    def __init__(self, button_data, device_id, button_manager, lang_manager):
+        super().__init__()
+        self.button_data = button_data
+        self.device_id = device_id
+        self.button_manager = button_manager
+        self.lang_manager = lang_manager
+    
+    def _tr(self, text):
+        return self.lang_manager.tr(text) if self.lang_manager else text
+    
+    def run(self):
+        """在线程中执行命令"""
+        try:
+            button_name = self.button_data.get('name', self._tr('自定义按钮'))
+            
+            # 执行命令
+            success, output = self.button_manager.execute_button_command(
+                self.button_data,
+                self.device_id
+            )
+            
+            # 发送完成信号
+            self.finished.emit(success, output or '', button_name)
+            
+        except Exception as e:
+            error_msg = str(e)
+            logger.exception(f"{self._tr('执行自定义按钮命令失败:')} {e}")
+            self.finished.emit(False, error_msg, self.button_data.get('name', self._tr('自定义按钮')))
+
+
 class RootRemountWorker(QThread):
     """在后台执行 adb root & remount"""
 
@@ -437,6 +473,7 @@ class MainWindow(QMainWindow):
         # 初始化变量
         self.selected_device = ""
         self._root_remount_worker = None
+        self._button_command_workers = []  # 存储按钮命令工作线程
         self._update_worker = None
         self._update_progress_dialog = None
         self._update_status_text = ""
@@ -3029,30 +3066,50 @@ class MainWindow(QMainWindow):
             logger.exception(f"{self.lang_manager.tr('处理按钮排序更新失败:')} {e}")
 
     def execute_custom_button_command(self, button_data):
-        """执行自定义按钮命令"""
+        """执行自定义按钮命令（异步执行）"""
         try:
-            button_type = button_data.get('type', 'adb')
-            command = button_data.get('command', '')
             name = button_data.get('name', self.lang_manager.tr('自定义按钮'))
             
             self.append_log.emit(f"🔧 {self.tr('执行自定义按钮: ')}{name}\n", "#17a2b8")
             
-            # 使用新的统一执行方法
-            success, output = self.custom_button_manager.execute_button_command(
-                button_data, 
-                self.device_manager.selected_device
+            # 创建并启动工作线程
+            worker = ButtonCommandWorker(
+                button_data,
+                self.device_manager.selected_device,
+                self.custom_button_manager,
+                self.lang_manager
             )
             
+            # 保存工作线程引用（避免被垃圾回收）
+            self._button_command_workers.append(worker)
+            
+            # 连接信号
+            worker.finished.connect(lambda success, output, btn_name, w=worker: self._on_button_command_finished(success, output, btn_name, w))
+            
+            # 启动线程
+            worker.start()
+            
+        except Exception as e:
+            logger.exception(f"{self.lang_manager.tr('启动自定义按钮命令执行失败:')} {e}")
+            self.append_log.emit(f"❌ {self.tr('启动执行失败: ')}{str(e)}\n", "#dc3545")
+    
+    def _on_button_command_finished(self, success, output, button_name, worker):
+        """处理按钮命令执行完成"""
+        try:
             if success:
                 self.append_log.emit(f"✅ {self.tr('执行成功')}\n", "#28a745")
                 if output:
                     self.append_log.emit(f"{output}\n", "#9370DB")
             else:
                 self.append_log.emit(f"❌ {self.tr('执行失败: ')}{output}\n", "#dc3545")
-            
         except Exception as e:
-            logger.exception(f"{self.lang_manager.tr('执行自定义按钮命令失败:')} {e}")
-            self.append_log.emit(f"❌ {self.tr('执行失败: ')}{str(e)}\n", "#dc3545")
+            logger.exception(f"{self.lang_manager.tr('处理按钮命令完成信号失败:')} {e}")
+        finally:
+            # 清理工作线程引用
+            if worker in self._button_command_workers:
+                self._button_command_workers.remove(worker)
+            # 安全地删除工作线程对象（在事件循环中）
+            worker.deleteLater()
     
     def on_custom_buttons_updated(self):
         """自定义按钮配置更新时的处理"""
