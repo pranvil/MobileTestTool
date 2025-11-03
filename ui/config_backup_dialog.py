@@ -81,21 +81,21 @@ class ConfigBackupDialog(QDialog):
         desc.setStyleSheet("color: #666; padding: 10px;")
         layout.addWidget(desc)
         
-        # 按钮组
-        button_layout = QVBoxLayout()
+        # 按钮组（水平布局）
+        button_layout = QHBoxLayout()
         button_layout.setSpacing(10)
         
         # 导出按钮
         self.export_btn = QPushButton("📤 " + self.tr("导出所有配置"))
-        self.export_btn.setMinimumHeight(50)
         self.export_btn.clicked.connect(self.export_all_configs)
         self.export_btn.setStyleSheet("""
             QPushButton {
                 background-color: #28a745;
                 color: white;
                 font-weight: bold;
-                font-size: 12pt;
+                font-size: 10pt;
                 border-radius: 5px;
+                padding: 8px 20px;
             }
             QPushButton:hover {
                 background-color: #218838;
@@ -105,15 +105,15 @@ class ConfigBackupDialog(QDialog):
         
         # 导入按钮
         self.import_btn = QPushButton("📥 " + self.tr("导入所有配置"))
-        self.import_btn.setMinimumHeight(50)
         self.import_btn.clicked.connect(self.import_all_configs)
         self.import_btn.setStyleSheet("""
             QPushButton {
                 background-color: #007bff;
                 color: white;
                 font-weight: bold;
-                font-size: 12pt;
+                font-size: 10pt;
                 border-radius: 5px;
+                padding: 8px 20px;
             }
             QPushButton:hover {
                 background-color: #0056b3;
@@ -314,9 +314,24 @@ class ConfigBackupDialog(QDialog):
                 try:
                     config_data = configs['button_config']
                     self.custom_button_manager.buttons = config_data.get('custom_buttons', [])
-                    self.custom_button_manager.save_buttons()
-                    self.log_status(self.tr("✓ 自定义按钮配置导入成功"))
-                    success_count += 1
+                    
+                    # 验证Button的Tab和Card引用
+                    validation_errors = self._validate_button_references()
+                    if validation_errors:
+                        # 有验证错误，停止导入并显示错误信息
+                        error_msg = self.tr("❌ 自定义按钮配置导入失败！\n\n") + self.tr("发现以下问题：\n\n")
+                        error_msg += "\n".join(f"• {error}" for error in validation_errors)
+                        error_msg += f"\n\n{self.tr('请检查配置文件中的Tab和Card名称是否正确。')}"
+                        self.log_status(f"✗ 自定义按钮配置导入失败: 验证错误")
+                        for error in validation_errors:
+                            self.log_status(f"  - {error}")
+                        error_count += 1
+                        # 不保存按钮配置，保持原有配置
+                        self.custom_button_manager.load_buttons()
+                    else:
+                        self.custom_button_manager.save_buttons()
+                        self.log_status(self.tr("✓ 自定义按钮配置导入成功"))
+                        success_count += 1
                 except Exception as e:
                     self.log_status(f"✗ 自定义按钮配置导入失败: {str(e)}")
                     error_count += 1
@@ -376,13 +391,83 @@ class ConfigBackupDialog(QDialog):
                 self.parent.reload_tabs()
                 self.log_status(self.tr("✓ 已通知主窗口重新加载"))
             
-            QMessageBox.information(
-                self,
-                self.tr("导入完成"),
-                self.tr(f"共导入 {success_count} 个配置项\n失败 {error_count} 个")
-            )
+            # 如果有失败项，显示详细错误信息
+            if error_count > 0:
+                QMessageBox.warning(
+                    self,
+                    self.tr("导入完成（有错误）"),
+                    self.tr(f"共导入 {success_count} 个配置项\n失败 {error_count} 个\n\n请查看下方的详细日志了解失败原因。")
+                )
+            else:
+                # 确保按钮正确显示 - 触发按钮更新信号
+                if self.custom_button_manager:
+                    self.custom_button_manager.buttons_updated.emit()
+                QMessageBox.information(
+                    self,
+                    self.tr("导入完成"),
+                    self.tr(f"共导入 {success_count} 个配置项\n失败 {error_count} 个")
+                )
             
         except Exception as e:
             logger.exception(f"{self.tr('导入配置失败:')} {e}")
             QMessageBox.critical(self, self.tr("错误"), self.tr(f"导入失败: {str(e)}"))
+    
+    def _validate_button_references(self):
+        """验证Button的Tab和Card引用，返回错误列表"""
+        errors = []
+        try:
+            if not self.tab_config_manager or not self.custom_button_manager:
+                return errors
+            
+            # 获取所有有效的Tab名称
+            valid_tab_names = set()
+            
+            # 添加默认Tab名称
+            for tab in self.tab_config_manager.default_tabs:
+                valid_tab_names.add(tab['name'])
+            
+            # 添加自定义Tab名称
+            for tab in self.tab_config_manager.custom_tabs:
+                valid_tab_names.add(tab['name'])
+            
+            # 验证每个按钮的Tab和Card引用
+            for button in self.custom_button_manager.buttons:
+                button_name = button.get('name', '未知按钮')
+                button_tab = button.get('tab', '')
+                button_card = button.get('card', '')
+                
+                # 验证Tab是否存在
+                if button_tab:
+                    if button_tab not in valid_tab_names:
+                        errors.append(f"{self.tr('按钮')} '{button_name}' {self.tr('引用的Tab不存在:')} '{button_tab}'")
+                        continue
+                    
+                    # 验证Card是否存在（允许空格变体匹配）
+                    if button_card:
+                        # 获取该Tab下所有可用的Card
+                        available_cards = self.custom_button_manager.get_available_cards(button_tab)
+                        # 规范化card名称进行比较（去除多余空格）
+                        normalized_button_card = ' '.join(button_card.split())
+                        card_matched = False
+                        for available_card in available_cards:
+                            normalized_available_card = ' '.join(available_card.split())
+                            if normalized_button_card == normalized_available_card:
+                                card_matched = True
+                                # 如果存在空格差异，规范化按钮的card名称
+                                if button_card != available_card:
+                                    button['card'] = available_card
+                                    logger.info(f"{self.tr('规范化按钮card名称:')} '{button_card}' -> '{available_card}'")
+                                break
+                        
+                        if not card_matched:
+                            errors.append(f"{self.tr('按钮')} '{button_name}' {self.tr('引用的Card不存在:')} Tab='{button_tab}', Card='{button_card}'")
+                else:
+                    # Tab为空也可能是个问题，但这里不报错，因为可能是未配置的按钮
+                    pass
+                
+        except Exception as e:
+            logger.exception(f"{self.tr('验证Button引用失败:')} {e}")
+            errors.append(f"{self.tr('验证过程出错:')} {str(e)}")
+        
+        return errors
 

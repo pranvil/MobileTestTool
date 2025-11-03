@@ -115,7 +115,7 @@ class CustomButtonManager(QObject):
                 'command': 'shell getprop',
                 'tab': self.lang_manager.tr('其他'),
                 'card': self.lang_manager.tr('其他操作'),
-                'enabled': True,
+                'enabled': False,
                 'description': self.lang_manager.tr('查看设备的所有系统属性')
             },
             {
@@ -125,7 +125,7 @@ class CustomButtonManager(QObject):
                 'command': 'shell df -h',
                 'tab': self.lang_manager.tr('其他'),
                 'card': self.lang_manager.tr('设备信息'),
-                'enabled': True,
+                'enabled': False,
                 'description': self.lang_manager.tr('查看设备存储空间使用情况')
             }
         ]
@@ -135,13 +135,22 @@ class CustomButtonManager(QObject):
         return self.buttons
     
     def get_buttons_by_location(self, tab_name, card_name):
-        """根据Tab和Card获取按钮列表"""
-        return [
-            btn for btn in self.buttons 
-            if btn.get('enabled', True) and 
-               btn.get('tab') == tab_name and 
-               btn.get('card') == card_name
-        ]
+        """根据Tab和Card获取按钮列表（支持空格变体匹配）"""
+        # 规范化card名称用于匹配（去除多余空格）
+        normalized_card_name = ' '.join(card_name.split()) if card_name else ''
+        
+        result = []
+        for btn in self.buttons:
+            if not btn.get('enabled', True):
+                continue
+            if btn.get('tab') != tab_name:
+                continue
+            # 规范化按钮的card名称进行比较
+            btn_card = btn.get('card', '')
+            normalized_btn_card = ' '.join(btn_card.split()) if btn_card else ''
+            if normalized_btn_card == normalized_card_name:
+                result.append(btn)
+        return result
     
     def get_available_tabs(self):
         """获取可用的Tab列表"""

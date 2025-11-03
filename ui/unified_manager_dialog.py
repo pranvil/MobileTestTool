@@ -955,8 +955,16 @@ class UnifiedManagerDialog(QDialog):
                     button_config = config_data['button_config']
                     self.custom_button_manager.buttons = button_config.get('custom_buttons', [])
                     
-                    # 验证并修复Button的Tab名称引用
-                    self._validate_and_fix_button_tab_references()
+                    # 验证Button的Tab和Card引用
+                    validation_errors = self._validate_button_references()
+                    if validation_errors:
+                        # 有验证错误，停止导入并显示错误信息
+                        error_msg = self.tr("❌ 配置导入失败！\n\n") + self.tr("发现以下问题：\n\n")
+                        error_msg += "\n".join(f"• {error}" for error in validation_errors)
+                        error_msg += f"\n\n{self.tr('请检查配置文件中的Tab和Card名称是否正确。')}"
+                        QMessageBox.critical(self, self.tr("导入失败"), error_msg)
+                        logger.error(f"{self.tr('配置导入失败，验证错误:')} {validation_errors}")
+                        return
                     
                     self.custom_button_manager.save_buttons()
                     
@@ -967,6 +975,9 @@ class UnifiedManagerDialog(QDialog):
                     if self.parent() and hasattr(self.parent(), 'reload_tabs'):
                         self.parent().reload_tabs()
                         logger.info(self.tr("已通知主窗口重新加载Tab"))
+                    
+                    # 确保按钮正确显示 - 触发按钮更新信号
+                    self.custom_button_manager.buttons_updated.emit()
                     
                     # 统计导入的内容
                     tab_count = len(self.tab_config_manager.custom_tabs)
@@ -987,8 +998,9 @@ class UnifiedManagerDialog(QDialog):
             logger.exception(f"{self.tr('导入配置失败:')} {e}")
             QMessageBox.critical(self, self.tr("错误"), f"{self.tr('导入配置失败:')} {str(e)}")
     
-    def _validate_and_fix_button_tab_references(self):
-        """验证并修复Button的Tab名称引用"""
+    def _validate_button_references(self):
+        """验证Button的Tab和Card引用，返回错误列表"""
+        errors = []
         try:
             # 获取所有有效的Tab名称
             valid_tab_names = set()
@@ -1001,23 +1013,54 @@ class UnifiedManagerDialog(QDialog):
             for tab in self.tab_config_manager.custom_tabs:
                 valid_tab_names.add(tab['name'])
             
-            # 检查并修复Button的Tab引用
-            fixed_count = 0
+            # 验证每个按钮的Tab和Card引用
             for button in self.custom_button_manager.buttons:
+                button_name = button.get('name', '未知按钮')
                 button_tab = button.get('tab', '')
-                if button_tab and button_tab not in valid_tab_names:
-                    # 尝试找到对应的Tab（通过ID或其他方式）
-                    # 这里可以根据需要添加更复杂的匹配逻辑
-                    logger.warning(f"{self.tr('Button')} '{button.get('name', '')}' {self.tr('引用了不存在的Tab:')} '{button_tab}'")
-                    # 可以选择设置为空或使用默认值
-                    button['tab'] = ''
-                    fixed_count += 1
-            
-            if fixed_count > 0:
-                logger.info(f"{self.tr('已修复')} {fixed_count} {self.tr('个Button的Tab引用')}")
+                button_card = button.get('card', '')
+                
+                # 验证Tab是否存在
+                if button_tab:
+                    if button_tab not in valid_tab_names:
+                        errors.append(f"{self.tr('按钮')} '{button_name}' {self.tr('引用的Tab不存在:')} '{button_tab}'")
+                        continue
+                    
+                    # 验证Card是否存在（允许空格变体匹配）
+                    if button_card:
+                        # 获取该Tab下所有可用的Card
+                        available_cards = self.custom_button_manager.get_available_cards(button_tab)
+                        # 规范化card名称进行比较（去除多余空格）
+                        normalized_button_card = ' '.join(button_card.split())
+                        card_matched = False
+                        for available_card in available_cards:
+                            normalized_available_card = ' '.join(available_card.split())
+                            if normalized_button_card == normalized_available_card:
+                                card_matched = True
+                                # 如果存在空格差异，规范化按钮的card名称
+                                if button_card != available_card:
+                                    button['card'] = available_card
+                                    logger.info(f"{self.tr('规范化按钮card名称:')} '{button_card}' -> '{available_card}'")
+                                break
+                        
+                        if not card_matched:
+                            errors.append(f"{self.tr('按钮')} '{button_name}' {self.tr('引用的Card不存在:')} Tab='{button_tab}', Card='{button_card}'")
+                else:
+                    # Tab为空也可能是个问题，但这里不报错，因为可能是未配置的按钮
+                    pass
                 
         except Exception as e:
-            logger.exception(f"{self.tr('验证Button Tab引用失败:')} {e}")
+            logger.exception(f"{self.tr('验证Button引用失败:')} {e}")
+            errors.append(f"{self.tr('验证过程出错:')} {str(e)}")
+        
+        return errors
+    
+    def _validate_and_fix_button_tab_references(self):
+        """验证并修复Button的Tab名称引用（保留此方法以兼容旧代码）"""
+        # 先验证，如果有错误就记录警告
+        errors = self._validate_button_references()
+        if errors:
+            for error in errors:
+                logger.warning(error)
     
     def reset_to_default(self):
         """重置为默认配置"""
