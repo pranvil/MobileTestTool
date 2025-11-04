@@ -223,6 +223,22 @@ class ButtonEditDialog(QDialog):
                 </div>
             </div>
             
+            <div class="type-section">
+                <h3>⑥ 打开网页</h3>
+                <p><strong>用途：</strong>在默认浏览器中打开指定的网页地址</p>
+                <p><strong>输入格式：</strong>输入网页地址（URL），支持http://或https://前缀，也可以省略前缀（会自动添加https://）</p>
+                <p><strong>示例：</strong></p>
+                <div class="example">
+                    https://www.example.com<br>
+                    http://www.google.com<br>
+                    www.example.com  ← 会自动添加https://前缀<br>
+                    github.com  ← 会自动添加https://前缀
+                </div>
+                <div class="tip">
+                    <strong>💡 提示：</strong>如果输入的地址没有http://或https://前缀，系统会自动添加https://前缀。网页会在系统默认浏览器中打开。
+                </div>
+            </div>
+            
             <h2>🎯 按钮配置说明</h2>
             
             <ul>
@@ -329,7 +345,8 @@ class ButtonEditDialog(QDialog):
             self.tr("Python脚本"), 
             self.tr("打开文件"), 
             self.tr("运行程序"), 
-            self.tr("系统命令")
+            self.tr("系统命令"),
+            self.tr("打开网页")
         ])
         self.type_combo.setCurrentIndex(0)  # 默认选择ADB命令
         self.type_combo.currentTextChanged.connect(self.on_type_changed)
@@ -530,7 +547,8 @@ class ButtonEditDialog(QDialog):
             self.tr("Python脚本"): "python", 
             self.tr("打开文件"): "file",
             self.tr("运行程序"): "program",
-            self.tr("系统命令"): "system"
+            self.tr("系统命令"): "system",
+            self.tr("打开网页"): "url"
         }
         
         button_type = type_map.get(type_text, None)
@@ -572,6 +590,14 @@ class ButtonEditDialog(QDialog):
                 self.path_edit.setPlaceholderText(self.tr("例如：C:\\Users\\用户名\\Desktop\\文件.txt"))
             else:  # program
                 self.path_edit.setPlaceholderText(self.tr("例如：C:\\Program Files\\Notepad++\\notepad++.exe"))
+        elif button_type == "url":
+            # 打开网页：使用路径输入，但不显示浏览按钮
+            self.script_edit.setVisible(False)
+            self.path_edit.setVisible(True)
+            self.file_browse_btn.setVisible(False)
+            self.advanced_title.setText(self.tr("网页地址"))  # 更新标题文本
+            self.advanced_group.setVisible(True)
+            self.path_edit.setPlaceholderText(self.tr("例如：https://www.example.com 或 www.example.com"))
         else:
             self.script_edit.setVisible(False)
             self.path_edit.setVisible(False)
@@ -711,6 +737,23 @@ class ButtonEditDialog(QDialog):
                 self.preview_label.setText(preview)
             else:
                 self.preview_label.setText(self.tr("请输入系统命令..."))
+        elif button_type == self.tr("打开网页"):
+            # 网页预览
+            url = self.path_edit.text().strip()
+            if url:
+                # 确保URL包含协议
+                display_url = url
+                if not url.startswith(('http://', 'https://')):
+                    display_url = 'https://' + url
+                preview = f"🌐 {self.tr('将打开网页:')}\n{display_url}"
+                self.preview_label.setStyleSheet(
+                    "background: #f8f9fa; padding: 10px; "
+                    "border: 1px solid #dee2e6; border-radius: 4px; "
+                    "font-family: 'Consolas', 'Monaco', monospace;"
+                )
+                self.preview_label.setText(preview)
+            else:
+                self.preview_label.setText(self.tr("请输入网页地址..."))
         else:
             self.preview_label.setText(f"{self.tr('请输入')}{button_type}{self.tr('内容...')}")
     
@@ -726,7 +769,8 @@ class ButtonEditDialog(QDialog):
             'python': self.tr('Python脚本'),
             'file': self.tr('打开文件'),
             'program': self.tr('运行程序'),
-            'system': self.tr('系统命令')
+            'system': self.tr('系统命令'),
+            'url': self.tr('打开网页')
         }
         type_text = type_map.get(button_type, self.tr('ADB命令'))
         # 在ComboBox中查找，注意第一个选项是空字符串
@@ -743,8 +787,8 @@ class ButtonEditDialog(QDialog):
             # Python脚本：加载script字段到script_edit
             script = self.button_data.get('script', '')
             self.script_edit.setPlainText(script)
-        elif button_type in ['file', 'program']:
-            # 文件和程序：加载到path_edit
+        elif button_type in ['file', 'program', 'url']:
+            # 文件和程序、网页地址：加载到path_edit
             self.path_edit.setText(command)
         
         tab = self.button_data.get('tab', '')
@@ -814,6 +858,12 @@ class ButtonEditDialog(QDialog):
                     f"{self.tr('文件/程序不存在:')}\n{command}\n\n{self.tr('请检查路径是否正确')}"
                 )
                 return
+        elif button_type == self.tr("打开网页"):
+            # 验证网页地址
+            url = self.path_edit.text().strip()
+            if not url:
+                QMessageBox.warning(self, self.tr("验证失败"), "请输入网页地址")
+                return
         
         self.accept()
     
@@ -826,7 +876,8 @@ class ButtonEditDialog(QDialog):
             self.tr("Python脚本"): "python", 
             self.tr("打开文件"): "file",
             self.tr("运行程序"): "program",
-            self.tr("系统命令"): "system"
+            self.tr("系统命令"): "system",
+            self.tr("打开网页"): "url"
         }
         button_type = type_map.get(current_text, "adb")
         
@@ -834,8 +885,8 @@ class ButtonEditDialog(QDialog):
         if button_type in ['adb', 'system']:
             # ADB命令和系统命令：从script_edit获取
             command = self.script_edit.toPlainText().strip()
-        elif button_type in ['file', 'program']:
-            # 文件和程序：从path_edit获取
+        elif button_type in ['file', 'program', 'url']:
+            # 文件和程序、网页地址：从path_edit获取
             command = self.path_edit.text().strip()
         else:
             # Python脚本：command可以为空

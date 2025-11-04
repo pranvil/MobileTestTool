@@ -573,7 +573,8 @@ class UnifiedManagerDialog(QDialog):
                     'python': self.tr('Python脚本'),
                     'file': self.tr('打开文件'),
                     'program': self.tr('运行程序'),
-                    'system': self.tr('系统命令')
+                    'system': self.tr('系统命令'),
+                    'url': self.tr('打开网页')
                 }
                 type_display = type_map.get(button_type, self.tr('ADB命令'))
                 
@@ -776,7 +777,8 @@ class UnifiedManagerDialog(QDialog):
                     'python': self.tr('Python脚本'),
                     'file': self.tr('打开文件'),
                     'program': self.tr('运行程序'),
-                    'system': self.tr('系统命令')
+                    'system': self.tr('系统命令'),
+                    'url': self.tr('打开网页')
                 }
                 type_display = type_map.get(button_type, self.tr('ADB命令'))
                 

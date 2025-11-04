@@ -26,7 +26,8 @@ class CustomButtonManager(QObject):
         'python': 'Python脚本',
         'file': '打开文件',
         'program': '运行程序',
-        'system': '系统命令'
+        'system': '系统命令',
+        'url': '打开网页'
     }
     
     # 命令黑名单：不允许的持续输出命令
@@ -551,6 +552,8 @@ class CustomButtonManager(QObject):
                 return self._run_program(command, device_id)
             elif button_type == 'system':
                 return self._execute_system_command(command)
+            elif button_type == 'url':
+                return self._open_url(command)
             else:
                 logger.error(f"{self.lang_manager.tr('不支持的按钮类型:')} {button_type}")
                 return False, f"{self.lang_manager.tr('不支持的按钮类型:')} {button_type}"
@@ -777,4 +780,26 @@ class CustomButtonManager(QObject):
             return False, self.lang_manager.tr("命令执行超时")
         except Exception as e:
             return False, f"{self.lang_manager.tr('执行失败:')} {str(e)}"
+    
+    def _open_url(self, url):
+        """打开网页"""
+        try:
+            import webbrowser
+            
+            # 验证URL格式
+            if not url or not url.strip():
+                return False, self.lang_manager.tr("网页地址不能为空")
+            
+            # 确保URL包含协议
+            url = url.strip()
+            if not url.startswith(('http://', 'https://')):
+                url = 'https://' + url
+            
+            # 使用webbrowser模块打开URL
+            webbrowser.open(url)
+            
+            return True, f"{self.lang_manager.tr('已打开网页:')} {url}"
+            
+        except Exception as e:
+            return False, f"{self.lang_manager.tr('打开网页失败:')} {str(e)}"
 
