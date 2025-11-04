@@ -13,7 +13,7 @@ from datetime import datetime
 from PyQt5.QtCore import QObject, pyqtSignal
 
 
-LOG_DIR = Path(r"C:\log")
+LOG_DIR = Path(r"c:\log")
 TEMP_DIR = LOG_DIR / "temp"
 WIRESHARK_DIR = Path(r"C:\Program Files\Wireshark")
 TEXT2PCAP = WIRESHARK_DIR / "text2pcap.exe"

@@ -109,7 +109,7 @@ class GoogleLogWorker(QThread):
                 base_log_dir = self.storage_path_func()
             else:
                 current_date = datetime.datetime.now().strftime("%Y%m%d")
-                base_log_dir = f"C:\\log\\{current_date}"
+                base_log_dir = f"c:\\log\\{current_date}"
             self.google_log_folder = f"{base_log_dir}\\Google_log_{current_time}"
             
             if not os.path.exists(self.google_log_folder):
@@ -208,7 +208,7 @@ class GoogleLogWorker(QThread):
                 base_log_dir = self.storage_path_func()
             else:
                 current_date = datetime.datetime.now().strftime("%Y%m%d")
-                base_log_dir = f"C:\\log\\{current_date}"
+                base_log_dir = f"c:\\log\\{current_date}"
             self.google_log_folder = f"{base_log_dir}\\bugreport"
             
             if not os.path.exists(self.google_log_folder):
@@ -241,7 +241,7 @@ class GoogleLogWorker(QThread):
                 base_log_dir = self.storage_path_func()
             else:
                 current_date = datetime.datetime.now().strftime("%Y%m%d")
-                base_log_dir = f"C:\\log\\{current_date}"
+                base_log_dir = f"c:\\log\\{current_date}"
             bugreport_folder = f"{base_log_dir}\\bugreport"
             
             if not os.path.exists(bugreport_folder):

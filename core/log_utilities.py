@@ -182,6 +182,18 @@ class PyQtBugreportManager(QObject):
         self.device_manager = device_manager
         # 从父窗口获取语言管理器
         self.lang_manager = parent.lang_manager if parent and hasattr(parent, 'lang_manager') else None
+    
+    def get_storage_path(self):
+        """获取存储路径，优先使用用户配置的路径"""
+        # 从父窗口获取工具配置
+        if hasattr(self.parent(), 'tool_config') and self.parent().tool_config:
+            storage_path = self.parent().tool_config.get("storage_path", "")
+            if storage_path:
+                return storage_path
+        
+        # 使用默认路径
+        current_date = datetime.datetime.now().strftime("%Y%m%d")
+        return f"c:\\log\\{current_date}"
         
     def generate_bugreport(self):
         """生成Bugreport"""
@@ -193,8 +205,8 @@ class PyQtBugreportManager(QObject):
             self.status_message.emit(self.lang_manager.tr("正在生成Bugreport..."))
             
             # 创建保存目录
-            current_date = datetime.datetime.now().strftime("%Y%m%d")
-            bugreport_folder = f"C:\\{current_date}\\bugreport"
+            base_log_dir = self.get_storage_path()
+            bugreport_folder = f"{base_log_dir}\\bugreport"
             
             if not os.path.exists(bugreport_folder):
                 os.makedirs(bugreport_folder)
@@ -272,8 +284,8 @@ class PyQtBugreportManager(QObject):
             self.status_message.emit(self.lang_manager.tr("正在拉取Bugreport..."))
             
             # 创建保存目录
-            current_date = datetime.datetime.now().strftime("%Y%m%d")
-            bugreport_folder = f"C:\\log\\{current_date}\\bugreport"
+            base_log_dir = self.get_storage_path()
+            bugreport_folder = f"{base_log_dir}\\bugreport"
             
             if not os.path.exists(bugreport_folder):
                 os.makedirs(bugreport_folder)
