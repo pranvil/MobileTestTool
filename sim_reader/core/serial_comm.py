@@ -264,9 +264,15 @@ class SerialComm:
     
     def close(self):
         """关闭串口连接"""
-        if self.ser.is_open:
-            self.ser.close()
-            logging.info("串口连接已关闭") 
+        try:
+            if self.ser and self.ser.is_open:
+                self.ser.close()
+                logging.info("串口连接已关闭")
+            # 重置状态
+            self.initialized = False
+            self.port = None
+        except Exception as e:
+            logging.error(f"关闭串口时出错: {e}") 
 
     def is_port_alive(self) -> bool:
         """

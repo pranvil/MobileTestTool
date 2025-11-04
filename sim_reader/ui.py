@@ -426,6 +426,29 @@ class SimEditorUI(QMainWindow):
         """关闭窗口时需要做的清理操作"""
         if hasattr(self, "port_timer"):
             self.port_timer.stop()
+        
+        # 关闭串口连接
+        if hasattr(self, 'comm') and self.comm:
+            try:
+                # 先尝试使用 close() 方法
+                if hasattr(self.comm, 'close'):
+                    self.comm.close()
+                # 确保串口被关闭
+                if hasattr(self.comm, 'ser') and self.comm.ser is not None:
+                    if self.comm.ser.is_open:
+                        self.comm.ser.close()
+                        time.sleep(0.1)  # 给串口一点时间完全关闭
+                # 重置初始化标志和端口信息
+                if hasattr(self.comm, 'initialized'):
+                    self.comm.initialized = False
+                if hasattr(self.comm, 'port'):
+                    self.comm.port = None
+                if hasattr(self.comm, 'ser'):
+                    self.comm.ser = None
+                logging.info("[SimEditorUI] 串口连接已关闭并清理")
+            except Exception as e:
+                logging.error(f"[SimEditorUI] 关闭串口时出错: {e}")
+        
         self.executor.shutdown(wait=False)
         super().closeEvent(event)
 

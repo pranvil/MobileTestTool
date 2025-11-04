@@ -7,6 +7,8 @@ SIM卡读写工具对话框
 
 import sys
 import os
+import logging
+import time
 from PyQt5.QtWidgets import QDialog, QVBoxLayout, QMessageBox
 from PyQt5.QtCore import Qt, pyqtSignal
 
@@ -58,6 +60,7 @@ class SimReaderDialog(QDialog):
         self.resize(900, 700)
         
         # 设置窗口标志，允许最小化和最大化
+        # 使用 Qt.Dialog 但添加 WindowMinMaxButtonsHint 以支持最大化按钮
         self.setWindowFlags(Qt.Dialog | Qt.WindowMinMaxButtonsHint | Qt.WindowCloseButtonHint)
         
         # 初始化布局
@@ -313,11 +316,25 @@ class SimReaderDialog(QDialog):
                 # 关闭串口连接
                 if hasattr(self.sim_editor, 'comm') and self.sim_editor.comm:
                     try:
-                        if hasattr(self.sim_editor.comm, 'ser') and self.sim_editor.comm.ser:
-                            if self.sim_editor.comm.ser.is_open:
-                                self.sim_editor.comm.ser.close()
-                    except:
-                        pass
+                        comm = self.sim_editor.comm
+                        # 先尝试使用 close() 方法
+                        if hasattr(comm, 'close'):
+                            comm.close()
+                        # 确保串口被关闭
+                        if hasattr(comm, 'ser') and comm.ser is not None:
+                            if comm.ser.is_open:
+                                comm.ser.close()
+                                time.sleep(0.1)  # 给串口一点时间完全关闭
+                        # 重置初始化标志和端口信息
+                        if hasattr(comm, 'initialized'):
+                            comm.initialized = False
+                        if hasattr(comm, 'port'):
+                            comm.port = None
+                        if hasattr(comm, 'ser'):
+                            comm.ser = None
+                        logging.info("[SimReaderDialog] 串口连接已关闭并清理")
+                    except Exception as e:
+                        logging.error(f"[SimReaderDialog] 关闭串口时出错: {e}")
                 
                 # 关闭线程池
                 if hasattr(self.sim_editor, 'executor'):

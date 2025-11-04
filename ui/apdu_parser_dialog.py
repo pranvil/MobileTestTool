@@ -166,11 +166,17 @@ class ApduParserDialog(QDialog):
         super().__init__(parent)
         self.current_file = None
         self.parse_results = []
+        
+        # 设置窗口标志，允许最小化和最大化
+        # 使用 Qt.Dialog 但添加 WindowMinMaxButtonsHint 以支持最大化按钮
+        self.setWindowFlags(Qt.Dialog | Qt.WindowMinMaxButtonsHint | Qt.WindowCloseButtonHint)
+        
         self.setup_ui()
         
     def setup_ui(self):
         """设置UI"""
         self.setWindowTitle("APDU 解析器")
+        self.setMinimumSize(800, 600)
         self.setGeometry(100, 100, 1200, 800)
         
         # 主布局
