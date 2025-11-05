@@ -1,10 +1,10 @@
 {
-    "version":  "0.9.5.1",
-    "download_url":  "https://github.com/pranvil/MobileTestTool/releases/download/v0.9.5.1/MobileTestTool_0.9.5.1.zip",
-    "sha256":  "cc205bb36cc3567cf7d33b6e00884ad66f04890b6b450fb082ad16d35d86ec15",
-    "file_name":  "MobileTestTool_0.9.5.1.zip",
-    "file_size":  109819988,
+    "version":  "0.9.5.2",
+    "download_url":  "https://github.com/pranvil/MobileTestTool/releases/download/v0.9.5.2/MobileTestTool_0.9.5.2.zip",
+    "sha256":  "5a5b6f3a40206a696f451d2fcd51ba63d195a7dc08ac0d2daf22f0d061764a14",
+    "file_name":  "MobileTestTool_0.9.5.2.zip",
+    "file_size":  109820875,
     "release_notes":  "# MobileTestTool Release Notes\r\n\r\n## 版本信息\r\n- 版本号：0.9.5.2\r\n- 发布日期：2025/11/5\r\n\r\n## 本次更新摘要\r\n- ✅ 修复SIM READER端口释放问题\r\n- ✅ SIM reader, SIM APUD对话框添加全屏功能\r\n- ✅ 自定义按钮添加打开网页功能\r\n- ✅ 修复生成bugreport按钮导出的路径问题\r\n- ✅ 修自动检查更新报错问题\r\n- ✅ 修复python脚本运行help函数报错问题\r\n- ✅ 修复安装MTKlogger 命令问题\r\n- ✅ 解决TMO CC按钮点击偶尔失效的问题\r\n## 已知问题\r\n-",
-    "published_at":  "2025-11-05T21:19:51Z",
+    "published_at":  "2025-11-05T21:30:13Z",
     "mandatory":  false
 }
