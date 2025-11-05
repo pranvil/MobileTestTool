@@ -19,6 +19,9 @@ class CustomButtonManager(QObject):
     
     # 信号定义
     buttons_updated = pyqtSignal()  # 按钮配置更新
+    # 对话框相关信号（用于脚本中的UI调用）
+    dialog_request = pyqtSignal(str, str, str, int, int, object)  # dialog_type, title, message, buttons, default_button, response_handler
+    dialog_response = pyqtSignal(int)  # button_clicked (QMessageBox.Yes/No等)
     
     # 按钮类型
     BUTTON_TYPES = {
@@ -545,6 +548,7 @@ class CustomButtonManager(QObject):
                 script_code = button_data.get('script', '')
                 if not script_code:
                     return False, self.lang_manager.tr("Python脚本内容为空")
+                # 注意：这里不传递dialog_response_handler，因为需要在ButtonCommandWorker中处理
                 return self._execute_python_script(script_code, device_id)
             elif button_type == 'file':
                 return self._open_file(command)
@@ -594,7 +598,89 @@ class CustomButtonManager(QObject):
         except Exception as e:
             return False, f"{self.lang_manager.tr('执行失败:')} {str(e)}"
     
-    def _execute_python_script(self, script_code, device_id=None):
+    def _create_safe_pyqt5_module(self, dialog_request_handler):
+        """创建安全的PyQt5模块包装，用于脚本中的UI调用"""
+        from PyQt5.QtWidgets import QMessageBox as RealQMessageBox
+        
+        def show_dialog_in_main_thread(dialog_type, title, message, buttons, default_button):
+            """在工作线程中调用，通过信号请求主线程显示对话框"""
+            # 直接调用dialog_request_handler，它会在worker中等待响应
+            return dialog_request_handler(dialog_type, title, message, buttons, default_button)
+        
+        # 创建安全的QMessageBox类
+        class SafeQMessageBox:
+            """线程安全的QMessageBox包装类"""
+            # 定义常量
+            Yes = RealQMessageBox.Yes
+            No = RealQMessageBox.No
+            Ok = RealQMessageBox.Ok
+            Cancel = RealQMessageBox.Cancel
+            Abort = RealQMessageBox.Abort
+            Retry = RealQMessageBox.Retry
+            Ignore = RealQMessageBox.Ignore
+            YesAll = RealQMessageBox.YesAll
+            NoAll = RealQMessageBox.NoAll
+            Save = RealQMessageBox.Save
+            Discard = RealQMessageBox.Discard
+            Apply = RealQMessageBox.Apply
+            Reset = RealQMessageBox.Reset
+            RestoreDefaults = RealQMessageBox.RestoreDefaults
+            Help = RealQMessageBox.Help
+            SaveAll = RealQMessageBox.SaveAll
+            YesToAll = RealQMessageBox.YesToAll
+            NoToAll = RealQMessageBox.NoToAll
+            Open = RealQMessageBox.Open
+            Close = RealQMessageBox.Close
+            
+            @staticmethod
+            def question(parent, title, message, buttons=RealQMessageBox.Yes | RealQMessageBox.No, defaultButton=RealQMessageBox.No):
+                return show_dialog_in_main_thread("question", title, message, buttons, defaultButton)
+            
+            @staticmethod
+            def information(parent, title, message, buttons=RealQMessageBox.Ok, defaultButton=RealQMessageBox.Ok):
+                return show_dialog_in_main_thread("information", title, message, buttons, defaultButton)
+            
+            @staticmethod
+            def warning(parent, title, message, buttons=RealQMessageBox.Ok, defaultButton=RealQMessageBox.Ok):
+                return show_dialog_in_main_thread("warning", title, message, buttons, defaultButton)
+            
+            @staticmethod
+            def critical(parent, title, message, buttons=RealQMessageBox.Ok, defaultButton=RealQMessageBox.Ok):
+                return show_dialog_in_main_thread("critical", title, message, buttons, defaultButton)
+            
+            @staticmethod
+            def about(parent, title, message):
+                return show_dialog_in_main_thread("about", title, message, RealQMessageBox.Ok, RealQMessageBox.Ok)
+        
+        # 创建安全的QApplication类
+        class SafeQApplication:
+            """线程安全的QApplication包装类"""
+            _instance = None
+            
+            @staticmethod
+            def instance():
+                """返回主线程的QApplication实例"""
+                from PyQt5.QtWidgets import QApplication
+                return QApplication.instance()
+            
+            @staticmethod
+            def __call__(argv=None):
+                """创建QApplication实例（实际上返回主线程的实例）"""
+                return SafeQApplication.instance()
+        
+        # 创建模块结构
+        QtWidgets_module = type('module', (), {
+            'QMessageBox': SafeQMessageBox,
+            'QApplication': SafeQApplication,
+        })
+        
+        PyQt5_module = type('module', (), {
+            'QtWidgets': QtWidgets_module,
+        })
+        
+        return PyQt5_module
+    
+    def _execute_python_script(self, script_code, device_id=None, dialog_response_handler=None):
         """执行Python脚本"""
         try:
             import io
@@ -643,6 +729,24 @@ class CustomButtonManager(QObject):
             if hasattr(builtins, 'help'):
                 safe_builtins['help'] = builtins.help
             
+            # 创建安全的PyQt5模块（如果提供了对话框响应处理器）
+            safe_pyqt5_module = None
+            if dialog_response_handler:
+                safe_pyqt5_module = self._create_safe_pyqt5_module(dialog_response_handler)
+            
+            # 创建自定义的__import__函数，拦截PyQt5导入
+            original_import = safe_builtins['__import__']
+            def safe_import(name, globals=None, locals=None, fromlist=(), level=0):
+                # 如果导入PyQt5.QtWidgets，返回我们的安全包装模块
+                if name == 'PyQt5.QtWidgets' and safe_pyqt5_module:
+                    return safe_pyqt5_module.QtWidgets
+                elif name == 'PyQt5' and safe_pyqt5_module:
+                    return safe_pyqt5_module
+                # 其他导入使用原始方法
+                return original_import(name, globals, locals, fromlist, level)
+            
+            safe_builtins['__import__'] = safe_import
+            
             safe_globals = {
                 '__builtins__': safe_builtins,
                 '__name__': '__main__',  # 允许使用 if __name__ == "__main__" 模式
@@ -656,6 +760,11 @@ class CustomButtonManager(QObject):
                 'time': time,
                 'subprocess': subprocess,
             }
+            
+            # 如果创建了安全的PyQt5模块，直接注入到全局环境
+            if safe_pyqt5_module:
+                safe_globals['PyQt5'] = safe_pyqt5_module
+            
             # 同时将常用的内置函数添加到全局作用域，确保可以直接访问
             for key in ['print', 'len', 'str', 'int', 'float', 'list', 'dict', 'range', 'enumerate', 
                        'zip', 'sorted', 'min', 'max', 'sum', 'abs', 'round', 'type', 'isinstance', 

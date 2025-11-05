@@ -14,7 +14,7 @@ from typing import Optional
 from PyQt5.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, 
                               QSplitter, QTabWidget, QMessageBox, QProgressDialog,
                               QHBoxLayout, QPushButton, QSizePolicy, QApplication)
-from PyQt5.QtCore import Qt, pyqtSignal, QThread, QMimeData, QTimer
+from PyQt5.QtCore import Qt, pyqtSignal, pyqtSlot, QThread, QMimeData, QTimer
 from PyQt5.QtGui import QDrag
 from ui.menu_bar import DisplayLinesDialog
 from ui.tools_config_dialog import ToolsConfigDialog
@@ -260,27 +260,95 @@ class ButtonCommandWorker(QThread):
     
     finished = pyqtSignal(bool, str, str)  # success, output, button_name
     log_message = pyqtSignal(str, str)  # message, color
+    dialog_request = pyqtSignal(str, str, str, int, int)  # dialog_type, title, message, buttons, default_button
+    dialog_response_received = pyqtSignal(int)  # 接收对话框响应
     
-    def __init__(self, button_data, device_id, button_manager, lang_manager):
+    def __init__(self, button_data, device_id, button_manager, lang_manager, main_window):
         super().__init__()
         self.button_data = button_data
         self.device_id = device_id
         self.button_manager = button_manager
         self.lang_manager = lang_manager
+        self.main_window = main_window  # 用于在主线程显示对话框
+        self._dialog_response_handler = None  # 存储对话框响应处理器
+        self._current_dialog_response = None  # 当前对话框响应值
+        self._dialog_response_ready = False  # 响应是否就绪
     
     def _tr(self, text):
         return self.lang_manager.tr(text) if self.lang_manager else text
+    
+    def _create_dialog_request_handler(self):
+        """创建对话框请求处理器，用于在脚本中调用"""
+        def dialog_request_handler(dialog_type, title, message, buttons, default_button):
+            """在工作线程中调用，通过信号请求主线程显示对话框"""
+            # 重置响应状态
+            self._current_dialog_response = None
+            self._dialog_response_ready = False
+            
+            # 使用信号发送请求到主线程
+            self.dialog_request.emit(dialog_type, title, message, buttons, default_button)
+            
+            # 等待响应（最多30秒）
+            from PyQt5.QtCore import QEventLoop, QTimer
+            loop = QEventLoop()
+            timer = QTimer()
+            timer.timeout.connect(lambda: None)  # 空回调，保持事件循环活跃
+            timer.start(10)
+            
+            # 超时保护
+            timeout_timer = QTimer()
+            timeout_timer.timeout.connect(loop.quit)
+            timeout_timer.setSingleShot(True)
+            timeout_timer.start(30000)  # 30秒超时
+            
+            # 轮询等待响应
+            while not self._dialog_response_ready and timeout_timer.isActive():
+                loop.processEvents()
+                from PyQt5.QtCore import QThread
+                QThread.msleep(10)
+            
+            timer.stop()
+            timeout_timer.stop()
+            
+            return self._current_dialog_response if self._dialog_response_ready else default_button
+        
+        # 连接响应信号
+        self.dialog_response_received.connect(self._on_dialog_response_received)
+        
+        return dialog_request_handler
+    
+    @pyqtSlot(int)
+    def _on_dialog_response_received(self, value):
+        """接收对话框响应（由信号触发）"""
+        self._current_dialog_response = value
+        self._dialog_response_ready = True
     
     def run(self):
         """在线程中执行命令"""
         try:
             button_name = self.button_data.get('name', self._tr('自定义按钮'))
             
-            # 执行命令
-            success, output = self.button_manager.execute_button_command(
-                self.button_data,
-                self.device_id
-            )
+            # 如果是Python脚本，需要创建对话框请求处理器
+            if self.button_data.get('type') == 'python':
+                # 创建对话框请求处理器
+                dialog_handler = self._create_dialog_request_handler()
+                
+                # 直接调用_execute_python_script，传递对话框处理器
+                script_code = self.button_data.get('script', '')
+                if script_code:
+                    success, output = self.button_manager._execute_python_script(
+                        script_code,
+                        self.device_id,
+                        dialog_handler
+                    )
+                else:
+                    success, output = False, self.lang_manager.tr("Python脚本内容为空")
+            else:
+                # 其他类型的命令正常执行
+                success, output = self.button_manager.execute_button_command(
+                    self.button_data,
+                    self.device_id
+                )
             
             # 发送完成信号
             self.finished.emit(success, output or '', button_name)
@@ -3077,7 +3145,8 @@ class MainWindow(QMainWindow):
                 button_data,
                 self.device_manager.selected_device,
                 self.custom_button_manager,
-                self.lang_manager
+                self.lang_manager,
+                self  # 传递主窗口引用
             )
             
             # 保存工作线程引用（避免被垃圾回收）
@@ -3085,6 +3154,11 @@ class MainWindow(QMainWindow):
             
             # 连接信号
             worker.finished.connect(lambda success, output, btn_name, w=worker: self._on_button_command_finished(success, output, btn_name, w))
+            # 连接对话框请求信号（用于脚本中的UI调用）
+            worker.dialog_request.connect(
+                lambda dialog_type, title, message, buttons, default_button, w=worker: 
+                self._handle_script_dialog_request(dialog_type, title, message, buttons, default_button, w)
+            )
             
             # 启动线程
             worker.start()
@@ -3092,6 +3166,70 @@ class MainWindow(QMainWindow):
         except Exception as e:
             logger.exception(f"{self.lang_manager.tr('启动自定义按钮命令执行失败:')} {e}")
             self.append_log.emit(f"❌ {self.tr('启动执行失败: ')}{str(e)}\n", "#dc3545")
+    
+    def _handle_script_dialog_request(self, dialog_type, title, message, buttons, default_button, worker):
+        """处理脚本中发起的对话框请求（在主线程中执行）"""
+        try:
+            from PyQt5.QtWidgets import QMessageBox
+            
+            # 将int类型的buttons和default_button转换为QMessageBox.StandardButtons类型
+            buttons_enum = QMessageBox.StandardButtons(buttons) if isinstance(buttons, int) else buttons
+            default_button_enum = QMessageBox.StandardButton(default_button) if isinstance(default_button, int) else default_button
+            
+            # 根据对话框类型显示相应的对话框
+            if dialog_type == "question":
+                reply = QMessageBox.question(
+                    self,
+                    title,
+                    message,
+                    buttons_enum,
+                    default_button_enum
+                )
+            elif dialog_type == "information":
+                reply = QMessageBox.information(
+                    self,
+                    title,
+                    message,
+                    buttons_enum,
+                    default_button_enum
+                )
+            elif dialog_type == "warning":
+                reply = QMessageBox.warning(
+                    self,
+                    title,
+                    message,
+                    buttons_enum,
+                    default_button_enum
+                )
+            elif dialog_type == "critical":
+                reply = QMessageBox.critical(
+                    self,
+                    title,
+                    message,
+                    buttons_enum,
+                    default_button_enum
+                )
+            elif dialog_type == "about":
+                QMessageBox.about(self, title, message)
+                reply = QMessageBox.Ok
+            else:
+                # 默认使用question
+                reply = QMessageBox.question(
+                    self,
+                    title,
+                    message,
+                    buttons_enum,
+                    default_button_enum
+                )
+            
+            # 通过信号发送响应回工作线程
+            worker.dialog_response_received.emit(int(reply))
+            
+        except Exception as e:
+            logger.exception(f"处理脚本对话框请求失败: {e}")
+            # 如果出错，发送默认响应
+            default_value = int(default_button) if isinstance(default_button, int) else default_button
+            worker.dialog_response_received.emit(default_value)
     
     def _on_button_command_finished(self, success, output, button_name, worker):
         """处理按钮命令执行完成"""
