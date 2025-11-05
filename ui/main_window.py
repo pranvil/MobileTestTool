@@ -1469,7 +1469,7 @@ class MainWindow(QMainWindow):
         if self._update_request_origin == "manual":
             QMessageBox.information(self, self.tr("在线更新"), message)
         else:
-            logger.info("自动检查更新结果: %s", message)
+            logger.info(f"自动检查更新结果: {message}")
         self.append_log.emit(f"[更新] {message}\n", "#4CAF50")
 
     def _on_update_download_finished(self, manifest: LatestManifest, result: DownloadResult) -> None:
@@ -1533,7 +1533,7 @@ class MainWindow(QMainWindow):
         if self._update_request_origin == "manual":
             QMessageBox.critical(self, self.tr("在线更新"), message)
         else:
-            logger.error("自动检查更新失败: %s", message)
+            logger.error(f"自动检查更新失败: {message}")
 
     def _on_update_cancel_requested(self) -> None:
         if self._suppress_progress_cancel:
@@ -3611,7 +3611,7 @@ class MainWindow(QMainWindow):
             self.other_operations_manager.tool_config["update_last_checked_at"] = float(timestamp)
             self.other_operations_manager._save_tool_config()
         except Exception as exc:
-            logger.warning("保存自动更新检查时间失败: %s", exc)
+            logger.warning(f"保存自动更新检查时间失败: {exc}")
         self._schedule_next_auto_check(self._update_check_interval_seconds)
 
     def _on_update_available(self, manifest_data: dict) -> None:
