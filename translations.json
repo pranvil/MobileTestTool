@@ -1742,7 +1742,7 @@
     "拉取 Bugreport": "Pull Bugreport",
     "请输入日志名称:": "Please enter log name:",
     "导出媒体文件": "Export Media Files",
-    "是否同时导出截图和录制的视频？\n\n包括:\n• 屏幕录制视频\n• 截图文件\n\n选择'是'将额外导出这些媒体文件。": "Do you want to export screenshots and recorded videos at the same time?\n\nIncluding:\n• Screen recording videos\n• Screenshot files\n\nSelect 'Yes' to additionally export these media files.",
+    "是否导出手机录制的视频和截图？": "Do you want to export screenshots and recorded videos at the same time?\n\nIncluding:\n• Screen recording videos\n• Screenshot files\n\nSelect 'Yes' to additionally export these media files.",
     "输入的值无效，请输入数字": "Invalid input value, please enter a number",
     "设置Modem Log大小失败:": "Failed to set Modem Log size:",
     "设置Mobile Log大小失败:": "Failed to set Mobile Log size:",

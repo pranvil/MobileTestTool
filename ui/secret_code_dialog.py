@@ -582,7 +582,6 @@ class SecretCodeDialog(QDialog):
         
         # 步骤7: 输入暗码（在焦点获取后额外等待一小段时间，确保焦点完全稳定）
         time.sleep(0.3)
-        logger.debug("焦点获取后额外等待0.3秒，确保输入框焦点完全稳定")
         self._input_text(device, code)
         time.sleep(1)
         
@@ -832,56 +831,40 @@ class SecretCodeDialog(QDialog):
             bool: 成功返回True，失败返回False
         """
         try:
-            logger.info("=" * 50)
-            logger.info("开始聚焦 Google Dialer 输入框（通过点击0然后删除）...")
-            logger.info("=" * 50)
+            logger.debug("开始聚焦 Google Dialer 输入框（通过点击0然后删除）...")
             
             # 步骤1: 等待并点击数字0按钮
-            logger.info("步骤1: 查找数字0按钮 (resourceId: com.google.android.dialer:id/zero)")
             zero_button = d(resourceId="com.google.android.dialer:id/zero")
-            logger.info("正在等待数字0按钮出现（最多3秒）...")
             zero_button.wait(timeout=3.0)  # 等待数字0按钮出现
             
             if not zero_button.exists:
-                logger.error("❌ 未找到数字0按钮，焦点获取失败")
+                logger.error("未找到数字0按钮，焦点获取失败")
                 return False
             
-            logger.info("✓ 找到数字0按钮，准备点击...")
             zero_button.click()
-            logger.info("✓ 已点击数字0按钮")
+            logger.debug("已点击数字0按钮")
             time.sleep(0.3)  # 短暂等待，确保点击生效
-            logger.info("等待0.3秒，确保点击生效")
             
             # 步骤2: 点击删除按钮
-            logger.info("步骤2: 查找删除按钮 (resourceId: com.google.android.dialer:id/deleteButton)")
             delete_button = d(resourceId="com.google.android.dialer:id/deleteButton")
-            logger.info("正在等待删除按钮出现（最多2秒）...")
             delete_button.wait(timeout=2.0)  # 等待删除按钮出现
             
             if not delete_button.exists:
-                logger.error("❌ 未找到删除按钮，焦点获取失败")
+                logger.error("未找到删除按钮，焦点获取失败")
                 return False
             
-            logger.info("✓ 找到删除按钮，准备点击...")
             delete_button.click()
-            logger.info("✓ 已点击删除按钮")
+            logger.debug("已点击删除按钮")
             time.sleep(0.5)  # 等待删除完成
-            logger.info("等待0.5秒，确保删除完成")
             
             # 额外等待，确保焦点完全稳定
             time.sleep(0.5)
-            logger.info("再等待0.5秒，确保焦点完全稳定")
             
-            logger.info("=" * 50)
-            logger.info("✓✓✓ Google Dialer 输入框焦点获取成功 ✓✓✓")
-            logger.info("=" * 50)
+            logger.debug("Google Dialer 输入框焦点获取成功")
             return True
             
         except Exception as e:
-            logger.error("=" * 50)
-            logger.error(f"❌ 聚焦Google Dialer输入框失败: {e}")
-            logger.error("=" * 50)
-            logger.exception("详细错误信息:")
+            logger.exception(f"聚焦Google Dialer输入框失败: {e}")
             return False
     
     def _open_dialpad_and_wait(self, device, package_name):
@@ -919,20 +902,15 @@ class SecretCodeDialog(QDialog):
             for dial_button_id in dial_button_ids:
                 button = d(resourceId=dial_button_id)
                 if button.exists:
-                    logger.info(f"找到拨号按钮: {dial_button_id}，已位于拨号盘")
-                    logger.info(f"当前包名: {package_name}")
+                    logger.debug(f"找到拨号按钮: {dial_button_id}，已位于拨号盘")
                     # 判断是否是Google Dialer：通过resourceId或包名判断
                     is_google_dialer = (package_name == "com.google.android.dialer" or 
                                        dial_button_id == "com.google.android.dialer:id/dialpad_voice_call_button")
                     
                     if is_google_dialer:
-                        logger.info("✓ 检测到 Google Dialer（通过resourceId或包名），开始获取输入框焦点...")
                         if not self._focus_google_dialer_input(d):
-                            logger.error("❌ 聚焦Google Dialer输入框失败")
+                            logger.error("聚焦Google Dialer输入框失败")
                             return False
-                        logger.info("✓ 焦点获取完成，继续执行")
-                    else:
-                        logger.info(f"非Google Dialer应用 (包名: {package_name}, resourceId: {dial_button_id})，跳过焦点获取步骤")
                     return True
             
             # 如果不在拨号盘，尝试点击拨号盘按钮
@@ -957,23 +935,17 @@ class SecretCodeDialog(QDialog):
                     button = d(resourceId=dial_button_id)
                     button.wait(timeout=2.0)  # 等待元素出现，最多2秒
                     if button.exists:
-                        logger.info(f"拨号盘已加载，找到拨号按钮: {dial_button_id}")
-                        logger.info(f"当前包名: {package_name}")
+                        logger.debug(f"拨号盘已加载，找到拨号按钮: {dial_button_id}")
                         # 判断是否是Google Dialer：通过resourceId或包名判断
                         is_google_dialer = (package_name == "com.google.android.dialer" or 
                                            dial_button_id == "com.google.android.dialer:id/dialpad_voice_call_button")
                         
                         if is_google_dialer:
-                            logger.info("✓ 检测到 Google Dialer（通过resourceId或包名），开始获取输入框焦点...")
                             # 额外等待一小段时间，确保拨号盘UI完全稳定
-                            logger.info("等待0.5秒，确保拨号盘UI完全稳定...")
                             time.sleep(0.5)
                             if not self._focus_google_dialer_input(d):
-                                logger.error("❌ 聚焦Google Dialer输入框失败")
+                                logger.error("聚焦Google Dialer输入框失败")
                                 return False
-                            logger.info("✓ 焦点获取完成，继续执行")
-                        else:
-                            logger.info(f"非Google Dialer应用 (包名: {package_name}, resourceId: {dial_button_id})，跳过焦点获取步骤")
                         return True
                 except:
                     continue
@@ -988,19 +960,14 @@ class SecretCodeDialog(QDialog):
     def _input_text(self, device, text):
         """输入文本 - 使用input text，对特殊字符进行转义"""
         try:
-            logger.info("=" * 50)
-            logger.info(f"准备输入暗码文本: {text}")
-            logger.info("=" * 50)
+            logger.debug(f"输入文本: {text}")
             
             # 转义特殊字符
             # 空格用 %s，其他字符直接传递
             processed_text = text.replace(' ', '%s')
-            logger.debug(f"转义后的文本: {processed_text}")
             
             # 使用input text输入
             cmd = ["adb", "-s", device, "shell", "input", "text", processed_text]
-            logger.info(f"执行命令: adb -s {device} shell input text {processed_text}")
-            
             result = subprocess.run(
                 cmd,
                 capture_output=True,
@@ -1010,24 +977,12 @@ class SecretCodeDialog(QDialog):
             )
             
             if result.returncode != 0:
-                logger.error(f"❌ 输入文本命令执行失败，返回码: {result.returncode}")
-                logger.error(f"错误信息: {result.stderr}")
-                logger.error(f"标准输出: {result.stdout}")
+                logger.error(f"输入文本失败: {result.stderr}")
                 raise Exception(f"输入文本失败: {result.stderr}")
             
-            logger.info("=" * 50)
-            logger.info(f"✓✓✓ 已执行输入文本命令: {text} ✓✓✓")
-            logger.info(f"命令返回码: {result.returncode}")
-            if result.stdout:
-                logger.info(f"命令输出: {result.stdout}")
-            if result.stderr:
-                logger.debug(f"命令错误输出: {result.stderr}")
-            logger.info("=" * 50)
+            logger.debug(f"已输入文本: {text}")
         except Exception as e:
-            logger.error("=" * 50)
-            logger.error(f"❌ 输入文本失败: {e}")
-            logger.error("=" * 50)
-            logger.exception("详细错误信息:")
+            logger.exception(f"输入文本失败: {e}")
             raise
     
     def add_category(self):

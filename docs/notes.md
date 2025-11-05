@@ -5,7 +5,7 @@
 - Rlease date：2025/11/7
 
 ## Release Note
-- ✅ Double click secret code input issue - ongoing
+- ✅ Double click secret code input issue
 - ✅ run python ANR issue 
 ## Known issue
 - 

@@ -567,7 +567,7 @@ class CustomButtonManager(QObject):
             return False, str(e)
     
     def _execute_adb_command(self, command, device_id):
-        """执行ADB命令"""
+        """执行ADB命令（支持多行命令）"""
         if not device_id:
             return False, self.lang_manager.tr("未选择设备")
         
@@ -576,22 +576,88 @@ class CustomButtonManager(QObject):
         if clean_command.lower().startswith('adb '):
             clean_command = clean_command[4:].strip()
         
-        # 构建完整命令
-        full_command = f"adb -s {device_id} {clean_command}"
-        
         try:
-            result = subprocess.run(
-                full_command, 
-                shell=True, 
-                capture_output=True, 
-                text=True, 
-                timeout=30
-            )
+            # 检查是否是多行命令
+            lines = [line.strip() for line in clean_command.split('\n') if line.strip()]
             
-            output = result.stdout if result.stdout else result.stderr
-            success = result.returncode == 0
-            
-            return success, output
+            if len(lines) == 1:
+                # 单行命令，直接执行
+                full_command = f"adb -s {device_id} {clean_command}"
+                result = subprocess.run(
+                    full_command, 
+                    shell=True, 
+                    capture_output=True, 
+                    text=True, 
+                    timeout=30
+                )
+                
+                output = result.stdout if result.stdout else result.stderr
+                success = result.returncode == 0
+                
+                return success, output
+            else:
+                # 多行命令处理
+                # 检查第一行是否包含 'shell'
+                first_line = lines[0].lower()
+                if 'shell' in first_line:
+                    # 如果是 shell 命令，通过 stdin 发送所有命令
+                    # 移除每行的 'adb shell' 前缀（如果有）
+                    shell_commands = []
+                    for line in lines:
+                        # 移除可能的 'adb shell' 前缀
+                        if line.lower().startswith('adb shell '):
+                            shell_commands.append(line[10:].strip())
+                        elif line.lower().startswith('shell '):
+                            shell_commands.append(line[6:].strip())
+                        else:
+                            shell_commands.append(line)
+                    
+                    # 用换行符连接所有命令
+                    all_commands = '\n'.join(shell_commands)
+                    
+                    # 执行 adb shell，通过 stdin 发送所有命令
+                    result = subprocess.run(
+                        ["adb", "-s", device_id, "shell"],
+                        input=all_commands,
+                        text=True,
+                        capture_output=True,
+                        timeout=30,
+                        creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0
+                    )
+                    
+                    output = result.stdout if result.stdout else result.stderr
+                    success = result.returncode == 0
+                    
+                    return success, output
+                else:
+                    # 非 shell 命令，逐行执行
+                    all_output = []
+                    all_success = True
+                    
+                    for line in lines:
+                        # 移除可能的 'adb ' 前缀
+                        if line.lower().startswith('adb '):
+                            line = line[4:].strip()
+                        
+                        full_command = f"adb -s {device_id} {line}"
+                        result = subprocess.run(
+                            full_command, 
+                            shell=True, 
+                            capture_output=True, 
+                            text=True, 
+                            timeout=30
+                        )
+                        
+                        if result.stdout:
+                            all_output.append(result.stdout)
+                        if result.stderr:
+                            all_output.append(result.stderr)
+                        
+                        if result.returncode != 0:
+                            all_success = False
+                    
+                    output = '\n'.join(all_output)
+                    return all_success, output
             
         except subprocess.TimeoutExpired:
             return False, self.lang_manager.tr("命令执行超时")
@@ -883,20 +949,48 @@ class CustomButtonManager(QObject):
             return False, f"{self.lang_manager.tr('运行程序失败:')} {str(e)}"
     
     def _execute_system_command(self, command):
-        """执行系统命令"""
+        """执行系统命令（支持多行命令）"""
         try:
-            result = subprocess.run(
-                command, 
-                shell=True, 
-                capture_output=True, 
-                text=True, 
-                timeout=30
-            )
+            # 检查是否是多行命令
+            lines = [line.strip() for line in command.split('\n') if line.strip()]
             
-            output = result.stdout if result.stdout else result.stderr
-            success = result.returncode == 0
-            
-            return success, output
+            if len(lines) == 1:
+                # 单行命令，直接执行
+                result = subprocess.run(
+                    command, 
+                    shell=True, 
+                    capture_output=True, 
+                    text=True, 
+                    timeout=30
+                )
+                
+                output = result.stdout if result.stdout else result.stderr
+                success = result.returncode == 0
+                
+                return success, output
+            else:
+                # 多行命令，使用 && 连接（Windows和Linux都支持）或逐行执行
+                # Windows使用 &&，Linux/Mac也可以使用 &&
+                # 但为了更好的兼容性，使用换行符连接（在shell中）
+                if os.name == 'nt':  # Windows
+                    # Windows使用 && 连接命令
+                    combined_command = ' && '.join(lines)
+                else:  # Linux/Mac
+                    # 使用分号连接，或者使用换行符
+                    combined_command = '; '.join(lines)
+                
+                result = subprocess.run(
+                    combined_command, 
+                    shell=True, 
+                    capture_output=True, 
+                    text=True, 
+                    timeout=30
+                )
+                
+                output = result.stdout if result.stdout else result.stderr
+                success = result.returncode == 0
+                
+                return success, output
             
         except subprocess.TimeoutExpired:
             return False, self.lang_manager.tr("命令执行超时")

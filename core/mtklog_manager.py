@@ -849,11 +849,8 @@ class PyQtMTKLogManager(QObject):
         reply = QMessageBox.question(
             None,
             self.lang_manager.tr("导出媒体文件"),
-            (self.lang_manager.tr("是否同时导出截图和录制的视频？\n\n") +
-             self.lang_manager.tr("包括:\n") +
-             self.lang_manager.tr("• 屏幕录制视频\n") +
-             self.lang_manager.tr("• 截图文件\n\n") +
-             self.lang_manager.tr("选择") + self.lang_manager.tr("是") + self.lang_manager.tr("将额外导出这些媒体文件。")),
+            (self.lang_manager.tr("是否导出手机录制的视频和截图？\n\n") +
+             self.lang_manager.tr("选择") + self.lang_manager.tr("是") + self.lang_manager.tr("将导出这些媒体文件。")),
             QMessageBox.Yes | QMessageBox.No,
             QMessageBox.No
         )

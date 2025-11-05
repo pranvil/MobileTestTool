@@ -451,6 +451,11 @@ class ButtonEditDialog(QDialog):
         self.file_browse_btn.setVisible(False)
         path_layout.addWidget(self.file_browse_btn)
         
+        self.folder_browse_btn = QPushButton(self.tr("浏览文件夹"))
+        self.folder_browse_btn.clicked.connect(self.browse_folder)
+        self.folder_browse_btn.setVisible(False)
+        path_layout.addWidget(self.folder_browse_btn)
+        
         advanced_card_layout.addLayout(path_layout)
         advanced_layout.addWidget(self.advanced_card)
         scroll_layout.addWidget(advanced_container)
@@ -539,6 +544,7 @@ class ButtonEditDialog(QDialog):
             self.script_edit.setVisible(False)
             self.path_edit.setVisible(False)
             self.file_browse_btn.setVisible(False)
+            self.folder_browse_btn.setVisible(False)
             self.advanced_group.setVisible(False)  # advanced_group现在是容器
             return
         
@@ -557,6 +563,7 @@ class ButtonEditDialog(QDialog):
             self.script_edit.setVisible(False)
             self.path_edit.setVisible(False)
             self.file_browse_btn.setVisible(False)
+            self.folder_browse_btn.setVisible(False)
             self.advanced_group.setVisible(False)
             return
         
@@ -567,6 +574,7 @@ class ButtonEditDialog(QDialog):
             self.script_edit.setMaximumHeight(300)
             self.path_edit.setVisible(False)
             self.file_browse_btn.setVisible(False)
+            self.folder_browse_btn.setVisible(False)
             self.advanced_title.setText(self.tr("脚本\\命令"))  # 更新标题文本
             self.advanced_group.setVisible(True)
             
@@ -581,20 +589,24 @@ class ButtonEditDialog(QDialog):
             # 打开文件和运行程序：使用路径输入和浏览按钮
             self.script_edit.setVisible(False)
             self.path_edit.setVisible(True)
-            self.file_browse_btn.setVisible(True)
             self.advanced_title.setText(self.tr("文件选择"))  # 更新标题文本
             self.advanced_group.setVisible(True)
             
-            # 设置占位符
+            # 设置占位符和按钮可见性
             if button_type == "file":
-                self.path_edit.setPlaceholderText(self.tr("例如：C:\\Users\\用户名\\Desktop\\文件.txt"))
+                self.path_edit.setPlaceholderText(self.tr("例如：C:\\Users\\用户名\\Desktop\\文件.txt 或文件夹路径"))
+                self.file_browse_btn.setVisible(True)  # 显示浏览文件按钮
+                self.folder_browse_btn.setVisible(True)  # 显示浏览文件夹按钮
             else:  # program
                 self.path_edit.setPlaceholderText(self.tr("例如：C:\\Program Files\\Notepad++\\notepad++.exe"))
+                self.file_browse_btn.setVisible(True)  # 只显示浏览文件按钮
+                self.folder_browse_btn.setVisible(False)  # 隐藏浏览文件夹按钮
         elif button_type == "url":
             # 打开网页：使用路径输入，但不显示浏览按钮
             self.script_edit.setVisible(False)
             self.path_edit.setVisible(True)
             self.file_browse_btn.setVisible(False)
+            self.folder_browse_btn.setVisible(False)
             self.advanced_title.setText(self.tr("网页地址"))  # 更新标题文本
             self.advanced_group.setVisible(True)
             self.path_edit.setPlaceholderText(self.tr("例如：https://www.example.com 或 www.example.com"))
@@ -602,6 +614,7 @@ class ButtonEditDialog(QDialog):
             self.script_edit.setVisible(False)
             self.path_edit.setVisible(False)
             self.file_browse_btn.setVisible(False)
+            self.folder_browse_btn.setVisible(False)
             self.advanced_group.setVisible(False)
     
     def browse_file(self):
@@ -611,24 +624,38 @@ class ButtonEditDialog(QDialog):
         type_text = self.type_combo.currentText()
         
         if type_text == self.tr("打开文件"):
+            # 选择文件
             file_path, _ = QFileDialog.getOpenFileName(
                 self, self.tr("选择要打开的文件"), "",
                 self.tr("所有文件 (*.*)")
             )
+            if file_path:
+                self.path_edit.setText(file_path)
         elif type_text == self.tr("运行程序"):
             # Windows平台：支持.exe、.py、.bat、.cmd等
             file_path, _ = QFileDialog.getOpenFileName(
                 self, self.tr("选择要运行的程序"), "",
                 self.tr("可执行文件和脚本 (*.exe *.py *.bat *.cmd);;所有文件 (*.*)")
             )
+            if file_path:
+                self.path_edit.setText(file_path)
         else:
             file_path, _ = QFileDialog.getOpenFileName(
                 self, self.tr("选择文件"), "",
                 self.tr("所有文件 (*.*)")
             )
+            if file_path:
+                self.path_edit.setText(file_path)
+    
+    def browse_folder(self):
+        """浏览文件夹"""
+        from PyQt5.QtWidgets import QFileDialog
         
-        if file_path:
-            self.path_edit.setText(file_path)
+        folder_path = QFileDialog.getExistingDirectory(
+            self, self.tr("选择要打开的文件夹"), ""
+        )
+        if folder_path:
+            self.path_edit.setText(folder_path)
     
     def update_preview(self):
         """更新命令预览"""
