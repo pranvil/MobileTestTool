@@ -612,33 +612,39 @@ class CustomButtonManager(QObject):
             import subprocess
             
             # 创建安全的执行环境
+            # 获取真正的内置函数字典
+            import builtins
+            safe_builtins = {
+                '__import__': __import__,  # 允许使用 import 语句
+                'print': print,
+                'len': len,
+                'str': str,
+                'int': int,
+                'float': float,
+                'list': list,
+                'dict': dict,
+                'range': range,
+                'enumerate': enumerate,
+                'zip': zip,
+                'sorted': sorted,
+                'min': min,
+                'max': max,
+                'sum': sum,
+                'abs': abs,
+                'round': round,
+                'type': type,
+                'isinstance': isinstance,
+                'hasattr': hasattr,
+                'getattr': getattr,
+                'setattr': setattr,
+                'dir': dir,
+            }
+            # 安全地添加 help 函数（如果可用）
+            if hasattr(builtins, 'help'):
+                safe_builtins['help'] = builtins.help
+            
             safe_globals = {
-                '__builtins__': {
-                    '__import__': __import__,  # 允许使用 import 语句
-                    'print': print,
-                    'len': len,
-                    'str': str,
-                    'int': int,
-                    'float': float,
-                    'list': list,
-                    'dict': dict,
-                    'range': range,
-                    'enumerate': enumerate,
-                    'zip': zip,
-                    'sorted': sorted,
-                    'min': min,
-                    'max': max,
-                    'sum': sum,
-                    'abs': abs,
-                    'round': round,
-                    'type': type,
-                    'isinstance': isinstance,
-                    'hasattr': hasattr,
-                    'getattr': getattr,
-                    'setattr': setattr,
-                    'dir': dir,
-                    'help': help,
-                },
+                '__builtins__': safe_builtins,
                 '__name__': '__main__',  # 允许使用 if __name__ == "__main__" 模式
                 'datetime': datetime,
                 'platform': platform,
@@ -650,6 +656,13 @@ class CustomButtonManager(QObject):
                 'time': time,
                 'subprocess': subprocess,
             }
+            # 同时将常用的内置函数添加到全局作用域，确保可以直接访问
+            for key in ['print', 'len', 'str', 'int', 'float', 'list', 'dict', 'range', 'enumerate', 
+                       'zip', 'sorted', 'min', 'max', 'sum', 'abs', 'round', 'type', 'isinstance', 
+                       'hasattr', 'getattr', 'setattr', 'dir']:
+                safe_globals[key] = safe_builtins[key]
+            if 'help' in safe_builtins:
+                safe_globals['help'] = safe_builtins['help']
             
             # 添加设备ID到全局环境（如果提供）
             if device_id:
