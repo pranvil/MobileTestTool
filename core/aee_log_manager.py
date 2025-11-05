@@ -259,7 +259,7 @@ class PyQtAEELogManager(QObject):
         """安装com.tcl.logger APK"""
         try:
             # 直接执行安装命令
-            install_cmd = ["adb", "-s", device, "install", "--bypass-low-target-sdk-block", apk_file]
+            install_cmd = ["adb", "-s", device, "install", apk_file]
             result = subprocess.run(install_cmd, capture_output=True, text=True, timeout=120, 
                                   creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0)
             

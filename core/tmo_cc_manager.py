@@ -321,6 +321,66 @@ class PyQtTMOCCManager(QObject):
             if not self.device_manager.ensure_screen_unlocked(device):
                 return
             
+            # 尝试使用UIAutomator2，如果不可用则回退到adb方法
+            if HAS_UIAUTOMATOR2:
+                success = self._start_entitlement_and_click_no_card_u2(device)
+                if success:
+                    self.status_message.emit(self.lang_manager.tr("NO CARD按钮点击成功"))
+                    return
+            
+            # 回退到原来的adb方法
+            self.status_message.emit(self.lang_manager.tr("使用备用方法启动活动..."))
+            success = self._start_entitlement_and_click_no_card_adb(device)
+            if success:
+                self.status_message.emit(self.lang_manager.tr("NO CARD按钮点击成功"))
+            else:
+                QMessageBox.warning(
+                    None,
+                    self.lang_manager.tr("点击失败"),
+                    f"{self.lang_manager.tr('NO CARD按钮点击失败!')}\n\n设备: {device}\n{self.lang_manager.tr('请手动点击NO CARD按钮')}"
+                )
+                
+        except Exception as e:
+            self.status_message.emit(f"{self.lang_manager.tr('启动Entitlement活动失败:')} {str(e)}")
+    
+    def _start_entitlement_and_click_no_card_u2(self, device):
+        """使用UIAutomator2启动Entitlement活动并点击NO CARD按钮"""
+        try:
+            # 连接设备
+            self.status_message.emit(f"正在连接设备: {device}")
+            d = u2.connect(device)
+            
+            # 检查连接状态
+            try:
+                device_info = d.info
+                self.status_message.emit(f"设备连接成功: {device_info.get('productName', 'Unknown')}")
+            except Exception as e:
+                self.status_message.emit(f"设备连接验证失败: {str(e)}")
+                return False
+            
+            self.status_message.emit(self.lang_manager.tr("启动应用..."))
+            
+            # 启动Entitlement活动
+            d.app_start("com.tct.entitlement", activity=".EditEntitlementEndpointActivity")
+            time.sleep(3)  # 等待应用启动
+            
+            # 等待界面加载（等待NO CARD按钮出现）
+            self.status_message.emit(self.lang_manager.tr("等待界面加载..."))
+            if not self._wait_for_no_card_button_u2(d, timeout=10):
+                self.status_message.emit(self.lang_manager.tr("等待NO CARD按钮超时"))
+                return False
+            
+            # 点击NO CARD按钮
+            self.status_message.emit(self.lang_manager.tr("查找NO CARD按钮..."))
+            return self._click_no_card_button_u2(d)
+                
+        except Exception as e:
+            self.status_message.emit(f"UIAutomator2方法失败: {str(e)}")
+            return False
+    
+    def _start_entitlement_and_click_no_card_adb(self, device):
+        """使用adb启动Entitlement活动并点击NO CARD按钮（备用方法）"""
+        try:
             # 启动Entitlement活动
             cmd = ["adb", "-s", device, "shell", "am", "start", "com.tct.entitlement/.EditEntitlementEndpointActivity"]
             result = subprocess.run(
@@ -331,125 +391,187 @@ class PyQtTMOCCManager(QObject):
                 creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0
             )
             
-            if result.returncode == 0:
-                # 等待界面加载
-                time.sleep(3)
-                
-                # 使用uiautomator点击NO CARD按钮
-                self._click_no_card_button_with_uiautomator(device)
-            else:
+            if result.returncode != 0:
                 error_msg = result.stderr.strip() if result.stderr else self.lang_manager.tr("未知错误")
-                self.status_message.emit(f"{self.lang_manager.tr('Entitlement活动启动失败:')} {error_msg}")
+                self.status_message.emit(f"启动活动失败: {error_msg}")
+                return False
+            
+            # 等待界面加载（等待NO CARD按钮出现）
+            self.status_message.emit(self.lang_manager.tr("等待界面加载..."))
+            if not self._wait_for_no_card_button_adb(device, timeout=8):
+                self.status_message.emit(self.lang_manager.tr("等待NO CARD按钮超时"))
+                return False
+            
+            # 点击NO CARD按钮
+            self.status_message.emit(self.lang_manager.tr("查找NO CARD按钮..."))
+            return self._click_no_card_button_adb(device)
                 
         except Exception as e:
-            self.status_message.emit(f"{self.lang_manager.tr('启动Entitlement活动失败:')} {str(e)}")
+            self.status_message.emit(f"ADB方法失败: {str(e)}")
+            return False
     
-    def _click_no_card_button_with_uiautomator(self, device):
-        """使用uiautomator点击NO CARD按钮"""
+    def _wait_for_no_card_button_u2(self, d, timeout=10):
+        """使用UIAutomator2等待NO CARD按钮出现（最多timeout秒）"""
+        t0 = time.time()
+        no_card_texts = ["NO CARD", "No Card", "no card", "NO CARD按钮"]
+        
+        while time.time() - t0 < timeout:
+            try:
+                # 尝试多种方式查找NO CARD按钮
+                for text in no_card_texts:
+                    button = d(text=text)
+                    if button.exists:
+                        self.status_message.emit(f"找到NO CARD按钮（文本: {text}）")
+                        return True
+                    
+                    button = d(description=text)
+                    if button.exists:
+                        self.status_message.emit(f"找到NO CARD按钮（描述: {text}）")
+                        return True
+                
+                # 尝试通过Button类名查找（可能有多个按钮，需要进一步筛选）
+                buttons = d(className="android.widget.Button")
+                for btn in buttons:
+                    btn_text = btn.get_text()
+                    if btn_text and "card" in btn_text.lower() and "no" in btn_text.lower():
+                        self.status_message.emit(f"找到NO CARD按钮（通过类名筛选: {btn_text}）")
+                        return True
+                
+                time.sleep(0.6)
+            except Exception as e:
+                self.status_message.emit(f"检查按钮时出错: {str(e)}")
+                time.sleep(0.6)
+        
+        self.status_message.emit(f"等待超时({timeout}秒)，未找到NO CARD按钮")
+        return False
+    
+    def _wait_for_no_card_button_adb(self, device, timeout=8):
+        """使用adb等待NO CARD按钮出现（最多timeout秒）"""
+        t0 = time.time()
+        no_card_patterns = [
+            r'text="NO CARD"',
+            r'text="No Card"',
+            r'text="no card"',
+            r'content-desc="NO CARD"',
+            r'content-desc="No Card"',
+            r'content-desc="no card"'
+        ]
+        
+        while time.time() - t0 < timeout:
+            xml = self._dump_ui_and_get(device)
+            if xml:
+                for pattern in no_card_patterns:
+                    if re.search(pattern, xml, re.IGNORECASE):
+                        self.status_message.emit(f"找到NO CARD按钮（匹配: {pattern}）")
+                        return True
+            time.sleep(0.6)
+        
+        self.status_message.emit(f"等待超时({timeout}秒)，未找到NO CARD按钮")
+        return False
+    
+    def _click_no_card_button_u2(self, d):
+        """使用UIAutomator2点击NO CARD按钮"""
         try:
-            print(f"[DEBUG] {self.tr('开始使用uiautomator点击NO CARD按钮，设备:')} {device}")
-            print(f"[DEBUG] {self.tr('当前环境:')} {'exe' if is_pyinstaller() else 'python'}")
+            self.status_message.emit("正在查找NO CARD按钮...")
             
-            # 使用uiautomator命令查找并点击NO CARD按钮
-            cmd = ["adb", "-s", device, "shell", "uiautomator", "dump", "/sdcard/ui_dump.xml"]
-            print(f"[DEBUG] {self.tr('执行UI dump命令:')} {' '.join(cmd)}")
+            # 尝试多种方式查找NO CARD按钮
+            no_card_button = None
+            found_method = ""
+            no_card_texts = ["NO CARD", "No Card", "no card"]
             
-            result = subprocess.run(
-                cmd,
-                capture_output=True,
-                text=True,
-                timeout=10,
-                creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0
-            )
+            # 方法1: 通过文本查找
+            for text in no_card_texts:
+                no_card_button = d(text=text)
+                if no_card_button.exists:
+                    found_method = f"通过文本'{text}'"
+                    break
             
-            print(f"[DEBUG] {self.tr('UI dump命令结果 - returncode:')} {result.returncode}")
-            print(f"[DEBUG] {self.tr('UI dump命令stdout:')} {result.stdout.strip()}")
-            print(f"[DEBUG] {self.tr('UI dump命令stderr:')} {result.stderr.strip()}")
+            # 方法2: 通过content-desc查找
+            if not no_card_button or not no_card_button.exists:
+                for text in no_card_texts:
+                    no_card_button = d(description=text)
+                    if no_card_button.exists:
+                        found_method = f"通过描述'{text}'"
+                        break
             
-            if result.returncode == 0:
-                # 获取UI dump内容
-                cmd_get_dump = ["adb", "-s", device, "shell", "cat", "/sdcard/ui_dump.xml"]
-                print(f"[DEBUG] {self.tr('执行获取dump内容命令:')} {' '.join(cmd_get_dump)}")
+            # 方法3: 通过resource-id查找（如果知道具体的ID）
+            if not no_card_button or not no_card_button.exists:
+                common_ids = [
+                    "com.tct.entitlement:id/no_card_button",
+                    "com.tct.entitlement:id/btn_no_card"
+                ]
+                for rid in common_ids:
+                    no_card_button = d(resourceId=rid)
+                    if no_card_button.exists:
+                        found_method = f"通过资源ID'{rid}'"
+                        break
+            
+            # 方法4: 通过Button类名查找并筛选
+            if not no_card_button or not no_card_button.exists:
+                buttons = d(className="android.widget.Button")
+                for btn in buttons:
+                    btn_text = btn.get_text()
+                    if btn_text and "card" in btn_text.lower() and "no" in btn_text.lower():
+                        no_card_button = btn
+                        found_method = f"通过Button类名筛选（文本: {btn_text}）"
+                        break
+            
+            if no_card_button and no_card_button.exists:
+                self.status_message.emit(f"找到NO CARD按钮({found_method})，准备点击")
+                no_card_button.click()
+                time.sleep(1)
+                self.status_message.emit("NO CARD按钮点击完成")
+                return True
+            else:
+                self.status_message.emit("未找到NO CARD按钮")
+                return False
                 
-                dump_result = subprocess.run(
-                    cmd_get_dump,
-                    capture_output=True,
-                    text=True,
-                    timeout=10,
-                    creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0
-                )
-                
-                print(f"[DEBUG] {self.tr('获取dump内容结果 - returncode:')} {dump_result.returncode}")
-                print(f"[DEBUG] {self.tr('dump内容长度:')} {len(dump_result.stdout) if dump_result.stdout else 0}")
-                
-                if dump_result.returncode == 0:
-                    ui_content = dump_result.stdout
-                    
-                    # 查找NO CARD按钮的坐标
-                    pattern = r'text="NO CARD"[^>]*bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"'
-                    match = re.search(pattern, ui_content)
-                    
-                    if match:
-                        x1, y1, x2, y2 = map(int, match.groups())
-                        center_x = (x1 + x2) // 2
-                        center_y = (y1 + y2) // 2
-                        
-                        # 点击按钮
-                        click_cmd = ["adb", "-s", device, "shell", "input", "tap", str(center_x), str(center_y)]
-                        click_result = subprocess.run(
-                            click_cmd,
-                            capture_output=True,
-                            text=True,
-                            timeout=10,
-                            creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0
-                        )
-                        
-                        if click_result.returncode == 0:
-                            self.status_message.emit(self.lang_manager.tr("NO CARD按钮点击成功"))
-                        else:
-                            QMessageBox.warning(
-                                None,
-                                self.lang_manager.tr("点击失败"),
-                                f"{self.lang_manager.tr('NO CARD按钮点击失败!')}\n\n设备: {device}\n坐标: ({center_x}, {center_y})\n\n{self.lang_manager.tr('请手动点击NO CARD按钮')}"
-                            )
-                    else:
-                        # 尝试其他可能的文本
-                        alt_patterns = [
-                            r'text="No Card"[^>]*bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"',
-                            r'text="no card"[^>]*bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"',
-                        ]
-                        
-                        found_button = False
-                        for alt_pattern in alt_patterns:
-                            match = re.search(alt_pattern, ui_content)
-                            if match:
-                                x1, y1, x2, y2 = map(int, match.groups())
-                                center_x = (x1 + x2) // 2
-                                center_y = (y1 + y2) // 2
-                                
-                                click_cmd = ["adb", "-s", device, "shell", "input", "tap", str(center_x), str(center_y)]
-                                click_result = subprocess.run(
-                                    click_cmd,
-                                    capture_output=True,
-                                    text=True,
-                                    timeout=10,
-                                    creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0
-                                )
-                                
-                                if click_result.returncode == 0:
-                                    found_button = True
-                                    self.status_message.emit(self.lang_manager.tr("NO CARD按钮点击成功"))
-                                    break
-                        
-                        if not found_button:
-                            QMessageBox.warning(
-                                None,
-                                self.lang_manager.tr("未找到按钮"),
-                                f"{self.lang_manager.tr('未找到NO CARD按钮!')}\n\n设备: {device}\n{self.lang_manager.tr('界面可能未完全加载或按钮文本不匹配')}\n\n{self.lang_manager.tr('请手动点击NO CARD按钮')}"
-                            )
-                            
         except Exception as e:
-            self.status_message.emit(f"{self.lang_manager.tr('点击NO CARD按钮失败:')} {str(e)}")
+            self.status_message.emit(f"点击NO CARD按钮时出错: {str(e)}")
+            return False
+    
+    def _click_no_card_button_adb(self, device):
+        """使用adb点击NO CARD按钮（备用方法）"""
+        try:
+            # 获取UI dump
+            xml = self._dump_ui_and_get(device)
+            if not xml:
+                return False
+            
+            # 查找NO CARD按钮（多种模式）
+            no_card_patterns = [
+                r'text="NO CARD"[^>]*bounds="(\[[^"]+\])"',
+                r'text="No Card"[^>]*bounds="(\[[^"]+\])"',
+                r'text="no card"[^>]*bounds="(\[[^"]+\])"',
+                r'content-desc="NO CARD"[^>]*bounds="(\[[^"]+\])"',
+                r'content-desc="No Card"[^>]*bounds="(\[[^"]+\])"',
+                r'content-desc="no card"[^>]*bounds="(\[[^"]+\])"',
+                # 更灵活的匹配模式（允许属性顺序不同）
+                r'text="NO CARD".*?bounds="(\[[^"]+\])"',
+                r'text="No Card".*?bounds="(\[[^"]+\])"',
+                r'text="no card".*?bounds="(\[[^"]+\])"',
+            ]
+            
+            no_card_bounds = None
+            for pattern in no_card_patterns:
+                match = re.search(pattern, xml, re.IGNORECASE)
+                if match:
+                    no_card_bounds = match.group(1)
+                    break
+            
+            if no_card_bounds:
+                cx, cy = self._bounds_center(no_card_bounds)
+                self.status_message.emit(f"找到NO CARD按钮，坐标: ({cx}, {cy})")
+                self._tap(device, cx, cy)
+                time.sleep(0.5)
+                return True
+            else:
+                self.status_message.emit("未找到NO CARD按钮")
+                return False
+                
+        except Exception as e:
+            self.status_message.emit(f"点击NO CARD按钮时出错: {str(e)}")
+            return False
     
     def start_prod_server(self):
         """启动PROD服务器"""
