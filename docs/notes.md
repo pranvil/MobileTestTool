@@ -6,7 +6,7 @@
 
 ## Release Note
 - ✅ Double click secret code input issue - ongoing
-- ✅ run python ANR issue - ongoing
+- ✅ run python ANR issue 
 ## Known issue
 - 
 

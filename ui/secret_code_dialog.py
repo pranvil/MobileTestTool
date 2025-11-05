@@ -580,7 +580,9 @@ class SecretCodeDialog(QDialog):
         if not self._open_dialpad_and_wait(device, package_name):
             raise Exception(self.tr("未找到拨号盘或拨号按钮"))
         
-        # 步骤7: 输入暗码
+        # 步骤7: 输入暗码（在焦点获取后额外等待一小段时间，确保焦点完全稳定）
+        time.sleep(0.3)
+        logger.debug("焦点获取后额外等待0.3秒，确保输入框焦点完全稳定")
         self._input_text(device, code)
         time.sleep(1)
         
@@ -754,9 +756,9 @@ class SecretCodeDialog(QDialog):
             raise
     
     def _get_current_package_name(self, device):
-        """获取当前应用的包名"""
+        """获取当前应用的包名 - 使用 dumpsys window 查找 mCurrentFocus"""
         try:
-            cmd = ["adb", "-s", device, "shell", "dumpsys", "window", "windows"]
+            cmd = ["adb", "-s", device, "shell", "dumpsys", "window"]
             result = subprocess.run(
                 cmd,
                 stdout=subprocess.PIPE,
@@ -768,17 +770,36 @@ class SecretCodeDialog(QDialog):
                 creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0
             )
             
-            # 查找mCurrentFocus行
+            if result.returncode != 0:
+                logger.error(f"dumpsys window 命令执行失败: {result.stderr}")
+                return None
+            
+            # 查找 mCurrentFocus 行
+            # 格式: mCurrentFocus=Window{xxx u0 com.package.name/Activity}
             for line in result.stdout.split('\n'):
                 if 'mCurrentFocus' in line:
-                    # 解析包名，格式类似于: Window{xxx u0 com.package.name/Activity}
-                    match = re.search(r'(com\.[a-z0-9_\.]+)', line)
-                    if match:
-                        package_name = match.group(1)
-                        logger.debug(f"解析到包名: {package_name}")
-                        return package_name
+                    logger.debug(f"找到 mCurrentFocus 行: {line.strip()}")
+                    # 解析格式: Window{xxx u0 com.package.name/Activity}
+                    # 提取 u0 后面，/ 前面的包名部分
+                    if ' u0 ' in line:
+                        parts = line.split(' u0 ')
+                        if len(parts) > 1:
+                            package_part = parts[1].strip()
+                            # 提取包名（在第一个/之前的部分）
+                            if '/' in package_part:
+                                package_name = package_part.split('/')[0].strip()
+                            else:
+                                # 如果没有/，可能是格式不同，尝试提取包名
+                                # 去掉可能的后续字符
+                                package_name = package_part.split()[0].strip() if package_part.split() else None
+                            
+                            if package_name and len(package_name) > 0:
+                                logger.info(f"解析到包名: {package_name}")
+                                return package_name
             
+            logger.warning("未找到 mCurrentFocus 行，无法获取包名")
             return None
+            
         except Exception as e:
             logger.exception(f"获取当前包名失败: {e}")
             return None
@@ -800,6 +821,68 @@ class SecretCodeDialog(QDialog):
             logger.debug("使用DEL键清空输入")
         except Exception as e:
             logger.exception(f"清空输入失败: {e}")
+    
+    def _focus_google_dialer_input(self, d):
+        """聚焦Google Dialer输入框的辅助方法 - 通过点击数字0然后删除获取焦点
+        
+        Args:
+            d: uiautomator2设备对象
+            
+        Returns:
+            bool: 成功返回True，失败返回False
+        """
+        try:
+            logger.info("=" * 50)
+            logger.info("开始聚焦 Google Dialer 输入框（通过点击0然后删除）...")
+            logger.info("=" * 50)
+            
+            # 步骤1: 等待并点击数字0按钮
+            logger.info("步骤1: 查找数字0按钮 (resourceId: com.google.android.dialer:id/zero)")
+            zero_button = d(resourceId="com.google.android.dialer:id/zero")
+            logger.info("正在等待数字0按钮出现（最多3秒）...")
+            zero_button.wait(timeout=3.0)  # 等待数字0按钮出现
+            
+            if not zero_button.exists:
+                logger.error("❌ 未找到数字0按钮，焦点获取失败")
+                return False
+            
+            logger.info("✓ 找到数字0按钮，准备点击...")
+            zero_button.click()
+            logger.info("✓ 已点击数字0按钮")
+            time.sleep(0.3)  # 短暂等待，确保点击生效
+            logger.info("等待0.3秒，确保点击生效")
+            
+            # 步骤2: 点击删除按钮
+            logger.info("步骤2: 查找删除按钮 (resourceId: com.google.android.dialer:id/deleteButton)")
+            delete_button = d(resourceId="com.google.android.dialer:id/deleteButton")
+            logger.info("正在等待删除按钮出现（最多2秒）...")
+            delete_button.wait(timeout=2.0)  # 等待删除按钮出现
+            
+            if not delete_button.exists:
+                logger.error("❌ 未找到删除按钮，焦点获取失败")
+                return False
+            
+            logger.info("✓ 找到删除按钮，准备点击...")
+            delete_button.click()
+            logger.info("✓ 已点击删除按钮")
+            time.sleep(0.5)  # 等待删除完成
+            logger.info("等待0.5秒，确保删除完成")
+            
+            # 额外等待，确保焦点完全稳定
+            time.sleep(0.5)
+            logger.info("再等待0.5秒，确保焦点完全稳定")
+            
+            logger.info("=" * 50)
+            logger.info("✓✓✓ Google Dialer 输入框焦点获取成功 ✓✓✓")
+            logger.info("=" * 50)
+            return True
+            
+        except Exception as e:
+            logger.error("=" * 50)
+            logger.error(f"❌ 聚焦Google Dialer输入框失败: {e}")
+            logger.error("=" * 50)
+            logger.exception("详细错误信息:")
+            return False
     
     def _open_dialpad_and_wait(self, device, package_name):
         """检查并点击拨号盘，然后等待拨号盘完全加载"""
@@ -836,44 +919,20 @@ class SecretCodeDialog(QDialog):
             for dial_button_id in dial_button_ids:
                 button = d(resourceId=dial_button_id)
                 if button.exists:
-                    logger.debug(f"找到拨号按钮: {dial_button_id}，已位于拨号盘")
-                    # 如果是Google Dialer，需要点击输入框获取焦点
-                    if package_name == "com.google.android.dialer":
-                        # 方法1: 通过text="Phone Number"查找
-                        input_field = d(text="Phone Number")
-                        if not input_field.exists:
-                            # 方法2: 通过resourceId查找
-                            input_field = d(resourceId="com.google.android.dialer:id/digits")
-                        if not input_field.exists:
-                            # 方法3: 通过class查找第一个EditText
-                            all_edittexts = d(className="android.widget.EditText")
-                            if len(all_edittexts) > 0:
-                                input_field = all_edittexts[0]
-                        
-                        if input_field.exists:
-                            info = input_field.info
-                            bounds = info.get('bounds', {})
-                            logger.debug(f"找到 Google Dialer 输入框，bounds: {bounds}")
-                            logger.debug(f"info完整内容: {info}")
-                            
-                            # 计算点击位置 - 使用bounds的上半部分，避免点到电话号码显示区域
-                            left = bounds.get('left', 0)
-                            top = bounds.get('top', 0)
-                            right = bounds.get('right', 0)
-                            bottom = bounds.get('bottom', 0)
-                            
-                            # 点击左上角稍微偏下一点的位置
-                            click_x = (left + right) // 2
-                            click_y = top + (bottom - top) // 4  # 从上往下1/4处
-                            
-                            logger.debug(f"bounds: left={left}, top={top}, right={right}, bottom={bottom}")
-                            logger.debug(f"点击位置: ({click_x}, {click_y})")
-                            
-                            d.click(click_x, click_y)
-                            time.sleep(0.5)
-                            logger.debug("已点击 Google Dialer 输入框")
-                        else:
-                            logger.warning("未找到 Google Dialer 输入框")
+                    logger.info(f"找到拨号按钮: {dial_button_id}，已位于拨号盘")
+                    logger.info(f"当前包名: {package_name}")
+                    # 判断是否是Google Dialer：通过resourceId或包名判断
+                    is_google_dialer = (package_name == "com.google.android.dialer" or 
+                                       dial_button_id == "com.google.android.dialer:id/dialpad_voice_call_button")
+                    
+                    if is_google_dialer:
+                        logger.info("✓ 检测到 Google Dialer（通过resourceId或包名），开始获取输入框焦点...")
+                        if not self._focus_google_dialer_input(d):
+                            logger.error("❌ 聚焦Google Dialer输入框失败")
+                            return False
+                        logger.info("✓ 焦点获取完成，继续执行")
+                    else:
+                        logger.info(f"非Google Dialer应用 (包名: {package_name}, resourceId: {dial_button_id})，跳过焦点获取步骤")
                     return True
             
             # 如果不在拨号盘，尝试点击拨号盘按钮
@@ -898,44 +957,23 @@ class SecretCodeDialog(QDialog):
                     button = d(resourceId=dial_button_id)
                     button.wait(timeout=2.0)  # 等待元素出现，最多2秒
                     if button.exists:
-                        logger.debug(f"拨号盘已加载，找到拨号按钮: {dial_button_id}")
-                        # 如果是Google Dialer，需要点击输入框获取焦点
-                        if package_name == "com.google.android.dialer":
-                            # 方法1: 通过text="Phone Number"查找
-                            input_field = d(text="Phone Number")
-                            if not input_field.exists:
-                                # 方法2: 通过resourceId查找
-                                input_field = d(resourceId="com.google.android.dialer:id/digits")
-                            if not input_field.exists:
-                                # 方法3: 通过class查找第一个EditText
-                                all_edittexts = d(className="android.widget.EditText")
-                                if len(all_edittexts) > 0:
-                                    input_field = all_edittexts[0]
-                            
-                            if input_field.exists:
-                                info = input_field.info
-                                bounds = info.get('bounds', {})
-                                logger.debug(f"找到 Google Dialer 输入框，bounds: {bounds}")
-                                logger.debug(f"info完整内容: {info}")
-                                
-                                # 计算点击位置 - 使用bounds的上半部分，避免点到电话号码显示区域
-                                left = bounds.get('left', 0)
-                                top = bounds.get('top', 0)
-                                right = bounds.get('right', 0)
-                                bottom = bounds.get('bottom', 0)
-                                
-                                # 点击左上角稍微偏下一点的位置
-                                click_x = (left + right) // 2
-                                click_y = top + (bottom - top) // 4  # 从上往下1/4处
-                                
-                                logger.debug(f"bounds: left={left}, top={top}, right={right}, bottom={bottom}")
-                                logger.debug(f"点击位置: ({click_x}, {click_y})")
-                                
-                                d.click(click_x, click_y)
-                                time.sleep(0.5)
-                                logger.debug("已点击 Google Dialer 输入框")
-                            else:
-                                logger.warning("未找到 Google Dialer 输入框")
+                        logger.info(f"拨号盘已加载，找到拨号按钮: {dial_button_id}")
+                        logger.info(f"当前包名: {package_name}")
+                        # 判断是否是Google Dialer：通过resourceId或包名判断
+                        is_google_dialer = (package_name == "com.google.android.dialer" or 
+                                           dial_button_id == "com.google.android.dialer:id/dialpad_voice_call_button")
+                        
+                        if is_google_dialer:
+                            logger.info("✓ 检测到 Google Dialer（通过resourceId或包名），开始获取输入框焦点...")
+                            # 额外等待一小段时间，确保拨号盘UI完全稳定
+                            logger.info("等待0.5秒，确保拨号盘UI完全稳定...")
+                            time.sleep(0.5)
+                            if not self._focus_google_dialer_input(d):
+                                logger.error("❌ 聚焦Google Dialer输入框失败")
+                                return False
+                            logger.info("✓ 焦点获取完成，继续执行")
+                        else:
+                            logger.info(f"非Google Dialer应用 (包名: {package_name}, resourceId: {dial_button_id})，跳过焦点获取步骤")
                         return True
                 except:
                     continue
@@ -950,14 +988,19 @@ class SecretCodeDialog(QDialog):
     def _input_text(self, device, text):
         """输入文本 - 使用input text，对特殊字符进行转义"""
         try:
-            logger.debug(f"输入文本: {text}")
+            logger.info("=" * 50)
+            logger.info(f"准备输入暗码文本: {text}")
+            logger.info("=" * 50)
             
             # 转义特殊字符
             # 空格用 %s，其他字符直接传递
             processed_text = text.replace(' ', '%s')
+            logger.debug(f"转义后的文本: {processed_text}")
             
             # 使用input text输入
             cmd = ["adb", "-s", device, "shell", "input", "text", processed_text]
+            logger.info(f"执行命令: adb -s {device} shell input text {processed_text}")
+            
             result = subprocess.run(
                 cmd,
                 capture_output=True,
@@ -967,12 +1010,24 @@ class SecretCodeDialog(QDialog):
             )
             
             if result.returncode != 0:
-                logger.error(f"输入文本失败: {result.stderr}")
+                logger.error(f"❌ 输入文本命令执行失败，返回码: {result.returncode}")
+                logger.error(f"错误信息: {result.stderr}")
+                logger.error(f"标准输出: {result.stdout}")
                 raise Exception(f"输入文本失败: {result.stderr}")
             
-            logger.debug(f"已输入文本: {text}")
+            logger.info("=" * 50)
+            logger.info(f"✓✓✓ 已执行输入文本命令: {text} ✓✓✓")
+            logger.info(f"命令返回码: {result.returncode}")
+            if result.stdout:
+                logger.info(f"命令输出: {result.stdout}")
+            if result.stderr:
+                logger.debug(f"命令错误输出: {result.stderr}")
+            logger.info("=" * 50)
         except Exception as e:
-            logger.exception(f"输入文本失败: {e}")
+            logger.error("=" * 50)
+            logger.error(f"❌ 输入文本失败: {e}")
+            logger.error("=" * 50)
+            logger.exception("详细错误信息:")
             raise
     
     def add_category(self):
