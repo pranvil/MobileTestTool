@@ -1,10 +1,10 @@
 {
-    "version":  "0.9.5.3",
-    "download_url":  "https://github.com/pranvil/MobileTestTool/releases/download/v0.9.5.3/MobileTestTool_0.9.5.3.zip",
-    "sha256":  "da2acf8169fccb19c392006418165d92bd090c7b0705db013a29531a930b9eeb",
-    "file_name":  "MobileTestTool_0.9.5.3.zip",
-    "file_size":  109827804,
-    "release_notes":  "# MobileTestTool Release Notes\r\n\r\n## Verison information\r\n- Verison：0.9.5.3\r\n- Rlease date：2025/11/5\r\n\r\n## Release Note\r\n- ✅ Double click secret code input issue\r\n- ✅ run python ANR issue \r\n- ✅ fix open file command can\u0027t open folder\r\n- ✅ fix multiple line command issue\r\n- ✅ fix UI reset after edit button\r\n## Known issue\r\n-",
-    "published_at":  "2025-11-06T00:07:19Z",
+    "version":  "0.9.5.4",
+    "download_url":  "https://github.com/pranvil/MobileTestTool/releases/download/v0.9.5.4/MobileTestTool_0.9.5.4.zip",
+    "sha256":  "9c4a86da6397f724de591d66957a7d8431d6d654c82370ded83c2417f84a39a5",
+    "file_name":  "MobileTestTool_0.9.5.4.zip",
+    "file_size":  109837643,
+    "release_notes":  "# MobileTestTool Release Notes\r\n\r\n## Verison information\r\n- Verison：0.9.5.4\r\n- Rlease date：2025/11/7\r\n\r\n## Release Note\r\n- ✅ 修复win10无法正确检测程序已经退出的问题\r\n- ✅ 移除导出log的百分比显示\r\n- ✅ 运行自定义python脚本可以显示输出内容\r\n- ✅ 暗码自动输入提升可靠性\r\n## Known issue\r\n-",
+    "published_at":  "2025-11-06T18:10:00Z",
     "mandatory":  false
 }
