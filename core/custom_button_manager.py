@@ -944,7 +944,87 @@ class CustomButtonManager(QObject):
             # 如果是Python脚本，使用python解释器运行，并传递设备ID
             if program_path.lower().endswith('.py'):
                 import sys
-                cmd = [sys.executable, '-u', program_path]  # -u 参数确保无缓冲输出
+                
+                # 检测是否在PyInstaller打包环境中
+                is_frozen = getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS')
+                
+                if is_frozen:
+                    # 在打包环境中，需要找到系统的Python解释器
+                    # 尝试多种方式查找Python解释器
+                    python_exe = None
+                    
+                    # 方法1: 检查环境变量PYTHON
+                    if 'PYTHON' in os.environ:
+                        python_exe = os.environ['PYTHON']
+                        if os.path.exists(python_exe):
+                            cmd = [python_exe, '-u', program_path]
+                    
+                    # 方法2: 尝试使用 'python' 命令（在PATH中查找）
+                    if not python_exe:
+                        try:
+                            # 使用 'python' 命令查找Python解释器
+                            result = subprocess.run(
+                                ['python', '--version'],
+                                capture_output=True,
+                                text=True,
+                                timeout=2,
+                                creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0
+                            )
+                            if result.returncode == 0:
+                                python_exe = 'python'
+                                cmd = [python_exe, '-u', program_path]
+                        except:
+                            pass
+                    
+                    # 方法3: 尝试使用 'python3' 命令
+                    if not python_exe:
+                        try:
+                            result = subprocess.run(
+                                ['python3', '--version'],
+                                capture_output=True,
+                                text=True,
+                                timeout=2,
+                                creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0
+                            )
+                            if result.returncode == 0:
+                                python_exe = 'python3'
+                                cmd = [python_exe, '-u', program_path]
+                        except:
+                            pass
+                    
+                    # 方法4: 尝试常见的Python安装路径（Windows）
+                    if not python_exe:
+                        common_paths = [
+                            r'C:\Python39\python.exe',
+                            r'C:\Python310\python.exe',
+                            r'C:\Python311\python.exe',
+                            r'C:\Python312\python.exe',
+                            r'C:\Program Files\Python39\python.exe',
+                            r'C:\Program Files\Python310\python.exe',
+                            r'C:\Program Files\Python311\python.exe',
+                            r'C:\Program Files\Python312\python.exe',
+                        ]
+                        # 添加用户目录下的Python路径
+                        username = os.getenv('USERNAME', '')
+                        if username:
+                            common_paths.extend([
+                                rf'C:\Users\{username}\AppData\Local\Programs\Python\Python39\python.exe',
+                                rf'C:\Users\{username}\AppData\Local\Programs\Python\Python310\python.exe',
+                                rf'C:\Users\{username}\AppData\Local\Programs\Python\Python311\python.exe',
+                                rf'C:\Users\{username}\AppData\Local\Programs\Python\Python312\python.exe',
+                            ])
+                        for path in common_paths:
+                            if os.path.exists(path):
+                                python_exe = path
+                                cmd = [python_exe, '-u', program_path]
+                                break
+                    
+                    # 如果仍然找不到Python解释器，返回错误
+                    if not python_exe:
+                        return None, False, self.lang_manager.tr("在打包环境中无法找到Python解释器。请确保系统已安装Python，或者设置PYTHON环境变量指向Python解释器路径。")
+                else:
+                    # 非打包环境，直接使用sys.executable
+                    cmd = [sys.executable, '-u', program_path]  # -u 参数确保无缓冲输出
                 
                 # 传递设备ID作为命令行参数
                 if device_id:
