@@ -7,6 +7,9 @@
 ## Release Note
 - ✅ Double click secret code input issue
 - ✅ run python ANR issue 
+- ✅ fix open file command can't open folder
+- ✅ fix multiple line command issue
+- ✅ fix UI reset after edit button
 ## Known issue
 - 
 

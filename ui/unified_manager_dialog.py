@@ -555,6 +555,19 @@ class UnifiedManagerDialog(QDialog):
     def load_buttons(self):
         """加载按钮到表格"""
         try:
+            # 保存当前的过滤状态（在清空之前）
+            saved_filter_states = {}
+            if hasattr(self, 'column_filters') and self.column_filters:
+                for combo, col_idx, _ in self.column_filters:
+                    saved_filter_states[col_idx] = {
+                        'current_index': combo.currentIndex(),
+                        'current_text': combo.currentText() if combo.currentIndex() >= 0 else ''
+                    }
+            
+            # 保存搜索状态
+            saved_search_keyword = self.search_input.text() if hasattr(self, 'search_input') else ''
+            saved_search_scope = self.search_scope_combo.currentIndex() if hasattr(self, 'search_scope_combo') else 0
+            
             self.button_table.setSortingEnabled(False)
             self.button_table.setRowCount(0)
             buttons = self.custom_button_manager.get_all_buttons()
@@ -591,8 +604,42 @@ class UnifiedManagerDialog(QDialog):
 
             self.button_table.resizeRowsToContents()
             
-            # 填充列过滤器
+            # 填充列过滤器（会清空并重新填充）
             self.populate_column_filters()
+            
+            # 恢复过滤状态（阻止信号，避免触发apply_filters）
+            if saved_filter_states and hasattr(self, 'column_filters') and self.column_filters:
+                for combo, col_idx, _ in self.column_filters:
+                    combo.blockSignals(True)  # 阻止信号
+                    if col_idx in saved_filter_states:
+                        saved_state = saved_filter_states[col_idx]
+                        saved_text = saved_state['current_text']
+                        # 尝试找到相同的文本
+                        found = False
+                        for i in range(combo.count()):
+                            if combo.itemText(i) == saved_text:
+                                combo.setCurrentIndex(i)
+                                found = True
+                                break
+                        if not found:
+                            # 如果找不到，使用保存的索引（如果有效）
+                            saved_index = saved_state['current_index']
+                            if 0 <= saved_index < combo.count():
+                                combo.setCurrentIndex(saved_index)
+                    combo.blockSignals(False)  # 恢复信号
+            
+            # 恢复搜索状态（阻止信号）
+            if hasattr(self, 'search_input'):
+                self.search_input.blockSignals(True)
+                if saved_search_keyword:
+                    self.search_input.setText(saved_search_keyword)
+                self.search_input.blockSignals(False)
+            if hasattr(self, 'search_scope_combo'):
+                self.search_scope_combo.blockSignals(True)
+                if 0 <= saved_search_scope < self.search_scope_combo.count():
+                    self.search_scope_combo.setCurrentIndex(saved_search_scope)
+                self.search_scope_combo.blockSignals(False)
+                    
         except Exception as e:
             logger.exception(f"{self.tr('加载按钮失败:')} {e}")
     
@@ -1291,7 +1338,10 @@ class UnifiedManagerDialog(QDialog):
         if dialog.exec_() == QDialog.Accepted:
             button_data = dialog.get_button_data()
             if self.custom_button_manager.add_button(button_data):
-                self.clear_search()  # 清除搜索并刷新显示
+                # 重新加载数据，但保持当前的搜索和过滤条件
+                self.load_buttons()
+                # 重新应用当前过滤条件
+                self.apply_filters()
                 QMessageBox.information(self, self.tr("成功"), self.tr("按钮添加成功！"))
             else:
                 QMessageBox.warning(self, self.tr("失败"), self.tr("按钮添加失败，请检查日志"))
@@ -1318,7 +1368,10 @@ class UnifiedManagerDialog(QDialog):
             if dialog.exec_() == QDialog.Accepted:
                 updated_data = dialog.get_button_data()
                 if self.custom_button_manager.update_button(button_id, updated_data):
-                    self.clear_search()  # 清除搜索并刷新显示
+                    # 重新加载数据，但保持当前的搜索和过滤条件
+                    self.load_buttons()
+                    # 重新应用当前过滤条件
+                    self.apply_filters()
                     QMessageBox.information(self, self.tr("成功"), self.tr("按钮更新成功！"))
                 else:
                     QMessageBox.warning(self, self.tr("失败"), self.tr("按钮更新失败，请检查日志"))
@@ -1340,7 +1393,10 @@ class UnifiedManagerDialog(QDialog):
         if reply == QMessageBox.Yes:
             button_id = self.button_table.item(current_row, 0).data(Qt.UserRole)
             if self.custom_button_manager.delete_button(button_id):
-                self.clear_search()  # 清除搜索并刷新显示
+                # 重新加载数据，但保持当前的搜索和过滤条件
+                self.load_buttons()
+                # 重新应用当前过滤条件
+                self.apply_filters()
                 QMessageBox.information(self, self.tr("成功"), self.tr("按钮删除成功！"))
             else:
                 QMessageBox.warning(self, self.tr("失败"), self.tr("按钮删除失败，请检查日志"))
@@ -1353,8 +1409,10 @@ class UnifiedManagerDialog(QDialog):
         if not self.custom_button_manager.reorder_buttons(ordered_ids):
             QMessageBox.warning(self, self.tr("失败"), self.tr("按钮排序保存失败，请检查日志"))
         else:
-            # 重新加载以确保显示与数据一致
-            self.clear_search()  # 清除搜索并刷新显示
+            # 重新加载数据，但保持当前的搜索和过滤条件
+            self.load_buttons()
+            # 重新应用当前过滤条件
+            self.apply_filters()
 
     def closeEvent(self, event):
         """关闭事件"""
