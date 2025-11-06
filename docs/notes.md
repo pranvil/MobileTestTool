@@ -6,6 +6,7 @@
 
 ## Release Note
 - ✅ 修复win10无法正确检测程序已经退出的问题
+- ✅ 移除导出log的百分比显示
 ## Known issue
 - 
 

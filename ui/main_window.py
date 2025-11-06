@@ -2045,7 +2045,7 @@ class MainWindow(QMainWindow):
         
     def _on_mtklog_progress(self, progress, status):
         """MTKLOG进度更新"""
-        self.append_log.emit(f"[{progress}%] {status}\n", None)
+        self.append_log.emit(f"- {status}\n", None)
         
     def _on_mtklog_status(self, message):
         """MTKLOG状态消息"""

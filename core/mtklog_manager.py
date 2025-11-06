@@ -66,7 +66,7 @@ def wait_for_logger_stop(device, progress_callback, tr_callback, max_wait_time=1
     
     # 尝试使用UIAutomator2检查（在exe和非exe环境下都尝试）
     if U2_AVAILABLE:
-        progress_callback(30, tr_callback("正在确认logger已完全停止..."))
+        progress_callback(0, tr_callback("正在确认logger已完全停止..."))
         start_time = time.time()
         check_count = 0
         
@@ -254,12 +254,12 @@ class MTKLogWorker(QThread):
         """开启MTKLOG"""
         try:
             # 1. 确保屏幕亮屏且解锁
-            self.progress.emit(5, self.tr("检查屏幕状态..."))
+            self.progress.emit(0, self.tr("检查屏幕状态..."))
             if not self.device_manager.ensure_screen_unlocked(self.device):
                 raise Exception(self.lang_manager.tr("无法确保屏幕状态"))
             
             # 2. 启动logger应用
-            self.progress.emit(10, self.tr("启动logger应用..."))
+            self.progress.emit(0, self.tr("启动logger应用..."))
             start_app_cmd = ["adb", "-s", self.device, "shell", "am", "start", "-n", "com.debug.loggerui/.MainActivity"]
             result = subprocess.run(start_app_cmd, capture_output=True, text=True, timeout=30,
                                   creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0)
@@ -268,12 +268,12 @@ class MTKLogWorker(QThread):
             time.sleep(2)
             
             # 3. 检查logger状态
-            self.progress.emit(15, self.tr("检查logger状态..."))
+            self.progress.emit(0, self.tr("检查logger状态..."))
             logger_is_running = check_logger_status(self.device, self.lang_manager)
             
             # 4. 如果logger正在运行，先停止
             if logger_is_running:
-                self.progress.emit(20, self.tr("停止logger..."))
+                self.progress.emit(0, self.tr("停止logger..."))
                 stop_cmd = ["adb", "-s", self.device, "shell", "am", "broadcast", "-a", "com.debug.loggerui.ADB_CMD", 
                            "-e", "cmd_name", "stop", "--ei", "cmd_target", "-1", "-n", "com.debug.loggerui/.framework.LogReceiver"]
                 
@@ -283,11 +283,11 @@ class MTKLogWorker(QThread):
                     raise Exception(f"{self.lang_manager.tr('停止logger失败:')} {result.stderr.strip()}")
                 
                 # 5. 等待2秒后检查按钮状态
-                self.progress.emit(25, self.tr("等待logger停止..."))
+                self.progress.emit(0, self.tr("等待logger停止..."))
                 time.sleep(2)
                 
                 # 6. 检查按钮checked是否为false
-                self.progress.emit(30, self.tr("正在确认logger已完全停止..."))
+                self.progress.emit(0, self.tr("正在确认logger已完全停止..."))
                 max_wait_time = 120
                 start_time = time.time()
                 while time.time() - start_time < max_wait_time:
@@ -304,7 +304,7 @@ class MTKLogWorker(QThread):
                     time.sleep(1)
             
             # 7. 清除旧日志
-            self.progress.emit(40, self.tr("清除旧日志..."))
+            self.progress.emit(0, self.tr("清除旧日志..."))
             clear_cmd = ["adb", "-s", self.device, "shell", "am", "broadcast", "-a", "com.debug.loggerui.ADB_CMD", 
                         "-e", "cmd_name", "clear_logs_all", "--ei", "cmd_target", "0", "-n", "com.debug.loggerui/.framework.LogReceiver"]
             
@@ -317,7 +317,7 @@ class MTKLogWorker(QThread):
             time.sleep(3)
             
             # 8. 设置MD log缓存大小20GB
-            self.progress.emit(50, self.tr("设置缓存大小..."))
+            self.progress.emit(0, self.tr("设置缓存大小..."))
             size_cmd = ["adb", "-s", self.device, "shell", "am", "broadcast", "-a", "com.debug.loggerui.ADB_CMD", 
                        "-e", "cmd_name", "set_log_size_20000", "--ei", "cmd_target", "2", "-n", "com.debug.loggerui/.framework.LogReceiver"]
             
@@ -327,7 +327,7 @@ class MTKLogWorker(QThread):
                 raise Exception(f"{self.lang_manager.tr('设置缓存大小失败:')} {result.stderr.strip()}")
             
             # 9. 开启MTK LOGGER
-            self.progress.emit(60, self.tr("开启logger..."))
+            self.progress.emit(0, self.tr("开启logger..."))
             start_cmd = ["adb", "-s", self.device, "shell", "am", "broadcast", "-a", "com.debug.loggerui.ADB_CMD", 
                         "-e", "cmd_name", "start", "--ei", "cmd_target", "-1", "-n", "com.debug.loggerui/.framework.LogReceiver"]
             
@@ -337,7 +337,7 @@ class MTKLogWorker(QThread):
                 raise Exception(f"{self.lang_manager.tr('开启logger失败:')} {result.stderr.strip()}")
             
             # 10. 等待"Starting logs"对话框消失
-            self.progress.emit(70, self.tr("等待logger启动..."))
+            self.progress.emit(0, self.tr("等待logger启动..."))
             max_wait_time = 120
             start_time = time.time()
             dialog_appeared = False
@@ -360,7 +360,7 @@ class MTKLogWorker(QThread):
                 time.sleep(1)
             
             # 11. 检查按钮checked是否为true
-            self.progress.emit(90, self.tr("正在确认logger已完全启动..."))
+            self.progress.emit(0, self.tr("正在确认logger已完全启动..."))
             start_time = time.time()
             while time.time() - start_time < max_wait_time:
                 if U2_AVAILABLE:
@@ -375,7 +375,7 @@ class MTKLogWorker(QThread):
                         break
                 time.sleep(1)
             
-            self.progress.emit(100, self.tr("完成!"))
+            self.progress.emit(0, self.tr("完成!"))
             self.finished.emit(True, self.tr("MTKLOG启动成功"))
             
         except Exception as e:
@@ -387,7 +387,7 @@ class MTKLogWorker(QThread):
             print(f"[DEBUG] {self.tr('开始停止并导出MTKLOG操作，设备:')} {self.device}{self.tr(', 日志名称:')} {log_name}{self.tr(', 导出媒体:')} {export_media}")
             
             # 1. 检查并停止screenrecord进程（通过video_manager）
-            self.progress.emit(2, self.tr("检查并停止视频录制进程..."))
+            self.progress.emit(0, self.tr("检查并停止视频录制进程..."))
             try:
                 # 首先尝试通过video_manager停止录制
                 # MTKLogWorker的parent是PyQtMTKLogManager，PyQtMTKLogManager的parent是主窗口
@@ -489,13 +489,13 @@ class MTKLogWorker(QThread):
                 # 继续执行，不因检查失败而中断
             
             # 2. 确保屏幕亮屏且解锁
-            self.progress.emit(5, self.tr("检查屏幕状态..."))
+            self.progress.emit(0, self.tr("检查屏幕状态..."))
             if not self.device_manager.ensure_screen_unlocked(self.device):
                 raise Exception(self.lang_manager.tr("无法确保屏幕状态"))
             print(f"[DEBUG] {self.tr('屏幕状态检查完成')}")
             
             # 2. 启动logger应用
-            self.progress.emit(10, self.tr("启动logger应用..."))
+            self.progress.emit(0, self.tr("启动logger应用..."))
             start_app_cmd = ["adb", "-s", self.device, "shell", "am", "start", "-n", "com.debug.loggerui/.MainActivity"]
             print(f"[DEBUG] {self.tr('启动logger应用命令:')} {' '.join(start_app_cmd)}")
             result = subprocess.run(start_app_cmd, capture_output=True, text=True, timeout=30,
@@ -506,13 +506,13 @@ class MTKLogWorker(QThread):
             time.sleep(2)
             
             # 3. 检查logger状态
-            self.progress.emit(15, self.tr("检查logger状态..."))
+            self.progress.emit(0, self.tr("检查logger状态..."))
             logger_is_running = check_logger_status(self.device, self.lang_manager)
             
             # 4. 如果logger正在运行，执行停止命令
             if logger_is_running:
                 print(f"[DEBUG] {self.tr('Logger正在运行，开始执行停止命令')}")
-                self.progress.emit(20, self.tr("停止logger..."))
+                self.progress.emit(0, self.tr("停止logger..."))
                 stop_cmd = ["adb", "-s", self.device, "shell", "am", "broadcast", "-a", "com.debug.loggerui.ADB_CMD", 
                            "-e", "cmd_name", "stop", "--ei", "cmd_target", "-1", "-n", "com.debug.loggerui/.framework.LogReceiver"]
                 
@@ -527,7 +527,7 @@ class MTKLogWorker(QThread):
                     raise Exception(f"{self.lang_manager.tr('停止logger失败:')} {result.stderr.strip()}")
                 
                 # 5. 等待2秒后检查按钮状态
-                self.progress.emit(25, self.tr("等待logger停止..."))
+                self.progress.emit(0, self.tr("等待logger停止..."))
                 time.sleep(2)
                 
                 # 6. 等待logger停止（使用统一函数）
@@ -536,7 +536,7 @@ class MTKLogWorker(QThread):
                 print(f"[DEBUG] {self.tr('Logger未在运行，跳过停止操作')}")
             
             # 8. 创建日志目录
-            self.progress.emit(40, self.tr("创建日志目录..."))
+            self.progress.emit(0, self.tr("创建日志目录..."))
             curredate = datetime.datetime.now().strftime("%Y%m%d")
             if self.storage_path_func:
                 log_dir = self.storage_path_func()
@@ -561,7 +561,7 @@ class MTKLogWorker(QThread):
             # 8.1 如果有视频录制，将视频文件移动到log文件夹
             if hasattr(self, '_video_manager') and self._video_manager:
                 try:
-                    self.progress.emit(42, self.tr("移动视频文件到log文件夹..."))
+                    self.progress.emit(0, self.tr("移动视频文件到log文件夹..."))
                     # 获取默认的视频目录
                     video_storage_path = self._video_manager.get_storage_path()
                     default_video_dir = os.path.join(video_storage_path, "video")
@@ -646,7 +646,7 @@ class MTKLogWorker(QThread):
             
             for i, (source_path, folder_name) in enumerate(pull_commands):
                 try:
-                    self.progress.emit(45 + (i * 5), f"{self.lang_manager.tr('检查')} {folder_name} ({i+1}/{total_commands})...")
+                    self.progress.emit(0, f"{self.lang_manager.tr('检查')} {folder_name} ({i+1}/{total_commands})...")
                     print(f"[DEBUG] {self.tr('检查文件夹:')} {source_path} -> {folder_name}")
                     
                     # 先检查文件夹是否存在
@@ -667,7 +667,7 @@ class MTKLogWorker(QThread):
                         continue
                     
                     # 文件夹存在，执行pull
-                    self.progress.emit(45 + (i * 5), f"{self.lang_manager.tr('导出')} {folder_name} ({i+1}/{total_commands})...")
+                    self.progress.emit(0, f"{self.lang_manager.tr('导出')} {folder_name} ({i+1}/{total_commands})...")
                     target_path = os.path.join(log_folder, folder_name)
                     cmd = ["adb", "-s", self.device, "pull", source_path, target_path]
                     print(f"[DEBUG] {self.tr('执行pull命令:')} {' '.join(cmd)}")
@@ -688,7 +688,7 @@ class MTKLogWorker(QThread):
                     continue
             
             print(f"[DEBUG] {self.tr('MTKLOG停止并导出操作完成，导出路径:')} {log_folder}")
-            self.progress.emit(100, self.tr("完成!"))
+            self.progress.emit(0, self.tr("完成!"))
             self.finished.emit(True, log_folder)
             
         except Exception as e:
@@ -701,13 +701,13 @@ class MTKLogWorker(QThread):
             print(f"[DEBUG] {self.tr('开始停止MTKLOG操作，设备:')} {self.device}")
             
             # 1. 确保屏幕亮屏且解锁
-            self.progress.emit(5, self.tr("检查屏幕状态..."))
+            self.progress.emit(0, self.tr("检查屏幕状态..."))
             if not self.device_manager.ensure_screen_unlocked(self.device):
                 raise Exception(self.lang_manager.tr("无法确保屏幕状态"))
             print(f"[DEBUG] {self.tr('屏幕状态检查完成')}")
             
             # 2. 启动logger应用
-            self.progress.emit(10, self.tr("启动logger应用..."))
+            self.progress.emit(0, self.tr("启动logger应用..."))
             start_app_cmd = ["adb", "-s", self.device, "shell", "am", "start", "-n", "com.debug.loggerui/.MainActivity"]
             print(f"[DEBUG] {self.tr('启动logger应用命令:')} {' '.join(start_app_cmd)}")
             result = subprocess.run(start_app_cmd, capture_output=True, text=True, timeout=30,
@@ -718,13 +718,13 @@ class MTKLogWorker(QThread):
             time.sleep(2)
             
             # 3. 检查logger状态
-            self.progress.emit(15, self.tr("检查logger状态..."))
+            self.progress.emit(0, self.tr("检查logger状态..."))
             logger_is_running = check_logger_status(self.device, self.lang_manager)
             
             # 4. 如果logger正在运行，执行停止命令
             if logger_is_running:
                 print(f"[DEBUG] {self.tr('Logger正在运行，开始执行停止命令')}")
-                self.progress.emit(20, self.tr("停止logger..."))
+                self.progress.emit(0, self.tr("停止logger..."))
                 stop_cmd = ["adb", "-s", self.device, "shell", "am", "broadcast", "-a", "com.debug.loggerui.ADB_CMD", 
                            "-e", "cmd_name", "stop", "--ei", "cmd_target", "-1", "-n", "com.debug.loggerui/.framework.LogReceiver"]
                 
@@ -739,17 +739,17 @@ class MTKLogWorker(QThread):
                     raise Exception(f"{self.lang_manager.tr('停止logger失败:')} {result.stderr.strip()}")
                 
                 # 5. 等待2秒后检查按钮状态
-                self.progress.emit(25, self.tr("等待logger停止..."))
+                self.progress.emit(0, self.tr("等待logger停止..."))
                 time.sleep(2)
                 
                 # 6. 等待logger停止（使用统一函数）
                 wait_for_logger_stop(self.device, self.progress.emit, self.tr)
             else:
                 print(f"[DEBUG] {self.tr('Logger未在运行，跳过停止操作')}")
-                self.progress.emit(50, self.tr("Logger已处于停止状态..."))
+                self.progress.emit(0, self.tr("Logger已处于停止状态..."))
             
             print(f"[DEBUG] {self.tr('MTKLOG停止操作完成')}")
-            self.progress.emit(100, self.tr("完成!"))
+            self.progress.emit(0, self.tr("完成!"))
             self.finished.emit(True, self.tr("MTKLOG已停止"))
             
         except Exception as e:
@@ -759,7 +759,7 @@ class MTKLogWorker(QThread):
     def _delete_mtklog(self):
         """删除MTKLOG"""
         try:
-            self.progress.emit(50, self.tr("执行删除命令..."))
+            self.progress.emit(0, self.tr("执行删除命令..."))
             cmd = ["adb", "-s", self.device, "shell", "am", "broadcast", "-a", "com.debug.loggerui.ADB_CMD", 
                    "-e", "cmd_name", "clear_logs_all", "--ei", "cmd_target", "0", "-n", "com.debug.loggerui/.framework.LogReceiver"]
             
@@ -770,7 +770,7 @@ class MTKLogWorker(QThread):
                 error_msg = result.stderr.strip() if result.stderr else self.lang_manager.tr("未知错误")
                 raise Exception(f"{self.lang_manager.tr('删除MTKLOG失败:')} {error_msg}")
             
-            self.progress.emit(100, self.tr("删除完成!"))
+            self.progress.emit(0, self.tr("删除完成!"))
             self.finished.emit(True, self.tr("MTKLOG已删除"))
         except Exception as e:
             self.finished.emit(False, f"{self.lang_manager.tr('删除MTKLOG失败:')} {str(e)}")
