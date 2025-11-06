@@ -553,7 +553,24 @@ class CustomButtonManager(QObject):
             elif button_type == 'file':
                 return self._open_file(command)
             elif button_type == 'program':
-                return self._run_program(command, device_id)
+                # 注意：program类型通常在ButtonCommandWorker中直接处理，不会调用这里
+                # 这里保留是为了向后兼容和错误处理
+                # 如果进程被启动，需要立即清理，避免成为孤儿进程
+                process, success, error_msg = self._run_program(command, device_id)
+                if success and process:
+                    # 进程不应在这里启动，立即清理
+                    try:
+                        if process.poll() is None:  # 进程仍在运行
+                            process.terminate()
+                            process.wait(timeout=2)
+                    except:
+                        try:
+                            process.kill()
+                        except:
+                            pass
+                    return False, self.lang_manager.tr('program类型应该在ButtonCommandWorker中处理，不应直接调用execute_button_command')
+                else:
+                    return False, error_msg or self.lang_manager.tr('启动程序失败')
             elif button_type == 'system':
                 return self._execute_system_command(command)
             elif button_type == 'url':
@@ -906,10 +923,17 @@ class CustomButtonManager(QObject):
             return False, f"{self.lang_manager.tr('打开文件失败:')} {str(e)}"
     
     def _run_program(self, program_path, device_id=None):
-        """运行程序"""
+        """运行程序，返回进程对象和错误信息
+        
+        Returns:
+            tuple: (process, success, error_message)
+                - process: subprocess.Popen对象，如果启动失败则为None
+                - success: bool，是否成功启动
+                - error_message: str，错误信息，成功时为None
+        """
         try:
             if not os.path.exists(program_path):
-                return False, f"{self.lang_manager.tr('程序不存在:')} {program_path}"
+                return None, False, f"{self.lang_manager.tr('程序不存在:')} {program_path}"
             
             # 获取程序所在目录作为工作目录（确保能正确导入同目录下的模块）
             working_dir = os.path.dirname(os.path.abspath(program_path))
@@ -920,7 +944,7 @@ class CustomButtonManager(QObject):
             # 如果是Python脚本，使用python解释器运行，并传递设备ID
             if program_path.lower().endswith('.py'):
                 import sys
-                cmd = [sys.executable, program_path]
+                cmd = [sys.executable, '-u', program_path]  # -u 参数确保无缓冲输出
                 
                 # 传递设备ID作为命令行参数
                 if device_id:
@@ -932,25 +956,15 @@ class CustomButtonManager(QObject):
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=True,
+                bufsize=1,  # 行缓冲，确保输出实时
                 cwd=working_dir,  # 设置工作目录
                 creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0
             )
             
-            # 读取输出（非阻塞）
-            try:
-                stdout, stderr = process.communicate(timeout=1)
-                if stdout:
-                    logger.info(f"程序输出: {stdout}")
-                if stderr:
-                    logger.warning(f"程序错误: {stderr}")
-            except subprocess.TimeoutExpired:
-                # 程序仍在运行，这是正常的
-                pass
-            
-            return True, f"{self.lang_manager.tr('已启动程序:')} {program_path}"
+            return process, True, None  # 返回 (process, success, error_message)
                 
         except Exception as e:
-            return False, f"{self.lang_manager.tr('运行程序失败:')} {str(e)}"
+            return None, False, f"{self.lang_manager.tr('运行程序失败:')} {str(e)}"
     
     def _execute_system_command(self, command):
         """执行系统命令（支持多行命令）"""

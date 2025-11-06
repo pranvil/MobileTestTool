@@ -273,6 +273,8 @@ class ButtonCommandWorker(QThread):
         self._dialog_response_handler = None  # 存储对话框响应处理器
         self._current_dialog_response = None  # 当前对话框响应值
         self._dialog_response_ready = False  # 响应是否就绪
+        self._process = None  # 存储进程对象（用于program类型）
+        self._stop_event = None  # 停止事件（用于program类型）
     
     def _tr(self, text):
         return self.lang_manager.tr(text) if self.lang_manager else text
@@ -327,9 +329,10 @@ class ButtonCommandWorker(QThread):
         """在线程中执行命令"""
         try:
             button_name = self.button_data.get('name', self._tr('自定义按钮'))
+            button_type = self.button_data.get('type', 'adb')
             
             # 如果是Python脚本，需要创建对话框请求处理器
-            if self.button_data.get('type') == 'python':
+            if button_type == 'python':
                 # 创建对话框请求处理器
                 dialog_handler = self._create_dialog_request_handler()
                 
@@ -343,6 +346,11 @@ class ButtonCommandWorker(QThread):
                     )
                 else:
                     success, output = False, self.lang_manager.tr("Python脚本内容为空")
+            
+            # 如果是运行程序类型，需要实时读取输出
+            elif button_type == 'program':
+                success, output = self._run_program_with_output()
+            
             else:
                 # 其他类型的命令正常执行
                 success, output = self.button_manager.execute_button_command(
@@ -357,6 +365,206 @@ class ButtonCommandWorker(QThread):
             error_msg = str(e)
             logger.exception(f"{self._tr('执行自定义按钮命令失败:')} {e}")
             self.finished.emit(False, error_msg, self.button_data.get('name', self._tr('自定义按钮')))
+        finally:
+            # 确保进程被清理
+            self._cleanup_process()
+    
+    def _run_program_with_output(self):
+        """运行程序并实时读取输出"""
+        import threading
+        import queue
+        import subprocess
+        
+        process = None
+        stdout_thread = None
+        stderr_thread = None
+        output_queue = None
+        stop_event = None
+        
+        try:
+            program_path = self.button_data.get('command', '')
+            if not program_path:
+                return False, self._tr('程序路径不能为空')
+            
+            # 启动进程
+            process, success, error_msg = self.button_manager._run_program(
+                program_path,
+                self.device_id
+            )
+            
+            if not success:
+                return False, error_msg or self._tr('启动进程失败')
+            
+            if process is None:
+                return False, self._tr('启动进程失败')
+            
+            # 保存进程引用，用于清理
+            self._process = process
+            
+            # 创建停止事件和输出队列
+            stop_event = threading.Event()
+            self._stop_event = stop_event
+            output_queue = queue.Queue()
+            
+            # 读取线程函数
+            def read_stdout():
+                """读取标准输出"""
+                try:
+                    for line in iter(process.stdout.readline, ''):
+                        if stop_event.is_set():
+                            break
+                        if line:
+                            output_queue.put(('stdout', line))
+                except Exception as e:
+                    if not stop_event.is_set():
+                        output_queue.put(('error', f"{self._tr('读取输出错误:')} {str(e)}"))
+                finally:
+                    output_queue.put(('stdout_done', None))
+            
+            def read_stderr():
+                """读取错误输出"""
+                try:
+                    for line in iter(process.stderr.readline, ''):
+                        if stop_event.is_set():
+                            break
+                        if line:
+                            output_queue.put(('stderr', line))
+                except Exception as e:
+                    if not stop_event.is_set():
+                        output_queue.put(('error', f"{self._tr('读取错误输出错误:')} {str(e)}"))
+                finally:
+                    output_queue.put(('stderr_done', None))
+            
+            # 启动读取线程（daemon线程，主程序退出时自动清理）
+            stdout_thread = threading.Thread(target=read_stdout, daemon=True)
+            stderr_thread = threading.Thread(target=read_stderr, daemon=True)
+            stdout_thread.start()
+            stderr_thread.start()
+            
+            # 实时处理输出
+            stdout_done = False
+            stderr_done = False
+            
+            while not (stdout_done and stderr_done):
+                try:
+                    msg_type, line = output_queue.get(timeout=0.1)
+                    
+                    if msg_type == 'stdout':
+                        # 发送标准输出到日志窗口
+                        self.log_message.emit(line, None)
+                    elif msg_type == 'stderr':
+                        # 发送错误输出到日志窗口（红色显示）
+                        self.log_message.emit(line, "#FF0000")
+                    elif msg_type == 'stdout_done':
+                        stdout_done = True
+                    elif msg_type == 'stderr_done':
+                        stderr_done = True
+                    elif msg_type == 'error':
+                        self.log_message.emit(f"⚠️ {line}\n", "#FFA500")
+                        
+                except queue.Empty:
+                    # 检查进程是否已结束
+                    if process.poll() is not None:
+                        # 进程已结束，等待读取线程完成
+                        if not stdout_done:
+                            stdout_thread.join(timeout=1)
+                        if not stderr_done:
+                            stderr_thread.join(timeout=1)
+                        break
+            
+            # 等待进程结束
+            return_code = process.wait(timeout=300)  # 最多等待5分钟
+            
+            # 处理剩余的队列消息
+            while not output_queue.empty():
+                try:
+                    msg_type, line = output_queue.get_nowait()
+                    if msg_type == 'stdout':
+                        self.log_message.emit(line, None)
+                    elif msg_type == 'stderr':
+                        self.log_message.emit(line, "#FF0000")
+                    elif msg_type == 'error':
+                        self.log_message.emit(f"⚠️ {line}\n", "#FFA500")
+                except queue.Empty:
+                    break
+            
+            # 根据返回码判断成功或失败
+            if return_code == 0:
+                return True, f"{self._tr('程序执行完成，退出码:')} {return_code}"
+            else:
+                return False, f"{self._tr('程序执行失败，退出码:')} {return_code}"
+                
+        except subprocess.TimeoutExpired:
+            # 进程超时，强制终止
+            if process:
+                try:
+                    process.terminate()
+                    process.wait(timeout=2)
+                except:
+                    try:
+                        process.kill()
+                    except:
+                        pass
+            return False, self._tr('程序执行超时，已强制终止')
+            
+        except Exception as e:
+            error_msg = f"{self._tr('运行程序异常:')} {str(e)}"
+            logger.exception(error_msg)
+            # 确保进程被终止
+            if process:
+                try:
+                    process.terminate()
+                    process.wait(timeout=2)
+                except:
+                    try:
+                        process.kill()
+                    except:
+                        pass
+            return False, error_msg
+        
+        finally:
+            # 设置停止标志
+            if stop_event:
+                stop_event.set()
+            
+            # 等待读取线程结束（最多等待1秒）
+            if stdout_thread:
+                stdout_thread.join(timeout=1)
+            if stderr_thread:
+                stderr_thread.join(timeout=1)
+    
+    def _cleanup_process(self):
+        """清理进程，确保不产生孤儿进程"""
+        if self._process:
+            try:
+                # 检查进程是否还在运行
+                if self._process.poll() is None:
+                    # 进程仍在运行，尝试终止
+                    try:
+                        self._process.terminate()
+                        self._process.wait(timeout=2)
+                    except subprocess.TimeoutExpired:
+                        # 如果terminate失败，强制kill
+                        try:
+                            self._process.kill()
+                            self._process.wait(timeout=1)
+                        except:
+                            pass
+                    except:
+                        # terminate失败，尝试kill
+                        try:
+                            self._process.kill()
+                            self._process.wait(timeout=1)
+                        except:
+                            pass
+            except Exception as e:
+                logger.exception(f"{self._tr('清理进程失败:')} {e}")
+            finally:
+                self._process = None
+                
+        if self._stop_event:
+            self._stop_event.set()
+            self._stop_event = None
 
 
 class RootRemountWorker(QThread):
@@ -3154,6 +3362,10 @@ class MainWindow(QMainWindow):
             
             # 连接信号
             worker.finished.connect(lambda success, output, btn_name, w=worker: self._on_button_command_finished(success, output, btn_name, w))
+            
+            # 连接日志消息信号（用于实时显示程序输出）
+            worker.log_message.connect(lambda msg, color: self.append_log.emit(msg, color))
+            
             # 连接对话框请求信号（用于脚本中的UI调用）
             worker.dialog_request.connect(
                 lambda dialog_type, title, message, buttons, default_button, w=worker: 
@@ -3709,6 +3921,21 @@ class MainWindow(QMainWindow):
             # 停止录制
             if hasattr(self, 'video_manager') and self.video_manager.is_recording:
                 self.video_manager.stop_recording()
+            
+            # 清理所有自定义按钮工作线程中的进程（防止孤儿进程）
+            if hasattr(self, '_button_command_workers'):
+                for worker in self._button_command_workers[:]:  # 创建副本，避免修改时出错
+                    try:
+                        if hasattr(worker, '_cleanup_process'):
+                            worker._cleanup_process()
+                        # 等待线程结束（最多等待2秒）
+                        if worker.isRunning():
+                            worker.wait(2000)
+                            if worker.isRunning():
+                                worker.terminate()
+                                worker.wait(1000)
+                    except Exception as e:
+                        logger.exception(f"{self.lang_manager.tr('清理工作线程失败:')} {e}")
             
             # 接受关闭事件
             event.accept()
