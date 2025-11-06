@@ -554,7 +554,7 @@ class SecretCodeDialog(QDialog):
         thread.start()
         
         # 显示一个简单的提示，用户可以看到正在执行
-        # QMessageBox.information(self, self.tr("提示"), self.tr(f"正在执行暗码输入，请稍候...\n暗码: {code}"))
+        QMessageBox.information(self, self.tr("提示"), self.tr(f"暗码已发送\n {code}"))
     
     def _execute_secret_code(self, device, code):
         """执行暗码输入的完整流程"""
@@ -822,7 +822,7 @@ class SecretCodeDialog(QDialog):
             logger.exception(f"清空输入失败: {e}")
     
     def _focus_google_dialer_input(self, d):
-        """聚焦Google Dialer输入框的辅助方法 - 通过点击数字0然后删除获取焦点
+        """聚焦Google Dialer输入框的辅助方法 - 通过点击数字2按钮上方位置获取焦点
         
         Args:
             d: uiautomator2设备对象
@@ -831,31 +831,44 @@ class SecretCodeDialog(QDialog):
             bool: 成功返回True，失败返回False
         """
         try:
-            logger.debug("开始聚焦 Google Dialer 输入框（通过点击0然后删除）...")
+            logger.debug("开始聚焦 Google Dialer 输入框（通过点击数字2按钮上方位置）...")
             
-            # 步骤1: 等待并点击数字0按钮
-            zero_button = d(resourceId="com.google.android.dialer:id/zero")
-            zero_button.wait(timeout=3.0)  # 等待数字0按钮出现
+            # 步骤1: 等待并找到数字2按钮
+            two_button = d(resourceId="com.google.android.dialer:id/two")
+            two_button.wait(timeout=3.0)  # 等待数字2按钮出现
             
-            if not zero_button.exists:
-                logger.error("未找到数字0按钮，焦点获取失败")
+            if not two_button.exists:
+                logger.error("未找到数字2按钮，焦点获取失败")
                 return False
             
-            zero_button.click()
-            logger.debug("已点击数字0按钮")
-            time.sleep(0.3)  # 短暂等待，确保点击生效
-            
-            # 步骤2: 点击删除按钮
-            delete_button = d(resourceId="com.google.android.dialer:id/deleteButton")
-            delete_button.wait(timeout=2.0)  # 等待删除按钮出现
-            
-            if not delete_button.exists:
-                logger.error("未找到删除按钮，焦点获取失败")
+            # 步骤2: 获取数字2按钮的坐标信息
+            button_info = two_button.info
+            if not button_info:
+                logger.error("无法获取数字2按钮的坐标信息")
                 return False
             
-            delete_button.click()
-            logger.debug("已点击删除按钮")
-            time.sleep(0.5)  # 等待删除完成
+            # 获取按钮的中心坐标和边界
+            bounds = button_info.get('bounds', {})
+            if not bounds:
+                logger.error("无法获取数字2按钮的边界信息")
+                return False
+            
+            # 计算按钮的中心坐标
+            center_x = (bounds['left'] + bounds['right']) // 2
+            center_y = (bounds['top'] + bounds['bottom']) // 2
+            button_height = bounds['bottom'] - bounds['top']
+            
+            logger.debug(f"数字2按钮位置: center=({center_x}, {center_y}), height={button_height}")
+            
+            # 步骤3: 计算向上一点的位置（向上移动按钮高度的1.5倍）
+            click_y = center_y - int(button_height * 1.5)
+            click_x = center_x  # x坐标保持不变
+            
+            logger.debug(f"点击输入框位置: ({click_x}, {click_y})")
+            
+            # 步骤4: 点击输入框位置
+            d.click(click_x, click_y)
+            logger.debug("已点击输入框位置")
             
             # 额外等待，确保焦点完全稳定
             time.sleep(0.5)
@@ -878,7 +891,10 @@ class SecretCodeDialog(QDialog):
             
             if package_name == "com.google.android.dialer":
                 dial_button_ids = ["com.google.android.dialer:id/dialpad_voice_call_button"]
-                dialpad_button_ids = ["com.google.android.dialer:id/tab_dialpad"]
+                dialpad_button_ids = [
+                    "com.google.android.dialer:id/dialpad_fab",
+                    "com.google.android.dialer:id/tab_dialpad"
+                ]
             elif package_name == "com.android.dialer":
                 dial_button_ids = ["com.android.dialer:id/dialpad_floating_action_button"]
                 dialpad_button_ids = ["com.android.dialer:id/fab"]
@@ -893,6 +909,7 @@ class SecretCodeDialog(QDialog):
                     "com.samsung.android.dialer:id/dialButton",
                 ]
                 dialpad_button_ids = [
+                    "com.google.android.dialer:id/dialpad_fab",
                     "com.google.android.dialer:id/tab_dialpad",
                     "com.android.dialer:id/fab",
                     "com.samsung.android.dialer:id/tab_text_container",

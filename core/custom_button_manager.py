@@ -911,6 +911,9 @@ class CustomButtonManager(QObject):
             if not os.path.exists(program_path):
                 return False, f"{self.lang_manager.tr('程序不存在:')} {program_path}"
             
+            # 获取程序所在目录作为工作目录（确保能正确导入同目录下的模块）
+            working_dir = os.path.dirname(os.path.abspath(program_path))
+            
             # 构建命令
             cmd = [program_path]
             
@@ -929,6 +932,7 @@ class CustomButtonManager(QObject):
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=True,
+                cwd=working_dir,  # 设置工作目录
                 creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0
             )
             
