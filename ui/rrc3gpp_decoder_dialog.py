@@ -9,6 +9,7 @@ from PyQt5.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel,
                               QDialogButtonBox, QMessageBox, QScrollArea, 
                               QWidget, QFrame)
 from PyQt5.QtCore import Qt
+from PyQt5.QtGui import QFontMetrics
 
 
 # 协议列表（根据技术类型）
@@ -106,6 +107,29 @@ class RRC3GPPMessageWidget(QFrame):
         protocol_layout.addWidget(QLabel(self.tr("协议:")))
         self.protocol_combo = QComboBox()
         self.protocol_combo.addItems(PROTOCOLS['SMS'])  # 默认SMS
+        # 设置下拉菜单自动调整宽度
+        self.protocol_combo.setSizeAdjustPolicy(QComboBox.AdjustToContentsOnFirstShow)
+        # 重写 showPopup 方法以动态调整下拉列表宽度
+        original_show_popup = self.protocol_combo.showPopup
+        def adjusted_show_popup():
+            original_show_popup()
+            # 计算所有选项的最大宽度
+            font_metrics = QFontMetrics(self.protocol_combo.font())
+            max_width = 0
+            for i in range(self.protocol_combo.count()):
+                text = self.protocol_combo.itemText(i)
+                # 使用 horizontalAdvance 方法（PyQt5 推荐），如果不存在则使用 width
+                if hasattr(font_metrics, 'horizontalAdvance'):
+                    width = font_metrics.horizontalAdvance(text)
+                else:
+                    width = font_metrics.width(text)
+                max_width = max(max_width, width)
+            # 设置下拉列表的最小宽度（加上一些边距和滚动条宽度）
+            view = self.protocol_combo.view()
+            if view:
+                min_width = max_width + 50  # 50像素用于边距和滚动条
+                view.setMinimumWidth(min_width)
+        self.protocol_combo.showPopup = adjusted_show_popup
         protocol_layout.addWidget(self.protocol_combo)
         protocol_layout.addStretch()
         layout.addLayout(protocol_layout)

@@ -41,6 +41,11 @@ a = Analysis(
         'ui.widgets.shadow_utils',
         'ui.widgets.animations',
         'ui.widgets.log_viewer',
+        # UI 对话框模块（确保PyInstaller包含它们）
+        'ui.secret_code_dialog',
+        'ui.qc_nv_dialog',
+        'ui.cell_lock_dialog',
+        'ui.at_tool_dialog',
         # UIAutomator2 相关模块（由hook文件自动处理）
         'uiautomator2',
         # 核心模块

@@ -12,8 +12,26 @@ from PyQt5.QtWidgets import QApplication
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QFont, QIcon
 
-from ui.main_window import MainWindow
 from core.debug_logger import logger
+
+# 在打包环境中，预导入对话框模块以确保PyInstaller包含它们
+# 这样可以避免首次导入时的模块找不到问题
+# 必须在PyQt5导入之后、MainWindow导入之前进行预导入
+if hasattr(sys, 'frozen') and hasattr(sys, '_MEIPASS'):
+    try:
+        # 预导入所有对话框模块，确保它们在启动时就被PyInstaller识别
+        # 这些模块依赖 core.debug_logger，而 core.debug_logger 已经在 main.py 中导入
+        import ui.secret_code_dialog
+        import ui.qc_nv_dialog
+        import ui.cell_lock_dialog
+        import ui.at_tool_dialog
+        logger.debug("对话框模块预导入成功")
+    except ImportError as e:
+        # 如果预导入失败，记录警告但不影响程序启动
+        # 因为后续可能通过其他路径成功导入
+        logger.warning(f"对话框模块预导入失败（可能不影响使用）: {e}")
+
+from ui.main_window import MainWindow
 
 
 def _set_application_icon(app):
