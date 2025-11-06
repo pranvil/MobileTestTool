@@ -1,10 +1,10 @@
 {
-    "version":  "0.9.5.4",
-    "download_url":  "https://github.com/pranvil/MobileTestTool/releases/download/v0.9.5.4/MobileTestTool_0.9.5.4.zip",
-    "sha256":  "c0ee20ef5656d89cf1b8ae64a40a0b6d57b94a743619b5e50f1261143125079c",
-    "file_name":  "MobileTestTool_0.9.5.4.zip",
-    "file_size":  109838143,
-    "release_notes":  "# MobileTestTool Release Notes\r\n\r\n## Verison information\r\n- Verison：0.9.5.4\r\n- Rlease date：2025/11/7\r\n\r\n## Release Note\r\n- ✅ 修复win10无法正确检测程序已经退出的问题\r\n- ✅ 移除导出log的百分比显示\r\n- ✅ 运行自定义python脚本可以显示输出内容\r\n- ✅ 暗码自动输入提升可靠性\r\n## Known issue\r\n-",
-    "published_at":  "2025-11-06T18:36:19Z",
+    "version":  "0.9.5.5",
+    "download_url":  "https://github.com/pranvil/MobileTestTool/releases/download/v0.9.5.5/MobileTestTool_0.9.5.5.zip",
+    "sha256":  "bfc41952c05c94e4ed562b63346d883d1860b42d88b1a1783b8827909f009323",
+    "file_name":  "MobileTestTool_0.9.5.5.zip",
+    "file_size":  109841936,
+    "release_notes":  "# MobileTestTool Release Notes\r\n\r\n## Verison information\r\n- Verison：0.9.5.5\r\n- Rlease date：2025/11/7\r\n\r\n## Release Note\r\n- ✅ 修复win10无法正确检测程序已经退出的问题\r\n- ✅ 移除导出log的百分比显示\r\n- ✅ 运行自定义python脚本可以显示输出内容\r\n- ✅ 暗码自动输入提升可靠性\r\n- ✅ 修复tab无法隐藏/显示的问题\r\n- ✅ 概率性某些按钮点击报错模块导入失败\r\n## Known issue\r\n-",
+    "published_at":  "2025-11-06T23:21:44Z",
     "mandatory":  false
 }
