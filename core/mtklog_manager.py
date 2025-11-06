@@ -646,7 +646,6 @@ class MTKLogWorker(QThread):
             
             for i, (source_path, folder_name) in enumerate(pull_commands):
                 try:
-                    self.progress.emit(0, f"{self.lang_manager.tr('检查')} {folder_name} ({i+1}/{total_commands})...")
                     print(f"[DEBUG] {self.tr('检查文件夹:')} {source_path} -> {folder_name}")
                     
                     # 先检查文件夹是否存在
@@ -667,7 +666,7 @@ class MTKLogWorker(QThread):
                         continue
                     
                     # 文件夹存在，执行pull
-                    self.progress.emit(0, f"{self.lang_manager.tr('导出')} {folder_name} ({i+1}/{total_commands})...")
+                    self.progress.emit(0, f"{self.lang_manager.tr('正在导出')} {folder_name} ({i+1}/{total_commands})...")
                     target_path = os.path.join(log_folder, folder_name)
                     cmd = ["adb", "-s", self.device, "pull", source_path, target_path]
                     print(f"[DEBUG] {self.tr('执行pull命令:')} {' '.join(cmd)}")
