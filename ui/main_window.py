@@ -1278,6 +1278,10 @@ class MainWindow(QMainWindow):
         logger.info(self.lang_manager.tr("开始初始化所有Tab页面..."))
         
         try:
+            # 修复tab_order，确保包含所有默认tab和自定义tab
+            # 这样可以避免因为配置不完整导致tab无法显示的问题
+            self.tab_config_manager._fix_tab_order()
+            
             # 获取Tab配置
             tab_order = self.tab_config_manager.get_tab_order()
             tab_visibility = self.tab_config_manager.get_tab_visibility()

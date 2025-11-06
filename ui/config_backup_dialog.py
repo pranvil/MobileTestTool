@@ -363,6 +363,11 @@ class ConfigBackupDialog(QDialog):
                     self.tab_config_manager.tab_visibility = config_data.get('tab_visibility', {})
                     self.tab_config_manager.custom_tabs = config_data.get('custom_tabs', [])
                     self.tab_config_manager.custom_cards = config_data.get('custom_cards', [])
+                    
+                    # 修复tab_order：确保包含所有默认tab和自定义tab
+                    # 这样可以避免因为配置不完整导致tab无法显示的问题
+                    self.tab_config_manager._fix_tab_order()
+                    
                     self.tab_config_manager.save_config()
                     self.log_status(self.tr("✓ Tab配置导入成功"))
                     success_count += 1

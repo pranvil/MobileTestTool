@@ -152,6 +152,63 @@ class TabConfigManager(QObject):
         self.custom_tabs = []
         self.custom_cards = []
     
+    def _fix_tab_order(self):
+        """修复tab_order，确保包含所有默认tab和自定义tab"""
+        try:
+            # 获取所有应该存在的tab ID
+            all_tab_ids = set()
+            
+            # 添加所有默认tab
+            for tab in self.default_tabs:
+                all_tab_ids.add(tab['id'])
+            
+            # 添加所有自定义tab
+            for tab in self.custom_tabs:
+                all_tab_ids.add(tab['id'])
+            
+            # 找出缺失的tab
+            missing_tabs = all_tab_ids - set(self.tab_order)
+            
+            if missing_tabs:
+                logger.info(f"{self.tr('发现缺失的Tab，正在修复tab_order:')} {missing_tabs}")
+                
+                # 对于缺失的默认tab，按照default_tabs的顺序插入到合适位置
+                for tab in self.default_tabs:
+                    if tab['id'] in missing_tabs:
+                        # 找到该tab在default_tabs中的位置
+                        default_index = self.default_tabs.index(tab)
+                        # 找到应该插入的位置：找到tab_order中最后一个位置小于default_index的默认tab
+                        insert_pos = len(self.tab_order)
+                        for i, tid in enumerate(self.tab_order):
+                            tid_default_index = next((j for j, t in enumerate(self.default_tabs) if t['id'] == tid), -1)
+                            if tid_default_index >= 0 and tid_default_index < default_index:
+                                insert_pos = i + 1
+                            elif tid_default_index >= 0 and tid_default_index > default_index:
+                                insert_pos = i
+                                break
+                        self.tab_order.insert(insert_pos, tab['id'])
+                        logger.debug(f"{self.tr('已添加默认Tab到tab_order:')} {tab['id']} (位置: {insert_pos})")
+                
+                # 对于缺失的自定义tab，添加到自定义tab区域
+                for tab in self.custom_tabs:
+                    if tab['id'] in missing_tabs:
+                        # 找到最后一个自定义tab的位置
+                        last_custom_index = -1
+                        for i, tid in enumerate(self.tab_order):
+                            if any(t['id'] == tid for t in self.custom_tabs):
+                                last_custom_index = i
+                        if last_custom_index >= 0:
+                            self.tab_order.insert(last_custom_index + 1, tab['id'])
+                        else:
+                            # 如果没有自定义tab，添加到末尾
+                            self.tab_order.append(tab['id'])
+                        logger.debug(f"{self.tr('已添加自定义Tab到tab_order:')} {tab['id']}")
+                
+                logger.info(f"{self.tr('tab_order修复完成')}")
+            
+        except Exception as e:
+            logger.exception(f"{self.tr('修复tab_order失败:')} {e}")
+    
     def get_tab_order(self):
         """获取tab顺序"""
         return self.tab_order
@@ -171,6 +228,50 @@ class TabConfigManager(QObject):
         if not visible and not self.can_hide_tab(tab_id):
             logger.warning(f"{self.tr('Tab')} '{tab_id}' {self.tr('不能隐藏')}")
             return False
+        
+        # 如果tab不在tab_order中，需要先添加到tab_order
+        # 这样可以确保即使配置不完整，tab也能正常显示/隐藏
+        if tab_id not in self.tab_order:
+            # 检查是否是默认tab或自定义tab
+            is_default_tab = any(tab['id'] == tab_id for tab in self.default_tabs)
+            is_custom_tab = any(tab['id'] == tab_id for tab in self.custom_tabs)
+            
+            if not is_default_tab and not is_custom_tab:
+                logger.warning(f"{self.tr('Tab')} '{tab_id}' {self.tr('不存在，无法设置可见性')}")
+                return False
+            
+            # 对于默认tab，尝试按照default_tabs的顺序插入到合适位置
+            if is_default_tab:
+                # 找到该tab在default_tabs中的位置
+                default_index = next((i for i, tab in enumerate(self.default_tabs) if tab['id'] == tab_id), -1)
+                if default_index >= 0:
+                    # 尝试找到应该插入的位置：找到tab_order中最后一个位置小于default_index的默认tab
+                    insert_pos = len(self.tab_order)
+                    for i, tid in enumerate(self.tab_order):
+                        tid_default_index = next((j for j, tab in enumerate(self.default_tabs) if tab['id'] == tid), -1)
+                        if tid_default_index >= 0 and tid_default_index < default_index:
+                            insert_pos = i + 1
+                        elif tid_default_index >= 0 and tid_default_index > default_index:
+                            insert_pos = i
+                            break
+                    self.tab_order.insert(insert_pos, tab_id)
+                    logger.info(f"{self.tr('Tab')} '{tab_id}' {self.tr('已添加到tab_order，位置')}: {insert_pos}")
+                else:
+                    # 如果找不到，添加到末尾
+                    self.tab_order.append(tab_id)
+                    logger.info(f"{self.tr('Tab')} '{tab_id}' {self.tr('已添加到tab_order末尾')}")
+            else:
+                # 对于自定义tab，添加到自定义tab区域（在最后一个自定义tab之后）
+                last_custom_index = -1
+                for i, tid in enumerate(self.tab_order):
+                    if any(tab['id'] == tid for tab in self.custom_tabs):
+                        last_custom_index = i
+                if last_custom_index >= 0:
+                    self.tab_order.insert(last_custom_index + 1, tab_id)
+                else:
+                    # 如果没有自定义tab，添加到末尾
+                    self.tab_order.append(tab_id)
+                logger.info(f"{self.tr('Tab')} '{tab_id}' {self.tr('已添加到tab_order')}")
         
         self.tab_visibility[tab_id] = visible
         self.save_config()

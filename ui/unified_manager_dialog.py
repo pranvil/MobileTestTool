@@ -998,6 +998,10 @@ class UnifiedManagerDialog(QDialog):
                         custom_tab_ids = [tab['id'] for tab in self.tab_config_manager.custom_tabs]
                         self.tab_config_manager.tab_order = default_order + custom_tab_ids
                     
+                    # 修复tab_order，确保包含所有默认tab和自定义tab
+                    # 这样可以避免因为配置不完整导致tab无法显示的问题
+                    self.tab_config_manager._fix_tab_order()
+                    
                     self.tab_config_manager.save_config()
                     
                     # 导入按钮配置
