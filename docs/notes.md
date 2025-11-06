@@ -1,15 +1,11 @@
 # MobileTestTool Release Notes
 
 ## Verison information
-- Verison：0.9.5.3
+- Verison：0.9.5.4
 - Rlease date：2025/11/7
 
 ## Release Note
-- ✅ Double click secret code input issue
-- ✅ run python ANR issue 
-- ✅ fix open file command can't open folder
-- ✅ fix multiple line command issue
-- ✅ fix UI reset after edit button
+- ✅ 修复win10无法正确检测程序已经退出的问题
 ## Known issue
 - 
 

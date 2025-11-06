@@ -13,6 +13,8 @@ import zipfile
 import argparse
 import tempfile
 import subprocess
+import re
+import locale
 from pathlib import Path
 from typing import Optional, Tuple
 
@@ -52,8 +54,10 @@ def wait_for_process_exit(process_name: str, timeout: int = 30) -> bool:
     try:
         import psutil
         use_psutil = True
+        print("使用 psutil 进行进程检测")
     except ImportError:
         use_psutil = False
+        print("psutil 不可用，使用系统命令进行进程检测")
     
     while time.time() - start_time < timeout:
         found = False
@@ -66,43 +70,187 @@ def wait_for_process_exit(process_name: str, timeout: int = 30) -> bool:
                     proc_name = proc_info.get('name', '')
                     proc_exe = proc_info.get('exe', '')
                     
-                    # 检查进程名或可执行文件路径
-                    if process_name.lower() in proc_name.lower():
-                        if 'MobileTestTool' in proc_name or 'MobileTestTool' in (proc_exe or ''):
-                            # 排除自己（更新器）
-                            if 'updater' not in proc_name.lower() and 'updater' not in (proc_exe or '').lower():
+                    # 精确匹配进程名（不区分大小写）
+                    if proc_name.lower() == process_name.lower():
+                        # 排除自己（更新器）- 通过检查可执行文件路径
+                        proc_exe_lower = (proc_exe or '').lower()
+                        if 'updater' not in proc_name.lower() and 'updater' not in proc_exe_lower:
+                            # 额外验证：确保进程确实存在且可访问
+                            try:
+                                proc.status()  # 检查进程状态
                                 found = True
                                 break
+                            except (psutil.NoSuchProcess, psutil.AccessDenied):
+                                continue
                 except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
                     continue
         else:
             # 使用tasklist命令检查进程（Windows）
             if sys.platform.startswith('win'):
                 try:
-                    result = subprocess.run(
-                        ['tasklist', '/FI', f'IMAGENAME eq {process_name}'],
-                        capture_output=True,
-                        text=True,
-                        timeout=5,
-                        creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0
-                    )
-                    if process_name.lower() in result.stdout.lower():
-                        # 检查是否包含MobileTestTool且不包含updater
-                        lines = result.stdout.lower().split('\n')
-                        for line in lines:
-                            if 'mobiletesttool' in line and 'updater' not in line:
-                                found = True
-                                break
-                except Exception:
-                    pass
+                    # 使用 CSV 格式，更便于解析
+                    # Windows 10 中文系统默认使用 GBK 编码，Windows 11 可能使用 UTF-8
+                    # 尝试多种编码以确保兼容性
+                    try:
+                        # 尝试获取系统默认编码
+                        system_encoding = locale.getpreferredencoding()
+                        print(f"[DEBUG] 系统默认编码: {system_encoding}")
+                    except Exception as e:
+                        system_encoding = 'gbk'  # Windows 中文系统默认使用 GBK
+                        print(f"[DEBUG] 获取系统编码失败，使用默认 GBK: {e}")
+                    
+                    result = None
+                    encoding_attempts = [system_encoding, 'gbk', 'utf-8', 'cp936']
+                    print(f"[DEBUG] 尝试编码列表: {encoding_attempts}")
+                    
+                    for encoding in encoding_attempts:
+                        try:
+                            print(f"[DEBUG] 尝试使用编码: {encoding}")
+                            result = subprocess.run(
+                                ['tasklist', '/FI', f'IMAGENAME eq {process_name}', '/FO', 'CSV'],
+                                capture_output=True,
+                                text=True,
+                                encoding=encoding,
+                                errors='replace',  # 编码错误时替换为占位符，而不是抛出异常
+                                timeout=5,
+                                creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0
+                            )
+                            print(f"[DEBUG] tasklist 返回码: {result.returncode}")
+                            if result.returncode == 0:
+                                print(f"[DEBUG] 使用编码 {encoding} 成功，输出长度: {len(result.stdout)} 字符")
+                                # 打印前200个字符用于调试（避免输出过长）
+                                preview = result.stdout[:200].replace('\n', '\\n').replace('\r', '\\r')
+                                print(f"[DEBUG] 输出预览: {preview}...")
+                                break  # 成功则退出循环
+                            else:
+                                print(f"[DEBUG] tasklist 返回码非0: {result.returncode}, stderr: {result.stderr[:100]}")
+                        except (UnicodeDecodeError, UnicodeError) as e:
+                            print(f"[DEBUG] 编码 {encoding} 解码失败: {e}")
+                            continue  # 尝试下一个编码
+                        except Exception as e:
+                            print(f"[DEBUG] 执行 tasklist 时发生异常: {type(e).__name__}: {e}")
+                            continue
+                    
+                    if result is None or result.returncode != 0:
+                        error_msg = f"无法执行 tasklist 命令或编码错误"
+                        if result:
+                            error_msg += f", 返回码: {result.returncode}, stderr: {result.stderr[:200]}"
+                        print(f"[ERROR] {error_msg}")
+                        raise Exception(error_msg)
+                    
+                    if result.returncode == 0 and result.stdout:
+                        # 解析 CSV 输出，检查是否有实际的进程行（排除标题行和信息行）
+                        stdout_lower = result.stdout.lower()
+                        stdout_lines = result.stdout.strip().split('\n')
+                        print(f"[DEBUG] 解析 tasklist 输出，共 {len(stdout_lines)} 行")
+                        
+                        # 检查是否有 "INFO: 没有运行的任务" 或类似提示（支持中英文）
+                        # 英文: "INFO: No tasks are running which match the specified criteria."
+                        # 中文: "INFO: 没有运行的任务匹配指定标准。"
+                        has_info_no_tasks = (
+                            'info' in stdout_lower and (
+                                '没有运行的任务' in stdout_lower or 
+                                'no tasks are running' in stdout_lower or
+                                'no tasks' in stdout_lower or
+                                'which match the specified criteria' in stdout_lower
+                            )
+                        )
+                        
+                        if has_info_no_tasks:
+                            # 明确表示没有找到进程
+                            print(f"[DEBUG] 检测到 '无任务' 提示信息，进程不存在")
+                            found = False
+                        elif len(stdout_lines) <= 1:
+                            # 如果只有标题行，说明没有进程
+                            print(f"[DEBUG] 输出只有 {len(stdout_lines)} 行，可能是标题行，进程不存在")
+                            found = False
+                        else:
+                            # 解析 CSV 输出
+                            print(f"[DEBUG] 开始解析进程列表，查找进程: {process_name}")
+                            lines = result.stdout.strip().split('\n')
+                            line_count = 0
+                            for line in lines:
+                                if not line.strip():
+                                    continue
+                                line_count += 1
+                                # 跳过标题行（包含 "Image Name" 或 "进程名"）
+                                line_lower = line.lower()
+                                if 'image name' in line_lower or '进程名' in line_lower or 'imagename' in line_lower:
+                                    print(f"[DEBUG] 跳过标题行: {line[:100]}")
+                                    continue
+                                
+                                # CSV 格式：第一列是进程名（带引号）
+                                # 精确匹配进程名（在引号中）
+                                if f'"{process_name.lower()}"' in line_lower or f'"{process_name.lower()}"' in line:
+                                    print(f"[DEBUG] 找到匹配的进程行: {line[:150]}")
+                                    # 排除更新器进程
+                                    if 'updater' in line_lower:
+                                        print(f"[DEBUG] 跳过更新器进程")
+                                        continue
+                                    # 验证这是进程数据行，通过检查是否有 PID（数字在引号中）
+                                    # CSV 格式："Image Name","PID",...
+                                    if re.search(r'"\d+"', line):
+                                        pid_match = re.search(r'"(\d+)"', line)
+                                        pid = pid_match.group(1) if pid_match else "未知"
+                                        print(f"[DEBUG] 找到进程，PID: {pid}")
+                                        found = True
+                                        break
+                                    else:
+                                        print(f"[DEBUG] 行中未找到有效的 PID: {line[:100]}")
+                            print(f"[DEBUG] 共检查了 {line_count} 行，未找到进程: {process_name}")
+                    else:
+                        print(f"[DEBUG] tasklist 执行失败或无输出，returncode: {result.returncode if result else 'None'}")
+                except Exception as e:
+                    # 如果命令执行失败，尝试使用 wmic 作为备选方案（Windows 10 及以下）
+                    # 注意：Windows 11 中 wmic 已被弃用，可能不存在
+                    print(f"tasklist 命令执行失败: {e}，尝试使用 wmic...")
+                    try:
+                        # 检查 wmic 是否存在
+                        wmic_check = subprocess.run(
+                            ['where', 'wmic'],
+                            capture_output=True,
+                            timeout=2,
+                            creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0
+                        )
+                        if wmic_check.returncode == 0:
+                            print("使用 wmic 进行进程检测")
+                            result = subprocess.run(
+                                ['wmic', 'process', 'where', f'name="{process_name}"', 'get', 'name,processid', '/format:csv'],
+                                capture_output=True,
+                                text=True,
+                                timeout=5,
+                                creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0
+                            )
+                            if result.returncode == 0 and result.stdout:
+                                # wmic 输出：检查是否有进程ID（排除标题行）
+                                lines = result.stdout.strip().split('\n')
+                                for line in lines:
+                                    if process_name.lower() in line.lower() and 'updater' not in line.lower():
+                                        # 检查是否有数字（PID）
+                                        if re.search(r'\d+', line):
+                                            found = True
+                                            break
+                        else:
+                            print("警告：wmic 不可用（Windows 11 已弃用），进程检测可能不准确")
+                    except Exception as wmic_error:
+                        # wmic 不存在或执行失败，忽略
+                        print(f"wmic 执行失败: {wmic_error}")
+                        pass
         
         if not found:
-            print(f"进程 {process_name} 已退出")
+            elapsed_time = time.time() - start_time
+            print(f"进程 {process_name} 已退出（耗时 {elapsed_time:.2f} 秒）")
             return True
+        
+        # 每5秒打印一次等待状态
+        elapsed_time = time.time() - start_time
+        if int(elapsed_time) % 5 == 0 and int(elapsed_time * 10) % 50 == 0:
+            print(f"[DEBUG] 等待进程退出中... 已等待 {elapsed_time:.1f} 秒")
         
         time.sleep(0.5)
     
-    print(f"警告：等待进程退出超时（{timeout}秒）")
+    elapsed_time = time.time() - start_time
+    print(f"警告：等待进程退出超时（{timeout}秒，实际等待 {elapsed_time:.2f} 秒）")
     return False
 
 
@@ -116,34 +264,117 @@ def check_process_running(process_name: str) -> bool:
     
     if use_psutil:
         # 使用psutil检查进程
-        for proc in psutil.process_iter(['name', 'exe']):
+        for proc in psutil.process_iter(['pid', 'name', 'exe']):
             try:
                 proc_info = proc.info
                 proc_name = proc_info.get('name', '')
                 proc_exe = proc_info.get('exe', '')
-                if 'MobileTestTool' in proc_name or 'MobileTestTool' in (proc_exe or ''):
+                
+                # 精确匹配进程名（不区分大小写）
+                if proc_name.lower() == process_name.lower():
                     # 排除自己（更新器）
-                    if 'updater' not in proc_name.lower() and 'updater' not in (proc_exe or '').lower():
-                        return True
+                    proc_exe_lower = (proc_exe or '').lower()
+                    if 'updater' not in proc_name.lower() and 'updater' not in proc_exe_lower:
+                        # 额外验证：确保进程确实存在且可访问
+                        try:
+                            proc.status()  # 检查进程状态
+                            return True
+                        except (psutil.NoSuchProcess, psutil.AccessDenied):
+                            continue
             except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
                 continue
     else:
         # 使用tasklist命令检查进程（Windows）
         try:
             if sys.platform.startswith('win'):
-                result = subprocess.run(
-                    ['tasklist', '/FI', f'IMAGENAME eq {process_name}'],
-                    capture_output=True,
-                    text=True,
-                    timeout=5,
-                    creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0
-                )
-                if process_name.lower() in result.stdout.lower():
-                    # 检查是否包含MobileTestTool且不包含updater
-                    lines = result.stdout.lower().split('\n')
+                # 使用 CSV 格式，更便于解析
+                # Windows 10 中文系统默认使用 GBK 编码，Windows 11 可能使用 UTF-8
+                # 尝试多种编码以确保兼容性
+                try:
+                    # 尝试获取系统默认编码
+                    system_encoding = locale.getpreferredencoding()
+                    print(f"[DEBUG] check_process_running: 系统默认编码: {system_encoding}")
+                except Exception as e:
+                    system_encoding = 'gbk'  # Windows 中文系统默认使用 GBK
+                    print(f"[DEBUG] check_process_running: 获取系统编码失败，使用默认 GBK: {e}")
+                
+                result = None
+                encoding_attempts = [system_encoding, 'gbk', 'utf-8', 'cp936']
+                
+                for encoding in encoding_attempts:
+                    try:
+                        result = subprocess.run(
+                            ['tasklist', '/FI', f'IMAGENAME eq {process_name}', '/FO', 'CSV'],
+                            capture_output=True,
+                            text=True,
+                            encoding=encoding,
+                            errors='replace',  # 编码错误时替换为占位符，而不是抛出异常
+                            timeout=5,
+                            creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0
+                        )
+                        if result.returncode == 0:
+                            print(f"[DEBUG] check_process_running: 使用编码 {encoding} 成功")
+                            break  # 成功则退出循环
+                    except (UnicodeDecodeError, UnicodeError) as e:
+                        print(f"[DEBUG] check_process_running: 编码 {encoding} 解码失败: {e}")
+                        continue  # 尝试下一个编码
+                
+                if result is None or result.returncode != 0:
+                    print(f"[DEBUG] check_process_running: tasklist 执行失败，returncode: {result.returncode if result else 'None'}")
+                    return False  # 如果无法执行命令，返回 False
+                
+                if result.returncode == 0 and result.stdout:
+                    # 解析 CSV 输出，检查是否有实际的进程行（排除标题行和信息行）
+                    stdout_lower = result.stdout.lower()
+                    stdout_lines = result.stdout.strip().split('\n')
+                    print(f"[DEBUG] check_process_running: 解析输出，共 {len(stdout_lines)} 行")
+                    
+                    # 检查是否有 "INFO: 没有运行的任务" 或类似提示（支持中英文）
+                    # 英文: "INFO: No tasks are running which match the specified criteria."
+                    # 中文: "INFO: 没有运行的任务匹配指定标准。"
+                    has_info_no_tasks = (
+                        'info' in stdout_lower and (
+                            '没有运行的任务' in stdout_lower or 
+                            'no tasks are running' in stdout_lower or
+                            'no tasks' in stdout_lower or
+                            'which match the specified criteria' in stdout_lower
+                        )
+                    )
+                    
+                    if has_info_no_tasks:
+                        # 明确表示没有找到进程
+                        print(f"[DEBUG] check_process_running: 检测到 '无任务' 提示信息")
+                        return False
+                    elif len(stdout_lines) <= 1:
+                        # 如果只有标题行，说明没有进程
+                        print(f"[DEBUG] check_process_running: 输出只有标题行")
+                        return False
+                    
+                    # 解析 CSV 输出
+                    print(f"[DEBUG] check_process_running: 查找进程: {process_name}")
+                    lines = result.stdout.strip().split('\n')
                     for line in lines:
-                        if 'mobiletesttool' in line and 'updater' not in line:
-                            return True
+                        if not line.strip():
+                            continue
+                        # 跳过标题行（包含 "Image Name" 或 "进程名"）
+                        line_lower = line.lower()
+                        if 'image name' in line_lower or '进程名' in line_lower or 'imagename' in line_lower:
+                            continue
+                        
+                        # 精确匹配进程名（在引号中）
+                        if f'"{process_name.lower()}"' in line_lower or f'"{process_name.lower()}"' in line:
+                            print(f"[DEBUG] check_process_running: 找到匹配行: {line[:100]}")
+                            # 排除更新器进程
+                            if 'updater' in line_lower:
+                                print(f"[DEBUG] check_process_running: 跳过更新器进程")
+                                continue
+                            # 验证这是进程数据行，通过检查是否有 PID（数字在引号中）
+                            if re.search(r'"\d+"', line):
+                                print(f"[DEBUG] check_process_running: 进程正在运行")
+                                return True
+                    print(f"[DEBUG] check_process_running: 未找到进程")
+                else:
+                    print(f"[DEBUG] check_process_running: tasklist 无输出或失败")
         except Exception:
             pass
     
