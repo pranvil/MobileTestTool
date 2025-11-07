@@ -1,10 +1,10 @@
 {
-    "version":  "0.9.5.6",
-    "download_url":  "https://github.com/pranvil/MobileTestTool/releases/download/v0.9.5.6/MobileTestTool_0.9.5.6.zip",
-    "sha256":  "d992c5b7994d0f4c0776746be667cfa2cdf1d2b6145931d5a0b77373e346e96d",
-    "file_name":  "MobileTestTool_0.9.5.6.zip",
-    "file_size":  110243254,
-    "release_notes":  "# MobileTestTool Release Notes\r\n\r\n## Verison information\r\n- Verison：0.9.5.6\r\n- Rlease date：2025/11/7\r\n\r\n## Release Note\r\n- ✅ 3GPP解码器下拉菜单宽度随字串长度自动调整\r\n- ✅ 添加PR翻译功能\r\n## Known issue\r\n-",
-    "published_at":  "2025-11-07T21:30:31Z",
+    "version":  "0.9.5.7",
+    "download_url":  "https://github.com/pranvil/MobileTestTool/releases/download/v0.9.5.7/MobileTestTool_0.9.5.7.zip",
+    "sha256":  "4982a41699bc731ce142c51d18dcca66f3158388fa22580ecc54670bd8ee054e",
+    "file_name":  "MobileTestTool_0.9.5.7.zip",
+    "file_size":  110243529,
+    "release_notes":  "# MobileTestTool Release Notes\r\n\r\n## Verison information\r\n- Verison：0.9.5.7\r\n- Rlease date：2025/11/7\r\n\r\n## Release Note\r\n- ✅ 添加中英互译\r\n- ✅ 修复卡死问题\r\n## Known issue\r\n-",
+    "published_at":  "2025-11-07T22:01:05Z",
     "mandatory":  false
 }
