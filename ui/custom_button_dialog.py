@@ -435,7 +435,6 @@ class ButtonEditDialog(QDialog):
         self.script_edit.setPlaceholderText(self.tr("输入Python脚本代码..."))
         self.script_edit.setMaximumHeight(300)
         self.script_edit.setVisible(False)
-        self.script_edit.textChanged.connect(self.update_preview)
         advanced_card_layout.addWidget(self.script_edit)
         
         # 文件路径输入区域（用于打开文件和运行程序）
@@ -443,7 +442,6 @@ class ButtonEditDialog(QDialog):
         self.path_edit = QLineEdit()
         self.path_edit.setPlaceholderText(self.tr("输入文件路径或点击浏览按钮选择..."))
         self.path_edit.setVisible(False)
-        self.path_edit.textChanged.connect(self.update_preview)
         path_layout.addWidget(self.path_edit)
         
         self.file_browse_btn = QPushButton(self.tr("浏览文件"))
@@ -462,37 +460,6 @@ class ButtonEditDialog(QDialog):
         
         # 保存advanced_card引用，用于控制可见性
         self.advanced_group = advanced_container
-        
-        # 命令预览（使用与Tab界面一致的样式）
-        preview_container = QWidget()
-        preview_layout = QVBoxLayout(preview_container)
-        preview_layout.setContentsMargins(0, 0, 0, 0)
-        preview_layout.setSpacing(4)  # 与Tab界面一致的紧凑间距
-        
-        # 标题
-        preview_title = QLabel(self.tr("命令预览"))
-        preview_title.setProperty("class", "section-title")
-        preview_layout.addWidget(preview_title)
-        
-        # 卡片容器
-        preview_card = QFrame()
-        preview_card.setObjectName("card")
-        add_card_shadow(preview_card)
-        preview_card_layout = QVBoxLayout(preview_card)
-        preview_card_layout.setContentsMargins(10, 1, 10, 1)
-        preview_card_layout.setSpacing(8)
-        
-        self.preview_label = QLabel()
-        self.preview_label.setWordWrap(True)
-        self.preview_label.setStyleSheet(
-            "background: #f8f9fa; padding: 10px; "
-            "border: 1px solid #dee2e6; border-radius: 4px; "
-            "font-family: 'Consolas', 'Monaco', monospace;"
-        )
-        preview_card_layout.addWidget(self.preview_label)
-        
-        preview_layout.addWidget(preview_card)
-        scroll_layout.addWidget(preview_container)
         
         # 设置滚动区域的内容
         scroll_area.setWidget(scroll_content)
@@ -517,9 +484,6 @@ class ButtonEditDialog(QDialog):
         
         # 初始化类型相关的UI（默认不选择类型，所以高级设置区域应该是隐藏的）
         self.on_type_changed(self.type_combo.currentText())
-        
-        # 初始预览
-        self.update_preview()
     
     def refresh_tab_list(self):
         """刷新Tab列表"""
@@ -656,133 +620,6 @@ class ButtonEditDialog(QDialog):
         )
         if folder_path:
             self.path_edit.setText(folder_path)
-    
-    def update_preview(self):
-        """更新命令预览"""
-        button_type = self.type_combo.currentText()
-        
-        # 如果未选择类型，显示提示
-        if not button_type or button_type.strip() == "":
-            self.preview_label.setText(self.tr("请先选择按钮类型..."))
-            return
-        
-        if button_type == self.tr("ADB命令"):
-            # ADB命令预览
-            command = self.script_edit.toPlainText().strip()
-            if command:
-                clean_command = command.split('\n')[0]  # 只显示第一行作为预览
-                if clean_command.lower().startswith('adb '):
-                    clean_command = clean_command[4:].strip()
-                
-                preview = f"{self.tr('adb -s {{设备ID}}')} {clean_command}"
-                
-                # 检查ADB命令是否被阻止
-                if not self.button_manager.validate_command(command):
-                    reason = self.button_manager.get_blocked_reason(command)
-                    if reason:
-                        self.preview_label.setStyleSheet(
-                            "background: #f8d7da; padding: 10px; "
-                            "border: 1px solid #f5c6cb; border-radius: 4px; "
-                            "color: #721c24; font-family: 'Consolas', 'Monaco', monospace;"
-                        )
-                        self.preview_label.setText(f"{self.tr('⚠️ 不支持的命令')}\n{reason}")
-                        return
-                    else:
-                        self.preview_label.setStyleSheet(
-                            "background: #f8d7da; padding: 10px; "
-                            "border: 1px solid #f5c6cb; border-radius: 4px; "
-                            "color: #721c24; font-family: 'Consolas', 'Monaco', monospace;"
-                        )
-                        self.preview_label.setText(f"{self.tr('⚠️ 命令验证失败')}")
-                        return
-                
-                self.preview_label.setStyleSheet(
-                    "background: #f8f9fa; padding: 10px; "
-                    "border: 1px solid #dee2e6; border-radius: 4px; "
-                    "font-family: 'Consolas', 'Monaco', monospace;"
-                )
-                self.preview_label.setText(preview)
-            else:
-                self.preview_label.setText(self.tr("请输入ADB命令..."))
-        elif button_type == self.tr("Python脚本"):
-            # Python脚本预览
-            script = self.script_edit.toPlainText().strip()
-            if script:
-                preview = f"{self.tr('执行Python脚本:')}\n{script[:100]}{'...' if len(script) > 100 else ''}"
-                self.preview_label.setStyleSheet(
-                    "background: #f8f9fa; padding: 10px; "
-                    "border: 1px solid #dee2e6; border-radius: 4px; "
-                    "font-family: 'Consolas', 'Monaco', monospace;"
-                )
-                self.preview_label.setText(preview)
-            else:
-                self.preview_label.setText(self.tr("Python脚本为空"))
-        elif button_type == self.tr("打开文件"):
-            # 文件预览
-            command = self.path_edit.text().strip()
-            if command:
-                import os
-                if os.path.exists(command):
-                    preview = f"✅ {self.tr('将打开文件:')}\n{command}"
-                else:
-                    preview = f"⚠️ {self.tr('文件不存在:')}\n{command}"
-                self.preview_label.setStyleSheet(
-                    "background: #f8f9fa; padding: 10px; "
-                    "border: 1px solid #dee2e6; border-radius: 4px; "
-                    "font-family: 'Consolas', 'Monaco', monospace;"
-                )
-                self.preview_label.setText(preview)
-            else:
-                self.preview_label.setText(self.tr("请选择要打开的文件..."))
-        elif button_type == self.tr("运行程序"):
-            # 程序预览
-            command = self.path_edit.text().strip()
-            if command:
-                import os
-                if os.path.exists(command):
-                    preview = f"✅ {self.tr('将运行程序:')}\n{command}"
-                else:
-                    preview = f"⚠️ {self.tr('程序不存在:')}\n{command}"
-                self.preview_label.setStyleSheet(
-                    "background: #f8f9fa; padding: 10px; "
-                    "border: 1px solid #dee2e6; border-radius: 4px; "
-                    "font-family: 'Consolas', 'Monaco', monospace;"
-                )
-                self.preview_label.setText(preview)
-            else:
-                self.preview_label.setText(self.tr("请选择要运行的程序..."))
-        elif button_type == self.tr("系统命令"):
-            # 系统命令预览
-            command = self.script_edit.toPlainText().strip()
-            if command:
-                preview = f"{self.tr('将执行系统命令:')}\n{command.split('\n')[0]}"  # 显示第一行
-                self.preview_label.setStyleSheet(
-                    "background: #f8f9fa; padding: 10px; "
-                    "border: 1px solid #dee2e6; border-radius: 4px; "
-                    "font-family: 'Consolas', 'Monaco', monospace;"
-                )
-                self.preview_label.setText(preview)
-            else:
-                self.preview_label.setText(self.tr("请输入系统命令..."))
-        elif button_type == self.tr("打开网页"):
-            # 网页预览
-            url = self.path_edit.text().strip()
-            if url:
-                # 确保URL包含协议
-                display_url = url
-                if not url.startswith(('http://', 'https://')):
-                    display_url = 'https://' + url
-                preview = f"🌐 {self.tr('将打开网页:')}\n{display_url}"
-                self.preview_label.setStyleSheet(
-                    "background: #f8f9fa; padding: 10px; "
-                    "border: 1px solid #dee2e6; border-radius: 4px; "
-                    "font-family: 'Consolas', 'Monaco', monospace;"
-                )
-                self.preview_label.setText(preview)
-            else:
-                self.preview_label.setText(self.tr("请输入网页地址..."))
-        else:
-            self.preview_label.setText(f"{self.tr('请输入')}{button_type}{self.tr('内容...')}")
     
     def load_data(self):
         """加载按钮数据"""

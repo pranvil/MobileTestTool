@@ -15,3 +15,6 @@ uiautomator2>=2.16.25
 # 串口通信
 pyserial>=3.5
 
+# Word文档生成
+python-docx>=0.8.11
+

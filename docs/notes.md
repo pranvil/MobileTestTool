@@ -5,7 +5,7 @@
 - Rlease date：2025/11/7
 
 ## Release Note
-- ✅  
+- ✅ 3GPP解码器下拉菜单宽度随字串长度自动调整
 ## Known issue
 - 
 

@@ -1269,6 +1269,7 @@ class MainWindow(QMainWindow):
         self.other_tab.show_secret_code_dialog.connect(self.show_secret_code_dialog)
         self.other_tab.show_lock_cell_dialog.connect(self.show_lock_cell_dialog)
         self.other_tab.show_qc_nv_dialog.connect(self.show_qc_nv_dialog)
+        self.other_tab.show_pr_translation_dialog.connect(self._on_show_pr_translation_dialog)
         
         # 连接Tab配置管理器信号
         self.tab_config_manager.tab_config_updated.connect(self._on_tab_config_updated)
@@ -2803,6 +2804,16 @@ class MainWindow(QMainWindow):
     def _on_show_input_text_dialog(self):
         """显示输入文本对话框"""
         self.other_operations_manager.show_input_text_dialog()
+    
+    def _on_show_pr_translation_dialog(self):
+        """显示PR翻译对话框"""
+        try:
+            from ui.pr_translation_dialog import PRTranslationDialog
+            dialog = PRTranslationDialog(parent=self)
+            dialog.exec_()
+        except Exception as e:
+            logger.exception(f"{self.tr('显示PR翻译对话框失败')}: {str(e)}")
+            QMessageBox.critical(self, self.tr("错误"), self.tr(f"显示PR翻译对话框失败: {str(e)}"))
     
     # 菜单栏信号处理
     def _on_show_display_lines_dialog(self):
