@@ -1,10 +1,10 @@
 {
-    "version":  "0.9.5.5",
-    "download_url":  "https://github.com/pranvil/MobileTestTool/releases/download/v0.9.5.5/MobileTestTool_0.9.5.5.zip",
-    "sha256":  "bfc41952c05c94e4ed562b63346d883d1860b42d88b1a1783b8827909f009323",
-    "file_name":  "MobileTestTool_0.9.5.5.zip",
-    "file_size":  109841936,
-    "release_notes":  "# MobileTestTool Release Notes\r\n\r\n## Verison information\r\n- Verison：0.9.5.5\r\n- Rlease date：2025/11/7\r\n\r\n## Release Note\r\n- ✅ 修复win10无法正确检测程序已经退出的问题\r\n- ✅ 移除导出log的百分比显示\r\n- ✅ 运行自定义python脚本可以显示输出内容\r\n- ✅ 暗码自动输入提升可靠性\r\n- ✅ 修复tab无法隐藏/显示的问题\r\n- ✅ 概率性某些按钮点击报错模块导入失败\r\n## Known issue\r\n-",
-    "published_at":  "2025-11-06T23:21:44Z",
+    "version":  "0.9.5.6",
+    "download_url":  "https://github.com/pranvil/MobileTestTool/releases/download/v0.9.5.6/MobileTestTool_0.9.5.6.zip",
+    "sha256":  "d992c5b7994d0f4c0776746be667cfa2cdf1d2b6145931d5a0b77373e346e96d",
+    "file_name":  "MobileTestTool_0.9.5.6.zip",
+    "file_size":  110243254,
+    "release_notes":  "# MobileTestTool Release Notes\r\n\r\n## Verison information\r\n- Verison：0.9.5.6\r\n- Rlease date：2025/11/7\r\n\r\n## Release Note\r\n- ✅ 3GPP解码器下拉菜单宽度随字串长度自动调整\r\n- ✅ 添加PR翻译功能\r\n## Known issue\r\n-",
+    "published_at":  "2025-11-07T21:30:31Z",
     "mandatory":  false
 }
