@@ -4,19 +4,91 @@
 日志查看器
 """
 
+import os
+import json
 from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QTextEdit, QLabel,
                              QHBoxLayout, QPushButton, QLineEdit, QCheckBox,
                              QSizePolicy, QFrame)
 from PyQt5.QtCore import Qt, pyqtSignal
-from PyQt5.QtGui import QTextCharFormat, QColor, QTextCursor, QFont, QTextDocument
+from PyQt5.QtGui import QTextCharFormat, QColor, QTextCursor, QFont, QTextDocument, QKeyEvent
 
 
 class FileDropLineEdit(QLineEdit):
-    """支持拖拽文件路径的输入框"""
+    """支持拖拽文件路径和历史命令的输入框"""
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.setAcceptDrops(True)
+        # 历史命令相关属性
+        self.command_history = []  # 命令历史列表
+        self.history_index = -1  # 当前历史索引，-1表示不在历史浏览状态
+        self.temp_command = ""  # 临时保存当前输入的命令（用于在浏览历史时保存未提交的命令）
+
+    def set_command_history(self, history):
+        """设置命令历史列表"""
+        self.command_history = history if history else []
+        self.history_index = -1
+
+    def add_to_history(self, command):
+        """添加命令到历史记录"""
+        if not command or not command.strip():
+            return
+        
+        command = command.strip()
+        # 避免重复保存相同的连续命令
+        if self.command_history and self.command_history[-1] == command:
+            return
+        
+        self.command_history.append(command)
+        # 限制历史记录数量（最多100条）
+        if len(self.command_history) > 100:
+            self.command_history.pop(0)
+        self.history_index = -1
+
+    def keyPressEvent(self, event: QKeyEvent):
+        """处理键盘事件，实现历史命令导航"""
+        if event.key() == Qt.Key_Up:
+            # 上键：显示上一个历史命令
+            if self.command_history:
+                # 如果当前不在浏览历史状态，保存当前输入
+                if self.history_index == -1:
+                    self.temp_command = self.text()
+                
+                # 移动到上一个历史命令
+                if self.history_index > 0:
+                    self.history_index -= 1
+                elif self.history_index == -1:
+                    self.history_index = len(self.command_history) - 1
+                
+                # 显示历史命令
+                if 0 <= self.history_index < len(self.command_history):
+                    self.setText(self.command_history[self.history_index])
+            event.accept()
+            return
+        elif event.key() == Qt.Key_Down:
+            # 下键：显示下一个历史命令
+            if self.command_history and self.history_index != -1:
+                # 移动到下一个历史命令
+                if self.history_index < len(self.command_history) - 1:
+                    self.history_index += 1
+                    self.setText(self.command_history[self.history_index])
+                else:
+                    # 已经到最新命令，恢复临时保存的命令
+                    self.history_index = -1
+                    self.setText(self.temp_command)
+                    self.temp_command = ""
+            event.accept()
+            return
+        
+        # 其他按键正常处理
+        super().keyPressEvent(event)
+        # 如果用户开始输入新命令，重置历史索引
+        if event.key() not in (Qt.Key_Up, Qt.Key_Down, Qt.Key_Left, Qt.Key_Right, 
+                               Qt.Key_Home, Qt.Key_End, Qt.Key_Shift, Qt.Key_Control,
+                               Qt.Key_Alt, Qt.Key_Meta):
+            if self.history_index != -1:
+                self.history_index = -1
+                self.temp_command = ""
 
     def dragEnterEvent(self, event):
         if event.mimeData().hasUrls():
@@ -67,6 +139,12 @@ class LogViewer(QWidget):
         self.search_case_sensitive = False
         self.search_results = []
         self.current_search_index = -1
+        
+        # ADB命令历史
+        self.adb_command_history = []
+        
+        # 加载历史命令
+        self.load_command_history()
         
         self.setup_ui()
     
@@ -179,8 +257,11 @@ class LogViewer(QWidget):
         self.adb_input.setToolTip(
             self.lang_manager.tr("支持快速执行一次性ADB命令\n") +
             self.lang_manager.tr("例如: adb devices, adb shell pm list packages 等\n") +
-            self.lang_manager.tr("不支持持续输出命令（logcat、top等），请使用对应功能")
+            self.lang_manager.tr("不支持持续输出命令（logcat、top等），请使用对应功能\n") +
+            self.lang_manager.tr("提示: 使用上下键可以浏览历史命令")
         )
+        # 设置命令历史
+        self.adb_input.set_command_history(self.adb_command_history)
         self.adb_input.returnPressed.connect(self._on_adb_command_entered)
         adb_layout_h.addWidget(self.adb_input)
         
@@ -195,8 +276,68 @@ class LogViewer(QWidget):
         """处理ADB命令输入"""
         command = self.adb_input.text().strip()
         if command:
+            # 添加到历史记录（避免重复保存相同的连续命令）
+            if not self.adb_command_history or self.adb_command_history[-1] != command:
+                self.adb_command_history.append(command)
+                # 限制历史记录数量（最多100条）
+                if len(self.adb_command_history) > 100:
+                    self.adb_command_history.pop(0)
+                # 同步到输入框的历史记录
+                self.adb_input.set_command_history(self.adb_command_history)
+                # 保存历史命令到文件
+                self.save_command_history()
+            else:
+                # 即使命令相同，也要同步到输入框（确保索引正确）
+                self.adb_input.set_command_history(self.adb_command_history)
+            
             self.adb_command_executed.emit(command)
             self.adb_input.clear()
+    
+    def _get_config_file_path(self):
+        """获取配置文件路径，兼容exe和开发环境"""
+        # 统一保存到 ~/.netui/ 目录，与其他配置保持一致
+        user_config_dir = os.path.expanduser('~/.netui')
+        os.makedirs(user_config_dir, exist_ok=True)
+        return os.path.join(user_config_dir, 'adb_command_history.json')
+    
+    def save_command_history(self):
+        """保存ADB命令历史到文件"""
+        file_path = self._get_config_file_path()
+        try:
+            data = {
+                'command_history': self.adb_command_history,
+                'version': '1.0'
+            }
+            with open(file_path, 'w', encoding='utf-8') as f:
+                json.dump(data, f, ensure_ascii=False, indent=2)
+        except Exception as e:
+            # 静默处理错误，不影响主功能
+            from core.debug_logger import logger
+            logger.exception(f"保存ADB命令历史失败: {e}")
+    
+    def load_command_history(self):
+        """从文件加载ADB命令历史"""
+        file_path = self._get_config_file_path()
+        if os.path.exists(file_path):
+            try:
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                    # 兼容旧格式（直接是列表）和新格式（包含version字段）
+                    if isinstance(data, list):
+                        self.adb_command_history = data
+                    elif isinstance(data, dict) and 'command_history' in data:
+                        self.adb_command_history = data.get('command_history', [])
+                    else:
+                        self.adb_command_history = []
+                    
+                    # 限制历史记录数量（最多100条）
+                    if len(self.adb_command_history) > 100:
+                        self.adb_command_history = self.adb_command_history[-100:]
+            except Exception as e:
+                # 静默处理错误，不影响主功能
+                from core.debug_logger import logger
+                logger.exception(f"加载ADB命令历史失败: {e}")
+                self.adb_command_history = []
         
     def append_log(self, text, color=None):
         """追加日志"""

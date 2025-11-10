@@ -1,11 +1,11 @@
 # MobileTestTool Release Notes
 
 ## Verison information
-- Verison：0.9.5.6
+- Verison：0.9.5.9
 - Rlease date：2025/11/7
 
 ## Release Note
-- ✅ 3GPP解码器下拉菜单宽度随字串长度自动调整
+- ✅ adb命令输入框支持上下键调用历史命令
 ## Known issue
 - 
 

@@ -9,12 +9,29 @@ import urllib.parse
 import urllib.request
 import json
 import datetime
+import html
 from PyQt5.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel, 
                              QLineEdit, QTextEdit, QPushButton, QMessageBox,
-                             QScrollArea, QWidget, QFrame)
-from PyQt5.QtCore import Qt, QThread, pyqtSignal
+                             QScrollArea, QWidget, QFrame, QComboBox, QApplication)
+from PyQt5.QtCore import Qt, QThread, pyqtSignal, QTimer
+from PyQt5.QtGui import QTextCursor
+import subprocess
 from ui.widgets.shadow_utils import add_card_shadow
 from core.debug_logger import logger
+
+
+class PlainTextEdit(QTextEdit):
+    """只允许粘贴纯文本的QTextEdit"""
+    
+    def insertFromMimeData(self, source):
+        """重写粘贴方法，只粘贴纯文本"""
+        if source.hasText():
+            # 只获取纯文本内容
+            plain_text = source.text()
+            # 插入纯文本
+            self.textCursor().insertText(plain_text)
+        # 忽略其他格式（HTML、图片等）
+
 
 try:
     from docx import Document
@@ -31,10 +48,11 @@ class TranslationWorker(QThread):
     error = pyqtSignal(str)  # 翻译错误
     progress = pyqtSignal(str)  # 进度更新
     
-    def __init__(self, data_dict, email=None, parent=None):
+    def __init__(self, data_dict, email=None, translate_direction='zh_en', parent=None):
         super().__init__(parent)
         self.data_dict = data_dict
         self.email = email
+        self.translate_direction = translate_direction  # 'zh_en' 或 'en_zh'
         self.lang_manager = parent.lang_manager if parent and hasattr(parent, 'lang_manager') else None
     
     def tr(self, text):
@@ -48,25 +66,48 @@ class TranslationWorker(QThread):
             no_translate_fields = ['log', 'associate_specification', 'test_plan_reference', 
                                   'tools_and_platforms', 'user_impact', 'reproducing_rate']
             
-            # 翻译所有字段
-            translations = {}
-            for key, chinese_text in self.data_dict.items():
-                if chinese_text and chinese_text.strip():
-                    if key in no_translate_fields:
-                        # 不需要翻译的字段，直接使用中文
-                        translations[key] = ""
-                        self.progress.emit(f"{self.tr('跳过翻译')}: {key}...")
+            # 根据翻译方向处理数据
+            # Word文档始终是中文在前，英文在后
+            if self.translate_direction == 'zh_en':
+                # 中文翻译英文：输入的是中文，翻译成英文
+                source_dict = self.data_dict  # 中文内容
+                translations = {}
+                for key, source_text in source_dict.items():
+                    if source_text and source_text.strip():
+                        if key in no_translate_fields:
+                            translations[key] = ""
+                            self.progress.emit(f"{self.tr('跳过翻译')}: {key}...")
+                        else:
+                            self.progress.emit(f"{self.tr('正在翻译')}: {key}...")
+                            translated = self.translate_text(source_text)
+                            translations[key] = translated
                     else:
-                        # 需要翻译的字段
-                        self.progress.emit(f"{self.tr('正在翻译')}: {key}...")
-                        translated = self.translate_text(chinese_text)
-                        translations[key] = translated
-                else:
-                    translations[key] = ""
+                        translations[key] = ""
+                chinese_dict = source_dict
+                english_dict = translations
+            else:
+                # 英文翻译中文：输入的是英文，翻译成中文
+                source_dict = self.data_dict  # 英文内容
+                translations = {}
+                for key, source_text in source_dict.items():
+                    if source_text and source_text.strip():
+                        if key in no_translate_fields:
+                            translations[key] = ""
+                            self.progress.emit(f"{self.tr('跳过翻译')}: {key}...")
+                        else:
+                            self.progress.emit(f"{self.tr('正在翻译')}: {key}...")
+                            translated = self.translate_text(source_text)
+                            translations[key] = translated
+                    else:
+                        translations[key] = ""
+                # Word文档格式：中文在前，英文在后
+                # 所以英文输入时，翻译后的中文作为"中文"，原始英文作为"英文"
+                chinese_dict = translations  # 翻译后的中文
+                english_dict = source_dict  # 原始英文
             
             # 生成Word文档
             self.progress.emit(self.tr("正在生成Word文档..."))
-            doc_path = self.generate_word_document(self.data_dict, translations)
+            doc_path = self.generate_word_document(chinese_dict, english_dict)
             
             self.finished.emit(doc_path)
         except Exception as e:
@@ -76,28 +117,43 @@ class TranslationWorker(QThread):
     def translate_text(self, text):
         """使用MyMemory API翻译文本"""
         try:
+            # 根据翻译方向设置语言对
+            if self.translate_direction == 'zh_en':
+                langpair = 'zh|en'  # 中文翻译成英文
+            else:
+                langpair = 'en|zh'  # 英文翻译成中文
+            
             # 构建API URL
             base_url = "https://api.mymemory.translated.net/get"
             params = {
                 'q': text,
-                'langpair': 'zh|en'
+                'langpair': langpair
             }
             
             # 如果提供了邮箱，添加到参数中
             if self.email and self.email.strip():
                 params['de'] = self.email.strip()
             
-            url = f"{base_url}?{urllib.parse.urlencode(params)}"
+            # 使用urlencode确保特殊字符（如->）正确编码
+            # encoding='utf-8'确保中文字符正确编码
+            # quote_via=urllib.parse.quote_plus 使用quote_plus处理空格和特殊字符
+            url = f"{base_url}?{urllib.parse.urlencode(params, encoding='utf-8', quote_via=urllib.parse.quote_plus)}"
             
             # 发送请求
             request = urllib.request.Request(url)
             request.add_header('User-Agent', 'Mozilla/5.0')
+            request.add_header('Accept-Charset', 'UTF-8')
             
             with urllib.request.urlopen(request, timeout=30) as response:
-                data = json.loads(response.read().decode('utf-8'))
+                # 确保使用UTF-8解码响应
+                response_data = response.read()
+                decoded_data = response_data.decode('utf-8', errors='replace')
+                data = json.loads(decoded_data)
                 
                 if data.get('responseStatus') == 200:
                     translated_text = data.get('responseData', {}).get('translatedText', '')
+                    # 解码HTML实体（如 &lt; -> <, &gt; -> >, &amp; -> &）
+                    translated_text = html.unescape(translated_text)
                     return translated_text
                 else:
                     logger.warning(f"MyMemory API错误: {data.get('responseStatus')}")
@@ -205,7 +261,11 @@ class PRTranslationDialog(QDialog):
         # 从父窗口获取语言管理器
         self.lang_manager = parent.lang_manager if parent and hasattr(parent, 'lang_manager') else None
         self.translation_worker = None
+        # 配置文件路径
+        self.config_file = os.path.expanduser("~/.netui/pr_translation_config.json")
         self.setup_ui()
+        # 加载保存的邮箱
+        self.load_saved_email()
     
     def tr(self, text):
         """安全地获取翻译文本"""
@@ -217,10 +277,30 @@ class PRTranslationDialog(QDialog):
         self.setModal(True)
         self.resize(800, 700)
         
+        # 设置窗口标志，允许最大化
+        self.setWindowFlags(self.windowFlags() | Qt.WindowMaximizeButtonHint)
+        
         # 主布局
         main_layout = QVBoxLayout(self)
         main_layout.setContentsMargins(10, 10, 10, 10)
         main_layout.setSpacing(10)
+        
+        # 顶部工具栏：翻译方向选择
+        toolbar_layout = QHBoxLayout()
+        toolbar_layout.setSpacing(10)
+        
+        # 翻译方向选择
+        direction_label = QLabel(self.tr("翻译方向:"))
+        self.direction_combo = QComboBox()
+        self.direction_combo.addItem(self.tr("中文 → 英文"), 'zh_en')
+        self.direction_combo.addItem(self.tr("英文 → 中文"), 'en_zh')
+        self.direction_combo.setCurrentIndex(0)  # 默认中文翻译英文
+        toolbar_layout.addWidget(direction_label)
+        toolbar_layout.addWidget(self.direction_combo)
+        
+        toolbar_layout.addStretch()
+        
+        main_layout.addLayout(toolbar_layout)
         
         # 创建滚动区域
         scroll_area = QScrollArea()
@@ -252,6 +332,8 @@ class PRTranslationDialog(QDialog):
         
         self.email_edit = QLineEdit()
         self.email_edit.setPlaceholderText(self.tr("输入邮箱地址（可选，用于提高翻译配额）"))
+        # 监听邮箱输入变化，自动保存
+        self.email_edit.textChanged.connect(self._on_email_changed)
         email_card_layout.addWidget(self.email_edit)
         
         email_layout.addWidget(email_card)
@@ -296,12 +378,29 @@ class PRTranslationDialog(QDialog):
             field_card_layout = QVBoxLayout(field_card)
             field_card_layout.setContentsMargins(10, 1, 10, 1)
             
-            # 输入框
+            # 输入框（所有输入框都使用PlainTextEdit，只允许粘贴纯文本）
+            input_widget = PlainTextEdit()
             if is_multiline:
-                input_widget = QTextEdit()
-                input_widget.setMaximumHeight(100)
+                # 多行输入框：默认高度100，但可以根据内容自动调整
+                input_widget.setMinimumHeight(100)
+                input_widget.setMaximumHeight(500)  # 设置最大高度，避免无限增长
+                # 连接文本变化信号，自动调整高度
+                input_widget.textChanged.connect(
+                    lambda widget=input_widget: self._adjust_multiline_text_edit_height(widget)
+                )
+                # 初始设置高度为100像素
+                input_widget.setFixedHeight(100)
             else:
-                input_widget = QLineEdit()
+                # 单行输入框：默认一行高度，但可以根据内容自动调整
+                input_widget.setMinimumHeight(25)
+                input_widget.setMaximumHeight(200)  # 设置最大高度，避免无限增长
+                # 连接文本变化信号，自动调整高度
+                # 使用lambda捕获input_widget的引用（通过默认参数）
+                input_widget.textChanged.connect(
+                    lambda widget=input_widget: self._adjust_text_edit_height(widget)
+                )
+                # 初始设置高度为一行
+                input_widget.setFixedHeight(25)
             
             field_card_layout.addWidget(input_widget)
             field_layout.addWidget(field_card)
@@ -339,13 +438,10 @@ class PRTranslationDialog(QDialog):
             )
             return
         
-        # 收集所有输入数据
+        # 收集所有输入数据（所有输入框都是QTextEdit）
         data_dict = {}
         for field_key, input_widget in self.input_fields.items():
-            if isinstance(input_widget, QTextEdit):
-                text = input_widget.toPlainText().strip()
-            else:
-                text = input_widget.text().strip()
+            text = input_widget.toPlainText().strip()
             data_dict[field_key] = text
         
         # 检查是否有任何内容需要翻译
@@ -354,8 +450,13 @@ class PRTranslationDialog(QDialog):
             QMessageBox.warning(self, self.tr("输入错误"), self.tr("请至少输入一个字段的内容"))
             return
         
-        # 获取邮箱
+        # 获取邮箱并保存
         email = self.email_edit.text().strip() if self.email_edit.text().strip() else None
+        if email:
+            self.save_email(email)
+        
+        # 获取翻译方向
+        translate_direction = self.direction_combo.currentData()
         
         # 禁用按钮
         self.translate_btn.setEnabled(False)
@@ -369,7 +470,7 @@ class PRTranslationDialog(QDialog):
         self.progress_dialog.show()
         
         # 创建工作线程
-        self.translation_worker = TranslationWorker(data_dict, email, self)
+        self.translation_worker = TranslationWorker(data_dict, email, translate_direction, self)
         self.translation_worker.finished.connect(self.on_translation_finished)
         self.translation_worker.error.connect(self.on_translation_error)
         self.translation_worker.progress.connect(self.on_translation_progress)
@@ -382,29 +483,169 @@ class PRTranslationDialog(QDialog):
     
     def on_translation_finished(self, file_path):
         """翻译完成"""
-        # 关闭进度对话框
-        if hasattr(self, 'progress_dialog'):
-            self.progress_dialog.close()
+        # 彻底关闭进度对话框，避免阻塞
+        if hasattr(self, 'progress_dialog') and self.progress_dialog:
+            self.progress_dialog.hide()  # 先隐藏
+            self.progress_dialog.close()  # 关闭
+            self.progress_dialog.deleteLater()  # 确保彻底销毁
+            self.progress_dialog = None  # 清除引用
+            # 强制处理事件，确保UI立即更新
+            QApplication.processEvents()
         
         # 恢复按钮
         self.translate_btn.setEnabled(True)
         self.cancel_btn.setEnabled(True)
         
-        # 打开Word文档
+        # 使用QTimer延迟打开文件，确保UI更新完成后再打开
+        # 这样可以避免阻塞主线程
+        QTimer.singleShot(200, lambda: self._open_word_document(file_path))
+    
+    def _open_word_document(self, file_path):
+        """打开Word文档（非阻塞方式）"""
         try:
-            os.startfile(file_path)
-            QMessageBox.information(
-                self, 
-                self.tr("翻译完成"), 
-                self.tr(f"翻译完成！Word文档已生成并打开。\n文件路径: {file_path}")
-            )
-            # 不自动关闭对话框，让用户可以继续使用
+            # 再次确保进度对话框已关闭
+            if hasattr(self, 'progress_dialog') and self.progress_dialog:
+                self.progress_dialog.hide()
+                self.progress_dialog.close()
+                self.progress_dialog.deleteLater()
+                self.progress_dialog = None
+                QApplication.processEvents()
+            
+            # 使用subprocess.Popen非阻塞方式打开文件
+            if os.name == 'nt':  # Windows
+                subprocess.Popen(
+                    ['start', '', file_path],
+                    shell=True,
+                    creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0
+                )
+            else:
+                # 其他系统使用os.startfile或xdg-open
+                os.startfile(file_path)
+            
+            # 再次处理事件，确保文件打开操作完成
+            QApplication.processEvents()
+            
+            # 延迟显示成功消息，确保进度对话框完全消失
+            QTimer.singleShot(100, lambda: self._show_success_message(file_path))
         except Exception as e:
+            # 确保进度对话框已关闭后再显示错误消息
+            if hasattr(self, 'progress_dialog') and self.progress_dialog:
+                self.progress_dialog.hide()
+                self.progress_dialog.close()
+                self.progress_dialog.deleteLater()
+                self.progress_dialog = None
+                QApplication.processEvents()
+            
             QMessageBox.critical(
                 self, 
                 self.tr("打开失败"), 
                 self.tr(f"翻译完成，但打开文档失败: {str(e)}\n文件路径: {file_path}")
             )
+    
+    def _show_success_message(self, file_path):
+        """显示成功消息"""
+        # 最后一次确保进度对话框已关闭
+        if hasattr(self, 'progress_dialog') and self.progress_dialog:
+            self.progress_dialog.hide()
+            self.progress_dialog.close()
+            self.progress_dialog.deleteLater()
+            self.progress_dialog = None
+            QApplication.processEvents()
+        
+        QMessageBox.information(
+            self, 
+            self.tr("翻译完成"), 
+            self.tr(f"翻译完成！Word文档已生成并打开。\n文件路径: {file_path}")
+        )
+        # 不自动关闭对话框，让用户可以继续使用
+    
+    def _adjust_text_edit_height(self, text_edit):
+        """根据内容自动调整单行QTextEdit的高度"""
+        # 获取文档内容高度
+        doc_height = text_edit.document().size().height()
+        
+        # 添加一些边距（上下各4像素）
+        margin = 8
+        new_height = int(doc_height) + margin
+        
+        # 确保高度在最小和最大范围内
+        min_height = 25
+        max_height = 200
+        new_height = max(min_height, min(new_height, max_height))
+        
+        # 设置新高度
+        text_edit.setFixedHeight(new_height)
+    
+    def _adjust_multiline_text_edit_height(self, text_edit):
+        """根据内容自动调整多行QTextEdit的高度"""
+        # 获取文档内容高度
+        doc_height = text_edit.document().size().height()
+        
+        # 添加一些边距（上下各4像素）
+        margin = 8
+        new_height = int(doc_height) + margin
+        
+        # 确保高度在最小和最大范围内
+        min_height = 100  # 多行输入框最小高度
+        max_height = 500  # 多行输入框最大高度
+        new_height = max(min_height, min(new_height, max_height))
+        
+        # 设置新高度
+        text_edit.setFixedHeight(new_height)
+    
+    def load_saved_email(self):
+        """加载保存的邮箱"""
+        try:
+            if os.path.exists(self.config_file):
+                with open(self.config_file, 'r', encoding='utf-8') as f:
+                    config = json.load(f)
+                    saved_email = config.get('email', '')
+                    if saved_email:
+                        self.email_edit.setText(saved_email)
+        except Exception as e:
+            logger.exception(f"{self.tr('加载保存的邮箱失败')}: {str(e)}")
+    
+    def save_email(self, email):
+        """保存邮箱到配置文件"""
+        try:
+            # 确保配置目录存在
+            os.makedirs(os.path.dirname(self.config_file), exist_ok=True)
+            
+            # 读取现有配置或创建新配置
+            config = {}
+            if os.path.exists(self.config_file):
+                try:
+                    with open(self.config_file, 'r', encoding='utf-8') as f:
+                        config = json.load(f)
+                except Exception:
+                    config = {}
+            
+            # 更新邮箱
+            config['email'] = email
+            
+            # 保存配置
+            with open(self.config_file, 'w', encoding='utf-8') as f:
+                json.dump(config, f, ensure_ascii=False, indent=2)
+        except Exception as e:
+            logger.exception(f"{self.tr('保存邮箱失败')}: {str(e)}")
+    
+    def _on_email_changed(self, text):
+        """邮箱输入变化时的处理（延迟保存，避免频繁写入）"""
+        # 使用QTimer延迟保存，避免每次输入都保存
+        if not hasattr(self, '_email_save_timer'):
+            self._email_save_timer = QTimer()
+            self._email_save_timer.setSingleShot(True)
+            self._email_save_timer.timeout.connect(lambda: self._save_email_if_not_empty())
+        
+        # 重置定时器，延迟1秒后保存
+        self._email_save_timer.stop()
+        self._email_save_timer.start(1000)
+    
+    def _save_email_if_not_empty(self):
+        """保存邮箱（如果非空）"""
+        email = self.email_edit.text().strip()
+        if email:
+            self.save_email(email)
     
     def on_translation_error(self, error_msg):
         """翻译错误"""
