@@ -1,10 +1,10 @@
 {
-    "version":  "0.9.5.8",
-    "download_url":  "https://github.com/pranvil/MobileTestTool/releases/download/v0.9.5.8/MobileTestTool_0.9.5.8.zip",
+    "version":  "0.9.5.9",
+    "download_url":  "https://github.com/pranvil/MobileTestTool/releases/download/v0.9.5.9/MobileTestTool_0.9.5.9.zip",
     "sha256":  "be678e100dde3c63d1469efd357984bcd83a39a9652144cbf50b22da98139689",
-    "file_name":  "MobileTestTool_0.9.5.8.zip",
+    "file_name":  "MobileTestTool_0.9.5.9.zip",
     "file_size":  110246224,
-    "release_notes":  "# MobileTestTool Release Notes\r\n\r\n## Verison information\r\n- Verison：0.9.5.8\r\n- Rlease date：2025/11/7\r\n\r\n## Release Note\r\n- ✅ PR翻译对话框默认保存用户输入的邮箱\r\n- ✅ PR翻译对话框如果粘贴的话只允许粘贴纯文本\r\n## Known issue\r\n-",
+    "release_notes":  "# MobileTestTool Release Notes\r\n\r\n## Verison information\r\n- Verison：0.9.5.9\r\n- Rlease date：2025/11/7\r\n\r\n## Release Note\r\n- ✅ PR翻译对话框默认保存用户输入的邮箱\r\n- ✅ PR翻译对话框如果粘贴的话只允许粘贴纯文本\r\n## Known issue\r\n-",
     "published_at":  "2025-11-07T22:19:32Z",
     "mandatory":  false
 }

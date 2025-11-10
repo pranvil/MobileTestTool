@@ -2140,6 +2140,8 @@ class MainWindow(QMainWindow):
                     if subcmd_lower == 'shell':
                         idx += 1
                         expect_value = False
+                        shell_start_idx = idx  # 记录shell后的起始位置
+                        found_shell_command = False  # 标记是否找到实际命令
 
                         while idx < len(tokens_lower):
                             shell_tok_lower = tokens_lower[idx]
@@ -2159,11 +2161,18 @@ class MainWindow(QMainWindow):
                                 idx += 1
                                 continue
 
+                            # 找到了实际命令（非参数）
+                            found_shell_command = True
                             primary_cmd = shell_tok_lower.split()[0]
 
                             if primary_cmd in BLOCKED_COMMANDS:
                                 blocked_hint = BLOCKED_COMMANDS[primary_cmd]
                             break
+                        
+                        # 检查 adb shell 后面是否有实际命令
+                        if not found_shell_command:
+                            # adb shell 后面没有任何命令
+                            blocked_hint = self.tr('adb shell 后面必须跟命令，不允许单独使用')
                     else:
                         primary_cmd = subcmd_lower.split()[0]
                         if primary_cmd in BLOCKED_COMMANDS:
@@ -2190,12 +2199,12 @@ class MainWindow(QMainWindow):
                 creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0
             )
             
-            # 透传输出内容
+            # 透传输出内容（使用紫色显示返回值）
             if result.stdout:
-                self.append_log.emit(result.stdout, None)
+                self.append_log.emit(result.stdout, "#9D4EDD")
             
             if result.stderr:
-                self.append_log.emit(result.stderr, None)
+                self.append_log.emit(result.stderr, "#9D4EDD")
                 
         except subprocess.TimeoutExpired:
             self.append_log.emit(f"⚠️ {self.lang_manager.tr('命令执行超时（30秒）')}\n", "#FFA500")

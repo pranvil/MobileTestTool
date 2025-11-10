@@ -6,6 +6,8 @@
 
 ## Release Note
 - ✅ adb命令输入框支持上下键调用历史命令
+- ✅ 命令返回内容用紫色显示
+- ✅ 禁止输入adb shell
 ## Known issue
 - 
 
