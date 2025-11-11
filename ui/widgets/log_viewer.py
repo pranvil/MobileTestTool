@@ -8,7 +8,7 @@ import os
 import json
 from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QTextEdit, QLabel,
                              QHBoxLayout, QPushButton, QLineEdit, QCheckBox,
-                             QSizePolicy, QFrame)
+                             QSizePolicy, QFrame, QMenu, QAction)
 from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtGui import QTextCharFormat, QColor, QTextCursor, QFont, QTextDocument, QKeyEvent
 
@@ -143,6 +143,9 @@ class LogViewer(QWidget):
         # ADB命令历史
         self.adb_command_history = []
         
+        # 自动滚动状态（默认开启）
+        self.auto_scroll_enabled = True
+        
         # 加载历史命令
         self.load_command_history()
         
@@ -225,6 +228,9 @@ class LogViewer(QWidget):
                 border-radius: 4px;
             }
         """)
+        # 设置右键菜单
+        self.text_edit.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.text_edit.customContextMenuRequested.connect(self.show_context_menu)
         
         # 配置文本格式
         self.default_format = QTextCharFormat()
@@ -355,8 +361,9 @@ class LogViewer(QWidget):
         # 添加文本
         cursor.insertText(text)
         
-        # 自动滚动到底部
-        self.text_edit.setTextCursor(cursor)
+        # 根据自动滚动状态决定是否滚动到底部
+        if self.auto_scroll_enabled:
+            self.text_edit.setTextCursor(cursor)
         
     def append_log_with_highlight(self, text, keyword, color="#FF4444"):
         """追加日志并高亮关键字"""
@@ -371,8 +378,9 @@ class LogViewer(QWidget):
         if keyword:
             self.highlight_keyword_in_text(keyword, color)
         
-        # 自动滚动到底部
-        self.text_edit.setTextCursor(cursor)
+        # 根据自动滚动状态决定是否滚动到底部
+        if self.auto_scroll_enabled:
+            self.text_edit.setTextCursor(cursor)
         
     def highlight_keyword_in_text(self, keyword, color="#FF4444"):
         """高亮文本中的关键字"""
@@ -661,6 +669,56 @@ class LogViewer(QWidget):
         # 显示窗口
         results_window.exec_()
         self.status_message.emit(f"{self.tr('显示 ')}{len(matching_lines)}{self.tr(' 个匹配项')}")
+    
+    def show_context_menu(self, position):
+        """显示右键菜单"""
+        menu = QMenu(self.text_edit)
+        
+        # 添加QTextEdit的标准编辑动作（复制、全选等）
+        # 由于text_edit是只读的，只有复制和全选可用
+        copy_action = QAction(self.lang_manager.tr("复制"), self.text_edit)
+        copy_action.setShortcut("Ctrl+C")
+        copy_action.triggered.connect(self.text_edit.copy)
+        menu.addAction(copy_action)
+        
+        select_all_action = QAction(self.lang_manager.tr("全选"), self.text_edit)
+        select_all_action.setShortcut("Ctrl+A")
+        select_all_action.triggered.connect(self.text_edit.selectAll)
+        menu.addAction(select_all_action)
+        
+        # 添加分隔符
+        menu.addSeparator()
+        
+        # 根据当前自动滚动状态显示不同的菜单文本
+        if self.auto_scroll_enabled:
+            action_text = self.lang_manager.tr("停止自动滚动")
+        else:
+            action_text = self.lang_manager.tr("自动滚动")
+        
+        auto_scroll_action = QAction(action_text, self.text_edit)
+        auto_scroll_action.triggered.connect(self.toggle_auto_scroll)
+        menu.addAction(auto_scroll_action)
+        
+        # 添加分隔符
+        menu.addSeparator()
+        
+        # 清空日志
+        clear_action = QAction(self.lang_manager.tr("清空日志"), self.text_edit)
+        clear_action.triggered.connect(self.clear_logs)
+        menu.addAction(clear_action)
+        
+        # 显示菜单
+        menu.exec_(self.text_edit.mapToGlobal(position))
+    
+    def toggle_auto_scroll(self):
+        """切换自动滚动状态"""
+        self.auto_scroll_enabled = not self.auto_scroll_enabled
+        
+        # 如果重新启用自动滚动，立即滚动到底部
+        if self.auto_scroll_enabled:
+            cursor = self.text_edit.textCursor()
+            cursor.movePosition(QTextCursor.End)
+            self.text_edit.setTextCursor(cursor)
         
     # 信号定义（用于发送状态消息）
     status_message = pyqtSignal(str)

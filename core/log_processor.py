@@ -571,9 +571,10 @@ class PyQtLogProcessor(QObject):
         # 高效的行数裁剪机制
         self.trim_log_lines_if_needed(len(lines))
         
-        # 滚动到底部
-        text_edit.setTextCursor(cursor)
-        text_edit.ensureCursorVisible()
+        # 根据自动滚动状态决定是否滚动到底部
+        if self.log_viewer.auto_scroll_enabled:
+            text_edit.setTextCursor(cursor)
+            text_edit.ensureCursorVisible()
     
     def add_highlighted_line(self, line, cursor):
         """添加高亮显示的日志行"""
