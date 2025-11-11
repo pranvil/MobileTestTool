@@ -22,9 +22,17 @@ class BF22Parser:
                     if st.tag == "81":
                         grp.children.append(ParseNode(name="Number of installed application", value=st.value_hex))
                     elif st.tag == "82":
-                        grp.children.append(ParseNode(name="Available ROM (bytes)", value=str(int(st.value_hex, 16))))
+                        rom_bytes = int(st.value_hex, 16)
+                        rom_value = str(rom_bytes)
+                        if rom_bytes > 1024:
+                            rom_value += f" ({rom_bytes / 1024:.2f} KB)"
+                        grp.children.append(ParseNode(name="Available ROM (bytes)", value=rom_value))
                     elif st.tag == "83":
-                        grp.children.append(ParseNode(name="Available RAM (bytes)", value=str(int(st.value_hex, 16))))
+                        ram_bytes = int(st.value_hex, 16)
+                        ram_value = str(ram_bytes)
+                        if ram_bytes > 1024:
+                            ram_value += f" ({ram_bytes / 1024:.2f} KB)"
+                        grp.children.append(ParseNode(name="Available RAM (bytes)", value=ram_value))
                     else:
                         grp.children.append(ParseNode(name=f"Unknown {st.tag}", value=st.value_hex))
                 root.children.append(grp)

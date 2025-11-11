@@ -1,7 +1,7 @@
 # MobileTestTool Release Notes
 
 ## Verison information
-- Verison：0.9.5.9
+- Verison：0.9.6.0
 - Rlease date：2025/11/7
 
 ## Release Note
@@ -11,7 +11,7 @@
 - ✅ 日志显示区域添加自动滚动开关
 - ✅ 日志显示区域添加右键清空
 - ✅ AT命令拖动排序
-- at+cops=? 待解决
+- ✅ 解决at+cops=?无法返回结果的问题 
 ## Known issue
 - 
 

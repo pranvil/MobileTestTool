@@ -1,10 +1,10 @@
 {
-    "version":  "0.9.5.9",
-    "download_url":  "https://github.com/pranvil/MobileTestTool/releases/download/v0.9.5.9/MobileTestTool_0.9.5.9.zip",
+    "version":  "0.9.6.0",
+    "download_url":  "https://github.com/pranvil/MobileTestTool/releases/download/v0.9.6.0/MobileTestTool_0.9.6.0.zip",
     "sha256":  "92450795bb6e031ee65215fd9992e449509439a909a6c694fa0512a0e013bea4",
-    "file_name":  "MobileTestTool_0.9.5.9.zip",
+    "file_name":  "MobileTestTool_0.9.6.0.zip",
     "file_size":  110262633,
-    "release_notes":  "# MobileTestTool Release Notes\r\n\r\n## Verison information\r\n- Verison：0.9.5.9\r\n- Rlease date：2025/11/7\r\n\r\n## Release Note\r\n- ✅ adb命令输入框支持上下键调用历史命令\r\n- ✅ 命令返回内容用紫色显示\r\n- ✅ 禁止输入adb shell\r\n- ✅ 日志显示区域添加自动滚动开关\r\n- ✅ 日志显示区域添加右键清空\r\n- ✅ AT命令拖动排序\r\n- at+cops=? 待解决\r\n## Known issue\r\n-",
+    "release_notes":  "# MobileTestTool Release Notes\r\n\r\n## Verison information\r\n- Verison：0.9.6.0\r\n- Rlease date：2025/11/7\r\n\r\n## Release Note\r\n- ✅ adb命令输入框支持上下键调用历史命令\r\n- ✅ 命令返回内容用紫色显示\r\n- ✅ 禁止输入adb shell\r\n- ✅ 日志显示区域添加自动滚动开关\r\n- ✅ 日志显示区域添加右键清空\r\n- ✅ AT命令拖动排序\r\n- at+cops=? 待解决\r\n## Known issue\r\n-",
     "published_at":  "2025-11-11T05:35:19Z",
     "mandatory":  false
 }
