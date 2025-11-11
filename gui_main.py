@@ -139,6 +139,9 @@ def main():
         logger.info(f"程序正常退出，退出码: {exit_code}")
         logger.info("=" * 60)
         
+        # 关闭日志系统
+        logger.shutdown()
+        
         sys.exit(exit_code)
         
     except Exception as e:
@@ -156,6 +159,9 @@ def main():
         except:
             # 静默处理启动失败错误，避免控制台乱码
             pass
+        
+        # 关闭日志系统
+        logger.shutdown()
         
         sys.exit(1)
 

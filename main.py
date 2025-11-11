@@ -126,6 +126,8 @@ def main():
         
     except Exception as e:
         logger.exception("程序启动失败")
+        # 关闭日志系统
+        logger.shutdown()
         sys.exit(1)
 
 

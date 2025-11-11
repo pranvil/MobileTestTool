@@ -10,10 +10,126 @@ from PyQt5.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QPushButton,
                              QTextEdit, QTableWidget, QTableWidgetItem, 
                              QLineEdit, QComboBox, QMenu, QMessageBox,
                              QFileDialog, QHeaderView, QLabel, QSplitter, QWidget,
-                             QFormLayout)
-from PyQt5.QtCore import Qt, QThread, pyqtSignal, QDateTime
+                             QFormLayout, QAbstractItemView)
+from PyQt5.QtCore import Qt, QThread, pyqtSignal, QDateTime, QTimer
 from PyQt5.QtGui import QTextCursor, QTextCharFormat, QColor, QFont
 from core.debug_logger import logger
+
+
+class DraggableCommandsTable(QTableWidget):
+    """支持拖动排序的命令表格"""
+    
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.parent_dialog = parent
+        self.setDragEnabled(True)
+        self.setAcceptDrops(True)
+        self.viewport().setAcceptDrops(True)
+        self.setDropIndicatorShown(True)
+        self.setDragDropMode(QAbstractItemView.InternalMove)
+        self.setDragDropOverwriteMode(False)
+        self.setDefaultDropAction(Qt.MoveAction)
+        self.setSelectionBehavior(QAbstractItemView.SelectRows)
+        self.setSelectionMode(QAbstractItemView.SingleSelection)
+        
+        # 性能优化：使用像素级滚动，更流畅
+        self.setVerticalScrollMode(QAbstractItemView.ScrollPerPixel)
+        
+        # 性能优化：禁用交替行颜色，减少重绘开销
+        self.setAlternatingRowColors(False)
+        
+        # 性能优化：禁用自动调整行高
+        self.verticalHeader().setSectionResizeMode(QHeaderView.Fixed)
+    
+    def dragEnterEvent(self, event):
+        """处理拖入事件"""
+        if event.source() == self:
+            event.acceptProposedAction()
+        else:
+            super().dragEnterEvent(event)
+    
+    def dragMoveEvent(self, event):
+        """处理拖动移动事件"""
+        if event.source() == self:
+            # 快速接受事件，不做额外处理，提高拖动流畅度
+            event.acceptProposedAction()
+        else:
+            super().dragMoveEvent(event)
+    
+    def dropEvent(self, event):
+        """处理拖放事件"""
+        # 只处理来自自身的拖放事件
+        if event.source() != self:
+            super().dropEvent(event)
+            return
+        
+        # 获取源行（拖动开始时的选中行）
+        selected_items = self.selectedItems()
+        if not selected_items:
+            event.ignore()
+            return
+        
+        source_row = selected_items[0].row()
+        if source_row < 0 or source_row >= self.rowCount():
+            event.ignore()
+            return
+        
+        # 获取目标位置
+        target_index = self.indexAt(event.pos())
+        if target_index.isValid():
+            target_row = target_index.row()
+            # 获取拖放指示器位置（AboveItem或BelowItem）
+            indicator = self.dropIndicatorPosition()
+            if indicator == QAbstractItemView.BelowItem:
+                target_row += 1
+        else:
+            # 如果拖到表格外，放到最后
+            target_row = self.rowCount()
+        
+        # 调整目标行，考虑源行删除后的偏移
+        if target_row > source_row:
+            target_row -= 1
+        
+        # 如果目标位置和源位置相同，忽略
+        if target_row == source_row or target_row < 0:
+            event.ignore()
+            return
+        
+        if target_row > self.rowCount():
+            target_row = self.rowCount()
+        
+        # 直接操作数据列表，然后刷新表格
+        if self.parent_dialog and hasattr(self.parent_dialog, 'at_commands'):
+            # 获取要移动的命令
+            if source_row < len(self.parent_dialog.at_commands):
+                moved_command = self.parent_dialog.at_commands[source_row]
+                
+                # 从列表中删除
+                self.parent_dialog.at_commands.pop(source_row)
+                
+                # 插入到目标位置
+                self.parent_dialog.at_commands.insert(target_row, moved_command)
+                
+                # 保存
+                self.parent_dialog.save_commands()
+                
+                # 使用QTimer延迟刷新，确保拖放事件完全处理完成
+                QTimer.singleShot(0, lambda: self._refresh_after_drop(target_row))
+        
+        event.acceptProposedAction()
+    
+    def _refresh_after_drop(self, target_row):
+        """拖放完成后刷新表格"""
+        if self.parent_dialog and hasattr(self.parent_dialog, 'refresh_commands_table'):
+            # 设置强制刷新标志，绕过更新检查
+            self.parent_dialog._force_refresh = True
+            
+            # 刷新表格
+            self.parent_dialog.refresh_commands_table()
+            
+            # 选中移动后的行
+            if target_row < self.rowCount():
+                self.selectRow(target_row)
 
 
 class AddEditCommandDialog(QDialog):
@@ -95,8 +211,8 @@ class ATCommandDialog(QDialog):
             from core.language_manager import LanguageManager
             self.lang_manager = LanguageManager.get_instance()
         
-        # AT命令列表（名称 -> 命令）
-        self.at_commands = {}
+        # AT命令列表（有序列表，每个元素为 {"name": "...", "command": "..."}）
+        self.at_commands = []
         self.load_commands()
         
         # 当前选中的端口
@@ -170,7 +286,7 @@ class ATCommandDialog(QDialog):
         commands_label = QLabel(self.lang_manager.tr("保存的AT命令:"))
         commands_container.addWidget(commands_label)
         
-        self.commands_table = QTableWidget()
+        self.commands_table = DraggableCommandsTable(self)
         self.commands_table.setColumnCount(2)
         self.commands_table.setHorizontalHeaderLabels([
             self.lang_manager.tr("命令名称"), 
@@ -209,7 +325,7 @@ class ATCommandDialog(QDialog):
         splitter.addWidget(commands_widget)
         
         # 设置分割器比例（左右各占50%）
-        splitter.setSizes([500, 400])
+        splitter.setSizes([400, 500])
         
         # 刷新命令列表
         self.refresh_commands_table()
@@ -307,10 +423,11 @@ class ATCommandDialog(QDialog):
     
     def on_command_double_clicked(self, row, column):
         """双击命令时直接发送"""
-        command_item = self.commands_table.item(row, 1)
-        if command_item:
-            command = command_item.text()
-            self.send_at_command_directly(command)
+        if row < 0 or row >= len(self.at_commands):
+            return
+        
+        command = self.at_commands[row]["command"]
+        self.send_at_command_directly(command)
     
     def show_context_menu(self, position):
         """显示右键菜单"""
@@ -326,6 +443,18 @@ class ATCommandDialog(QDialog):
             
             delete_action = menu.addAction(self.lang_manager.tr("删除"))
             delete_action.triggered.connect(self.delete_command)
+            
+            menu.addSeparator()
+            
+            # 上移/下移选项
+            selected_row = self.commands_table.currentRow()
+            if selected_row > 0:
+                move_up_action = menu.addAction(self.lang_manager.tr("上移"))
+                move_up_action.triggered.connect(self.move_command_up)
+            
+            if selected_row < self.commands_table.rowCount() - 1:
+                move_down_action = menu.addAction(self.lang_manager.tr("下移"))
+                move_down_action.triggered.connect(self.move_command_down)
         
         menu.exec_(self.commands_table.viewport().mapToGlobal(position))
     
@@ -335,48 +464,47 @@ class ATCommandDialog(QDialog):
         if dialog.exec_() == QDialog.Accepted:
             name, command = dialog.get_data()
             if name and command:
-                self.at_commands[name] = command
+                # 检查名称是否已存在
+                if any(cmd["name"] == name for cmd in self.at_commands):
+                    QMessageBox.warning(self, self.lang_manager.tr("警告"), 
+                                      self.lang_manager.tr(f"命令名称 '{name}' 已存在"))
+                    return
+                self.at_commands.append({"name": name, "command": command})
                 self.save_commands()
                 self.refresh_commands_table()
     
     def edit_command(self):
         """编辑AT命令"""
         selected_row = self.commands_table.currentRow()
-        if selected_row < 0:
+        if selected_row < 0 or selected_row >= len(self.at_commands):
             return
         
-        name_item = self.commands_table.item(selected_row, 0)
-        if not name_item:
-            return
+        cmd = self.at_commands[selected_row]
+        name = cmd["name"]
+        command = cmd["command"]
         
-        name = name_item.text()
-        if name not in self.at_commands:
-            return
-        
-        command = self.at_commands[name]
         dialog = AddEditCommandDialog(self, is_edit=True, name=name, command=command)
         if dialog.exec_() == QDialog.Accepted:
             new_name, new_command = dialog.get_data()
             if new_name and new_command:
-                # 删除旧命令
-                if name in self.at_commands:
-                    del self.at_commands[name]
-                # 添加新命令
-                self.at_commands[new_name] = new_command
+                # 检查新名称是否与其他命令冲突
+                if new_name != name and any(cmd["name"] == new_name for cmd in self.at_commands):
+                    QMessageBox.warning(self, self.lang_manager.tr("警告"), 
+                                      self.lang_manager.tr(f"命令名称 '{new_name}' 已存在"))
+                    return
+                # 更新命令
+                self.at_commands[selected_row] = {"name": new_name, "command": new_command}
                 self.save_commands()
                 self.refresh_commands_table()
     
     def delete_command(self):
         """删除AT命令"""
         selected_row = self.commands_table.currentRow()
-        if selected_row < 0:
+        if selected_row < 0 or selected_row >= len(self.at_commands):
             return
         
-        name_item = self.commands_table.item(selected_row, 0)
-        if not name_item:
-            return
-        
-        name = name_item.text()
+        cmd = self.at_commands[selected_row]
+        name = cmd["name"]
         
         reply = QMessageBox.question(
             self,
@@ -386,10 +514,114 @@ class ATCommandDialog(QDialog):
         )
         
         if reply == QMessageBox.Yes:
-            if name in self.at_commands:
-                del self.at_commands[name]
+            self.at_commands.pop(selected_row)
+            self.save_commands()
+            self.refresh_commands_table()
+    
+    def move_command_up(self):
+        """上移命令"""
+        selected_row = self.commands_table.currentRow()
+        if selected_row <= 0 or selected_row >= len(self.at_commands):
+            return
+        
+        # 交换位置
+        self.at_commands[selected_row], self.at_commands[selected_row - 1] = \
+            self.at_commands[selected_row - 1], self.at_commands[selected_row]
+        
+        self.save_commands()
+        self.refresh_commands_table()
+        
+        # 保持选中状态
+        self.commands_table.selectRow(selected_row - 1)
+    
+    def move_command_down(self):
+        """下移命令"""
+        selected_row = self.commands_table.currentRow()
+        if selected_row < 0 or selected_row >= len(self.at_commands) - 1:
+            return
+        
+        # 交换位置
+        self.at_commands[selected_row], self.at_commands[selected_row + 1] = \
+            self.at_commands[selected_row + 1], self.at_commands[selected_row]
+        
+        self.save_commands()
+        self.refresh_commands_table()
+        
+        # 保持选中状态
+        self.commands_table.selectRow(selected_row + 1)
+    
+    def refresh_commands_table(self):
+        """刷新命令列表"""
+        # 如果正在更新顺序，不执行刷新（但允许强制刷新）
+        if hasattr(self, '_updating_order') and self._updating_order:
+            # 检查是否是强制刷新（通过临时设置标志来绕过检查）
+            if not getattr(self, '_force_refresh', False):
+                return
+        
+        try:
+            # 清除强制刷新标志
+            self._force_refresh = False
+            
+            # 清空表格
+            self.commands_table.setRowCount(0)
+            
+            # 重新填充表格
+            for cmd in self.at_commands:
+                row = self.commands_table.rowCount()
+                self.commands_table.insertRow(row)
+                
+                name_item = QTableWidgetItem(cmd["name"])
+                name_item.setFlags(name_item.flags() & ~Qt.ItemIsEditable)  # 禁止编辑
+                self.commands_table.setItem(row, 0, name_item)
+                
+                command_item = QTableWidgetItem(cmd["command"])
+                command_item.setFlags(command_item.flags() & ~Qt.ItemIsEditable)  # 禁止编辑
+                self.commands_table.setItem(row, 1, command_item)
+        except Exception as e:
+            logger.exception(f"刷新命令表格失败: {e}")
+    
+    def _sync_data_from_table(self):
+        """根据表格当前顺序同步数据列表"""
+        # 防止递归调用
+        if hasattr(self, '_updating_order') and self._updating_order:
+            return
+            
+        self._updating_order = True
+        try:
+            # 根据表格行的顺序重新排列数据
+            new_commands = []
+            used_indices = set()  # 记录已使用的索引，避免重复
+            
+            for row in range(self.commands_table.rowCount()):
+                name_item = self.commands_table.item(row, 0)
+                command_item = self.commands_table.item(row, 1)
+                if name_item and command_item:
+                    name = name_item.text()
+                    command = command_item.text()
+                    
+                    # 在原始列表中查找对应的命令（使用索引避免重复）
+                    found = False
+                    for idx, cmd in enumerate(self.at_commands):
+                        if idx not in used_indices and cmd["name"] == name and cmd["command"] == command:
+                            new_commands.append(cmd)
+                            used_indices.add(idx)
+                            found = True
+                            break
+                    
+                    # 如果没找到，创建一个新的（防止数据丢失）
+                    if not found:
+                        logger.warning(f"未找到匹配的命令: {name} - {command}")
+                        new_commands.append({"name": name, "command": command})
+            
+            # 更新数据列表
+            if len(new_commands) > 0:
+                self.at_commands = new_commands
                 self.save_commands()
-                self.refresh_commands_table()
+                logger.debug(f"数据同步成功，共 {len(new_commands)} 条命令")
+        except Exception as e:
+            logger.exception(f"同步数据失败: {e}")
+        finally:
+            self._updating_order = False
     
     def import_commands(self):
         """导入AT命令列表"""
@@ -403,8 +635,21 @@ class ATCommandDialog(QDialog):
         if file_path:
             try:
                 with open(file_path, 'r', encoding='utf-8') as f:
-                    imported_commands = json.load(f)
-                    self.at_commands.update(imported_commands)
+                    imported_data = json.load(f)
+                    
+                    # 兼容旧格式（字典）和新格式（列表）
+                    if isinstance(imported_data, dict):
+                        # 旧格式：转换为新格式
+                        imported_commands = [{"name": name, "command": cmd} 
+                                           for name, cmd in imported_data.items()]
+                    elif isinstance(imported_data, list):
+                        # 新格式：直接使用
+                        imported_commands = imported_data
+                    else:
+                        raise ValueError("不支持的JSON格式")
+                    
+                    # 合并到现有列表（追加到末尾）
+                    self.at_commands.extend(imported_commands)
                     self.save_commands()
                     self.refresh_commands_table()
                     QMessageBox.information(self, self.lang_manager.tr("成功"), 
@@ -433,22 +678,6 @@ class ATCommandDialog(QDialog):
                 QMessageBox.critical(self, self.lang_manager.tr("错误"), 
                                     self.lang_manager.tr(f"导出失败: {str(e)}"))
                 logger.exception(self.lang_manager.tr("导出AT命令失败"))
-    
-    def refresh_commands_table(self):
-        """刷新命令列表"""
-        self.commands_table.setRowCount(0)
-        
-        for name, command in self.at_commands.items():
-            row = self.commands_table.rowCount()
-            self.commands_table.insertRow(row)
-            
-            name_item = QTableWidgetItem(name)
-            name_item.setFlags(name_item.flags() & ~Qt.ItemIsEditable)  # 禁止编辑
-            self.commands_table.setItem(row, 0, name_item)
-            
-            command_item = QTableWidgetItem(command)
-            command_item.setFlags(command_item.flags() & ~Qt.ItemIsEditable)  # 禁止编辑
-            self.commands_table.setItem(row, 1, command_item)
     
     def append_output(self, text):
         """追加输出文本，使用颜色区分输入和输出"""
@@ -510,10 +739,26 @@ class ATCommandDialog(QDialog):
         if os.path.exists(file_path):
             try:
                 with open(file_path, 'r', encoding='utf-8') as f:
-                    self.at_commands = json.load(f)
+                    data = json.load(f)
+                    
+                    # 兼容旧格式（字典）和新格式（列表）
+                    if isinstance(data, dict):
+                        # 旧格式：转换为新格式（有序列表）
+                        self.at_commands = [{"name": name, "command": cmd} 
+                                           for name, cmd in data.items()]
+                        # 保存为新格式以便后续使用
+                        self.save_commands()
+                    elif isinstance(data, list):
+                        # 新格式：直接使用
+                        self.at_commands = data
+                    else:
+                        logger.warning("AT命令文件格式不正确，使用空列表")
+                        self.at_commands = []
             except Exception as e:
                 logger.exception(self.lang_manager.tr("加载AT命令失败"))
-                self.at_commands = {}
+                self.at_commands = []
+        else:
+            self.at_commands = []
 
 
 class ATCommandWorker(QThread):
