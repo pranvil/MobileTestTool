@@ -784,8 +784,27 @@ class ATCommandWorker(QThread):
             import serial
             import time
             
-            # 打开串口，使用较短的超时时间以提高响应速度
-            ser = serial.Serial(self.port, 115200, timeout=0.5)
+            # 判断命令类型，设置不同的超时时间
+            command_upper = self.command.upper().strip()
+            is_query_command = command_upper.endswith('=?') or command_upper.endswith('?')
+            is_cops_query = command_upper == 'AT+COPS=?' or command_upper == '+COPS=?'
+            
+            # 查询命令（如 AT+COPS=?）需要更长的超时时间，因为可能需要扫描网络
+            if is_query_command:
+                max_wait_time = 60.0  # 查询命令最多等待60秒
+                read_timeout = 1.0    # 串口读取超时1秒
+            else:
+                max_wait_time = 10.0  # 普通命令最多等待10秒
+                read_timeout = 0.5    # 串口读取超时0.5秒
+            
+            # AT+COPS=? 特殊处理：60秒内没有新数据也认为响应完成
+            if is_cops_query:
+                no_data_timeout = 60.0  # 60秒内没有新数据，认为响应完成
+            else:
+                no_data_timeout = 2.0   # 其他命令：2秒内没有新数据，认为响应完成
+            
+            # 打开串口
+            ser = serial.Serial(self.port, 115200, timeout=read_timeout)
             
             # 清空输入缓冲区
             ser.reset_input_buffer()
@@ -793,13 +812,13 @@ class ATCommandWorker(QThread):
             # 发送命令
             ser.write(f"{self.command}\r\n".encode())
             
-            # 等待一小段时间让设备处理命令（通常AT响应很快）
-            time.sleep(0.05)
+            # 等待一小段时间让设备处理命令
+            time.sleep(0.1)
             
-            # 读取所有可用的响应数据
+            # 读取响应数据
             response = ""
             start_time = time.time()
-            max_wait_time = 2.0  # 最多等待2秒
+            last_data_time = start_time
             
             while time.time() - start_time < max_wait_time:
                 if ser.in_waiting:
@@ -807,17 +826,25 @@ class ATCommandWorker(QThread):
                     data = ser.read(ser.in_waiting).decode('utf-8', errors='ignore')
                     if data:
                         response += data
+                        last_data_time = time.time()
+                        
+                        # 检查是否收到完整的响应（通常以OK或ERROR结尾）
+                        response_upper = response.upper()
+                        if 'OK' in response_upper or 'ERROR' in response_upper:
+                            # 再等待一小段时间，确保所有数据都已接收
+                            time.sleep(0.2)
+                            if ser.in_waiting:
+                                response += ser.read(ser.in_waiting).decode('utf-8', errors='ignore')
+                            break
                 else:
-                    # 如果没有数据，检查是否已经有响应（AT通常响应很快）
+                    # 如果没有数据，检查是否已经有响应
                     if response:
-                        # 如果有部分响应，再等待一小段时间看是否有更多数据
-                        time.sleep(0.05)
-                        if not ser.in_waiting:
-                            break  # 没有更多数据了
-                    else:
-                        time.sleep(0.01)  # 如果还没有响应，稍微等待一下
+                        # 如果已经有响应且超过指定时间没有新数据，认为响应完成
+                        if time.time() - last_data_time > no_data_timeout:
+                            break
+                    time.sleep(0.1)  # 等待一下再检查
             
-            # 再读取一次确保所有数据都被读取
+            # 最后再读取一次确保所有数据都被读取
             if ser.in_waiting:
                 response += ser.read(ser.in_waiting).decode('utf-8', errors='ignore')
             
@@ -827,7 +854,10 @@ class ATCommandWorker(QThread):
             response = response.strip()
             
             if not response:
-                response = "(无响应)"
+                if time.time() - start_time >= max_wait_time:
+                    response = f"(超时：等待超过{int(max_wait_time)}秒无响应)"
+                else:
+                    response = "(无响应)"
             
             # 发送响应信号
             self.output.emit(f"<<< {response}")
