@@ -165,6 +165,7 @@ if (-not (Test-Path $manifestDir)) {
 }
 
 $downloadUrl = "https://github.com/pranvil/MobileTestTool/releases/download/v$Version/$packageName"
+# 读取一次release notes，确保latest.json和GitHub release使用相同内容
 $releaseNotes = Get-ReleaseNotes -NotesFile $NotesFile -RepoRoot $repoRoot -DefaultNotes "- Add release notes here" -Trim
 
 $manifest = [ordered]@{
@@ -232,7 +233,8 @@ if ($tagExists) {
 Invoke-Git "tag" "-a" ("v{0}" -f $Version) "-m" ("Release v{0}" -f $Version)
 Invoke-Git "push" "origin" ("v{0}" -f $Version)
 
-$notesForRelease = Get-ReleaseNotes -NotesFile $NotesFile -RepoRoot $repoRoot -DefaultNotes "## Release notes`n- TODO: update notes"
+# 复用之前读取的release notes，确保与latest.json内容一致
+$notesForRelease = $releaseNotes
 
 Invoke-GhReleaseCreate -Version $Version -Package $packagePath -Notes $notesForRelease
 

@@ -4,7 +4,7 @@
     "sha256":  "9d7a7a4e7105b8cd22ffe344606aa16b122bea85e928f74340f9fd5bf1e3a274",
     "file_name":  "MobileTestTool_0.9.6.0.zip",
     "file_size":  110267531,
-    "release_notes":  "# MobileTestTool Release Notes\r\n\r\n## Verison information\r\n- Verison：0.9.6.0\r\n- Rlease date：2025/11/7\r\n\r\n## Release Note\r\n- ✅ adb命令输入框支持上下键调用历史命令\r\n- ✅ 命令返回内容用紫色显示\r\n- ✅ 禁止输入adb shell\r\n- ✅ 日志显示区域添加自动滚动开关\r\n- ✅ 日志显示区域添加右键清空\r\n- ✅ AT命令拖动排序\r\n- ✅ 解决at+cops=?无法返回结果的问题 \r\n## Known issue\r\n-",
+    "release_notes":  "# MobileTestTool Release Notes\r\n\r\n## Verison information\r\n- Verison：0.9.6.0\r\n- Rlease date：2025/11/7\r\n\r\n## Release Note\r\n- ✅ adb命令输入框支持上下键调用历史命令\r\n- ✅ 命令返回内容用紫色显示\r\n- ✅ 禁止输入adb shell\r\n- ✅ 日志显示区域添加自动滚动开关\r\n- ✅ 日志显示区域添加右键清空\r\n- ✅ AT命令拖动排序\r\n- ✅ 解决at+cops=?无法返回结果的问题\r\n- ✅ ESIM available ROM/RAM ，如果大于1024bytes，后面显加个括号换算成kb\r\n## Known issue\r\n-",
     "published_at":  "2025-11-12T17:52:48Z",
     "mandatory":  false
 }
