@@ -1,10 +1,10 @@
 {
-    "version":  "0.9.6.1",
-    "download_url":  "https://github.com/pranvil/MobileTestTool/releases/download/v0.9.6.1/MobileTestTool_0.9.6.1.zip",
-    "sha256":  "99facd5444407626b7a6a62d71d5d87cb8e06698bf9a51aabf605f5e1c33d79a",
-    "file_name":  "MobileTestTool_0.9.6.1.zip",
-    "file_size":  110283027,
+    "version":  "0.9.6.1.1",
+    "download_url":  "https://github.com/pranvil/MobileTestTool/releases/download/v0.9.6.1.1/MobileTestTool_0.9.6.1.1.zip",
+    "sha256":  "9c9a5e0aaefcc2939adfb1bb7ff8ee4c45c233dadfcb7ccabedaa2103e52338d",
+    "file_name":  "MobileTestTool_0.9.6.1.1.zip",
+    "file_size":  110285939,
     "release_notes":  "# MobileTestTool Release Notes\r\n\r\n## Verison information\r\n- Verison：0.9.6.1\r\n\r\n## Release Note\r\n- ✅ 添加转码功能\r\n- ✅ 修复PR 翻译长度导致失败的问题\r\n\r\n## Known issue\r\n-",
-    "published_at":  "2025-11-13T03:57:41Z",
+    "published_at":  "2025-11-13T04:37:13Z",
     "mandatory":  false
 }
