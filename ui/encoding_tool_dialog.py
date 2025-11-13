@@ -12,17 +12,27 @@ from PyQt5.QtCore import Qt
 from core.debug_logger import logger
 
 # 导入GSM 7-bit编码函数
+import sys
+import os
+# 确保项目根目录在 Python 路径中，以便正确导入 sim_reader 包
+project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
+
 try:
     from sim_reader.parsers.general import encode_7bit, decode_7bit
 except ImportError:
-    # 如果导入失败，尝试从相对路径导入
-    import sys
-    import os
-    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    parsers_path = os.path.join(project_root, 'sim_reader', 'parsers')
-    if parsers_path not in sys.path:
-        sys.path.insert(0, parsers_path)
-    from general import encode_7bit, decode_7bit
+    # 如果导入失败，尝试使用 importlib 动态导入
+    import importlib.util
+    general_path = os.path.join(project_root, 'sim_reader', 'parsers', 'general.py')
+    spec = importlib.util.spec_from_file_location("general", general_path)
+    if spec and spec.loader:
+        general_module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(general_module)
+        encode_7bit = general_module.encode_7bit
+        decode_7bit = general_module.decode_7bit
+    else:
+        raise ImportError(f"无法加载 general 模块: {general_path}")
 
 
 class EncodingToolDialog(QDialog):

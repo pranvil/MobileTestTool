@@ -116,6 +116,120 @@ class TranslationWorker(QThread):
     
     def translate_text(self, text):
         """使用MyMemory API翻译文本"""
+        # MyMemory API限制：单次查询最大500字符
+        # 为了安全起见，使用450字符作为分割点
+        MAX_CHARS = 450
+        
+        # 如果文本为空，直接返回
+        if not text or not text.strip():
+            return text
+        
+        # 如果文本长度在限制内，直接翻译
+        if len(text) <= MAX_CHARS:
+            return self._translate_single_text(text)
+        
+        # 文本过长，需要分段翻译
+        # 使用更智能的分割策略：按段落分割，但如果段落太长则按句子分割
+        # 先尝试按双换行符分割段落
+        parts = []
+        remaining_text = text
+        
+        while remaining_text:
+            # 如果剩余文本在限制内，直接翻译
+            if len(remaining_text) <= MAX_CHARS:
+                translated = self._translate_single_text(remaining_text)
+                parts.append({
+                    'text': translated,
+                    'original_end': len(remaining_text)
+                })
+                break
+            
+            # 尝试找到最佳分割点（在MAX_CHARS附近）
+            # 优先在段落边界（双换行符）分割
+            split_pos = MAX_CHARS
+            best_split = None
+            
+            # 查找最近的段落边界（向前查找）
+            para_boundary = remaining_text.rfind('\n\n', 0, MAX_CHARS)
+            if para_boundary > MAX_CHARS * 0.5:  # 如果段落边界在合理范围内
+                best_split = para_boundary + 2  # 包含双换行符
+            else:
+                # 如果没有找到段落边界，尝试在单换行符处分割
+                line_boundary = remaining_text.rfind('\n', 0, MAX_CHARS)
+                if line_boundary > MAX_CHARS * 0.5:
+                    best_split = line_boundary + 1
+                else:
+                    # 如果都没有，尝试在句子边界分割
+                    sentence_boundary = self._find_sentence_boundary(remaining_text, MAX_CHARS)
+                    if sentence_boundary > MAX_CHARS * 0.5:
+                        best_split = sentence_boundary
+                    else:
+                        # 最后选择在空格处分割
+                        space_boundary = remaining_text.rfind(' ', 0, MAX_CHARS)
+                        if space_boundary > MAX_CHARS * 0.5:
+                            best_split = space_boundary + 1
+                        else:
+                            # 强制在MAX_CHARS处分割
+                            best_split = MAX_CHARS
+            
+            # 分割并翻译第一部分（保留末尾空白，但翻译时去掉）
+            chunk_with_whitespace = remaining_text[:best_split]
+            chunk = chunk_with_whitespace.rstrip()
+            
+            if chunk:
+                translated_chunk = self._translate_single_text(chunk)
+                
+                # 提取chunk后面的空白字符作为分隔符
+                trailing_whitespace = chunk_with_whitespace[len(chunk):]
+                
+                parts.append({
+                    'text': translated_chunk,
+                    'separator': trailing_whitespace if trailing_whitespace else ''
+                })
+            
+            # 更新剩余文本
+            remaining_text = remaining_text[best_split:]
+        
+        # 合并翻译结果，保留原始格式
+        result_parts = []
+        for i, part in enumerate(parts):
+            result_parts.append(part['text'])
+            # 添加分隔符（除了最后一部分）
+            if i < len(parts) - 1 and 'separator' in part:
+                result_parts.append(part['separator'])
+        
+        return ''.join(result_parts)
+    
+    def _find_sentence_boundary(self, text, max_pos):
+        """查找句子边界（句号、问号、感叹号后跟空格）"""
+        import re
+        # 查找句号、问号、感叹号后跟空格或换行的位置
+        pattern = r'[.!?]\s+'
+        matches = list(re.finditer(pattern, text[:max_pos]))
+        if matches:
+            # 返回最后一个匹配的结束位置
+            return matches[-1].end()
+        return max_pos
+    
+    def _split_into_sentences(self, text):
+        """将文本按句子分割"""
+        import re
+        # 按句号、问号、感叹号分割，保留分隔符
+        sentences = re.split(r'([.!?]\s+)', text)
+        result = []
+        i = 0
+        while i < len(sentences):
+            if i + 1 < len(sentences):
+                result.append(sentences[i] + sentences[i + 1])
+                i += 2
+            else:
+                if sentences[i].strip():
+                    result.append(sentences[i])
+                i += 1
+        return result
+    
+    def _translate_single_text(self, text):
+        """翻译单个文本片段（不超过500字符）"""
         try:
             # 根据翻译方向设置语言对
             if self.translate_direction == 'zh_en':
@@ -156,7 +270,20 @@ class TranslationWorker(QThread):
                     translated_text = html.unescape(translated_text)
                     return translated_text
                 else:
-                    logger.warning(f"MyMemory API错误: {data.get('responseStatus')}")
+                    error_msg = data.get('responseDetails', '')
+                    logger.warning(f"MyMemory API错误: {data.get('responseStatus')} - {error_msg}")
+                    # 如果是长度超限错误，尝试进一步分割
+                    if '500' in error_msg or 'LENGTH' in error_msg.upper():
+                        logger.warning(f"文本仍然过长，尝试进一步分割: {len(text)} 字符")
+                        # 递归分割
+                        mid = len(text) // 2
+                        # 尝试在空格处分割
+                        split_pos = text.rfind(' ', 0, mid)
+                        if split_pos == -1:
+                            split_pos = mid
+                        part1 = self._translate_single_text(text[:split_pos])
+                        part2 = self._translate_single_text(text[split_pos:].lstrip())
+                        return part1 + " " + part2
                     return text  # 翻译失败时返回原文
         except Exception as e:
             logger.exception(f"翻译API调用失败: {str(e)}")
