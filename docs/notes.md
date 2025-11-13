@@ -1,11 +1,12 @@
 # MobileTestTool Release Notes
 
 ## Verison information
-- Verison：0.9.6.0
-- Rlease date：2025/11/13
+- Verison：0.9.6.1
 
 ## Release Note
-- ✅ 修改检查更新逻辑
+- ✅ 添加转码功能
+- ✅ 3gpp decode -todo
+
 ## Known issue
 - 
 

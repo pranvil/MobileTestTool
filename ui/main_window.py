@@ -1270,6 +1270,7 @@ class MainWindow(QMainWindow):
         self.other_tab.show_lock_cell_dialog.connect(self.show_lock_cell_dialog)
         self.other_tab.show_qc_nv_dialog.connect(self.show_qc_nv_dialog)
         self.other_tab.show_pr_translation_dialog.connect(self._on_show_pr_translation_dialog)
+        self.other_tab.show_encoding_tool_dialog.connect(self._on_show_encoding_tool_dialog)
         
         # 连接Tab配置管理器信号
         self.tab_config_manager.tab_config_updated.connect(self._on_tab_config_updated)
@@ -2859,6 +2860,18 @@ class MainWindow(QMainWindow):
             logger.exception(self.lang_manager.tr("打开AT工具对话框失败"))
             QMessageBox.critical(self, self.lang_manager.tr("错误"), f"{self.lang_manager.tr('打开AT工具对话框失败')}：{str(e)}")
     
+    def _on_show_encoding_tool_dialog(self):
+        """显示转码工具对话框"""
+        try:
+            logger.debug(self.lang_manager.tr("打开转码工具对话框..."))
+            from ui.encoding_tool_dialog import EncodingToolDialog
+            dialog = EncodingToolDialog(parent=self)
+            dialog.exec_()
+            logger.debug(self.lang_manager.tr("转码工具对话框已关闭"))
+        except Exception as e:
+            logger.exception(self.lang_manager.tr("打开转码工具对话框失败"))
+            QMessageBox.critical(self, self.lang_manager.tr("错误"), f"{self.lang_manager.tr('打开转码工具对话框失败')}：{str(e)}")
+    
     def _setup_shortcuts(self):
         """设置快捷键"""
         from PyQt5.QtWidgets import QShortcut
@@ -3901,6 +3914,7 @@ class MainWindow(QMainWindow):
                 self.other_tab.show_tools_config_dialog.connect(self._on_show_tools_config_dialog)
                 self.other_tab.show_display_lines_dialog.connect(self._on_show_display_lines_dialog)
                 self.other_tab.show_at_tool_dialog.connect(self._on_show_at_tool_dialog)
+                self.other_tab.show_encoding_tool_dialog.connect(self._on_show_encoding_tool_dialog)
                 self.other_tab.show_config_backup_dialog.connect(self.show_config_backup_dialog)
                 self.other_tab.show_unified_manager.connect(self.show_unified_manager_dialog)
                 self.other_tab.show_secret_code_dialog.connect(self.show_secret_code_dialog)

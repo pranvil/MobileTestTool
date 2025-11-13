@@ -53,6 +53,9 @@ class OtherTab(QWidget):
     # PR翻译
     show_pr_translation_dialog = pyqtSignal()
     
+    # 转码工具
+    show_encoding_tool_dialog = pyqtSignal()
+    
     def __init__(self, parent=None):
         try:
             super().__init__(parent)
@@ -245,6 +248,11 @@ class OtherTab(QWidget):
         self.show_pr_translation_btn.clicked.connect(self.show_pr_translation_dialog.emit)
         card_layout.addWidget(self.show_pr_translation_btn)
         
+        self.show_encoding_tool_btn = QPushButton("🔤 " + self.lang_manager.tr("转码"))
+        self.show_encoding_tool_btn.setToolTip(self.lang_manager.tr("转码工具 - ASCII和GSM 7-bit编码的双向转换"))
+        self.show_encoding_tool_btn.clicked.connect(self.show_encoding_tool_dialog.emit)
+        card_layout.addWidget(self.show_encoding_tool_btn)
+        
         card_layout.addStretch()
                  
         self.show_display_lines_btn = QPushButton(self.lang_manager.tr("日志区域行数"))
@@ -347,6 +355,8 @@ class OtherTab(QWidget):
             self.qc_nv_btn.setText("📊 " + self.lang_manager.tr("高通NV"))
         if hasattr(self, 'show_pr_translation_btn'):
             self.show_pr_translation_btn.setText("🌐 " + self.lang_manager.tr("PR翻译"))
+        if hasattr(self, 'show_encoding_tool_btn'):
+            self.show_encoding_tool_btn.setText("🔤 " + self.lang_manager.tr("转码"))
     
     def _refresh_section_titles(self):
         """刷新组标题标签"""
