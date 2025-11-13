@@ -4,8 +4,7 @@
 - Verison：0.9.6.1
 
 ## Release Note
-- ✅ 添加转码功能
-- ✅ 3gpp decode -todo
+- ✅ 修复概率性按钮点击报错问题
 
 ## Known issue
 - 

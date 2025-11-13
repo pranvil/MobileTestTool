@@ -46,6 +46,13 @@ a = Analysis(
         'ui.qc_nv_dialog',
         'ui.cell_lock_dialog',
         'ui.at_tool_dialog',
+        # SIM APDU Parser 子模块（确保完整导入）
+        'SIM_APDU_Parser.core.models',
+        'SIM_APDU_Parser.data_io.loaders',
+        'SIM_APDU_Parser.data_io.extractors.mtk',
+        'SIM_APDU_Parser.data_io.extractors.generic',
+        'SIM_APDU_Parser.classify.rules',
+        'SIM_APDU_Parser.parsers.base',
         # UIAutomator2 相关模块（由hook文件自动处理）
         'uiautomator2',
         # 核心模块
@@ -90,6 +97,9 @@ a = Analysis(
         'importlib.util',
         'concurrent',
         'concurrent.futures',
+        'html',  # html模块（用于HTML实体解码）
+        'urllib.parse',
+        'urllib.request',
         # python-docx 相关模块
         'docx',
         'docx.shared',
@@ -101,8 +111,19 @@ a = Analysis(
         'lxml',
         'lxml.etree',
         'lxml._elementpath',
-        # PR翻译对话框
+        # 核心资源工具模块（必须显式声明）
+        'core.resource_utils',
+        # UI 对话框模块（确保PyInstaller包含它们）
         'ui.pr_translation_dialog',
+        'ui.apdu_parser_dialog',
+        'ui.encoding_tool_dialog',
+        'ui.rrc3gpp_decoder_dialog',
+        'ui.sim_reader_dialog',
+        'ui.log_keyword_dialog',
+        'ui.config_backup_dialog',
+        'ui.unified_manager_dialog',
+        'ui.custom_button_dialog',
+        'ui.tab_manager_dialog',
     ],
     hookspath=['.'],
     hooksconfig={},

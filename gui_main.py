@@ -21,10 +21,27 @@ if hasattr(sys, 'frozen') and hasattr(sys, '_MEIPASS'):
     try:
         # 预导入所有对话框模块，确保它们在启动时就被PyInstaller识别
         # 这些模块依赖 core.debug_logger，而 core.debug_logger 已经在 main.py 中导入
+        
+        # 首先导入核心资源工具模块，确保它被正确加载
+        import core.resource_utils
+        
+        # 导入标准库模块（确保PyInstaller包含它们）
+        import html
+        
+        # 预导入所有对话框模块
         import ui.secret_code_dialog
         import ui.qc_nv_dialog
         import ui.cell_lock_dialog
         import ui.at_tool_dialog
+        import ui.pr_translation_dialog  # PR翻译对话框
+        import ui.apdu_parser_dialog  # APDU解析器对话框
+        import ui.encoding_tool_dialog  # 转码工具对话框
+        import ui.rrc3gpp_decoder_dialog  # RRC解码器对话框
+        import ui.sim_reader_dialog  # SIM读取器对话框
+        import ui.log_keyword_dialog  # 日志关键词对话框
+        import ui.config_backup_dialog  # 配置备份对话框
+        import ui.unified_manager_dialog  # 统一管理器对话框
+        
         logger.debug("对话框模块预导入成功")
     except ImportError as e:
         # 如果预导入失败，记录警告但不影响程序启动

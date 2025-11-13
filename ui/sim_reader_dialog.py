@@ -16,9 +16,16 @@ from PyQt5.QtCore import Qt, pyqtSignal
 # 这样可以避免与当前的 ui 模块冲突
 def _ensure_sim_reader_in_path():
     """确保 sim_reader 在 Python 路径中"""
-    current_dir = os.path.dirname(os.path.abspath(__file__))  # ui目录
-    project_root = os.path.dirname(current_dir)  # 项目根目录
-    sim_reader_path = os.path.join(project_root, "sim_reader")
+    # 在PyInstaller打包环境中，使用sys._MEIPASS获取资源路径
+    if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
+        # PyInstaller打包环境：sim_reader在sys._MEIPASS中
+        base_path = sys._MEIPASS
+        sim_reader_path = os.path.join(base_path, "sim_reader")
+    else:
+        # 开发环境：使用__file__计算路径
+        current_dir = os.path.dirname(os.path.abspath(__file__))  # ui目录
+        project_root = os.path.dirname(current_dir)  # 项目根目录
+        sim_reader_path = os.path.join(project_root, "sim_reader")
     
     if sim_reader_path not in sys.path:
         sys.path.insert(0, sim_reader_path)
@@ -75,7 +82,11 @@ class SimReaderDialog(QDialog):
             
             # 确保 sim_reader 在路径中（这样 sim_reader 内的相对导入才能工作）
             sim_reader_path = _ensure_sim_reader_in_path()
-            project_root = os.path.dirname(sim_reader_path)
+            # 在PyInstaller打包环境中，project_root就是sys._MEIPASS
+            if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
+                project_root = sys._MEIPASS
+            else:
+                project_root = os.path.dirname(sim_reader_path)
             
             logging.debug(f"[SimReaderDialog] sim_reader_path: {sim_reader_path}")
             logging.debug(f"[SimReaderDialog] project_root: {project_root}")

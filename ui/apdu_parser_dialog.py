@@ -42,10 +42,20 @@ def _import_sim_parser_modules():
     # 添加详细的调试信息
     print("[DEBUG] ===== Starting SIM_APDU_Parser module import =====")
     print(f"[DEBUG] Current sys.path: {sys.path[:3]}...")  # 只显示前3个路径
-    print(f"[DEBUG] SIM_APDU_Parser path: {os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), 'SIM_APDU_Parser')}")
     
-    # 检查路径是否存在
-    sim_parser_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), 'SIM_APDU_Parser')
+    # 在PyInstaller打包环境中，使用sys._MEIPASS获取资源路径
+    # 在开发环境中，使用__file__计算路径
+    if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
+        # PyInstaller打包环境：SIM_APDU_Parser在sys._MEIPASS中
+        base_path = sys._MEIPASS
+        sim_parser_path = os.path.join(base_path, 'SIM_APDU_Parser')
+        print(f"[DEBUG] PyInstaller environment detected, using sys._MEIPASS: {base_path}")
+    else:
+        # 开发环境：使用__file__计算路径
+        sim_parser_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), 'SIM_APDU_Parser')
+        print(f"[DEBUG] Development environment, using __file__: {sim_parser_path}")
+    
+    print(f"[DEBUG] SIM_APDU_Parser path: {sim_parser_path}")
     print(f"[DEBUG] SIM_APDU_Parser path exists: {os.path.exists(sim_parser_path)}")
     print(f"[DEBUG] core directory exists: {os.path.exists(os.path.join(sim_parser_path, 'core'))}")
     print(f"[DEBUG] models.py exists: {os.path.exists(os.path.join(sim_parser_path, 'core', 'models.py'))}")

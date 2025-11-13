@@ -12,6 +12,8 @@ from PyQt5.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QPushButton,
                              QFileDialog, QMessageBox, QFormLayout, QDialogButtonBox)
 from PyQt5.QtCore import Qt
 from core.debug_logger import logger
+# 在模块顶层导入资源路径工具，避免PyInstaller打包时的延迟导入问题
+from core.resource_utils import get_resource_path
 
 
 class LockCellDialog(QDialog):
@@ -31,10 +33,8 @@ class LockCellDialog(QDialog):
         self.setModal(True)
         self.resize(500, 400)
         
-        # 导入资源路径工具
-        from core.resource_utils import get_resource_path
-        
         # 获取模板文件路径（使用统一的资源路径函数）
+        # get_resource_path已在模块顶层导入，避免PyInstaller打包时的延迟导入问题
         self.lte_template = get_resource_path("resources/template/cell_lock_list_LTE")
         self.fg_template = get_resource_path("resources/template/pci_lock_info_5G")
         

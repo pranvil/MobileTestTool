@@ -509,7 +509,7 @@ class OtherOperationsWorker(QThread):
                 text=True, 
                 encoding='utf-8', 
                 errors='replace', 
-                timeout=300,
+                timeout=3600,
                 creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0
             )
             
@@ -585,7 +585,7 @@ class OtherOperationsWorker(QThread):
                         text=True, 
                         encoding='utf-8', 
                         errors='replace', 
-                        timeout=300,
+                        timeout=3600,
                         creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0
                     )
                     if result.returncode == 0:
@@ -655,7 +655,7 @@ class OtherOperationsWorker(QThread):
                 text=True, 
                 encoding='utf-8', 
                 errors='replace', 
-                timeout=120,
+                timeout=3600,
                 creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0
             )
             
@@ -716,7 +716,7 @@ class OtherOperationsWorker(QThread):
                         text=True, 
                         encoding='utf-8', 
                         errors='replace', 
-                        timeout=300,
+                        timeout=3600,
                         creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0
                     )
                     if result.returncode == 0:
@@ -780,7 +780,7 @@ class OtherOperationsWorker(QThread):
                 text=True, 
                 encoding='utf-8', 
                 errors='replace', 
-                timeout=120,
+                timeout=3600,
                 creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0
             )
             

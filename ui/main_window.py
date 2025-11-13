@@ -814,12 +814,12 @@ class MainWindow(QMainWindow):
         import os
         
         # 尝试设置窗口图标
-        if hasattr(sys, 'frozen') and hasattr(sys, '_MEIPASS'):
+        if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
             # PyInstaller 环境
             icon_path = os.path.join(sys._MEIPASS, 'icon.ico')
         else:
             # 开发环境
-            icon_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'icon.ico')
+            icon_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'icon.ico')
         
         if os.path.exists(icon_path):
             self.setWindowIcon(QIcon(icon_path))

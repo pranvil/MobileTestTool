@@ -15,7 +15,15 @@ from core.debug_logger import logger
 import sys
 import os
 # 确保项目根目录在 Python 路径中，以便正确导入 sim_reader 包
-project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# 在PyInstaller打包环境中，使用sys._MEIPASS获取资源路径
+if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
+    # PyInstaller打包环境：sim_reader在sys._MEIPASS中
+    base_path = sys._MEIPASS
+    project_root = base_path
+else:
+    # 开发环境：使用__file__计算路径
+    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
