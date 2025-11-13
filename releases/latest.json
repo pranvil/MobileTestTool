@@ -1,10 +1,10 @@
 {
-    "version":  "0.9.6.0",
-    "download_url":  "https://github.com/pranvil/MobileTestTool/releases/download/v0.9.6.0/MobileTestTool_0.9.6.0.zip",
-    "sha256":  "9d7a7a4e7105b8cd22ffe344606aa16b122bea85e928f74340f9fd5bf1e3a274",
-    "file_name":  "MobileTestTool_0.9.6.0.zip",
-    "file_size":  110267531,
-    "release_notes":  "# MobileTestTool Release Notes\r\n\r\n## Verison information\r\n- Verison：0.9.6.0\r\n- Rlease date：2025/11/7\r\n\r\n## Release Note\r\n- ✅ adb命令输入框支持上下键调用历史命令\r\n- ✅ 命令返回内容用紫色显示\r\n- ✅ 禁止输入adb shell\r\n- ✅ 日志显示区域添加自动滚动开关\r\n- ✅ 日志显示区域添加右键清空\r\n- ✅ AT命令拖动排序\r\n- ✅ 解决at+cops=?无法返回结果的问题\r\n- ✅ ESIM available ROM/RAM ，如果大于1024bytes，后面显加个括号换算成kb\r\n## Known issue\r\n-",
-    "published_at":  "2025-11-12T17:52:48Z",
+    "version":  "0.9.6.1",
+    "download_url":  "https://github.com/pranvil/MobileTestTool/releases/download/v0.9.6.1/MobileTestTool_0.9.6.1.zip",
+    "sha256":  "99facd5444407626b7a6a62d71d5d87cb8e06698bf9a51aabf605f5e1c33d79a",
+    "file_name":  "MobileTestTool_0.9.6.1.zip",
+    "file_size":  110283027,
+    "release_notes":  "# MobileTestTool Release Notes\r\n\r\n## Verison information\r\n- Verison：0.9.6.1\r\n\r\n## Release Note\r\n- ✅ 添加转码功能\r\n- ✅ 修复PR 翻译长度导致失败的问题\r\n\r\n## Known issue\r\n-",
+    "published_at":  "2025-11-13T03:57:41Z",
     "mandatory":  false
 }
