@@ -1,10 +1,10 @@
 {
-    "version":  "0.9.6.2",
-    "download_url":  "https://github.com/pranvil/MobileTestTool/releases/download/v0.9.6.2/MobileTestTool_0.9.6.2.zip",
-    "sha256":  "424ac51db376aabcbdb3147660e5fea43ee1905b46823ba9f88ad06ea6c7fbdf",
-    "file_name":  "MobileTestTool_0.9.6.2.zip",
-    "file_size":  110285958,
-    "release_notes":  "# MobileTestTool Release Notes\r\n\r\n## Verison information\r\n- Verison：0.9.6.1\r\n\r\n## Release Note\r\n- ✅ 修复概率性按钮点击报错问题\r\n\r\n## Known issue\r\n-",
-    "published_at":  "2025-11-13T21:12:36Z",
+    "version":  "0.9.6.2.1",
+    "download_url":  "https://github.com/pranvil/MobileTestTool/releases/download/v0.9.6.2.1/MobileTestTool_0.9.6.2.1.zip",
+    "sha256":  "c43fb6b10493ffdd794401c5ae1baf2168d56e27de4dfba9eac981c48a4150cd",
+    "file_name":  "MobileTestTool_0.9.6.2.1.zip",
+    "file_size":  110289529,
+    "release_notes":  "# MobileTestTool Release Notes\r\n\r\n\r\n\r\n## Release Note\r\n- ✅ 修复概率性按钮点击报错问题\r\n\r\n## Known issue\r\n-",
+    "published_at":  "2025-11-14T00:14:04Z",
     "mandatory":  false
 }
