@@ -1,0 +1,32 @@
+{
+    "EF_list": [
+        {
+            "ef_id": "6F62",
+            "adf_type": "USIM",
+            "records": [
+                {
+                    "PLMN1": "310410",
+                    "Access Technology Identifier1": "E-UTRAN in WB-S1 mode and NB-S1 mode",
+                    "PLMN2": "FFFFFF",
+                    "Access Technology Identifier2": "",
+                    "PLMN3": "FFFFFF",
+                    "Access Technology Identifier3": "",
+                    "PLMN4": "FFFFFF",
+                    "Access Technology Identifier4": "",
+                    "PLMN5": "FFFFFF",
+                    "Access Technology Identifier5": "",
+                    "PLMN6": "FFFFFF",
+                    "Access Technology Identifier6": "",
+                    "PLMN7": "FFFFFF",
+                    "Access Technology Identifier7": "",
+                    "PLMN8": "FFFFFF",
+                    "Access Technology Identifier8": "",
+                    "PLMN9": "FFFFFF",
+                    "Access Technology Identifier9": "",
+                    "PLMN10": "FFFFFF",
+                    "Access Technology Identifier10": ""
+                }
+            ]
+        }
+    ]
+}

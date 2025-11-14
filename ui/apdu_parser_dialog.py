@@ -47,13 +47,18 @@ def _import_sim_parser_modules():
     # 在开发环境中，使用__file__计算路径
     if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
         # PyInstaller打包环境：SIM_APDU_Parser在sys._MEIPASS中
+        # 在打包环境中，SIM_APDU_Parser目录本身就在sys._MEIPASS中，所以将sys._MEIPASS添加到sys.path
         base_path = sys._MEIPASS
+        sim_parser_parent_path = base_path  # 父目录就是sys._MEIPASS
         sim_parser_path = os.path.join(base_path, 'SIM_APDU_Parser')
         print(f"[DEBUG] PyInstaller environment detected, using sys._MEIPASS: {base_path}")
     else:
         # 开发环境：使用__file__计算路径
+        # 需要将SIM_APDU_Parser的父目录添加到sys.path，而不是SIM_APDU_Parser本身
         sim_parser_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), 'SIM_APDU_Parser')
+        sim_parser_parent_path = os.path.dirname(sim_parser_path)  # 父目录
         print(f"[DEBUG] Development environment, using __file__: {sim_parser_path}")
+        print(f"[DEBUG] Parent path (to add to sys.path): {sim_parser_parent_path}")
     
     print(f"[DEBUG] SIM_APDU_Parser path: {sim_parser_path}")
     print(f"[DEBUG] SIM_APDU_Parser path exists: {os.path.exists(sim_parser_path)}")
@@ -61,12 +66,13 @@ def _import_sim_parser_modules():
     print(f"[DEBUG] models.py exists: {os.path.exists(os.path.join(sim_parser_path, 'core', 'models.py'))}")
     print(f"[DEBUG] pipeline.py exists: {os.path.exists(os.path.join(sim_parser_path, 'pipeline.py'))}")
     
-    # 检查Python路径
-    if sim_parser_path not in sys.path:
-        print(f"[DEBUG] Adding SIM_APDU_Parser path to sys.path")
-        sys.path.insert(0, sim_parser_path)
+    # 检查Python路径：需要将SIM_APDU_Parser的父目录添加到sys.path，而不是SIM_APDU_Parser本身
+    # 这样才能使用 from SIM_APDU_Parser.pipeline import Pipeline
+    if sim_parser_parent_path not in sys.path:
+        print(f"[DEBUG] Adding SIM_APDU_Parser parent path to sys.path: {sim_parser_parent_path}")
+        sys.path.insert(0, sim_parser_parent_path)
     else:
-        print(f"[DEBUG] SIM_APDU_Parser path already in sys.path")
+        print(f"[DEBUG] SIM_APDU_Parser parent path already in sys.path: {sim_parser_parent_path}")
     
     print(f"[DEBUG] Updated sys.path: {sys.path[:3]}...")
         

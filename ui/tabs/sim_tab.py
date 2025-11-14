@@ -16,18 +16,21 @@ from ui.widgets.shadow_utils import add_card_shadow
 # 在PyInstaller打包环境中，使用sys._MEIPASS获取资源路径
 if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
     # PyInstaller打包环境：SIM_APDU_Parser在sys._MEIPASS中
+    # 需要将sys._MEIPASS添加到sys.path（父目录），而不是SIM_APDU_Parser本身
     base_path = sys._MEIPASS
-    sim_parser_path = os.path.join(base_path, "SIM_APDU_Parser")
+    sim_parser_parent_path = base_path
 else:
     # 开发环境：使用__file__计算路径
+    # 需要将SIM_APDU_Parser的父目录添加到sys.path，而不是SIM_APDU_Parser本身
     current_dir = os.path.dirname(os.path.abspath(__file__))  # ui/tabs目录
     ui_dir = os.path.dirname(current_dir)  # ui目录
     project_root = os.path.dirname(ui_dir)  # 项目根目录
     sim_parser_path = os.path.join(project_root, "SIM_APDU_Parser")
+    sim_parser_parent_path = project_root  # 父目录就是项目根目录
 
-if sim_parser_path not in sys.path:
-    sys.path.insert(0, sim_parser_path)
-    print(f"[DEBUG] SIM Tab添加SIM_APDU_Parser路径: {sim_parser_path}")
+if sim_parser_parent_path not in sys.path:
+    sys.path.insert(0, sim_parser_parent_path)
+    print(f"[DEBUG] SIM Tab添加SIM_APDU_Parser父路径到sys.path: {sim_parser_parent_path}")
 
 from ui.apdu_parser_dialog import ApduParserDialog
 
