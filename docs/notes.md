@@ -3,7 +3,7 @@
 
 
 ## Release Note
-- ✅ 修复概率性按钮点击报错问题
+- ✅ 添加decode MTK SIP消息功能
 
 ## Known issue
 - 

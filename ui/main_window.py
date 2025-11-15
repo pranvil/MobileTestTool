@@ -1254,6 +1254,7 @@ class MainWindow(QMainWindow):
         self.log_control_tab.merge_pcap.connect(self._on_merge_pcap)
         self.log_control_tab.extract_pcap_from_qualcomm_log.connect(self._on_extract_pcap_from_qualcomm_log)
         self.log_control_tab.parse_3gpp_message.connect(self._on_parse_3gpp_message)
+        self.log_control_tab.mtk_sip_decode.connect(self._on_mtk_sip_decode)
         
         # 连接 其他 Tab 信号
         self.other_tab.show_device_info_dialog.connect(self._on_show_device_info_dialog)
@@ -2782,6 +2783,10 @@ class MainWindow(QMainWindow):
         """高通log提取pcap"""
         self.other_operations_manager.extract_pcap_from_qualcomm_log()
     
+    def _on_mtk_sip_decode(self):
+        """MTK SIP DECODE"""
+        self.other_operations_manager.mtk_sip_decode()
+    
     def _on_parse_3gpp_message(self):
         """3GPP消息解码"""
         from ui.rrc3gpp_decoder_dialog import RRC3GPPDecoderDialog
@@ -3904,6 +3909,7 @@ class MainWindow(QMainWindow):
                 self.log_control_tab.merge_pcap.connect(self._on_merge_pcap)
                 self.log_control_tab.extract_pcap_from_qualcomm_log.connect(self._on_extract_pcap_from_qualcomm_log)
                 self.log_control_tab.parse_3gpp_message.connect(self._on_parse_3gpp_message)
+                self.log_control_tab.mtk_sip_decode.connect(self._on_mtk_sip_decode)
             
             if hasattr(self, 'other_tab'):
                 self.other_tab.show_device_info_dialog.connect(self._on_show_device_info_dialog)

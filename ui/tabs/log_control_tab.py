@@ -51,6 +51,7 @@ class LogControlTab(QWidget):
     merge_pcap = pyqtSignal()
     extract_pcap_from_qualcomm_log = pyqtSignal()
     parse_3gpp_message = pyqtSignal()
+    mtk_sip_decode = pyqtSignal()
     
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -184,6 +185,10 @@ class LogControlTab(QWidget):
         self.parse_3gpp_btn = QPushButton(self.lang_manager.tr("3GPP解码器"))
         self.parse_3gpp_btn.clicked.connect(self.parse_3gpp_message.emit)
         row2.addWidget(self.parse_3gpp_btn)
+        
+        self.mtk_sip_decode_btn = QPushButton(self.lang_manager.tr("MTK SIP DECODE"))
+        self.mtk_sip_decode_btn.clicked.connect(self.mtk_sip_decode.emit)
+        row2.addWidget(self.mtk_sip_decode_btn)
         
         row2.addStretch()
         card_layout.addLayout(row2)
