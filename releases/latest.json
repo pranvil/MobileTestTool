@@ -1,10 +1,10 @@
 {
     "version":  "0.9.6.3",
     "download_url":  "https://github.com/pranvil/MobileTestTool/releases/download/v0.9.6.3/MobileTestTool_0.9.6.3.zip",
-    "sha256":  "04ab09e72e8c2bcd3521b897f61d2567c43fd74716b30fb5dd01f42b997649eb",
+    "sha256":  "63f73de8c54c333bfb7dd1d7a97478d0e41787c047405d088fad1d187e954bd3",
     "file_name":  "MobileTestTool_0.9.6.3.zip",
-    "file_size":  88789500,
+    "file_size":  110312529,
     "release_notes":  "# MobileTestTool Release Notes\r\n\r\n\r\n\r\n## Release Note\r\n- ✅ 添加decode MTK SIP消息功能\r\n\r\n## Known issue\r\n-",
-    "published_at":  "2025-11-15T08:41:51Z",
+    "published_at":  "2025-11-16T01:26:47Z",
     "mandatory":  false
 }
