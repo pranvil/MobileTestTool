@@ -1,10 +1,10 @@
 {
     "version":  "0.9.6.4",
     "download_url":  "https://github.com/pranvil/MobileTestTool/releases/download/v0.9.6.4/MobileTestTool_0.9.6.4.zip",
-    "sha256":  "5cc70fd245a0baf096462cbac7b7540eff11bdea1624ca28d2cc6bce35ee4b8c",
+    "sha256":  "99a8eb17586cb41f4f6fd2e4c20bdec5ac0263df25c72a083722c3f1e0412db6",
     "file_name":  "MobileTestTool_0.9.6.4.zip",
-    "file_size":  110278084,
+    "file_size":  110278982,
     "release_notes":  "# MobileTestTool Release Notes\r\n\r\n\r\n\r\n## Release Note\r\n- ✅ 添加时间戳\r\n\r\n## Known issue\r\n- 3GPP decode协议书写问题",
-    "published_at":  "2025-11-18T05:17:01Z",
+    "published_at":  "2025-11-18T05:32:27Z",
     "mandatory":  false
 }
