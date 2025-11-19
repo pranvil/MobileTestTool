@@ -134,11 +134,11 @@ class DeviceToolBar(QToolBar):
         self.theme_btn.clicked.connect(self.theme_toggled.emit)
         right_layout.addWidget(self.theme_btn)
         
-        # 语言切换按钮（放置在右侧）
-        self.language_btn = QPushButton("🌐 中/EN")
-        self.language_btn.setToolTip(self.lang_manager.tr("点击切换语言 / Click to switch language"))
-        self.language_btn.clicked.connect(self._on_language_toggle)
-        right_layout.addWidget(self.language_btn)
+        # 语言切换按钮（已隐藏）
+        # self.language_btn = QPushButton("🌐 中/EN")
+        # self.language_btn.setToolTip(self.lang_manager.tr("点击切换语言 / Click to switch language"))
+        # self.language_btn.clicked.connect(self._on_language_toggle)
+        # right_layout.addWidget(self.language_btn)
 
         self.addWidget(right_widget)
         
@@ -220,6 +220,9 @@ class DeviceToolBar(QToolBar):
     
     def _update_language_button(self):
         """更新语言按钮显示"""
+        # 语言按钮已隐藏，不再更新
+        if not hasattr(self, 'language_btn') or not self.language_btn:
+            return
         current_lang = self.lang_manager.get_current_language()
         if current_lang == 'zh':
             self.language_btn.setText("🌐 " + self.lang_manager.tr("中/EN"))
@@ -266,8 +269,8 @@ class DeviceToolBar(QToolBar):
                 current_theme = "light"
             self.theme_btn.setText(self.lang_manager.tr("暗色主题") if current_theme == "dark" else self.lang_manager.tr("亮色主题"))
         
-        # 更新语言按钮
-        self._update_language_button()
+        # 更新语言按钮（已隐藏，不再更新）
+        # self._update_language_button()
 
     def set_update_enabled(self, enabled: bool):
         """设置检查更新按钮可用状态"""

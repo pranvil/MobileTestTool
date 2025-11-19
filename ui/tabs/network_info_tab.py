@@ -6,7 +6,7 @@
 
 from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, 
                              QPushButton, QTableWidget, 
-                             QTableWidgetItem, QHeaderView, QFrame)
+                             QTableWidgetItem, QHeaderView, QFrame, QLineEdit, QScrollArea)
 from PyQt5.QtCore import pyqtSignal, Qt
 from ui.widgets.shadow_utils import add_card_shadow
 
@@ -20,7 +20,7 @@ class NetworkInfoTab(QWidget):
     stop_network_info = pyqtSignal()
     
     # Ping 控制
-    start_ping = pyqtSignal()
+    start_ping = pyqtSignal(str)  # 传递 ping_target 参数
     stop_ping = pyqtSignal()
     
     def __init__(self, parent=None):
@@ -43,18 +43,27 @@ class NetworkInfoTab(QWidget):
         main_layout.setContentsMargins(10, 10, 10, 10)
         main_layout.setSpacing(10)
         
-        # 创建水平布局（控制面板 + 信息显示）
-        container_layout = QHBoxLayout()
+        # 创建滚动区域
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        
+        # 滚动内容
+        scroll_content = QWidget()
+        scroll_layout = QHBoxLayout(scroll_content)
+        scroll_layout.setContentsMargins(0, 0, 0, 0)
+        scroll_layout.setSpacing(10)
         
         # 左侧控制面板
         control_panel = self.create_control_panel()
-        container_layout.addWidget(control_panel, 0)
+        scroll_layout.addWidget(control_panel, 0)
         
         # 右侧信息显示区域
         info_panel = self.create_info_panel()
-        container_layout.addWidget(info_panel, 1)
+        scroll_layout.addWidget(info_panel, 1)
         
-        main_layout.addLayout(container_layout)
+        scroll.setWidget(scroll_content)
+        main_layout.addWidget(scroll)
         
     def create_control_panel(self):
         """创建控制面板（现代结构：QLabel + QFrame）"""
@@ -99,6 +108,23 @@ class NetworkInfoTab(QWidget):
         self.ping_status_label = QLabel("")
         self.ping_status_label.setStyleSheet("color: gray; font-size: 9pt;")
         layout.addWidget(self.ping_status_label)
+        
+        # Ping目标输入框（标签和输入框在同一行）
+        ping_target_layout = QHBoxLayout()
+        ping_target_label = QLabel(self.lang_manager.tr("Ping目标:"))
+        ping_target_label.setStyleSheet("font-size: 9pt;")
+        ping_target_layout.addWidget(ping_target_label)
+        
+        self.ping_target_input = QLineEdit()
+        self.ping_target_input.setPlaceholderText("www.google.com")
+        self.ping_target_input.setMaximumWidth(200)  # 限制输入框宽度
+        # 从配置加载 ping_target，如果没有则使用默认值
+        self._load_ping_target()
+        # 连接输入框文本改变信号，保存配置
+        self.ping_target_input.textChanged.connect(self._on_ping_target_changed)
+        ping_target_layout.addWidget(self.ping_target_input)
+        ping_target_layout.addStretch()  # 添加弹性空间，让输入框靠左
+        layout.addLayout(ping_target_layout)
         
         # 添加弹性空间
         layout.addStretch()
@@ -168,95 +194,9 @@ class NetworkInfoTab(QWidget):
         self.network_table.setColumnWidth(14, 50)  # CQI
         self.network_table.setColumnWidth(15, 150) # NOTE (最后一列自动拉伸)
         
-        # 设置选中行的样式
-        self.network_table.setStyleSheet("""
-            QTableWidget {
-                gridline-color: #555555;
-                background-color: #2b2b2b;
-                color: #ffffff;
-                alternate-background-color: #2b2b2b;
-            }
-            QTableCornerButton::section {
-                background-color: #2b2b2b;
-                border: none;
-            }
-            QTableWidget::item {
-                padding: 2px;
-            }
-            QTableWidget::item:selected {
-                background-color: #0078d4;
-                color: #ffffff;
-            }
-            QTableWidget::item:hover {
-                background-color: #4a4a4a;
-            }
-            QHeaderView::section {
-                background-color: #3a3a3a;
-                color: #ffffff;
-                padding: 4px;
-                border: none;
-                border-bottom: 1px solid #555555;
-                border-right: 1px solid #666666;
-            }
-            QScrollBar:horizontal {
-                background-color: white;
-                height: 12px;
-                border: none;
-                margin: 0px;
-            }
-            QScrollBar::groove:horizontal {
-                background-color: white;
-                border-radius: 6px;
-            }
-            QScrollBar::handle:horizontal {
-                background-color: #666666;
-                min-width: 30px;
-                border-radius: 6px;
-                margin: 2px;
-            }
-            QScrollBar::handle:horizontal:hover {
-                background-color: #888888;
-            }
-            QScrollBar::handle:horizontal:pressed {
-                background-color: #aaaaaa;
-            }
-            QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {
-                width: 0px;
-                height: 0px;
-            }
-            QScrollBar::add-page:horizontal, QScrollBar::sub-page:horizontal {
-                background-color: white;
-            }
-            QScrollBar:vertical {
-                background-color: white;
-                width: 12px;
-                border: none;
-                margin: 0px;
-            }
-            QScrollBar::groove:vertical {
-                background-color: white;
-                border-radius: 6px;
-            }
-            QScrollBar::handle:vertical {
-                background-color: #666666;
-                min-height: 30px;
-                border-radius: 6px;
-                margin: 2px;
-            }
-            QScrollBar::handle:vertical:hover {
-                background-color: #888888;
-            }
-            QScrollBar::handle:vertical:pressed {
-                background-color: #aaaaaa;
-            }
-            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
-                width: 0px;
-                height: 0px;
-            }
-            QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
-                background-color: white;
-            }
-        """)
+        # 设置对象名称以便在主题中识别
+        self.network_table.setObjectName("networkInfoTable")
+        # 移除硬编码样式，使用主题样式
         
         # 初始提示文本
         self._show_initial_message()
@@ -304,7 +244,11 @@ class NetworkInfoTab(QWidget):
             self.ping_status_label.setText("")
         else:
             # 开始时只发送信号，等待成功回调再改变状态
-            self.start_ping.emit()
+            # 从输入框获取 ping 目标，如果为空则使用默认值
+            ping_target = self.ping_target_input.text().strip()
+            if not ping_target:
+                ping_target = "www.google.com"
+            self.start_ping.emit(ping_target)
             
     def set_network_state(self, is_running):
         """设置网络信息状态"""
@@ -450,4 +394,32 @@ class NetworkInfoTab(QWidget):
                 label.setText(self.lang_manager.tr("控制"))
             elif current_text in ["网络信息", "Network Info"]:
                 label.setText(self.lang_manager.tr("网络信息"))
+    
+    def _load_ping_target(self):
+        """从配置加载 ping 目标"""
+        try:
+            # 从父窗口获取 network_info_manager
+            if self.parent() and hasattr(self.parent(), 'network_info_manager'):
+                network_info_manager = self.parent().network_info_manager
+                ping_target = network_info_manager.get_ping_target()
+                self.ping_target_input.setText(ping_target)
+            else:
+                # 如果没有父窗口，使用默认值
+                self.ping_target_input.setText("www.google.com")
+        except Exception:
+            # 加载失败，使用默认值
+            self.ping_target_input.setText("www.google.com")
+    
+    def _on_ping_target_changed(self, text):
+        """当 ping 目标输入框内容改变时，保存配置"""
+        try:
+            # 从父窗口获取 network_info_manager
+            if self.parent() and hasattr(self.parent(), 'network_info_manager'):
+                network_info_manager = self.parent().network_info_manager
+                ping_target = text.strip()
+                if ping_target:  # 只有当输入不为空时才保存
+                    network_info_manager.save_ping_target(ping_target)
+        except Exception:
+            # 保存失败不影响功能，静默处理
+            pass
 

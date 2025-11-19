@@ -780,6 +780,10 @@ class MainWindow(QMainWindow):
         # 加载主题
         self.theme_manager.load_theme("dark")
         
+        # 主题加载后，更新日志查看器的文本颜色
+        if hasattr(self, 'log_viewer') and self.log_viewer:
+            self.log_viewer._update_text_colors()
+        
         # 连接信号槽
         self.setup_connections()
         
@@ -1042,7 +1046,7 @@ class MainWindow(QMainWindow):
         splitter.addWidget(self.tab_widget)
         
         # 日志显示区域
-        self.log_viewer = LogViewer()
+        self.log_viewer = LogViewer(self)  # 传入parent以便获取主题管理器
         splitter.addWidget(self.log_viewer)
         
         # 设置分割比例（Tab区域:日志区域 = 1:2）
@@ -1304,7 +1308,7 @@ class MainWindow(QMainWindow):
             self.log_filter_tab.tab_id = 'log_filter'  # 添加tab_id属性
             tab_instances['log_filter'] = self.log_filter_tab
             
-            self.network_info_tab = NetworkInfoTab()
+            self.network_info_tab = NetworkInfoTab(self)
             self.network_info_tab.tab_id = 'network_info'  # 添加tab_id属性
             tab_instances['network_info'] = self.network_info_tab
             
@@ -2030,6 +2034,11 @@ class MainWindow(QMainWindow):
         self.theme_manager.toggle_theme()
         current_theme = self.theme_manager.get_current_theme()
         self.toolbar.update_theme_button(current_theme)
+        
+        # 更新日志查看器的文本颜色
+        if hasattr(self, 'log_viewer') and self.log_viewer:
+            self.log_viewer._update_text_colors()
+        
         self.append_log.emit(f"{self.tr('已切换到')}{current_theme}{self.tr('主题')}\n", None)
     
     def _on_language_changed(self, new_lang):
@@ -2548,10 +2557,10 @@ class MainWindow(QMainWindow):
         self.append_log.emit(self.lang_manager.tr("停止获取网络信息...") + "\n", None)
         self.network_info_manager.stop_network_info()
         
-    def _on_start_ping(self):
+    def _on_start_ping(self, ping_target="www.google.com"):
         """开始 Ping"""
         self.append_log.emit(self.lang_manager.tr("开始 Ping 测试...") + "\n", None)
-        self.network_info_manager.start_ping()
+        self.network_info_manager.start_ping(ping_target)
         
     def _on_stop_ping(self):
         """停止 Ping"""

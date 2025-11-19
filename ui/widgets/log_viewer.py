@@ -6,6 +6,8 @@
 
 import os
 import json
+import re
+from datetime import datetime
 from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QTextEdit, QLabel,
                              QHBoxLayout, QPushButton, QLineEdit, QCheckBox,
                              QSizePolicy, QFrame, QMenu, QAction)
@@ -124,6 +126,9 @@ class LogViewer(QWidget):
     search_requested = pyqtSignal(str, bool)  # keyword, case_sensitive
     adb_command_executed = pyqtSignal(str)  # 执行adb命令
     
+    # 行首 adb 时间戳匹配：MM-DD HH:mm:ss.SSS
+    _ADB_TS_RE = re.compile(r'^\s*\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}\.\d{3}\b')
+    
     def __init__(self, parent=None):
         super().__init__(parent)
         # 从父窗口获取语言管理器
@@ -154,6 +159,82 @@ class LogViewer(QWidget):
     def tr(self, text):
         """安全地获取翻译文本"""
         return self.lang_manager.tr(text) if self.lang_manager else text
+    
+    def _update_text_colors(self):
+        """根据当前主题更新文本颜色"""
+        # 获取当前主题
+        theme = "dark"  # 默认暗色主题
+        
+        # 尝试从parent获取主题管理器
+        # 注意：LogViewer的parent可能是QSplitter，需要向上查找MainWindow
+        widget = self.parent()
+        theme_manager = None
+        
+        # 向上查找MainWindow（最多查找5层）
+        for _ in range(5):
+            if widget is None:
+                break
+            if hasattr(widget, 'theme_manager'):
+                theme_manager = widget.theme_manager
+                break
+            widget = widget.parent()
+        
+        if theme_manager:
+            theme = theme_manager.get_current_theme()
+        else:
+            # 如果无法找到theme_manager，使用默认主题
+            pass
+        
+        # 根据主题设置文本颜色
+        if theme == "light":
+            # 亮色主题：使用深色文本
+            color = QColor("#000000")
+            self.default_format.setForeground(color)
+        else:
+            # 暗色主题：使用浅色文本
+            color = QColor("#ffffff")
+            self.default_format.setForeground(color)
+        
+        # 重新格式化所有已存在的文本（除了高亮的部分）
+        self._reformat_existing_text()
+    
+    def _reformat_existing_text(self):
+        """重新格式化所有已存在的文本，应用新的默认颜色"""
+        if not self.text_edit.document():
+            return
+        
+        # 保存当前光标位置
+        cursor = self.text_edit.textCursor()
+        original_position = cursor.position()
+        
+        # 获取所有文本
+        full_text = self.text_edit.toPlainText()
+        if not full_text:
+            return
+        
+        # 保存搜索高亮信息（如果有）
+        search_keyword = self.search_keyword
+        search_results = self.search_results.copy() if self.search_results else []
+        current_search_index = self.current_search_index
+        
+        # 保存高亮关键字信息（用于过滤时的高亮）
+        # 注意：这里我们无法完全恢复所有高亮，但至少可以恢复搜索高亮
+        
+        # 重新设置整个文档的格式
+        cursor.select(QTextCursor.Document)
+        cursor.setCharFormat(self.default_format)
+        
+        # 恢复搜索高亮（如果有）
+        if search_keyword and search_results:
+            self.search_keyword = search_keyword
+            self.search_results = search_results
+            self.current_search_index = current_search_index
+            self.highlight_search_results()
+        
+        # 恢复光标位置
+        new_position = min(original_position, len(full_text))
+        cursor.setPosition(new_position)
+        self.text_edit.setTextCursor(cursor)
         
     def setup_ui(self):
         """设置UI"""
@@ -220,21 +301,16 @@ class LogViewer(QWidget):
         self.text_edit = QTextEdit()
         self.text_edit.setReadOnly(True)
         self.text_edit.setFont(QFont("Cascadia Mono", 10))
-        self.text_edit.setStyleSheet("""
-            QTextEdit {
-                background-color: #1e1e1e;
-                color: #ffffff;
-                border: 1px solid #cccccc;
-                border-radius: 4px;
-            }
-        """)
+        # 移除硬编码样式，使用主题样式
+        # 设置对象名称以便在主题中识别
+        self.text_edit.setObjectName("logViewerTextEdit")
         # 设置右键菜单
         self.text_edit.setContextMenuPolicy(Qt.CustomContextMenu)
         self.text_edit.customContextMenuRequested.connect(self.show_context_menu)
         
-        # 配置文本格式
+        # 配置文本格式（根据主题动态调整）
         self.default_format = QTextCharFormat()
-        self.default_format.setForeground(QColor("#ffffff"))
+        self._update_text_colors()
         
         # 关键字高亮格式（用于过滤时的高亮）
         self.highlight_format = QTextCharFormat()
@@ -249,7 +325,8 @@ class LogViewer(QWidget):
         
         # ADB命令输入区域（日志显示区域下方）
         adb_frame = QFrame()
-        adb_frame.setStyleSheet("background-color: #2a2a2a; padding: 5px;")
+        adb_frame.setObjectName("adbCommandFrame")
+        # 移除硬编码样式，使用主题样式
         adb_layout_h = QHBoxLayout(adb_frame)
         adb_layout_h.setContentsMargins(5, 5, 5, 5)
         adb_layout_h.setSpacing(5)
@@ -347,6 +424,24 @@ class LogViewer(QWidget):
         
     def append_log(self, text, color=None):
         """追加日志"""
+        # 仅当行首没有 adb 时间戳时，为每一行添加本地时间戳（MM-DD HH:mm:ss.SSS）
+        def _ensure_ts(src: str) -> str:
+            lines = src.splitlines(keepends=True)
+            output_parts = []
+            for ln in lines:
+                # 空白行保持原样
+                if ln.strip() == "":
+                    output_parts.append(ln)
+                    continue
+                if self._ADB_TS_RE.match(ln):
+                    output_parts.append(ln)
+                else:
+                    ts = datetime.now().strftime('%m-%d %H:%M:%S.%f')[:-3]
+                    output_parts.append(f"{ts} {ln}")
+            return "".join(output_parts)
+        
+        text = _ensure_ts(text)
+        
         cursor = self.text_edit.textCursor()
         cursor.movePosition(QTextCursor.End)
         
@@ -595,13 +690,8 @@ class LogViewer(QWidget):
         results_text = QTextEdit()
         results_text.setReadOnly(True)
         results_text.setFont(QFont("Cascadia Mono", 10))
-        results_text.setStyleSheet("""
-            QTextEdit {
-                background-color: #0C0C0C;
-                color: #FFFFFF;
-                selection-background-color: #444444;
-            }
-        """)
+        # 移除硬编码样式，使用主题样式
+        results_text.setObjectName("searchResultsTextEdit")
         
         main_layout.addWidget(results_text)
         
@@ -609,9 +699,18 @@ class LogViewer(QWidget):
         highlight_format = QTextCharFormat()
         highlight_format.setForeground(QColor("#FF4444"))
         
-        # 配置默认格式（白色字体）
+        # 配置默认格式（根据主题动态调整）
         default_format = QTextCharFormat()
-        default_format.setForeground(QColor("#FFFFFF"))
+        # 获取当前主题
+        theme = "dark"  # 默认暗色主题
+        if self.parent() and hasattr(self.parent(), 'theme_manager'):
+            theme = self.parent().theme_manager.get_current_theme()
+        
+        # 根据主题设置文本颜色
+        if theme == "light":
+            default_format.setForeground(QColor("#000000"))  # 亮色主题：黑色文本
+        else:
+            default_format.setForeground(QColor("#FFFFFF"))  # 暗色主题：白色文本
         
         # 填充搜索结果
         for line_num, line in matching_lines:

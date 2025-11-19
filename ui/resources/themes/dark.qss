@@ -332,6 +332,36 @@ QHeaderView::section {
     border-right: 1px solid #666666;
 }
 
+/* 网络信息表格 */
+QTableWidget#networkInfoTable {
+    background-color: #2b2b2b;
+    color: #ffffff;
+    gridline-color: #555555;
+    alternate-background-color: #2b2b2b;
+}
+
+QTableWidget#networkInfoTable::item {
+    padding: 2px;
+}
+
+QTableWidget#networkInfoTable::item:selected {
+    background-color: #0078d4;
+    color: #ffffff;
+}
+
+QTableWidget#networkInfoTable::item:hover {
+    background-color: #4a4a4a;
+}
+
+QTableWidget#networkInfoTable QHeaderView::section {
+    background-color: #3a3a3a;
+    color: #ffffff;
+    padding: 4px;
+    border: none;
+    border-bottom: 1px solid #555555;
+    border-right: 1px solid #666666;
+}
+
 /* 状态栏 */
 QStatusBar {
     background-color: #333333;
@@ -430,6 +460,27 @@ QTextEdit {
 
 QTextEdit:focus {
     border-color: #0078d4;
+}
+
+/* 日志查看器文本编辑框 */
+QTextEdit#logViewerTextEdit {
+    background-color: #1e1e1e;
+    color: #ffffff;
+    border: 1px solid #555555;
+    border-radius: 4px;
+}
+
+/* 搜索结果文本编辑框 */
+QTextEdit#searchResultsTextEdit {
+    background-color: #0C0C0C;
+    color: #FFFFFF;
+    selection-background-color: #444444;
+}
+
+/* ADB命令输入区域 */
+QFrame#adbCommandFrame {
+    background-color: #2a2a2a;
+    padding: 5px;
 }
 
 /* 列表 */

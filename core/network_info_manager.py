@@ -8,6 +8,7 @@ PyQt5 网络信息管理器
 import subprocess
 import threading
 import re
+import json
 from PyQt5.QtCore import QObject, pyqtSignal, QTimer
 from PyQt5.QtWidgets import QMessageBox
 
@@ -155,12 +156,13 @@ class NetworkInfoWorker(threading.Thread):
 class PingWorker(threading.Thread):
     """Ping工作线程"""
     
-    def __init__(self, device, callback, stop_event, lang_manager=None):
+    def __init__(self, device, callback, stop_event, lang_manager=None, ping_target="www.google.com"):
         super().__init__()
         self.device = device
         self.callback = callback
         self.stop_event = stop_event
         self.lang_manager = lang_manager
+        self.ping_target = ping_target
         self.ping_process = None
         self.last_status = None  # 记录上次的网络状态
         
@@ -175,7 +177,7 @@ class PingWorker(threading.Thread):
         try:
             # 执行ping命令 - 使用更兼容的参数
             # 使用-i 0.5提高响应速度，但不限制包数，直到手动停止
-            cmd = f"adb -s {self.device} shell ping -i 0.5 www.google.com"
+            cmd = f"adb -s {self.device} shell ping -i 0.5 {self.ping_target}"
             
             # 启动ping进程
             creation_flags = 0
@@ -188,7 +190,7 @@ class PingWorker(threading.Thread):
             if platform.system() == 'Windows':
                 # Windows上直接启动adb，不使用shell
                 self.ping_process = subprocess.Popen(
-                    ["adb", "-s", self.device, "shell", "ping", "-i", "0.5", "www.google.com"],
+                    ["adb", "-s", self.device, "shell", "ping", "-i", "0.5", self.ping_target],
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE,
                     text=True,
@@ -257,7 +259,7 @@ class PingWorker(threading.Thread):
                                 # 重新启动ping进程
                                 if platform.system() == 'Windows':
                                     self.ping_process = subprocess.Popen(
-                                        ["adb", "-s", self.device, "shell", "ping", "-i", "0.5", "www.google.com"],
+                                        ["adb", "-s", self.device, "shell", "ping", "-i", "0.5", self.ping_target],
                                         stdout=subprocess.PIPE,
                                         stderr=subprocess.PIPE,
                                         text=True,
@@ -318,7 +320,7 @@ class PingWorker(threading.Thread):
                             try:
                                 if platform.system() == 'Windows':
                                     self.ping_process = subprocess.Popen(
-                                        ["adb", "-s", self.device, "shell", "ping", "-i", "0.5", "www.google.com"],
+                                        ["adb", "-s", self.device, "shell", "ping", "-i", "0.5", self.ping_target],
                                         stdout=subprocess.PIPE,
                                         stderr=subprocess.PIPE,
                                         text=True,
@@ -495,6 +497,10 @@ class PyQtNetworkInfoManager(QObject):
         self.stop_event = None
         self.is_running = False
         self.wifi_parser = WifiInfoParser()
+        # 配置文件路径
+        self.config_file = os.path.expanduser('~/.netui/network_config.json')
+        # 加载配置
+        self.ping_target = self._load_ping_target()
         
     def start_network_info(self):
         """开始获取网络信息"""
@@ -557,7 +563,7 @@ class PyQtNetworkInfoManager(QObject):
             except RuntimeError:
                 pass
     
-    def start_ping(self):
+    def start_ping(self, ping_target="www.google.com"):
         """开始Ping测试"""
         # 检查是否已经在运行
         if self.ping_worker and self.ping_worker.is_alive():
@@ -582,7 +588,8 @@ class PyQtNetworkInfoManager(QObject):
                 device,
                 self._on_ping_result,
                 self.stop_event,
-                self.lang_manager
+                self.lang_manager,
+                ping_target
             )
             self.ping_worker.start()
             
@@ -646,4 +653,46 @@ class PyQtNetworkInfoManager(QObject):
         except RuntimeError:
             # 对象已被销毁，忽略
             pass
+    
+    def _load_ping_target(self):
+        """加载保存的 ping 目标"""
+        try:
+            if os.path.exists(self.config_file):
+                with open(self.config_file, 'r', encoding='utf-8') as f:
+                    config = json.load(f)
+                    return config.get('ping_target', 'www.google.com')
+        except Exception:
+            pass
+        return 'www.google.com'
+    
+    def save_ping_target(self, ping_target):
+        """保存 ping 目标到配置文件"""
+        try:
+            # 确保配置目录存在
+            os.makedirs(os.path.dirname(self.config_file), exist_ok=True)
+            
+            # 读取现有配置（如果存在）
+            config = {}
+            if os.path.exists(self.config_file):
+                try:
+                    with open(self.config_file, 'r', encoding='utf-8') as f:
+                        config = json.load(f)
+                except Exception:
+                    pass
+            
+            # 更新 ping_target
+            config['ping_target'] = ping_target
+            
+            # 保存配置
+            with open(self.config_file, 'w', encoding='utf-8') as f:
+                json.dump(config, f, ensure_ascii=False, indent=2)
+            
+            self.ping_target = ping_target
+        except Exception as e:
+            # 保存失败不影响功能，静默处理
+            pass
+    
+    def get_ping_target(self):
+        """获取当前保存的 ping 目标"""
+        return self.ping_target
 

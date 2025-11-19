@@ -21,6 +21,15 @@ try:
 except Exception:
     # 如果导入失败，创建一个简单的默认配置对象
     class DefaultConfig:
+        # 日志级别映射（与LogConfig保持一致）
+        LEVELS = {
+            'DEBUG': 0,
+            'INFO': 1,
+            'WARNING': 2,
+            'ERROR': 3,
+            'EXCEPTION': 3  # EXCEPTION级别等同于ERROR
+        }
+        
         def get(self, key, default=None):
             defaults = {
                 'enabled': True,
@@ -39,7 +48,14 @@ except Exception:
             return defaults.get(key, default)
         
         def should_log(self, level):
-            return True
+            """判断指定级别的日志是否应该记录（与LogConfig实现一致）"""
+            if not self.get('enabled', True):
+                return False
+            
+            current_level = self.LEVELS.get(self.get('log_level', 'DEBUG'), 1)
+            log_level = self.LEVELS.get(level, 1)
+            
+            return log_level >= current_level
     
     config = DefaultConfig()
 
@@ -113,7 +129,11 @@ class DebugLogger:
             self._write_thread.start()
             
         except Exception as e:
-            # 静默处理日志系统初始化错误
+            # 日志系统初始化错误，记录到stderr
+            try:
+                sys.stderr.write(f"[DebugLogger] Failed to initialize logger: {e}\n")
+            except:
+                pass
             self._log_file = None
     
     def _get_log_file_path(self, log_dir):
@@ -123,13 +143,20 @@ class DebugLogger:
             date_str = current_date.strftime('%Y%m%d')
             
             # 检查是否需要按日期轮转
+            needs_date_rotation = False
             if config.get('rotation_by_date', True) and self._current_date and self._current_date != current_date:
                 # 日期已变化，需要轮转
-                pass
+                needs_date_rotation = True
             
             # 查找今天的日志文件
             log_filename = f'debug_{date_str}.log'
             log_file_path = os.path.join(log_dir, log_filename)
+            
+            # 如果需要按日期轮转，返回新日期的文件路径（文件可能不存在）
+            if needs_date_rotation:
+                self._current_date = current_date
+                self._current_file_size = 0
+                return log_file_path
             
             # 如果文件存在，检查大小
             if os.path.exists(log_file_path):
@@ -146,8 +173,20 @@ class DebugLogger:
             self._current_date = current_date
             return log_file_path
             
-        except Exception:
-            # 如果出错，使用时间戳文件名
+        except (OSError, IOError) as e:
+            # 文件操作错误，记录到stderr并使用时间戳文件名
+            try:
+                sys.stderr.write(f"[DebugLogger] Failed to get log file path: {e}\n")
+            except:
+                pass
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            return os.path.join(log_dir, f'debug_{timestamp}.log')
+        except Exception as e:
+            # 其他错误，记录到stderr并使用时间戳文件名
+            try:
+                sys.stderr.write(f"[DebugLogger] Unexpected error in _get_log_file_path: {e}\n")
+            except:
+                pass
             timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
             return os.path.join(log_dir, f'debug_{timestamp}.log')
     
@@ -206,8 +245,20 @@ class DebugLogger:
             self._current_file_size = 0
             return os.path.join(log_dir, f'{base_name}.log')
             
-        except Exception:
-            # 如果轮转失败，使用时间戳
+        except (OSError, IOError) as e:
+            # 文件操作错误，记录到stderr并使用时间戳文件名
+            try:
+                sys.stderr.write(f"[DebugLogger] Failed to rotate log file: {e}\n")
+            except:
+                pass
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            return os.path.join(log_dir, f'debug_{timestamp}.log')
+        except Exception as e:
+            # 其他错误，记录到stderr并使用时间戳文件名
+            try:
+                sys.stderr.write(f"[DebugLogger] Unexpected error in _rotate_log_file: {e}\n")
+            except:
+                pass
             timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
             return os.path.join(log_dir, f'debug_{timestamp}.log')
     
@@ -229,48 +280,101 @@ class DebugLogger:
                         
                         # 如果文件超过保留天数，删除它
                         if file_mtime < cutoff_time:
-                            os.remove(file_path)
-                    except:
-                        pass
-        
-        except Exception:
-            pass
+                            try:
+                                os.remove(file_path)
+                            except (OSError, IOError) as e:
+                                # 删除文件失败，记录到stderr（但不影响主流程）
+                                try:
+                                    sys.stderr.write(f"[DebugLogger] Failed to remove old log file {filename}: {e}\n")
+                                except:
+                                    pass
+                    except (OSError, IOError) as e:
+                        # 获取文件修改时间失败，记录到stderr（但不影响主流程）
+                        try:
+                            sys.stderr.write(f"[DebugLogger] Failed to get mtime for {filename}: {e}\n")
+                        except:
+                            pass
+        except (OSError, IOError) as e:
+            # 文件操作错误，记录到stderr
+            try:
+                sys.stderr.write(f"[DebugLogger] Failed to cleanup old logs: {e}\n")
+            except:
+                pass
+        except Exception as e:
+            # 其他错误，记录到stderr
+            try:
+                sys.stderr.write(f"[DebugLogger] Unexpected error in _cleanup_old_logs: {e}\n")
+            except:
+                pass
     
     def _write_header(self):
-        """写入日志文件头部信息"""
+        """写入日志文件头部信息（仅在文件不存在或为空时写入，避免覆盖已有日志）"""
         if not self._log_file:
             return
         
         try:
-            header_lines = [
-                "=" * 80,
-                "MobileTestTool Debug Log",
-                f"{self._tr('启动时间:')} {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
-                f"{self._tr('Python版本:')} {sys.version.split()[0]}",
-                f"{self._tr('运行目录:')} {os.getcwd()}",
-            ]
+            # 检查文件是否存在且不为空
+            file_exists = os.path.exists(self._log_file)
+            file_is_empty = False
             
-            if getattr(sys, 'frozen', False):
-                header_lines.append(f"{self._tr('可执行文件:')} {sys.executable}")
-                header_lines.append(f"{self._tr('运行模式:')} {self._tr('打包EXE模式')}")
-            else:
-                header_lines.append(f"{self._tr('运行模式:')} {self._tr('开发模式')}")
+            if file_exists:
+                try:
+                    file_is_empty = os.path.getsize(self._log_file) == 0
+                except (OSError, IOError):
+                    # 如果无法获取文件大小，假设文件不为空，跳过头部写入
+                    return
             
-            header_lines.append("=" * 80)
-            header_lines.append("")
+            # 只在文件不存在或为空时写入头部
+            if not file_exists or file_is_empty:
+                header_lines = [
+                    "=" * 80,
+                    "MobileTestTool Debug Log",
+                    f"{self._tr('启动时间:')} {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
+                    f"{self._tr('Python版本:')} {sys.version.split()[0]}",
+                    f"{self._tr('运行目录:')} {os.getcwd()}",
+                ]
+                
+                if getattr(sys, 'frozen', False):
+                    header_lines.append(f"{self._tr('可执行文件:')} {sys.executable}")
+                    header_lines.append(f"{self._tr('运行模式:')} {self._tr('打包EXE模式')}")
+                else:
+                    header_lines.append(f"{self._tr('运行模式:')} {self._tr('开发模式')}")
+                
+                header_lines.append("=" * 80)
+                header_lines.append("")
+                
+                header_content = "\n".join(header_lines) + "\n"
+                
+                # 使用追加模式写入（如果文件存在但为空）或创建模式（如果文件不存在）
+                mode = 'a' if file_exists else 'w'
+                with open(self._log_file, mode, encoding='utf-8') as f:
+                    f.write(header_content)
+                
+                if not file_exists:
+                    self._current_file_size = len(header_content.encode('utf-8'))
+                else:
+                    # 如果文件已存在但为空，更新文件大小
+                    self._current_file_size = len(header_content.encode('utf-8'))
             
-            header_content = "\n".join(header_lines) + "\n"
-            
-            with open(self._log_file, 'w', encoding='utf-8') as f:
-                f.write(header_content)
-            
-            self._current_file_size = len(header_content.encode('utf-8'))
-            
-        except Exception:
-            pass
+        except (OSError, IOError) as e:
+            # 文件操作错误，记录到stderr
+            try:
+                sys.stderr.write(f"[DebugLogger] Failed to write header: {e}\n")
+            except:
+                pass
+        except Exception as e:
+            # 其他错误，记录到stderr
+            try:
+                sys.stderr.write(f"[DebugLogger] Unexpected error in _write_header: {e}\n")
+            except:
+                pass
     
     def _get_caller_info(self):
-        """获取调用者信息（模块名、函数名、行号）"""
+        """获取调用者信息（模块名、函数名、行号）
+        
+        注意：此方法仅在DEBUG级别或配置启用时调用，以避免性能开销。
+        inspect.stack() 是一个相对昂贵的操作，应该谨慎使用。
+        """
         try:
             # 获取调用栈，跳过当前函数和log相关函数
             stack = inspect.stack()
@@ -288,20 +392,32 @@ class DebugLogger:
                         module_name = module_name.split('.')[-1]
                     
                     return module_name, function_name, line_number
-        except:
+        except Exception:
+            # 获取调用者信息失败时静默处理（避免影响日志记录）
             pass
         
         return None, None, None
     
     def _format_log_message(self, message, level):
-        """格式化日志消息"""
+        """格式化日志消息
+        
+        性能优化：仅在DEBUG级别获取调用者信息，其他级别跳过inspect.stack()调用
+        以提升性能。如需在其他级别启用调用者信息，可通过配置控制。
+        """
         timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
         
         # 构建日志行
         log_parts = [f"[{timestamp}]", f"[{level}]"]
         
-        # 添加调用者信息
-        if config.get('include_module', True) or config.get('include_function', True) or config.get('include_line', True):
+        # 仅在DEBUG级别获取调用者信息（性能优化：避免频繁调用inspect.stack()）
+        # 或者根据配置决定是否包含调用者信息
+        should_include_caller = (level == 'DEBUG') or (
+            config.get('include_module', True) or 
+            config.get('include_function', True) or 
+            config.get('include_line', True)
+        )
+        
+        if should_include_caller:
             module_name, function_name, line_number = self._get_caller_info()
             
             context_parts = []
@@ -347,8 +463,12 @@ class DebugLogger:
                     if (current_time - self._last_flush_time) >= flush_interval:
                         self._flush_buffer()
                 
-            except Exception:
-                pass
+            except Exception as e:
+                # 后台写入线程错误，记录到stderr
+                try:
+                    sys.stderr.write(f"[DebugLogger] Error in write worker thread: {e}\n")
+                except:
+                    pass
     
     def _flush_buffer(self):
         """刷新缓冲区，将日志写入文件"""
@@ -361,10 +481,12 @@ class DebugLogger:
                 current_date = datetime.now().date()
                 if config.get('rotation_by_date', True) and self._current_date and self._current_date != current_date:
                     log_dir = os.path.dirname(self._log_file)
-                    date_str = current_date.strftime('%Y%m%d')
+                    # 获取新日期的日志文件路径
                     self._log_file = self._get_log_file_path(log_dir)
+                    # 为新文件写入头部信息
+                    self._write_header()
                     self._current_date = current_date
-                    self._current_file_size = 0
+                    self._current_file_size = len("".join(self._buffer).encode('utf-8'))
                 
                 # 检查文件是否需要按大小轮转
                 if os.path.exists(self._log_file):
@@ -375,6 +497,8 @@ class DebugLogger:
                         log_dir = os.path.dirname(self._log_file)
                         date_str = datetime.now().date().strftime('%Y%m%d')
                         self._log_file = self._rotate_log_file(log_dir, date_str)
+                        # 为轮转后的新文件写入头部信息
+                        self._write_header()
                         self._current_file_size = 0
                 
                 # 批量写入日志
@@ -387,8 +511,18 @@ class DebugLogger:
                 self._buffer.clear()
                 self._last_flush_time = time.time()
                 
-        except Exception:
-            pass
+        except (OSError, IOError) as e:
+            # 文件操作错误，记录到stderr
+            try:
+                sys.stderr.write(f"[DebugLogger] Failed to flush buffer: {e}\n")
+            except:
+                pass
+        except Exception as e:
+            # 其他错误，记录到stderr
+            try:
+                sys.stderr.write(f"[DebugLogger] Unexpected error in _flush_buffer: {e}\n")
+            except:
+                pass
     
     def log(self, message, level="INFO"):
         """
@@ -410,16 +544,32 @@ class DebugLogger:
             try:
                 self._log_queue.put_nowait(log_line)
             except queue.Full:
-                # 队列已满，直接写入（避免丢失重要日志）
+                # 队列已满，直接写入文件（设计策略：确保重要日志不丢失）
+                # 注意：这会绕过缓冲区机制，但可以保证在队列满载时日志仍能记录
+                # 这是有意设计的行为，用于处理突发大量日志的场景
                 try:
                     with self._lock:
                         with open(self._log_file, 'a', encoding='utf-8') as f:
                             f.write(log_line)
-                except:
-                    pass
+                except (OSError, IOError) as e:
+                    # 文件写入错误，记录到stderr
+                    try:
+                        sys.stderr.write(f"[DebugLogger] Failed to write log directly: {e}\n")
+                    except:
+                        pass
+                except Exception as e:
+                    # 其他错误，记录到stderr
+                    try:
+                        sys.stderr.write(f"[DebugLogger] Unexpected error writing log directly: {e}\n")
+                    except:
+                        pass
         
-        except Exception:
-            pass
+        except Exception as e:
+            # 记录日志时出错，记录到stderr（避免日志系统自身错误影响程序）
+            try:
+                sys.stderr.write(f"[DebugLogger] Failed to log message: {e}\n")
+            except:
+                pass
     
     def info(self, message):
         """记录INFO级别日志"""
@@ -470,16 +620,32 @@ class DebugLogger:
             try:
                 self._log_queue.put_nowait(log_content)
             except queue.Full:
-                # 队列已满，直接写入
+                # 队列已满，直接写入文件（设计策略：确保重要日志不丢失）
+                # 注意：这会绕过缓冲区机制，但可以保证异常信息在队列满载时仍能记录
+                # 这是有意设计的行为，用于处理突发大量日志的场景
                 try:
                     with self._lock:
                         with open(self._log_file, 'a', encoding='utf-8') as f:
                             f.write(log_content)
-                except:
-                    pass
+                except (OSError, IOError) as e:
+                    # 文件写入错误，记录到stderr
+                    try:
+                        sys.stderr.write(f"[DebugLogger] Failed to write exception log directly: {e}\n")
+                    except:
+                        pass
+                except Exception as e:
+                    # 其他错误，记录到stderr
+                    try:
+                        sys.stderr.write(f"[DebugLogger] Unexpected error writing exception log directly: {e}\n")
+                    except:
+                        pass
         
-        except Exception:
-            pass
+        except Exception as e:
+            # 记录异常时出错，记录到stderr
+            try:
+                sys.stderr.write(f"[DebugLogger] Failed to log exception: {e}\n")
+            except:
+                pass
     
     def separator(self):
         """写入分隔线"""
@@ -490,20 +656,26 @@ class DebugLogger:
         return self._log_file
     
     def flush(self):
-        """立即刷新所有待写入的日志"""
+        """立即刷新所有待写入的日志（使用线程安全的队列操作）"""
         try:
-            # 等待队列中的所有消息
-            while not self._log_queue.empty():
+            # 使用非阻塞获取方式处理队列中的所有消息（线程安全）
+            # 避免使用empty()检查，因为它在多线程环境中不可靠
+            while True:
                 try:
                     log_entry = self._log_queue.get_nowait()
                     self._buffer.append(log_entry)
                 except queue.Empty:
+                    # 队列为空，退出循环
                     break
             
             # 刷新缓冲区
             self._flush_buffer()
-        except Exception:
-            pass
+        except Exception as e:
+            # 记录刷新错误到stderr
+            try:
+                sys.stderr.write(f"[DebugLogger] Failed to flush logs: {e}\n")
+            except:
+                pass
     
     def shutdown(self):
         """关闭日志系统"""
@@ -519,8 +691,12 @@ class DebugLogger:
             if self._write_thread and self._write_thread.is_alive():
                 self._write_thread.join(timeout=2.0)
         
-        except Exception:
-            pass
+        except Exception as e:
+            # 关闭日志系统时出错，记录到stderr
+            try:
+                sys.stderr.write(f"[DebugLogger] Failed to shutdown logger: {e}\n")
+            except:
+                pass
 
 
 # 创建全局日志实例

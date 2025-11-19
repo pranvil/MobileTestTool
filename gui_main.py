@@ -41,6 +41,7 @@ if hasattr(sys, 'frozen') and hasattr(sys, '_MEIPASS'):
         import ui.log_keyword_dialog  # 日志关键词对话框
         import ui.config_backup_dialog  # 配置备份对话框
         import ui.unified_manager_dialog  # 统一管理器对话框
+        import ui.tools_config_dialog  # 工具配置对话框
         
         logger.debug("对话框模块预导入成功")
     except ImportError as e:

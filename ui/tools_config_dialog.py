@@ -9,8 +9,8 @@ import glob
 import subprocess
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel,
-                             QPushButton, QLineEdit, QCheckBox,
-                             QMessageBox, QFileDialog, QSpinBox, QScrollArea,
+                             QPushButton, QLineEdit,
+                             QMessageBox, QFileDialog, QScrollArea,
                              QWidget, QFrame)
 
 from core.update_manager import DEFAULT_UPDATE_FEED_URL
@@ -95,50 +95,52 @@ class ToolsConfigDialog(QDialog):
         storage_container_layout.addWidget(storage_card)
         content_layout.addWidget(storage_container)
         
-        # 更新配置（使用与Tab界面一致的样式：QLabel + QFrame）
-        update_container = QWidget()
-        update_container_layout = QVBoxLayout(update_container)
-        update_container_layout.setContentsMargins(0, 0, 0, 0)
-        update_container_layout.setSpacing(4)
-        
-        update_title = QLabel(self.tr("更新配置"))
-        update_title.setProperty("class", "section-title")
-        update_container_layout.addWidget(update_title)
-        
-        update_card = QFrame()
-        update_card.setObjectName("card")
-        add_card_shadow(update_card)
-        update_layout = QVBoxLayout(update_card)
-        update_layout.setContentsMargins(10, 1, 10, 1)
-        update_layout.setSpacing(8)
-
-        update_url_layout = QHBoxLayout()
-        update_url_layout.addWidget(QLabel(self.tr("版本描述 URL:")))
-
-        self.update_url_entry = QLineEdit()
-        self.update_url_entry.setPlaceholderText(self.tr("例如: https://example.com/releases/latest.json"))
-        update_url_layout.addWidget(self.update_url_entry)
-        update_layout.addLayout(update_url_layout)
-
-        # download_dir_hint = QLabel(self.tr("下载目录: 程序当前目录（不可修改）"))
-        # download_dir_hint.setWordWrap(True)
-        # download_dir_hint.setStyleSheet("color: #666666;")
-        # update_layout.addWidget(download_dir_hint)
-
-        self.update_auto_launch_checkbox = QCheckBox(self.tr("下载完成后自动打开安装包"))
-        update_layout.addWidget(self.update_auto_launch_checkbox)
-
-        timeout_layout = QHBoxLayout()
-        timeout_layout.addWidget(QLabel(self.tr("网络超时 (秒):")))
-
-        self.update_timeout_spin = QSpinBox()
-        self.update_timeout_spin.setRange(5, 300)
-        self.update_timeout_spin.setSingleStep(5)
-        timeout_layout.addWidget(self.update_timeout_spin)
-
-        update_layout.addLayout(timeout_layout)
-        update_container_layout.addWidget(update_card)
-        content_layout.addWidget(update_container)
+        # 更新配置（已隐藏UI，但功能保留）
+        # 更新配置的UI部分已隐藏，用户无法通过界面修改更新配置
+        # 配置值将从现有配置中保留，不会被UI修改
+        # update_container = QWidget()
+        # update_container_layout = QVBoxLayout(update_container)
+        # update_container_layout.setContentsMargins(0, 0, 0, 0)
+        # update_container_layout.setSpacing(4)
+        # 
+        # update_title = QLabel(self.tr("更新配置"))
+        # update_title.setProperty("class", "section-title")
+        # update_container_layout.addWidget(update_title)
+        # 
+        # update_card = QFrame()
+        # update_card.setObjectName("card")
+        # add_card_shadow(update_card)
+        # update_layout = QVBoxLayout(update_card)
+        # update_layout.setContentsMargins(10, 1, 10, 1)
+        # update_layout.setSpacing(8)
+        #
+        # update_url_layout = QHBoxLayout()
+        # update_url_layout.addWidget(QLabel(self.tr("版本描述 URL:")))
+        #
+        # self.update_url_entry = QLineEdit()
+        # self.update_url_entry.setPlaceholderText(self.tr("例如: https://example.com/releases/latest.json"))
+        # update_url_layout.addWidget(self.update_url_entry)
+        # update_layout.addLayout(update_url_layout)
+        #
+        # # download_dir_hint = QLabel(self.tr("下载目录: 程序当前目录（不可修改）"))
+        # # download_dir_hint.setWordWrap(True)
+        # # download_dir_hint.setStyleSheet("color: #666666;")
+        # # update_layout.addWidget(download_dir_hint)
+        #
+        # self.update_auto_launch_checkbox = QCheckBox(self.tr("下载完成后自动打开安装包"))
+        # update_layout.addWidget(self.update_auto_launch_checkbox)
+        #
+        # timeout_layout = QHBoxLayout()
+        # timeout_layout.addWidget(QLabel(self.tr("网络超时 (秒):")))
+        #
+        # self.update_timeout_spin = QSpinBox()
+        # self.update_timeout_spin.setRange(5, 300)
+        # self.update_timeout_spin.setSingleStep(5)
+        # timeout_layout.addWidget(self.update_timeout_spin)
+        #
+        # update_layout.addLayout(timeout_layout)
+        # update_container_layout.addWidget(update_card)
+        # content_layout.addWidget(update_container)
 
         # MTK工具配置框架（使用与Tab界面一致的样式：QLabel + QFrame）
         mtk_container = QWidget()
@@ -268,11 +270,12 @@ class ToolsConfigDialog(QDialog):
         self._refresh_qualcomm_entry()
         self.wireshark_entry.setText(self.temp_config.get("wireshark_path", ""))
         self.storage_entry.setText(self.temp_config.get("storage_path", ""))
-        self.update_url_entry.setText(self.temp_config.get("update_feed_url", DEFAULT_UPDATE_FEED_URL))
-        self.update_auto_launch_checkbox.setChecked(self.temp_config.get("update_auto_launch_installer", True))
-        timeout_value = int(self.temp_config.get("update_timeout", 15) or 15)
-        timeout_value = max(self.update_timeout_spin.minimum(), min(self.update_timeout_spin.maximum(), timeout_value))
-        self.update_timeout_spin.setValue(timeout_value)
+        # 更新配置UI已隐藏，不再初始化UI控件
+        # self.update_url_entry.setText(self.temp_config.get("update_feed_url", DEFAULT_UPDATE_FEED_URL))
+        # self.update_auto_launch_checkbox.setChecked(self.temp_config.get("update_auto_launch_installer", True))
+        # timeout_value = int(self.temp_config.get("update_timeout", 15) or 15)
+        # timeout_value = max(self.update_timeout_spin.minimum(), min(self.update_timeout_spin.maximum(), timeout_value))
+        # self.update_timeout_spin.setValue(timeout_value)
         
     def _refresh_mtk_entry(self):
         """刷新MTK工具输入框"""
@@ -582,13 +585,22 @@ class ToolsConfigDialog(QDialog):
                 # 如果为空，删除存储路径配置，使用默认路径
                 self.temp_config.pop("storage_path", None)
 
-            # 保存更新 URL
-            update_feed_url = self.update_url_entry.text().strip() or DEFAULT_UPDATE_FEED_URL
-            self.temp_config["update_feed_url"] = update_feed_url
+            # 保存更新配置（UI已隐藏，保留原有配置值，不从UI读取）
+            # 如果配置中已有值，则保留；如果没有，则使用默认值
+            if "update_feed_url" not in self.temp_config:
+                self.temp_config["update_feed_url"] = DEFAULT_UPDATE_FEED_URL
+            # 保留原有的更新配置值，不从UI读取
+            # update_feed_url = self.update_url_entry.text().strip() or DEFAULT_UPDATE_FEED_URL
+            # self.temp_config["update_feed_url"] = update_feed_url
             self.temp_config.pop("update_download_dir", None)
 
-            self.temp_config["update_auto_launch_installer"] = self.update_auto_launch_checkbox.isChecked()
-            self.temp_config["update_timeout"] = int(self.update_timeout_spin.value())
+            # 保留原有的自动启动和超时配置值
+            if "update_auto_launch_installer" not in self.temp_config:
+                self.temp_config["update_auto_launch_installer"] = True
+            if "update_timeout" not in self.temp_config:
+                self.temp_config["update_timeout"] = 15
+            # self.temp_config["update_auto_launch_installer"] = self.update_auto_launch_checkbox.isChecked()
+            # self.temp_config["update_timeout"] = int(self.update_timeout_spin.value())
             
             # 更新原始配置
             self.tool_config.clear()

@@ -739,12 +739,27 @@ class OtherOperationsWorker(QThread):
             log_folder = self.kwargs['log_folder']
             mtk_tool = self.kwargs['mtk_tool']
             
+            # 检查base_path是否存在
+            base_path = mtk_tool.get("base_path")
+            if not base_path or not os.path.exists(base_path):
+                error_msg = (
+                    f"{self.tr('找不到MTK ELT工具路径')}\n\n"
+                    f"{self.tr('请安装MTK ELT工具并且完成注册，并且把路径添加到工具配置中。路径为ELT.exe所在目录。')}\n"
+                    f"{self.tr('示例路径:')} C:\\Tool\\ELT_exe_v3.2348.0_customer_x64"
+                )
+                return {'success': False, 'error': error_msg}
+            
             # 获取MDLogMan.exe路径
-            utilities_path = os.path.join(mtk_tool["base_path"], "Utilities")
+            utilities_path = os.path.join(base_path, "Utilities")
             mdlogman_exe = os.path.join(utilities_path, "MDLogMan.exe")
             
             if not os.path.exists(mdlogman_exe):
-                return {'success': False, 'error': f"{self.tr('找不到MDLogMan.exe:')} {mdlogman_exe}"}
+                error_msg = (
+                    f"{self.tr('找不到MDLogMan.exe:')} {mdlogman_exe}\n\n"
+                    f"{self.tr('请安装MTK ELT工具并且完成注册，并且把路径添加到工具配置中。路径为ELT.exe所在目录。')}\n"
+                    f"{self.tr('示例路径:')} C:\\Tool\\ELT_exe_v3.2348.0_customer_x64"
+                )
+                return {'success': False, 'error': error_msg}
             
             self.status_updated.emit(self.tr("准备合并环境..."))
             self.progress_updated.emit(10)
@@ -804,10 +819,45 @@ class OtherOperationsWorker(QThread):
             muxz_files = self.kwargs['muxz_files']
             mtk_tool = self.kwargs['mtk_tool']
             
+            # 检查base_path是否存在
+            base_path = mtk_tool.get("base_path")
+            if not base_path or not os.path.exists(base_path):
+                error_msg = (
+                    f"{self.tr('找不到MTK ELT工具路径')}\n\n"
+                    f"{self.tr('请安装MTK ELT工具并且完成注册，并且把路径添加到工具配置中。路径为ELT.exe所在目录。')}\n"
+                    f"{self.tr('示例路径:')} C:\\Tool\\ELT_exe_v3.2348.0_customer_x64"
+                )
+                return {'success': False, 'error': error_msg}
+            
             # 切换到elgcap目录
-            elgcap_path = mtk_tool["elgcap_path"]
-            python_path = mtk_tool["python_path"]
+            elgcap_path = mtk_tool.get("elgcap_path")
+            python_path = mtk_tool.get("python_path")
+            
+            if not elgcap_path or not os.path.exists(elgcap_path):
+                error_msg = (
+                    f"{self.tr('找不到elgcap目录:')} {elgcap_path}\n\n"
+                    f"{self.tr('请安装MTK ELT工具并且完成注册，并且把路径添加到工具配置中。路径为ELT.exe所在目录。')}\n"
+                    f"{self.tr('示例路径:')} C:\\Tool\\ELT_exe_v3.2348.0_customer_x64"
+                )
+                return {'success': False, 'error': error_msg}
+            
+            if not python_path or not os.path.exists(python_path):
+                error_msg = (
+                    f"{self.tr('找不到Python目录:')} {python_path}\n\n"
+                    f"{self.tr('请安装MTK ELT工具并且完成注册，并且把路径添加到工具配置中。路径为ELT.exe所在目录。')}\n"
+                    f"{self.tr('示例路径:')} C:\\Tool\\ELT_exe_v3.2348.0_customer_x64"
+                )
+                return {'success': False, 'error': error_msg}
+            
             embedded_python = os.path.join(python_path, "EmbeddedPython.exe")
+            
+            if not os.path.exists(embedded_python):
+                error_msg = (
+                    f"{self.tr('找不到EmbeddedPython.exe:')} {embedded_python}\n\n"
+                    f"{self.tr('请安装MTK ELT工具并且完成注册，并且把路径添加到工具配置中。路径为ELT.exe所在目录。')}\n"
+                    f"{self.tr('示例路径:')} C:\\Tool\\ELT_exe_v3.2348.0_customer_x64"
+                )
+                return {'success': False, 'error': error_msg}
             
             self.status_updated.emit(self.tr("准备提取环境..."))
             self.progress_updated.emit(0)
@@ -912,11 +962,33 @@ class OtherOperationsWorker(QThread):
                 return {'success': False, 'error': f"{self.tr('文件夹中没有找到pcap文件:')} {folder_path}"}
             
             # 检查Wireshark路径
-            wireshark_path = self.kwargs['wireshark_path']
+            wireshark_path = self.kwargs.get('wireshark_path')
+            
+            if not wireshark_path:
+                error_msg = (
+                    f"{self.tr('未配置Wireshark路径')}\n\n"
+                    f"{self.tr('请安装Wireshark，并且在工具配置里配置路径。')}\n"
+                    f"{self.tr('示例路径:')} C:\\Program Files\\Wireshark"
+                )
+                return {'success': False, 'error': error_msg}
+            
+            if not os.path.exists(wireshark_path):
+                error_msg = (
+                    f"{self.tr('Wireshark路径不存在:')} {wireshark_path}\n\n"
+                    f"{self.tr('请安装Wireshark，并且在工具配置里配置路径。')}\n"
+                    f"{self.tr('示例路径:')} C:\\Program Files\\Wireshark"
+                )
+                return {'success': False, 'error': error_msg}
+            
             mergecap_exe = os.path.join(wireshark_path, "mergecap.exe")
             
             if not os.path.exists(mergecap_exe):
-                return {'success': False, 'error': f"{self.tr('找不到mergecap.exe:')} {mergecap_exe}"}
+                error_msg = (
+                    f"{self.tr('找不到mergecap.exe:')} {mergecap_exe}\n\n"
+                    f"{self.tr('请安装Wireshark，并且在工具配置里配置路径。')}\n"
+                    f"{self.tr('示例路径:')} C:\\Program Files\\Wireshark"
+                )
+                return {'success': False, 'error': error_msg}
             
             self.status_updated.emit(self.tr("正在合并 ") + str(len(pcap_files)) + self.tr(" 个文件..."))
             self.progress_updated.emit(50)
@@ -964,7 +1036,12 @@ class OtherOperationsWorker(QThread):
             pcap_gen_exe = qualcomm_tool["pcap_gen_exe"]
             
             if not os.path.exists(pcap_gen_exe):
-                return {'success': False, 'error': f"{self.tr('找不到PCAP_Gen_2.0.exe:')} {pcap_gen_exe}"}
+                error_msg = (
+                    f"{self.tr('找不到PCAP_Gen_2.0.exe:')} {pcap_gen_exe}\n\n"
+                    f"{self.tr('请安装高通Packet Capture (PCAP) Generator，并且把路径添加到工具配置中。')}\n"
+                    f"{self.tr('示例路径:')} PCAP_Generator_PCAP_Gen_2.0 - C:\Program Files (x86)\Qualcomm\PCAP_Generator\PCAP_Gen_2.0\Release"
+                )
+                return {'success': False, 'error': error_msg}
             
             self.status_updated.emit(self.tr("准备提取环境..."))
             self.progress_updated.emit(0)
@@ -2305,8 +2382,14 @@ class PyQtOtherOperationsManager(QObject):
             
             # 检查Wireshark配置
             if not self.tool_config.get("wireshark_path"):
+                message = (
+                    f"{self.tr('未配置Wireshark路径')}\n\n"
+                    f"{self.tr('请安装Wireshark，并且在工具配置里配置路径。')}\n"
+                    f"{self.tr('示例路径:')} C:\\Program Files\\Wireshark\n\n"
+                    f"{self.tr('是否现在配置？')}"
+                )
                 reply = QMessageBox.question(
-                    None, self.tr("配置缺失"), self.tr("未配置Wireshark路径，是否现在配置？"),
+                    None, self.tr("配置缺失"), message,
                     QMessageBox.Yes | QMessageBox.No
                 )
                 if reply == QMessageBox.Yes:

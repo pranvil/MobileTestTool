@@ -12,6 +12,8 @@ a = Analysis(
         ('ui/resources/icons/*.png', 'ui/resources/icons'),
         # APK 资源文件
         ('resources/apk/*.apk', 'resources/apk'),
+        # Android工具文件（aapt.exe用于解析APK包名）
+        ('resources/apk/aapt.exe', 'resources/apk'),
         # 模板文件
         ('resources/template/*', 'resources/template'),
         # 图标文件
@@ -124,6 +126,7 @@ a = Analysis(
         'ui.unified_manager_dialog',
         'ui.custom_button_dialog',
         'ui.tab_manager_dialog',
+        'ui.tools_config_dialog',  # 工具配置对话框
     ],
     hookspath=['.'],
     hooksconfig={},

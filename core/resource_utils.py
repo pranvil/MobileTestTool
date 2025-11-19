@@ -71,3 +71,20 @@ def get_apk_path(apk_name):
     """
     return get_resource_path(f"resources/apk/{apk_name}")
 
+
+def get_aapt_path():
+    """
+    获取aapt工具路径（支持打包环境）
+    
+    Returns:
+        aapt.exe的绝对路径，如果不存在则返回None
+        
+    Note:
+        - 在打包环境中，返回打包后的aapt.exe路径
+        - 在开发环境中，返回项目目录下的aapt.exe路径
+        - 如果文件不存在，返回None（将尝试使用系统PATH中的aapt）
+    """
+    aapt_path = get_resource_path("resources/apk/aapt.exe")
+    if os.path.exists(aapt_path):
+        return aapt_path
+    return None

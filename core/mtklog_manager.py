@@ -13,12 +13,163 @@ import re
 import sys
 import shutil
 from PyQt5.QtCore import QObject, pyqtSignal, QThread, QMutex
-from PyQt5.QtWidgets import QMessageBox, QInputDialog, QFileDialog, QDialog, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton, QDialogButtonBox
+from PyQt5.QtWidgets import QMessageBox, QInputDialog, QFileDialog, QDialog, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton, QDialogButtonBox, QFrame
+
+# 导入资源工具
+try:
+    from core.resource_utils import get_aapt_path
+except ImportError:
+    # 如果导入失败，提供一个备用函数
+    def get_aapt_path():
+        return None
+
+# 尝试导入apkutils库
+try:
+    from apkutils import APK
+    APKUTILS_AVAILABLE = True
+except ImportError:
+    APKUTILS_AVAILABLE = False
+    print("警告: apkutils库未安装，无法检查APK包名。请使用 'pip install apkutils' 安装。")
 
 # 检测是否在PyInstaller打包环境中运行
 def is_pyinstaller():
     """检测是否在PyInstaller打包环境中运行"""
     return getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS')
+
+def get_device_chip_type(device):
+    """
+    检测设备的芯片类型
+    
+    Args:
+        device: 设备ID或序列号
+        
+    Returns:
+        str: "MTK" 或 "Qualcomm" 或 None（如果无法检测）
+    """
+    try:
+        # 执行 adb shell getprop ro.hardware 命令
+        cmd = ["adb", "-s", device, "shell", "getprop", "ro.hardware"]
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=10,
+                              creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0)
+        
+        if result.returncode != 0:
+            return None
+        
+        hardware = result.stdout.strip().lower()
+        
+        # 检测高通芯片
+        qualcomm_indicators = ["qcom", "msm", "sdm", "taro", "kalama", "pineapple"]
+        if hardware.startswith("sm") or any(indicator in hardware for indicator in qualcomm_indicators):
+            return "Qualcomm"
+        
+        # 检测MTK芯片
+        if hardware.startswith("mt"):
+            return "MTK"
+        
+        return None
+    except Exception as e:
+        print(f"检测芯片类型失败: {str(e)}")
+        return None
+
+def get_apk_package_name(apk_file_path):
+    """
+    获取APK文件的包名
+    
+    Args:
+        apk_file_path: APK文件路径
+        
+    Returns:
+        str: APK包名，如果无法获取则返回None
+    """
+    # 方法1: 尝试使用apkutils库
+    if APKUTILS_AVAILABLE:
+        try:
+            # 尝试不同的导入方式
+            try:
+                from apkutils.apkfile import APKFile
+                apk = APKFile(apk_file_path)
+                package = apk.get_package()
+                if package:
+                    return package
+            except (ImportError, AttributeError):
+                pass
+            
+            try:
+                # 尝试直接使用APK类
+                apk = APK(apk_file_path)
+                if hasattr(apk, 'package'):
+                    return apk.package
+                elif hasattr(apk, 'get_package'):
+                    return apk.get_package()
+            except Exception as e:
+                print(f"apkutils获取包名失败: {str(e)}")
+        except Exception as e:
+            print(f"使用apkutils获取APK包名失败: {str(e)}")
+    
+    # 方法2: 尝试使用aapt工具（Android SDK的一部分）
+    # 尝试多个aapt位置，按优先级顺序（打包的优先，如果失败则回退）
+    aapt_candidates = []
+    
+    # 1. 优先使用打包的aapt.exe（在打包环境中应该总是存在）
+    bundled_aapt = get_aapt_path()
+    if bundled_aapt and os.path.exists(bundled_aapt):
+        aapt_candidates.append(bundled_aapt)
+    
+    # 2. 系统PATH中的aapt
+    if shutil.which("aapt"):
+        aapt_candidates.append("aapt")
+    
+    # 3. Android SDK中的aapt.exe
+    import glob
+    sdk_paths = [
+        os.path.join(os.environ.get("ANDROID_HOME", ""), "build-tools", "*", "aapt.exe"),
+        os.path.join(os.environ.get("ANDROID_SDK_ROOT", ""), "build-tools", "*", "aapt.exe"),
+    ]
+    for pattern in sdk_paths:
+        matches = glob.glob(pattern)
+        if matches:
+            aapt_candidates.extend(matches)
+    
+    # 依次尝试每个aapt，直到成功或全部失败
+    for aapt_cmd in aapt_candidates:
+        try:
+            cmd = [aapt_cmd, "dump", "badging", apk_file_path]
+            # 处理编码问题，使用二进制模式然后解码
+            result = subprocess.run(cmd, capture_output=True, timeout=10,
+                                  creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0)
+            
+            if result.returncode == 0:
+                # 尝试多种编码解码
+                stdout_text = None
+                for encoding in ['utf-8', 'gbk', 'cp1252', 'latin-1']:
+                    try:
+                        stdout_text = result.stdout.decode(encoding, errors='ignore')
+                        break
+                    except:
+                        continue
+                
+                if stdout_text:
+                    for line in stdout_text.split('\n'):
+                        if line.startswith('package: name='):
+                            # 提取包名，格式: package: name='com.example.package' ...
+                            try:
+                                package = line.split("'")[1]
+                                # 成功获取包名，返回结果
+                                return package
+                            except IndexError:
+                                pass
+        except FileNotFoundError:
+            # 这个aapt不存在，尝试下一个
+            continue
+        except Exception as e:
+            # 这个aapt执行失败，尝试下一个
+            print(f"尝试使用 {aapt_cmd} 失败: {str(e)}")
+            continue
+    
+    # 所有aapt都失败了
+    print("所有aapt工具都无法使用，无法获取APK包名")
+    
+    return None
 
 def check_logger_status(device, lang_manager):
     """检查logger状态的统一函数，兼容exe环境"""
@@ -145,23 +296,79 @@ def init_uiautomator2_for_exe(lang_manager=None):
 class LogSizeDialog(QDialog):
     """Log大小设置对话框"""
     
-    def __init__(self, parent=None):
+    def __init__(self, device=None, parent=None):
         super().__init__(parent)
         # 从父窗口获取语言管理器
         self.lang_manager = parent.lang_manager if parent and hasattr(parent, 'lang_manager') else None
+        self.device = device
         self.setWindowTitle(self.tr("设置Log大小"))
         self.setModal(True)
-        self.resize(400, 200)
+        self.resize(400, 250)
         
         self.setup_ui()
+        # 异步获取可用存储容量
+        self.update_available_storage()
     
     def tr(self, text):
         """安全地获取翻译文本"""
         return self.lang_manager.tr(text) if self.lang_manager else text
     
+    def get_available_storage(self):
+        """获取设备可用存储容量（MB）"""
+        if not self.device:
+            return None
+        
+        try:
+            # 执行 adb shell df /data 命令
+            cmd = ["adb", "-s", self.device, "shell", "df", "/data"]
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=10,
+                                  creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0)
+            
+            if result.returncode != 0:
+                return None
+            
+            # 解析输出，提取可用容量
+            # 输出格式类似：
+            # Filesystem       1K-blocks     Used Available Use% Mounted on
+            # /dev/block/dm-63 108259296 15264568  92457860  15% /storage/emulated/0/Android/obb
+            lines = result.stdout.strip().split('\n')
+            if len(lines) >= 2:
+                # 解析第二行，Available列是第4列（索引为3）
+                parts = lines[1].split()
+                if len(parts) >= 4:
+                    # Available列的值单位是bytes，除以1024换算成MB
+                    available_bytes = int(parts[3])
+                    available_mb = available_bytes / 1024  # bytes除以1024得到MB
+                    return int(available_mb)  # 转换为整数显示
+            
+            return None
+        except (subprocess.TimeoutExpired, ValueError, IndexError, Exception) as e:
+            print(f"[DEBUG] 获取可用存储容量失败: {str(e)}")
+            return None
+    
+    def update_available_storage(self):
+        """更新可用存储容量显示"""
+        available_mb = self.get_available_storage()
+        if available_mb is not None:
+            self.storage_label.setText(self.tr("可用存储容量: {} MB").format(available_mb))
+        else:
+            self.storage_label.setText(self.tr("可用存储容量: 获取失败"))
+    
     def setup_ui(self):
         """设置UI"""
         layout = QVBoxLayout()
+        
+        # 可用存储容量显示
+        storage_layout = QHBoxLayout()
+        self.storage_label = QLabel(self.tr("可用存储容量: 正在获取..."))
+        storage_layout.addWidget(self.storage_label)
+        layout.addLayout(storage_layout)
+        
+        # 添加分隔线
+        separator = QFrame()
+        separator.setFrameShape(QFrame.HLine)
+        separator.setFrameShadow(QFrame.Sunken)
+        layout.addWidget(separator)
         
         # Modem Log
         modem_layout = QHBoxLayout()
@@ -215,7 +422,7 @@ class MTKLogWorker(QThread):
     finished = pyqtSignal(bool, str)  # success, message
     progress = pyqtSignal(int, str)   # progress, status
     
-    def __init__(self, device, operation, device_manager, parent=None, log_name=None, export_media=False, storage_path_func=None):
+    def __init__(self, device, operation, device_manager, parent=None, log_name=None, export_media=False, storage_path_func=None, should_record=False):
         super().__init__(parent)
         self.device = device
         self.operation = operation
@@ -223,6 +430,7 @@ class MTKLogWorker(QThread):
         self.log_name = log_name
         self.export_media = export_media
         self.storage_path_func = storage_path_func  # 存储路径获取函数
+        self.should_record = should_record  # 是否在logger启动成功后录制视频
         self._mutex = QMutex()
         self._stop_requested = False
         # 从父窗口获取语言管理器
@@ -362,6 +570,7 @@ class MTKLogWorker(QThread):
             # 11. 检查按钮checked是否为true
             self.progress.emit(0, self.tr("正在确认logger已完全启动..."))
             start_time = time.time()
+            logger_started = False
             while time.time() - start_time < max_wait_time:
                 if U2_AVAILABLE:
                     try:
@@ -370,10 +579,21 @@ class MTKLogWorker(QThread):
                         if button.exists:
                             is_checked = button.info.get('checked', False)
                             if is_checked:
+                                logger_started = True
                                 break
                     except Exception as e:
                         break
                 time.sleep(1)
+            
+            # 12. 如果用户同意录制，在确认logger启动成功后开始录制
+            if logger_started and self.should_record:
+                self.progress.emit(0, self.tr("开始录制视频..."))
+                try:
+                    video_manager = self.parent().get_video_manager() if self.parent() and hasattr(self.parent(), 'get_video_manager') else None
+                    if video_manager and not video_manager.is_recording:
+                        video_manager.start_recording()
+                except Exception as e:
+                    print(f"{self.lang_manager.tr('警告:')} {self.lang_manager.tr('开始录制视频失败:')} {str(e)}")
             
             self.progress.emit(0, self.tr("完成!"))
             self.finished.emit(True, self.tr("MTKLOG启动成功"))
@@ -822,8 +1042,22 @@ class PyQtMTKLogManager(QObject):
             self.status_message.emit(self.lang_manager.tr("未检测到MTKLOGGER，请先安装"))
             return
         
+        # 询问用户是否需要录制视频
+        video_manager = self.get_video_manager()
+        should_record = False
+        if video_manager:
+            reply = QMessageBox.question(
+                None,
+                self.lang_manager.tr("开始录制视频"),
+                (self.lang_manager.tr("是否在MTKLOG启动成功后开始录制视频？\n\n") +
+                 self.lang_manager.tr("注意：录制视频过程中USB连接不能断开。")),
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.No
+            )
+            should_record = (reply == QMessageBox.Yes)
+        
         # 创建工作线程
-        self.worker = MTKLogWorker(device, 'start', self.device_manager, self, storage_path_func=self.get_storage_path)
+        self.worker = MTKLogWorker(device, 'start', self.device_manager, self, storage_path_func=self.get_storage_path, should_record=should_record)
         self.worker.progress.connect(self.progress_updated.emit)
         self.worker.finished.connect(self._on_mtklog_started)
         self.is_running = True
@@ -911,7 +1145,7 @@ class PyQtMTKLogManager(QObject):
             return
         
         # 显示对话框
-        dialog = LogSizeDialog()
+        dialog = LogSizeDialog(device=device, parent=self.parent())
         if dialog.exec_() != QDialog.Accepted:
             return
         
@@ -1036,6 +1270,105 @@ class PyQtMTKLogManager(QObject):
         if not apk_file:
             return
         
+        # 检查芯片类型和APK包名的匹配性
+        try:
+            # 1. 检测设备芯片类型
+            chip_type = get_device_chip_type(device)
+            if chip_type:
+                self.status_message.emit(f"{self.lang_manager.tr('检测到芯片类型:')} {chip_type}")
+            
+            # 2. 获取APK包名
+            apk_package = get_apk_package_name(apk_file)
+            if apk_package:
+                self.status_message.emit(f"{self.lang_manager.tr('APK包名:')} {apk_package}")
+            
+            # 3. 检查匹配性并给出风险提示
+            if chip_type:
+                is_mtk_chip = (chip_type == "MTK")
+                
+                if apk_package:
+                    # 如果成功获取到APK包名，进行精确匹配检查
+                    is_mtk_apk = (apk_package == "com.debug.loggerui")
+                    
+                    # 检查不匹配的情况
+                    if is_mtk_chip and not is_mtk_apk:
+                        # MTK芯片但APK包名不是com.debug.loggerui
+                        warning_msg = (
+                            f"{self.lang_manager.tr('检测到不匹配:')}\n\n"
+                            f"{self.lang_manager.tr('设备芯片类型:')} {chip_type}\n"
+                            f"{self.lang_manager.tr('APK包名:')} {apk_package}\n\n"
+                            f"{self.lang_manager.tr('MTK芯片设备应安装包名为com.debug.loggerui的APK。')}\n"
+                            f"{self.lang_manager.tr('当前APK包名不匹配，可能无法正常工作。')}\n\n"
+                            f"{self.lang_manager.tr('是否继续安装?')}"
+                        )
+                        reply = QMessageBox.warning(
+                            None,
+                            self.lang_manager.tr("安装警告"),
+                            warning_msg,
+                            QMessageBox.Yes | QMessageBox.No,
+                            QMessageBox.No
+                        )
+                        if reply != QMessageBox.Yes:
+                            self.status_message.emit(self.lang_manager.tr("用户取消安装"))
+                            return
+                    
+                    elif not is_mtk_chip and is_mtk_apk:
+                        # 高通芯片但APK包名是com.debug.loggerui（MTK的APK）
+                        warning_msg = (
+                            f"{self.lang_manager.tr('检测到不匹配:')}\n\n"
+                            f"{self.lang_manager.tr('设备芯片类型:')} {chip_type}\n"
+                            f"{self.lang_manager.tr('APK包名:')} {apk_package}\n\n"
+                            f"{self.lang_manager.tr('此APK是专为MTK芯片设计的logger工具。')}\n"
+                            f"{self.lang_manager.tr('当前设备是')}{chip_type}{self.lang_manager.tr('芯片，安装此APK可能无法正常工作。')}\n\n"
+                            f"{self.lang_manager.tr('是否继续安装?')}"
+                        )
+                        reply = QMessageBox.warning(
+                            None,
+                            self.lang_manager.tr("安装警告"),
+                            warning_msg,
+                            QMessageBox.Yes | QMessageBox.No,
+                            QMessageBox.No
+                        )
+                        if reply != QMessageBox.Yes:
+                            self.status_message.emit(self.lang_manager.tr("用户取消安装"))
+                            return
+                else:
+                    # 如果无法获取APK包名，根据芯片类型和文件名进行警告
+                    # 检查文件名是否包含MTK相关的关键词
+                    apk_filename = os.path.basename(apk_file).lower()
+                    is_suspicious_mtk = any(keyword in apk_filename for keyword in ["debugloggerui", "mtk", "logger"])
+                    
+                    if not is_mtk_chip and is_suspicious_mtk:
+                        # 高通芯片，但文件名看起来像MTK的APK
+                        warning_msg = (
+                            f"{self.lang_manager.tr('警告: 无法获取APK包名，但检测到可疑情况:')}\n\n"
+                            f"{self.lang_manager.tr('设备芯片类型:')} {chip_type}\n"
+                            f"{self.lang_manager.tr('APK文件名:')} {os.path.basename(apk_file)}\n\n"
+                            f"{self.lang_manager.tr('文件名包含DebugLoggerUI，这通常是MTK芯片的logger工具。')}\n"
+                            f"{self.lang_manager.tr('当前设备是')}{chip_type}{self.lang_manager.tr('芯片，安装此APK可能无法正常工作。')}\n\n"
+                            f"{self.lang_manager.tr('建议:')}\n"
+                            f"1. {self.lang_manager.tr('确认这是正确的APK文件')}\n"
+                            f"2. {self.lang_manager.tr('如果是MTK的APK，建议使用匹配的logger工具')}\n\n"
+                            f"{self.lang_manager.tr('是否继续安装?')}"
+                        )
+                        reply = QMessageBox.warning(
+                            None,
+                            self.lang_manager.tr("安装警告"),
+                            warning_msg,
+                            QMessageBox.Yes | QMessageBox.No,
+                            QMessageBox.No
+                        )
+                        if reply != QMessageBox.Yes:
+                            self.status_message.emit(self.lang_manager.tr("用户取消安装"))
+                            return
+                    elif not APKUTILS_AVAILABLE:
+                        # 如果无法获取包名且apkutils库未安装，给出提示
+                        self.status_message.emit(f"{self.lang_manager.tr('提示:')} {self.lang_manager.tr('无法检查APK包名，建议安装apkutils库: pip install apkutils')}")
+        except Exception as e:
+            # 如果检查过程中出错，给出提示但允许继续
+            print(f"检查芯片类型或APK包名时出错: {str(e)}")
+            self.status_message.emit(f"{self.lang_manager.tr('检查过程出现警告:')} {str(e)}，{self.lang_manager.tr('将继续安装')}")
+        
         try:
             self.status_message.emit(self.lang_manager.tr("正在安装MTKLOGGER..."))
             
@@ -1090,21 +1423,6 @@ class PyQtMTKLogManager(QObject):
         self.is_running = False
         if success:
             self.mtklog_started.emit()
-            # 询问用户是否需要录制视频
-            video_manager = self.get_video_manager()
-            if video_manager:
-                reply = QMessageBox.question(
-                    None,
-                    self.lang_manager.tr("开始录制视频"),
-                    (self.lang_manager.tr("MTKLOG已成功启动。\n\n") +
-                     self.lang_manager.tr("是否开始录制视频？\n\n") +
-                     self.lang_manager.tr("注意：录制视频过程中USB连接不能断开。")),
-                    QMessageBox.Yes | QMessageBox.No,
-                    QMessageBox.No
-                )
-                if reply == QMessageBox.Yes:
-                    # 开始录制视频
-                    video_manager.start_recording()
         self.status_message.emit(message)
         
     def _on_mtklog_stopped(self, success, message):
