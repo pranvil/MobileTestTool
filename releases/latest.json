@@ -1,10 +1,10 @@
 {
-    "version":  "0.9.6.4",
-    "download_url":  "https://github.com/pranvil/MobileTestTool/releases/download/v0.9.6.4/MobileTestTool_0.9.6.4.zip",
-    "sha256":  "99a8eb17586cb41f4f6fd2e4c20bdec5ac0263df25c72a083722c3f1e0412db6",
-    "file_name":  "MobileTestTool_0.9.6.4.zip",
-    "file_size":  110278982,
-    "release_notes":  "# MobileTestTool Release Notes\r\n\r\n\r\n\r\n## Release Note\r\n- ✅ 添加时间戳\r\n\r\n## Known issue\r\n- 3GPP decode协议书写问题",
-    "published_at":  "2025-11-18T05:32:27Z",
+    "version":  "0.9.6.4.1",
+    "download_url":  "https://github.com/pranvil/MobileTestTool/releases/download/v0.9.6.4.1/MobileTestTool_0.9.6.4.1.zip",
+    "sha256":  "1bb57f1ed9c05b3f20ac68525535b5a940b0a31813aa0bc210a1306917694e40",
+    "file_name":  "MobileTestTool_0.9.6.4.1.zip",
+    "file_size":  115461026,
+    "release_notes":  "# MobileTestTool Release Notes\r\n\r\n\r\n\r\n## Release Note\r\n- ✅ 启动MTKloger的时候就询问是否开始录制视频\r\n\r\n## Known issue\r\n- 3GPP decode协议书写问题\r\n- 概率性功能失效，但是重新打开软件会恢复",
+    "published_at":  "2025-11-20T22:30:44Z",
     "mandatory":  false
 }
