@@ -1,10 +1,10 @@
 {
     "version":  "0.9.6.4.1",
     "download_url":  "https://github.com/pranvil/MobileTestTool/releases/download/v0.9.6.4.1/MobileTestTool_0.9.6.4.1.zip",
-    "sha256":  "1bb57f1ed9c05b3f20ac68525535b5a940b0a31813aa0bc210a1306917694e40",
+    "sha256":  "c8904babe678b339c5700b99d19a576c31bb13897d7bd7b61edbfb9502274fe6",
     "file_name":  "MobileTestTool_0.9.6.4.1.zip",
-    "file_size":  115461026,
-    "release_notes":  "# MobileTestTool Release Notes\r\n\r\n\r\n\r\n## Release Note\r\n- ✅ 启动MTKloger的时候就询问是否开始录制视频\r\n\r\n## Known issue\r\n- 3GPP decode协议书写问题\r\n- 概率性功能失效，但是重新打开软件会恢复",
-    "published_at":  "2025-11-20T22:30:44Z",
+    "file_size":  115462680,
+    "release_notes":  "## Release Note\r\n- 启动MTKloger的时候就询问是否开始录制视频\r\n- 亮色模式有部分界面还是暗色的（日志内容\\网络信息）\r\n- MTK设置log大小能否提示下当前手机可设置的最大值\r\n- QCT项目安装MTK Logger,会给出警告\r\n- MTK，wireshark，高通工具缺失都会给到明确提示。\r\n\r\n## Known issue\r\n- 3GPP decode协议书写问题\r\n- 概率性功能失效，但是重新打开软件会恢复",
+    "published_at":  "2025-11-20T22:44:13Z",
     "mandatory":  false
 }
