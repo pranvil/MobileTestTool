@@ -7,8 +7,9 @@
 from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, 
                              QPushButton, QTableWidget, 
                              QTableWidgetItem, QHeaderView, QFrame, QLineEdit, QScrollArea)
-from PyQt5.QtCore import pyqtSignal, Qt
+from PyQt5.QtCore import pyqtSignal, Qt, QObject
 from ui.widgets.shadow_utils import add_card_shadow
+from core.debug_logger import logger
 
 
 class NetworkInfoTab(QWidget):
@@ -221,34 +222,116 @@ class NetworkInfoTab(QWidget):
         
     def _on_toggle_network_info(self):
         """切换网络信息获取状态"""
-        if self.is_network_running:
-            # 停止时立即改变状态
-            self.stop_network_info.emit()
-            self.is_network_running = False
-            self.network_button.setText(self.lang_manager.tr("开始"))
-            self.network_button.setStyleSheet("")
-            self.network_status_label.setText(self.lang_manager.tr("已停止"))
-            self.network_status_label.setStyleSheet("color: gray; font-size: 9pt;")
-        else:
-            # 开始时只发送信号，等待成功回调再改变状态
-            self.start_network_info.emit()
+        logger.debug("=" * 60)
+        logger.debug(f"按钮点击事件触发")
+        logger.debug(f"Tab: NetworkInfoTab")
+        logger.debug(f"按钮名称: network_button")
+        logger.debug(f"当前状态: {'运行中' if self.is_network_running else '已停止'}")
+        
+        try:
+            if self.is_network_running:
+                # 停止时立即改变状态
+                # 检查信号连接状态
+                try:
+                    receivers = QObject.receivers(self.stop_network_info)
+                    logger.debug(f"信号对象: stop_network_info")
+                    logger.debug(f"信号接收器数量: {receivers}")
+                    if receivers == 0:
+                        logger.error(f"⚠️ 警告：信号 stop_network_info 没有接收者！信号连接可能失败！")
+                    else:
+                        logger.debug(f"✓ 信号 stop_network_info 有 {receivers} 个接收者")
+                except Exception as check_error:
+                    logger.warning(f"无法检查信号 stop_network_info 的接收器数量: {check_error}")
+                
+                logger.debug(f"准备发送信号: stop_network_info")
+                self.stop_network_info.emit()
+                logger.debug(f"信号发送成功: stop_network_info")
+                self.is_network_running = False
+                self.network_button.setText(self.lang_manager.tr("开始"))
+                self.network_button.setStyleSheet("")
+                self.network_status_label.setText(self.lang_manager.tr("已停止"))
+                self.network_status_label.setStyleSheet("color: gray; font-size: 9pt;")
+            else:
+                # 开始时只发送信号，等待成功回调再改变状态
+                # 检查信号连接状态
+                try:
+                    receivers = QObject.receivers(self.start_network_info)
+                    logger.debug(f"信号对象: start_network_info")
+                    logger.debug(f"信号接收器数量: {receivers}")
+                    if receivers == 0:
+                        logger.error(f"⚠️ 警告：信号 start_network_info 没有接收者！信号连接可能失败！")
+                    else:
+                        logger.debug(f"✓ 信号 start_network_info 有 {receivers} 个接收者")
+                except Exception as check_error:
+                    logger.warning(f"无法检查信号 start_network_info 的接收器数量: {check_error}")
+                
+                logger.debug(f"准备发送信号: start_network_info")
+                self.start_network_info.emit()
+                logger.debug(f"信号发送成功: start_network_info")
+        except Exception as e:
+            logger.error(f"按钮点击处理失败:\n  按钮名称: network_button\n  错误类型: {type(e).__name__}\n  错误信息: {str(e)}")
+            logger.exception("异常详情")
+        finally:
+            logger.debug("=" * 60)
             
     def _on_toggle_ping(self):
         """切换 Ping 状态"""
-        if self.is_ping_running:
-            # 停止时立即改变状态
-            self.stop_ping.emit()
-            self.is_ping_running = False
-            self.ping_button.setText("Ping")
-            self.ping_button.setStyleSheet("")
-            self.ping_status_label.setText("")
-        else:
-            # 开始时只发送信号，等待成功回调再改变状态
-            # 从输入框获取 ping 目标，如果为空则使用默认值
-            ping_target = self.ping_target_input.text().strip()
-            if not ping_target:
-                ping_target = "www.google.com"
-            self.start_ping.emit(ping_target)
+        logger.debug("=" * 60)
+        logger.debug(f"按钮点击事件触发")
+        logger.debug(f"Tab: NetworkInfoTab")
+        logger.debug(f"按钮名称: ping_button")
+        logger.debug(f"当前状态: {'运行中' if self.is_ping_running else '已停止'}")
+        
+        try:
+            if self.is_ping_running:
+                # 停止时立即改变状态
+                # 检查信号连接状态
+                try:
+                    receivers = QObject.receivers(self.stop_ping)
+                    logger.debug(f"信号对象: stop_ping")
+                    logger.debug(f"信号接收器数量: {receivers}")
+                    if receivers == 0:
+                        logger.error(f"⚠️ 警告：信号 stop_ping 没有接收者！信号连接可能失败！")
+                    else:
+                        logger.debug(f"✓ 信号 stop_ping 有 {receivers} 个接收者")
+                except Exception as check_error:
+                    logger.warning(f"无法检查信号 stop_ping 的接收器数量: {check_error}")
+                
+                logger.debug(f"准备发送信号: stop_ping")
+                self.stop_ping.emit()
+                logger.debug(f"信号发送成功: stop_ping")
+                self.is_ping_running = False
+                self.ping_button.setText("Ping")
+                self.ping_button.setStyleSheet("")
+                self.ping_status_label.setText("")
+            else:
+                # 开始时只发送信号，等待成功回调再改变状态
+                # 从输入框获取 ping 目标，如果为空则使用默认值
+                ping_target = self.ping_target_input.text().strip()
+                if not ping_target:
+                    ping_target = "www.google.com"
+                
+                # 检查信号连接状态
+                try:
+                    receivers = QObject.receivers(self.start_ping)
+                    logger.debug(f"信号对象: start_ping")
+                    logger.debug(f"信号接收器数量: {receivers}")
+                    logger.debug(f"Ping目标: {ping_target}")
+                    if receivers == 0:
+                        logger.error(f"⚠️ 警告：信号 start_ping 没有接收者！信号连接可能失败！")
+                    else:
+                        logger.debug(f"✓ 信号 start_ping 有 {receivers} 个接收者")
+                except Exception as check_error:
+                    logger.warning(f"无法检查信号 start_ping 的接收器数量: {check_error}")
+                
+                logger.debug(f"准备发送信号: start_ping (target: {ping_target})")
+                self.start_ping.emit(ping_target)
+                logger.debug(f"信号发送成功: start_ping")
+        except Exception as e:
+            logger.error(f"按钮点击处理失败:\n  按钮名称: ping_button\n  错误类型: {type(e).__name__}\n  错误信息: {str(e)}")
+            logger.exception("异常详情")
+        finally:
+            logger.debug("=" * 60)
             
     def set_network_state(self, is_running):
         """设置网络信息状态"""

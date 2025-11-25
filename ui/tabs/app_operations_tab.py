@@ -6,8 +6,9 @@ APP操作 Tab
 
 from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QPushButton, 
                              QScrollArea, QLabel, QFrame)
-from PyQt5.QtCore import pyqtSignal, Qt
+from PyQt5.QtCore import pyqtSignal, Qt, QObject
 from ui.widgets.shadow_utils import add_card_shadow
+from core.debug_logger import logger
 
 
 class AppOperationsTab(QWidget):
@@ -118,15 +119,15 @@ class AppOperationsTab(QWidget):
         card_layout.setSpacing(8)
         
         self.query_package_btn = QPushButton(self.lang_manager.tr("查询package"))
-        self.query_package_btn.clicked.connect(self.query_package.emit)
+        self.query_package_btn.clicked.connect(lambda: self._on_button_clicked("query_package_btn", self.query_package.emit))
         card_layout.addWidget(self.query_package_btn)
         
         self.query_package_name_btn = QPushButton(self.lang_manager.tr("查询包名"))
-        self.query_package_name_btn.clicked.connect(self.query_package_name.emit)
+        self.query_package_name_btn.clicked.connect(lambda: self._on_button_clicked("query_package_name_btn", self.query_package_name.emit))
         card_layout.addWidget(self.query_package_name_btn)
         
         self.query_install_path_btn = QPushButton(self.lang_manager.tr("查询安装路径"))
-        self.query_install_path_btn.clicked.connect(self.query_install_path.emit)
+        self.query_install_path_btn.clicked.connect(lambda: self._on_button_clicked("query_install_path_btn", self.query_install_path.emit))
         card_layout.addWidget(self.query_install_path_btn)
         
         card_layout.addStretch()
@@ -158,15 +159,15 @@ class AppOperationsTab(QWidget):
         card_layout.setSpacing(8)
         
         self.pull_apk_btn = QPushButton("pull apk")
-        self.pull_apk_btn.clicked.connect(self.pull_apk.emit)
+        self.pull_apk_btn.clicked.connect(lambda: self._on_button_clicked("pull_apk_btn", self.pull_apk.emit))
         card_layout.addWidget(self.pull_apk_btn)
         
         self.push_apk_btn = QPushButton(self.lang_manager.tr("push 文件"))
-        self.push_apk_btn.clicked.connect(self.push_apk.emit)
+        self.push_apk_btn.clicked.connect(lambda: self._on_button_clicked("push_apk_btn", self.push_apk.emit))
         card_layout.addWidget(self.push_apk_btn)
         
         self.install_apk_btn = QPushButton(self.lang_manager.tr("安装APK"))
-        self.install_apk_btn.clicked.connect(self.install_apk.emit)
+        self.install_apk_btn.clicked.connect(lambda: self._on_button_clicked("install_apk_btn", self.install_apk.emit))
         card_layout.addWidget(self.install_apk_btn)
         
         card_layout.addStretch()
@@ -198,11 +199,11 @@ class AppOperationsTab(QWidget):
         card_layout.setSpacing(8)
         
         self.view_processes_btn = QPushButton(self.lang_manager.tr("查看进程"))
-        self.view_processes_btn.clicked.connect(self.view_processes.emit)
+        self.view_processes_btn.clicked.connect(lambda: self._on_button_clicked("view_processes_btn", self.view_processes.emit))
         card_layout.addWidget(self.view_processes_btn)
         
         self.dump_app_btn = QPushButton("dump app")
-        self.dump_app_btn.clicked.connect(self.dump_app.emit)
+        self.dump_app_btn.clicked.connect(lambda: self._on_button_clicked("dump_app_btn", self.dump_app.emit))
         card_layout.addWidget(self.dump_app_btn)
         
         card_layout.addStretch()
@@ -234,11 +235,11 @@ class AppOperationsTab(QWidget):
         card_layout.setSpacing(8)
         
         self.enable_app_btn = QPushButton(self.lang_manager.tr("启用app"))
-        self.enable_app_btn.clicked.connect(self.enable_app.emit)
+        self.enable_app_btn.clicked.connect(lambda: self._on_button_clicked("enable_app_btn", self.enable_app.emit))
         card_layout.addWidget(self.enable_app_btn)
         
         self.disable_app_btn = QPushButton(self.lang_manager.tr("禁用app"))
-        self.disable_app_btn.clicked.connect(self.disable_app.emit)
+        self.disable_app_btn.clicked.connect(lambda: self._on_button_clicked("disable_app_btn", self.disable_app.emit))
         card_layout.addWidget(self.disable_app_btn)
         
         card_layout.addStretch()
@@ -247,6 +248,52 @@ class AppOperationsTab(QWidget):
         
         return container
 
+    def _on_button_clicked(self, button_name, emit_func):
+        """按钮点击统一处理函数，添加日志"""
+        logger.debug("=" * 60)
+        logger.debug(f"按钮点击事件触发")
+        logger.debug(f"Tab: AppOperationsTab")
+        logger.debug(f"按钮名称: {button_name}")
+        logger.debug(f"按钮对象: {getattr(self, button_name, None)}")
+        try:
+            # 检查信号连接状态 - 尝试多种可能的信号名
+            signal_name = None
+            # 规则1: xxx_btn -> xxx (去掉 _btn 后缀)
+            base_name = button_name.replace("_btn", "")
+            if hasattr(self, base_name):
+                signal_name = base_name
+            # 规则2: xxx_btn -> xxx_dialog
+            elif hasattr(self, base_name + "_dialog"):
+                signal_name = base_name + "_dialog"
+            # 规则3: xxx_btn -> show_xxx_dialog
+            elif hasattr(self, "show_" + base_name + "_dialog"):
+                signal_name = "show_" + base_name + "_dialog"
+            
+            if signal_name:
+                signal_obj = getattr(self, signal_name)
+                try:
+                    # 使用 QObject.receivers() 静态方法检查信号接收器数量
+                    receivers = QObject.receivers(signal_obj)
+                    logger.debug(f"信号对象: {signal_name}")
+                    logger.debug(f"信号接收器数量: {receivers}")
+                    if receivers == 0:
+                        logger.error(f"⚠️ 警告：信号 {signal_name} 没有接收者！信号连接可能失败！")
+                    else:
+                        logger.debug(f"✓ 信号 {signal_name} 有 {receivers} 个接收者")
+                except Exception as check_error:
+                    logger.warning(f"无法检查信号 {signal_name} 的接收器数量: {check_error}")
+            else:
+                logger.warning(f"⚠️ 无法找到按钮 {button_name} 对应的信号对象")
+            
+            logger.debug(f"准备发送信号: {button_name}")
+            emit_func()
+            logger.debug(f"信号发送成功: {button_name}")
+        except Exception as e:
+            logger.error(f"按钮点击处理失败:\n  按钮名称: {button_name}\n  错误类型: {type(e).__name__}\n  错误信息: {str(e)}")
+            logger.exception("异常详情")
+        finally:
+            logger.debug("=" * 60)
+    
     def refresh_texts(self, lang_manager=None):
         """刷新所有文本（用于语言切换）"""
         if lang_manager:

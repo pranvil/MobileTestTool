@@ -399,14 +399,14 @@ class DebugLogger:
         return None, None, None
     
     def _format_log_message(self, message, level):
-        """格式化日志消息
+        """格式化日志消息（支持多行输出）
         
         性能优化：仅在DEBUG级别获取调用者信息，其他级别跳过inspect.stack()调用
         以提升性能。如需在其他级别启用调用者信息，可通过配置控制。
         """
         timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
         
-        # 构建日志行
+        # 构建日志行头部
         log_parts = [f"[{timestamp}]", f"[{level}]"]
         
         # 仅在DEBUG级别获取调用者信息（性能优化：避免频繁调用inspect.stack()）
@@ -431,9 +431,25 @@ class DebugLogger:
             if context_parts:
                 log_parts.append(f"[{':'.join(context_parts)}]")
         
-        log_parts.append(str(message))
+        header = " ".join(log_parts)
+        message_str = str(message)
         
-        return " ".join(log_parts) + "\n"
+        # 支持多行消息：每行都添加头部信息
+        lines = message_str.split('\n')
+        if len(lines) == 1:
+            # 单行消息，直接返回
+            return f"{header} {message_str}\n"
+        else:
+            # 多行消息，第一行有完整头部，后续行只有缩进
+            result = []
+            for i, line in enumerate(lines):
+                if i == 0:
+                    result.append(f"{header} {line}")
+                else:
+                    # 后续行使用缩进，保持对齐
+                    indent = " " * len(header) + " "
+                    result.append(f"{indent}{line}")
+            return "\n".join(result) + "\n"
     
     def _write_worker(self):
         """后台写入线程工作函数"""

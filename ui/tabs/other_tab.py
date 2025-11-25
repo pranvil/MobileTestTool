@@ -6,7 +6,7 @@
 
 from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QPushButton, 
                              QScrollArea, QLabel, QFrame)
-from PyQt5.QtCore import pyqtSignal, Qt
+from PyQt5.QtCore import pyqtSignal, Qt, QObject
 from ui.widgets.shadow_utils import add_card_shadow
 from core.debug_logger import logger
 
@@ -145,25 +145,25 @@ class OtherTab(QWidget):
             card_layout.setSpacing(8)
             
             self.show_device_info_btn = QPushButton(self.lang_manager.tr("手机信息"))
-            self.show_device_info_btn.clicked.connect(self.show_device_info_dialog.emit)
+            self.show_device_info_btn.clicked.connect(lambda: self._on_button_clicked("show_device_info_btn", self.show_device_info_dialog.emit))
             card_layout.addWidget(self.show_device_info_btn)
             
             self.set_screen_timeout_btn = QPushButton(self.lang_manager.tr("设置灭屏时间"))
             self.set_screen_timeout_btn.setToolTip(self.lang_manager.tr("设置灭屏时间 - 配置手机屏幕自动关闭的延迟时间"))
-            self.set_screen_timeout_btn.clicked.connect(self.set_screen_timeout.emit)
+            self.set_screen_timeout_btn.clicked.connect(lambda: self._on_button_clicked("set_screen_timeout_btn", self.set_screen_timeout.emit))
             card_layout.addWidget(self.set_screen_timeout_btn)
 
             self.secret_code_btn = QPushButton("🔑 " + self.lang_manager.tr("暗码"))
-            self.secret_code_btn.clicked.connect(self.show_secret_code_dialog.emit)
+            self.secret_code_btn.clicked.connect(lambda: self._on_button_clicked("secret_code_btn", self.show_secret_code_dialog.emit))
             card_layout.addWidget(self.secret_code_btn)
             
             self.lock_cell_btn = QPushButton("📱 " + self.lang_manager.tr("高通lock cell"))
             self.lock_cell_btn.setToolTip(self.lang_manager.tr("高通lock cell - 锁定高通设备到指定的小区"))
-            self.lock_cell_btn.clicked.connect(self.show_lock_cell_dialog.emit)
+            self.lock_cell_btn.clicked.connect(lambda: self._on_button_clicked("lock_cell_btn", self.show_lock_cell_dialog.emit))
             card_layout.addWidget(self.lock_cell_btn)
             
             self.qc_nv_btn = QPushButton("📊 " + self.lang_manager.tr("高通NV"))
-            self.qc_nv_btn.clicked.connect(self.show_qc_nv_dialog.emit)
+            self.qc_nv_btn.clicked.connect(lambda: self._on_button_clicked("qc_nv_btn", self.show_qc_nv_dialog.emit))
             card_layout.addWidget(self.qc_nv_btn)
                      
             card_layout.addStretch()
@@ -199,12 +199,12 @@ class OtherTab(QWidget):
         card_layout.setSpacing(8)
         
         self.configure_hera_btn = QPushButton(self.lang_manager.tr("赫拉配置"))
-        self.configure_hera_btn.clicked.connect(self.configure_hera.emit)
+        self.configure_hera_btn.clicked.connect(lambda: self._on_button_clicked("configure_hera_btn", self.configure_hera.emit))
         card_layout.addWidget(self.configure_hera_btn)
         
         self.configure_collect_data_btn = QPushButton(self.lang_manager.tr("赫拉测试数据收集"))
         self.configure_collect_data_btn.setToolTip(self.lang_manager.tr("赫拉测试数据收集 - 配置赫拉框架的测试数据收集功能"))
-        self.configure_collect_data_btn.clicked.connect(self.configure_collect_data.emit)
+        self.configure_collect_data_btn.clicked.connect(lambda: self._on_button_clicked("configure_collect_data_btn", self.configure_collect_data.emit))
         card_layout.addWidget(self.configure_collect_data_btn)
         
         card_layout.addStretch()
@@ -236,32 +236,32 @@ class OtherTab(QWidget):
         card_layout.setSpacing(8)
         
         self.show_input_text_btn = QPushButton(self.lang_manager.tr("输入文本"))
-        self.show_input_text_btn.clicked.connect(self.show_input_text_dialog.emit)
+        self.show_input_text_btn.clicked.connect(lambda: self._on_button_clicked("show_input_text_btn", self.show_input_text_dialog.emit))
         card_layout.addWidget(self.show_input_text_btn)
 
         self.show_at_tool_btn = QPushButton("📡 " + self.lang_manager.tr("AT工具"))
-        self.show_at_tool_btn.clicked.connect(self.show_at_tool_dialog.emit)
+        self.show_at_tool_btn.clicked.connect(lambda: self._on_button_clicked("show_at_tool_btn", self.show_at_tool_dialog.emit))
         card_layout.addWidget(self.show_at_tool_btn)
-        
+
         self.show_pr_translation_btn = QPushButton("🌐 " + self.lang_manager.tr("PR翻译"))
         self.show_pr_translation_btn.setToolTip(self.lang_manager.tr("PR翻译 - 将中文PR内容翻译成英文并生成Word文档"))
-        self.show_pr_translation_btn.clicked.connect(self.show_pr_translation_dialog.emit)
+        self.show_pr_translation_btn.clicked.connect(lambda: self._on_button_clicked("show_pr_translation_btn", self.show_pr_translation_dialog.emit))
         card_layout.addWidget(self.show_pr_translation_btn)
-        
+
         self.show_encoding_tool_btn = QPushButton("🔤 " + self.lang_manager.tr("转码"))
         self.show_encoding_tool_btn.setToolTip(self.lang_manager.tr("转码工具 - ASCII和GSM 7-bit编码的双向转换"))
-        self.show_encoding_tool_btn.clicked.connect(self.show_encoding_tool_dialog.emit)
+        self.show_encoding_tool_btn.clicked.connect(lambda: self._on_button_clicked("show_encoding_tool_btn", self.show_encoding_tool_dialog.emit))
         card_layout.addWidget(self.show_encoding_tool_btn)
-        
+
         card_layout.addStretch()
                  
         self.show_display_lines_btn = QPushButton(self.lang_manager.tr("日志区域行数"))
         self.show_display_lines_btn.setToolTip(self.lang_manager.tr("设置显示行数 - 配置日志区域显示的最大行数"))
-        self.show_display_lines_btn.clicked.connect(self.show_display_lines_dialog.emit)
+        self.show_display_lines_btn.clicked.connect(lambda: self._on_button_clicked("show_display_lines_btn", self.show_display_lines_dialog.emit))
         card_layout.addWidget(self.show_display_lines_btn)
          
         self.show_tools_config_btn = QPushButton("🔧 " + self.lang_manager.tr("工具配置"))
-        self.show_tools_config_btn.clicked.connect(self.show_tools_config_dialog.emit)
+        self.show_tools_config_btn.clicked.connect(lambda: self._on_button_clicked("show_tools_config_btn", self.show_tools_config_dialog.emit))
         self.show_tools_config_btn.setStyleSheet("""
             QPushButton {
                 background-color: #6f42c1;
@@ -276,7 +276,7 @@ class OtherTab(QWidget):
       
         self.config_backup_btn = QPushButton("💾 " + self.lang_manager.tr("配置备份恢复"))
         self.config_backup_btn.setToolTip(self.lang_manager.tr("配置备份恢复 - 导出或导入工具配置"))
-        self.config_backup_btn.clicked.connect(self.show_config_backup_dialog.emit)
+        self.config_backup_btn.clicked.connect(lambda: self._on_button_clicked("config_backup_btn", self.show_config_backup_dialog.emit))
         self.config_backup_btn.setStyleSheet("""
             QPushButton {
                 background-color: #28a745;
@@ -290,7 +290,7 @@ class OtherTab(QWidget):
         card_layout.addWidget(self.config_backup_btn)
         
         self.unified_manager_btn = QPushButton("⚙️ " + self.lang_manager.tr("自定义界面管理"))
-        self.unified_manager_btn.clicked.connect(self.show_unified_manager.emit)
+        self.unified_manager_btn.clicked.connect(lambda: self._on_button_clicked("unified_manager_btn", self.show_unified_manager.emit))
         self.unified_manager_btn.setStyleSheet("""
             QPushButton {
                 background-color: #6f42c1;
@@ -307,6 +307,55 @@ class OtherTab(QWidget):
         
         return container
 
+    def _on_button_clicked(self, button_name, emit_func):
+        """按钮点击统一处理函数，添加日志"""
+        logger.debug("=" * 60)
+        logger.debug(f"按钮点击事件触发")
+        logger.debug(f"Tab: OtherTab")
+        logger.debug(f"按钮名称: {button_name}")
+        logger.debug(f"按钮对象: {getattr(self, button_name, None)}")
+        try:
+            # 检查信号连接状态 - 尝试多种可能的信号名
+            signal_name = None
+            base_name = button_name.replace("_btn", "")
+            # 规则1: xxx_btn -> xxx_dialog
+            if hasattr(self, base_name + "_dialog"):
+                signal_name = base_name + "_dialog"
+            # 规则2: xxx_btn -> xxx (去掉 _btn 后缀)
+            elif hasattr(self, base_name):
+                signal_name = base_name
+            # 规则3: xxx_btn -> show_xxx
+            elif hasattr(self, "show_" + base_name):
+                signal_name = "show_" + base_name
+            # 规则4: xxx_btn -> show_xxx_dialog
+            elif hasattr(self, "show_" + base_name + "_dialog"):
+                signal_name = "show_" + base_name + "_dialog"
+            
+            if signal_name:
+                signal_obj = getattr(self, signal_name)
+                try:
+                    # 使用 QObject.receivers() 静态方法检查信号接收器数量
+                    receivers = QObject.receivers(signal_obj)
+                    logger.debug(f"信号对象: {signal_name}")
+                    logger.debug(f"信号接收器数量: {receivers}")
+                    if receivers == 0:
+                        logger.error(f"⚠️ 警告：信号 {signal_name} 没有接收者！信号连接可能失败！")
+                    else:
+                        logger.debug(f"✓ 信号 {signal_name} 有 {receivers} 个接收者")
+                except Exception as check_error:
+                    logger.warning(f"无法检查信号 {signal_name} 的接收器数量: {check_error}")
+            else:
+                logger.warning(f"⚠️ 无法找到按钮 {button_name} 对应的信号对象")
+            
+            logger.debug(f"准备发送信号: {button_name}")
+            emit_func()
+            logger.debug(f"信号发送成功: {button_name}")
+        except Exception as e:
+            logger.error(f"按钮点击处理失败:\n  按钮名称: {button_name}\n  错误类型: {type(e).__name__}\n  错误信息: {str(e)}")
+            logger.exception("异常详情")
+        finally:
+            logger.debug("=" * 60)
+    
     def refresh_texts(self, lang_manager=None):
         """刷新所有文本（用于语言切换）"""
         if lang_manager:

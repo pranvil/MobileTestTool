@@ -1013,9 +1013,6 @@ class OtherOperationsWorker(QThread):
                 self.status_updated.emit(self.tr("合并完成!"))
                 self.progress_updated.emit(100)
                 
-                # 打开合并后的pcap文件
-                os.startfile(merge_pcap_path)
-                
                 return {'success': True, 'merge_file': merge_pcap_path}
             else:
                 return {'success': False, 'error': f"{self.tr('mergecap执行失败:')} {result.stderr}"}
