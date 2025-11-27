@@ -159,6 +159,18 @@ Write-Host "=== step 3: compute SHA256 ==="
 $sha256 = (Get-FileHash $packagePath -Algorithm SHA256).Hash.ToLower()
 Write-Host ("SHA256: {0}" -f $sha256)
 
+if ($SkipPublish) {
+    Write-Host "=== step 4: SKIPPED (SkipPublish enabled) ==="
+    Write-Host "警告: 由于使用了 -SkipPublish，不会生成 latest.json"
+    Write-Host "原因: latest.json 指向的下载链接需要对应的 GitHub Release 才能正常工作"
+    Write-Host "如果后续需要发布此版本，请运行不带 -SkipPublish 的完整发布流程"
+    Write-Host ""
+    Write-Host "SkipPublish enabled. Packaging complete."
+    Write-Host ("Package: {0}" -f $packagePath)
+    Write-Host ("SHA256: {0}" -f $sha256)
+    return
+}
+
 Write-Host "=== step 4: generate latest.json ==="
 if (-not (Test-Path $manifestDir)) {
     New-Item -ItemType Directory -Path $manifestDir | Out-Null
@@ -186,11 +198,6 @@ Write-Host ("Manifest written to: {0}" -f $manifestPath)
 Write-Host "=== step 5: summary ==="
 Get-Content $manifestPath
 Write-Host ""
-
-if ($SkipPublish) {
-    Write-Host "SkipPublish enabled. Packaging complete."
-    return
-}
 
 Write-Host "=== step 6: git commit & push ==="
 $filesToStage = @(

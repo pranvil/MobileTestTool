@@ -94,6 +94,11 @@ class UpdateManager:
                 if response.status != 200:
                     raise ManifestFetchError(f"latest.json 请求失败，HTTP {response.status}")
 
+                # 检查 Content-Type
+                content_type = response.headers.get("Content-Type", "").lower()
+                if "json" not in content_type and "text" not in content_type:
+                    self._log(f"警告: Content-Type 为 {content_type}，可能不是 JSON 文件")
+
                 raw = response.read()
 
         except urllib.error.HTTPError as exc:  # pragma: no cover - 网络错误难以覆盖
@@ -103,10 +108,62 @@ class UpdateManager:
         except TimeoutError as exc:  # pragma: no cover - 由底层抛出
             raise ManifestFetchError("请求 latest.json 超时") from exc
 
+        # 尝试解码和解析 JSON，提供更详细的错误信息
         try:
-            manifest_data = json.loads(raw.decode("utf-8"))
-        except (UnicodeDecodeError, json.JSONDecodeError) as exc:
-            raise ManifestValidationError("latest.json 不是有效的 UTF-8 JSON") from exc
+            # 首先尝试 UTF-8 解码
+            try:
+                text = raw.decode("utf-8")
+            except UnicodeDecodeError as decode_exc:
+                # UTF-8 解码失败，尝试其他常见编码
+                encodings = ["utf-8-sig", "gbk", "gb2312", "latin-1", "iso-8859-1"]
+                text = None
+                last_error = decode_exc
+                
+                for encoding in encodings:
+                    try:
+                        text = raw.decode(encoding)
+                        self._log(f"使用 {encoding} 编码成功解码响应")
+                        break
+                    except UnicodeDecodeError:
+                        continue
+                
+                if text is None:
+                    # 所有编码都失败，提供诊断信息
+                    preview = raw[:200] if len(raw) > 200 else raw
+                    hex_preview = preview.hex()[:100]
+                    raise ManifestValidationError(
+                        f"latest.json 无法解码为文本（尝试了 UTF-8、GBK、Latin-1 等编码）。"
+                        f"响应前 {len(preview)} 字节的十六进制: {hex_preview}..."
+                    ) from last_error
+            
+            # 检查是否是 HTML 错误页面
+            text_lower = text.strip().lower()
+            if text_lower.startswith("<!doctype") or text_lower.startswith("<html"):
+                # 尝试提取错误信息
+                error_msg = "latest.json 返回了 HTML 页面而不是 JSON"
+                if "404" in text or "not found" in text_lower:
+                    error_msg += "（可能是 404 错误页面）"
+                elif "403" in text or "forbidden" in text_lower:
+                    error_msg += "（可能是 403 禁止访问）"
+                raise ManifestValidationError(error_msg)
+            
+            # 解析 JSON
+            manifest_data = json.loads(text)
+            
+        except json.JSONDecodeError as json_exc:
+            # JSON 解析失败，提供更多上下文
+            preview = text[:500] if len(text) > 500 else text
+            raise ManifestValidationError(
+                f"latest.json 不是有效的 JSON 格式。"
+                f"解析错误位置: 第 {json_exc.lineno} 行，第 {json_exc.colno} 列。"
+                f"响应内容预览: {preview}..."
+            ) from json_exc
+        except ManifestValidationError:
+            # 重新抛出我们自己的错误
+            raise
+        except Exception as exc:
+            # 其他未预期的错误
+            raise ManifestValidationError(f"解析 latest.json 时发生错误: {exc}") from exc
 
         try:
             manifest = LatestManifest.from_dict(manifest_data)

@@ -142,12 +142,14 @@ class CustomButtonContainer(QWidget):
 
         self.setAcceptDrops(True)
         self.setProperty('custom_button_container', True)
-        self.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Fixed)
+        # 使用MinimumExpanding，让容器根据内容自动调整宽度
+        self.setSizePolicy(QSizePolicy.MinimumExpanding, QSizePolicy.Fixed)
 
         self._layout = QHBoxLayout(self)
         self._layout.setContentsMargins(0, 0, 0, 0)
         self._layout.setSpacing(6)
-        self._layout.addStretch()
+        # 不添加stretch，让按钮自然排列，避免按钮被压缩
+        # self._layout.addStretch()  # 注释掉，让按钮容器根据内容自动调整宽度
 
     def update_context(self, tab_name, card_name):
         self.tab_name = tab_name
@@ -3756,7 +3758,9 @@ class MainWindow(QMainWindow):
                     # 查找对应的Card GroupBox并添加按钮
                     self._add_buttons_to_custom_card(tab_widget, tab_name, card['name'], buttons)
                 else:
+                    # 清除按钮时，重置card宽度
                     self._clear_button_container(tab_widget, tab_name, card['name'])
+                    self._reset_custom_card_width(tab_widget, card['name'])
             
         except Exception as e:
             logger.exception(f"{self.lang_manager.tr('为自定义Tab加载按钮失败:')} {e}")
@@ -3796,7 +3800,9 @@ class MainWindow(QMainWindow):
                                     container.clear_buttons()
                                     for btn_data in buttons:
                                         container.add_custom_button(btn_data)
-                                        logger.debug(f"{self.lang_manager.tr('添加按钮')} '{btn_data['name']}' {self.lang_manager.tr('到Card')} '{card_name}'")
+                                    
+                                    # 动态调整自定义card的宽度
+                                    self._adjust_custom_card_width(frame, container)
                                 else:
                                     logger.warning(f"{self.lang_manager.tr('未找到按钮布局')}")
                                 return
@@ -3808,6 +3814,191 @@ class MainWindow(QMainWindow):
                 
         except Exception as e:
             logger.exception(f"{self.lang_manager.tr('向自定义Card添加按钮失败:')} {e}")
+    
+    def _adjust_custom_card_width(self, card_frame, button_container):
+        """根据按钮情况动态调整自定义card的宽度"""
+        try:
+            from PyQt5.QtCore import QTimer
+            
+            # 使用QTimer延迟计算，确保按钮已经完成布局
+            def calculate_and_set_width():
+                try:
+                    # 计算所有按钮的总宽度
+                    total_button_width = 0
+                    button_count = 0
+                    
+                    # 从布局中获取按钮（即使按钮不可见，因为按钮可能在不激活的tab中）
+                    buttons_from_layout = []
+                    for i in range(button_container._layout.count()):
+                        item = button_container._layout.itemAt(i)
+                        if item and item.widget():
+                            widget = item.widget()
+                            if isinstance(widget, DraggableCustomButton):
+                                buttons_from_layout.append(widget)
+                    
+                    # 如果布局中没有按钮，尝试从_button_widgets获取
+                    if not buttons_from_layout:
+                        buttons_from_layout = list(button_container._button_widgets.values())
+                    
+                    for button_widget in buttons_from_layout:
+                        # 先确保按钮已经完成布局
+                        button_widget.adjustSize()
+                        button_widget.updateGeometry()
+                        
+                        # 获取按钮文本用于估算宽度
+                        button_text = button_widget.text()
+                        
+                        # 获取按钮的实际宽度（优先使用实际宽度）
+                        button_width = button_widget.width()
+                        size_hint_width = button_widget.sizeHint().width()
+                        min_hint_width = button_widget.minimumSizeHint().width()
+                        is_visible = button_widget.isVisible()
+                        
+                        # 如果按钮不可见或实际宽度无效，使用文本长度估算
+                        if not is_visible or button_width <= 0 or button_width < 50:
+                            # 先尝试使用sizeHint
+                            if size_hint_width > 0 and size_hint_width >= 50:
+                                button_width = size_hint_width
+                            elif min_hint_width > 0 and min_hint_width >= 50:
+                                button_width = min_hint_width
+                            else:
+                                # 根据文本长度估算宽度（中文字符按2倍宽度计算）
+                                chinese_chars = sum(1 for c in button_text if '\u4e00' <= c <= '\u9fff')
+                                english_chars = len(button_text) - chinese_chars
+                                estimated_width = chinese_chars * 18 + english_chars * 9 + 24
+                                button_width = max(estimated_width, 80)
+                        elif button_width < 50:
+                            # 如果实际宽度太小，也使用估算
+                            chinese_chars = sum(1 for c in button_text if '\u4e00' <= c <= '\u9fff')
+                            english_chars = len(button_text) - chinese_chars
+                            estimated_width = chinese_chars * 18 + english_chars * 9 + 24
+                            button_width = max(estimated_width, button_width)
+                        
+                        total_button_width += button_width
+                        button_count += 1
+                    
+                    if button_count == 0:
+                        # 没有按钮时，使用默认最小宽度
+                        min_width = 200
+                    else:
+                        # 计算总宽度：按钮宽度 + 按钮间距 + card的padding和margin
+                        button_spacing = button_container._layout.spacing()
+                        spacing_width = button_spacing * max(0, button_count - 1)
+                        
+                        # card的padding: 左右各10px
+                        card_padding = 20
+                        
+                        # card的margin: 左右各6px
+                        card_margin = 12
+                        
+                        # 计算最小宽度，增加10%的余量以确保按钮不会重叠
+                        safety_margin = int(total_button_width * 0.1)
+                        min_width = total_button_width + spacing_width + card_padding + card_margin + safety_margin
+                        min_width = max(min_width, 200)
+                    
+                    # 设置sizePolicy为Preferred，不拉伸
+                    from PyQt5.QtWidgets import QSizePolicy
+                    size_policy = QSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
+                    size_policy.setHorizontalStretch(0)
+                    card_frame.setSizePolicy(size_policy)
+                    
+                    # 设置最小宽度和最大宽度
+                    card_frame.setMinimumWidth(min_width)
+                    card_frame.setMaximumWidth(min_width * 2)
+                    
+                    # 设置固定宽度，避免被父布局拉伸
+                    card_frame.setFixedWidth(min_width)
+                    
+                    # 更新布局
+                    card_frame.updateGeometry()
+                    if card_frame.parent() and hasattr(card_frame.parent(), 'layout'):
+                        parent_layout = card_frame.parent().layout()
+                        if parent_layout:
+                            parent_layout.invalidate()
+                            parent_layout.update()
+                    
+                except Exception as e:
+                    logger.exception(f"{self.lang_manager.tr('计算Card宽度失败:')} {e}")
+            
+            # 延迟执行，确保按钮布局完成
+            # 使用重试机制，确保按钮已经添加到布局中
+            container_ref = [button_container]  # 使用列表来避免nonlocal问题
+            
+            retry_count = [5]  # 最多重试5次
+            def retry_calculate(delay=200):
+                """重试计算宽度，直到找到按钮或达到最大重试次数"""
+                def attempt():
+                    current_container = container_ref[0]
+                    
+                    # 检查按钮是否已经添加到布局中
+                    buttons_from_layout = []
+                    for i in range(current_container._layout.count()):
+                        item = current_container._layout.itemAt(i)
+                        if item and item.widget():
+                            widget = item.widget()
+                            if isinstance(widget, DraggableCustomButton):
+                                buttons_from_layout.append(widget)
+                    
+                    # 如果布局中没有按钮，尝试从_button_widgets获取
+                    if not buttons_from_layout:
+                        buttons_from_layout = list(current_container._button_widgets.values())
+                    
+                    if len(buttons_from_layout) > 0:
+                        # 找到按钮了，执行计算
+                        calculate_and_set_width()
+                    else:
+                        # 还没找到按钮，继续重试
+                        retry_count[0] -= 1
+                        if retry_count[0] > 0:
+                            QTimer.singleShot(delay, attempt)
+                        else:
+                            # 达到最大重试次数，尝试从card_frame重新查找container
+                            found_container = None
+                            for child in card_frame.findChildren(CustomButtonContainer):
+                                if child.tab_name == container_ref[0].tab_name and child.card_name == container_ref[0].card_name:
+                                    found_container = child
+                                    break
+                            
+                            if found_container and len(found_container._button_widgets) > 0:
+                                # 更新container引用并重新计算
+                                container_ref[0] = found_container
+                                calculate_and_set_width()
+                            else:
+                                # 即使没找到按钮，也尝试计算（会使用默认宽度）
+                                calculate_and_set_width()
+                
+                # 第一次延迟执行
+                QTimer.singleShot(delay, attempt)
+            
+            retry_calculate(delay=200)
+            
+        except Exception as e:
+            logger.exception(f"{self.lang_manager.tr('调整Card宽度失败:')} {e}")
+    
+    def _reset_custom_card_width(self, tab_widget, card_name):
+        """重置自定义card的宽度（当按钮被清除时）"""
+        try:
+            from PyQt5.QtWidgets import QFrame, QLabel
+            
+            # 查找对应的card frame
+            frames = tab_widget.findChildren(QFrame)
+            for frame in frames:
+                if frame.property('custom_card') and frame.objectName() == "card":
+                    # 检查Frame上方是否有对应的标题Label
+                    parent_widget = frame.parent()
+                    if parent_widget:
+                        labels = parent_widget.findChildren(QLabel)
+                        for label in labels:
+                            label_text = label.text()
+                            label_class = label.property("class")
+                            
+                            if label_text == card_name and label_class == "section-title":
+                                # 重置为默认最小宽度
+                                frame.setMinimumWidth(200)
+                                logger.debug(f"{self.lang_manager.tr('重置Card宽度:')} '{card_name}'")
+                                return
+        except Exception as e:
+            logger.exception(f"{self.lang_manager.tr('重置Card宽度失败:')} {e}")
     
     def load_custom_buttons_for_tab(self, tab_name, tab_instance):
         """为指定Tab加载自定义按钮"""
