@@ -665,14 +665,14 @@ class CustomCardDialog(QDialog):
         }
         
         if self.card_id:
-            # 更新现有Card
-            for i, card in enumerate(self.tab_config_manager.custom_cards):
-                if card['id'] == self.card_id:
-                    self.tab_config_manager.custom_cards[i].update(card_data)
-                    self.tab_config_manager.save_config()
-                    QMessageBox.information(self, self.tr("成功"), self.tr("Card已更新"))
-                    self.accept()
-                    return
+            # 更新现有Card（使用update_custom_card方法，会自动更新相关按钮）
+            if self.tab_config_manager.update_custom_card(self.card_id, card_data):
+                QMessageBox.information(self, self.tr("成功"), self.tr("Card已更新"))
+                self.accept()
+                return
+            else:
+                QMessageBox.warning(self, self.tr("错误"), self.tr("Card更新失败"))
+                return
         else:
             # 创建新Card
             card_id = self.tab_config_manager.create_custom_card(card_data)

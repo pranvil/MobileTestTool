@@ -425,6 +425,51 @@ class TabConfigManager(QObject):
         except Exception as e:
             logger.exception(f"{self.tr('更新按钮Tab名称失败:')} {e}")
     
+    def _update_buttons_for_card_name_change(self, tab_name, old_card_name, new_card_name):
+        """当Card名称变化时，更新相关Button的card字段"""
+        try:
+            # 尝试多种方式获取按钮管理器
+            button_manager = None
+            
+            # 方式1：从父窗口获取
+            if hasattr(self.parent(), 'custom_button_manager'):
+                button_manager = self.parent().custom_button_manager
+            
+            # 方式2：从主窗口获取
+            elif hasattr(self.parent(), 'parent') and hasattr(self.parent().parent(), 'custom_button_manager'):
+                button_manager = self.parent().parent().custom_button_manager
+            
+            # 方式3：直接导入并创建实例（作为备选方案）
+            if button_manager is None:
+                try:
+                    from core.custom_button_manager import CustomButtonManager
+                    button_manager = CustomButtonManager()
+                except Exception as e:
+                    logger.warning(f"{self.tr('无法获取按钮管理器:')} {e}")
+                    return
+            
+            # 更新所有相关按钮的card字段（需要同时匹配tab和card名称）
+            updated_count = 0
+            for button in button_manager.buttons:
+                # 规范化card名称用于匹配（去除多余空格）
+                btn_tab = button.get('tab', '')
+                btn_card = button.get('card', '')
+                normalized_btn_card = ' '.join(btn_card.split()) if btn_card else ''
+                normalized_old_card = ' '.join(old_card_name.split()) if old_card_name else ''
+                
+                if btn_tab == tab_name and normalized_btn_card == normalized_old_card:
+                    button['card'] = new_card_name
+                    updated_count += 1
+            
+            if updated_count > 0:
+                button_manager.save_buttons()
+                logger.info(f"{self.tr('已更新')} {updated_count} {self.tr('个按钮的Card名称:')} {old_card_name} -> {new_card_name}")
+            else:
+                logger.info(f"{self.tr('没有找到需要更新的按钮')}")
+                    
+        except Exception as e:
+            logger.exception(f"{self.tr('更新按钮Card名称失败:')} {e}")
+    
     def create_custom_card(self, card_data):
         """创建自定义card"""
         try:
@@ -452,6 +497,46 @@ class TabConfigManager(QObject):
     def get_custom_cards_by_tab(self, tab_id):
         """获取指定tab的自定义card"""
         return [card for card in self.custom_cards if card.get('tab_id') == tab_id]
+    
+    def update_custom_card(self, card_id, card_data):
+        """更新自定义card"""
+        try:
+            # 查找要更新的Card
+            old_card = None
+            for i, card in enumerate(self.custom_cards):
+                if card['id'] == card_id:
+                    old_card = card.copy()
+                    self.custom_cards[i].update(card_data)
+                    break
+            
+            if old_card is None:
+                logger.error(f"{self.tr('未找到Card:')} {card_id}")
+                return False
+            
+            # 如果Card名称发生变化，需要更新相关的Button
+            old_card_name = old_card.get('name', '')
+            new_card_name = card_data.get('name', '')
+            
+            # 获取Tab名称
+            tab_id = card_data.get('tab_id', old_card.get('tab_id', ''))
+            tab_name = None
+            all_tabs = self.get_all_tabs()
+            for tab in all_tabs:
+                if tab['id'] == tab_id:
+                    tab_name = tab['name']
+                    break
+            
+            # 如果Card名称改变且找到了Tab名称，更新相关按钮
+            if old_card_name != new_card_name and old_card_name and tab_name:
+                self._update_buttons_for_card_name_change(tab_name, old_card_name, new_card_name)
+            
+            self.save_config()
+            logger.info(f"{self.tr('成功更新自定义Card:')} {card_id}")
+            return True
+            
+        except Exception as e:
+            logger.exception(f"{self.tr('更新自定义Card失败:')} {e}")
+            return False
     
     def delete_custom_card(self, card_id):
         """删除自定义card"""
