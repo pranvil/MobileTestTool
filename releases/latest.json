@@ -1,10 +1,10 @@
-﻿{
-    "version":  "0.9.6.4.1",
-    "download_url":  "https://github.com/pranvil/MobileTestTool/releases/download/v0.9.6.4.1/MobileTestTool_0.9.6.4.1.zip",
-    "sha256":  "c8904babe678b339c5700b99d19a576c31bb13897d7bd7b61edbfb9502274fe6",
-    "file_name":  "MobileTestTool_0.9.6.4.1.zip",
-    "file_size":  115462680,
-    "release_notes":  "## Release Note\r\n- σÉ»σè¿MTKlogerτÜäµù╢σÇÖσ░▒Φ»óΘù«µÿ»σÉªσ╝Çσºïσ╜òσê╢ΦºåΘóæ\r\n- Σ║«Φë▓µ¿íσ╝Åµ£ëΘâ¿σêåτòîΘ¥óΦ┐ÿµÿ»µÜùΦë▓τÜä∩╝êµùÑσ┐ùσåàσ«╣\\τ╜æτ╗£Σ┐íµü»∩╝ë\r\n- MTKΦ«╛τ╜«logσñºσ░ÅΦâ╜σÉªµÅÉτñ║Σ╕ïσ╜ôσëìµëïµ£║σÅ»Φ«╛τ╜«τÜäµ£ÇσñºσÇ╝\r\n- QCTΘí╣τ¢«σ«ëΦúàMTK Logger,Σ╝Üτ╗Öσç║Φ¡ªσæè\r\n- MTK∩╝îwireshark∩╝îΘ½ÿΘÇÜσ╖Ñσà╖τ╝║σñ▒Θâ╜Σ╝Üτ╗Öσê░µÿÄτí«µÅÉτñ║πÇé\r\n\r\n## Known issue\r\n- 3GPP decodeσìÅΦ««Σ╣ªσåÖΘù«Θóÿ\r\n- µªéτÄçµÇºσèƒΦâ╜σñ▒µòê∩╝îΣ╜åµÿ»Θçìµû░µëôσ╝ÇΦ╜»Σ╗╢Σ╝Üµüóσñì",
-    "published_at":  "2025-11-20T22:44:13Z",
-    "mandatory":  false
+{
+    "version": "0.9.6.4.1",
+    "download_url": "https://github.com/pranvil/MobileTestTool/releases/download/v0.9.6.4.1/MobileTestTool_0.9.6.4.1.zip",
+    "sha256": "c8904babe678b339c5700b99d19a576c31bb13897d7bd7b61edbfb9502274fe6",
+    "file_name": "MobileTestTool_0.9.6.4.1.zip",
+    "file_size": 115462680,
+    "release_notes": "## Release Note\r\n- 启动MTKloger的时候就询问是否开始录制视频\r\n- 亮色模式有部分界面还是暗色的（日志内容\\网络信息）\r\n- MTK设置log大小能否提示下当前手机可设置的最大值\r\n- QCT项目安装MTK Logger,会给出警告\r\n- MTK，wireshark，高通工具缺失都会给到明确提示。\r\n\r\n## Known issue\r\n- 3GPP decode协议书写问题\r\n- 概率性功能失效，但是重新打开软件会恢复",
+    "published_at": "2025-11-20T22:44:13Z",
+    "mandatory": false
 }
