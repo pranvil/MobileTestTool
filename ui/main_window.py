@@ -3269,27 +3269,10 @@ class MainWindow(QMainWindow):
             logger.debug("模块导入成功: QDialog, QMessageBox")
             
             logger.debug("创建 RRC3GPPDecoderDialog 实例")
-            dialog = RRC3GPPDecoderDialog(self)
+            dialog = RRC3GPPDecoderDialog(self, decoder=self.rrc3gpp_decoder)
             logger.debug("显示对话框")
-            if dialog.exec_() == QDialog.Accepted:
-                logger.debug("对话框返回 Accepted")
-                messages = dialog.get_inputs()
-                logger.debug(f"获取到消息数量: {len(messages) if messages else 0}")
-                try:
-                    logger.debug("调用 rrc3gpp_decoder.decode_messages()")
-                    success, message = self.rrc3gpp_decoder.decode_messages(messages)
-                    if success:
-                        logger.debug("3GPP消息解码成功")
-                        QMessageBox.information(self, self.tr("成功"), message)
-                    else:
-                        logger.warning(f"3GPP消息解码失败: {message}")
-                        QMessageBox.warning(self, self.tr("失败"), message)
-                except Exception as e:
-                    logger.error(f"3GPP消息解码过程出错:\n  错误类型: {type(e).__name__}\n  错误信息: {str(e)}")
-                    logger.exception("异常详情")
-                    QMessageBox.critical(self, self.tr("错误"), self.tr("3GPP消息解码失败: {}").format(str(e)))
-            else:
-                logger.debug("对话框被取消")
+            dialog.exec_()
+            logger.debug("对话框已关闭")
         except ImportError as e:
             logger.error(f"模块导入失败:\n  错误类型: ImportError\n  错误信息: {str(e)}")
             logger.exception("模块导入异常详情")

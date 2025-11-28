@@ -16,35 +16,26 @@ from PyQt5.QtGui import QFontMetrics
 PROTOCOLS = {
     'SMS': ['MO SMS', 'MT SMS'],
     'LTE': [
-        'NAS-EPS',
-        'NAS-EPS_plain',
-        'LTE-RRC.BCCH.BCH',
-        'LTE-RRC.BCCH.DL.SCH',
-        'LTE-RRC.BCCH.DL.SCH.BR',
-        'LTE-RRC.DL.CCCH',
-        'LTE-RRC.DL.DCCH',
-        'LTE-RRC.PCCH',
-        'LTE-RRC.RRCConnectionReconfiguration',
-        'LTE-RRC.SC.MCCH',
-        'LTE-RRC.UE-EUTRA-Capability',
-        'LTE-RRC.UECapabilityInformation',
-        'LTE-RRC.UL.CCCH',
-        'LTE-RRC.UL.DCCH',
+        'lte-rrc.bcch.bch',
+        'lte-rrc.bcch.dl.sch',
+        'lte-rrc.pcch',
+        'lte-rrc.dl.ccch',
+        'lte-rrc.dl.dcch',
+        'lte-rrc.ul.ccch',
+        'lte-rrc.ul.dcch',
+        'lte-rrc.mcch',
+        'nas-eps',
+        'nas-eps_plain',
     ],
     '5G': [
-        'NAS-5GS',
-        'NR-RRC.BCCH.BCH',
-        'NR-RRC.BCCH.DL.SCH',
-        'NR-RRC.DL.CCCH',
-        'NR-RRC.DL.DCCH',
-        'NR-RRC.PCCH',
-        'NR-RRC.UL.CCCH',
-        'NR-RRC.UL.DCCH',
-        'NR-RRC.CellGroupConfig',
-        'NR-RRC.HandoverCommand',
-        'NR-RRC.HandoverPreparationInformation',
-        'NR-RRC.MeasConfig',
-        'NR-RRC.MeasGapConfig',
+        'nr-rrc.bcch.bch',
+        'nr-rrc.bcch.dl.sch',
+        'nr-rrc.pcch',
+        'nr-rrc.dl.ccch',
+        'nr-rrc.dl.dcch',
+        'nr-rrc.ul.ccch',
+        'nr-rrc.ul.dcch',
+        'nas-5gs',
     ]
 }
 
@@ -220,9 +211,10 @@ class RRC3GPPMessageWidget(QFrame):
 class RRC3GPPDecoderDialog(QDialog):
     """3GPP消息解码对话框（支持多条消息）"""
     
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, decoder=None):
         super().__init__(parent)
         self.lang_manager = parent.lang_manager if parent and hasattr(parent, 'lang_manager') else None
+        self.decoder = decoder
         self.message_widgets = []
         self.setWindowTitle(self.tr("3GPP消息解码器"))
         self.setModal(True)
@@ -276,9 +268,24 @@ class RRC3GPPDecoderDialog(QDialog):
         scroll_area.setWidget(self.scroll_content)
         layout.addWidget(scroll_area)
         
-        # 底部：确认/取消按钮
-        button_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
-        button_box.accepted.connect(self.validate_and_accept)
+        # 底部：解码/取消按钮
+        button_box = QDialogButtonBox(QDialogButtonBox.Cancel)
+        self.decode_btn = QPushButton(self.tr("解码"))
+        self.decode_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #007bff;
+                color: white;
+                padding: 6px 16px;
+                border: none;
+                border-radius: 4px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #0056b3;
+            }
+        """)
+        self.decode_btn.clicked.connect(self.validate_and_decode)
+        button_box.addButton(self.decode_btn, QDialogButtonBox.AcceptRole)
         button_box.rejected.connect(self.reject)
         layout.addWidget(button_box)
         
@@ -321,8 +328,8 @@ class RRC3GPPDecoderDialog(QDialog):
         count = len(self.message_widgets)
         self.count_label.setText(self.tr("当前消息数量: {}").format(count))
     
-    def validate_and_accept(self):
-        """验证所有输入并接受"""
+    def validate_and_decode(self):
+        """验证所有输入并执行解码（不关闭对话框）"""
         if not self.message_widgets:
             QMessageBox.warning(self, self.tr("输入错误"), self.tr("至少需要输入一条消息"))
             return
@@ -339,7 +346,18 @@ class RRC3GPPDecoderDialog(QDialog):
                               self.tr("以下消息输入有误:\n\n{}").format("\n".join(errors)))
             return
         
-        self.accept()
+        # 执行解码
+        if not self.decoder:
+            QMessageBox.warning(self, self.tr("错误"), self.tr("解码器未初始化"))
+            return
+        
+        try:
+            messages = self.get_inputs()
+            success, message = self.decoder.decode_messages(messages)
+            if not success:
+                QMessageBox.warning(self, self.tr("解码失败"), message)
+        except Exception as e:
+            QMessageBox.critical(self, self.tr("错误"), self.tr("解码过程出错: {}").format(str(e)))
     
     def get_inputs(self):
         """获取所有用户输入"""
