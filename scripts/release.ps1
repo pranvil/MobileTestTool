@@ -47,13 +47,11 @@ function Invoke-GhReleaseCreate {
         & $ghPath release delete ("v{0}" -f $Version) --yes
     }
 
-    # 将 notes 写入临时文件，以便正确处理多行文本和特殊字符
+    # Write notes to temp file to properly handle multi-line text and special characters
     $tempNotesFile = [System.IO.Path]::GetTempFileName()
     try {
         [System.IO.File]::WriteAllText($tempNotesFile, $Notes, (New-Object System.Text.UTF8Encoding($false)))
-        & $ghPath release create ("v{0}" -f $Version) $Package `
-            --title ("MobileTestTool v{0}" -f $Version) `
-            --notes-file $tempNotesFile
+        & $ghPath release create ("v{0}" -f $Version) $Package --title ("MobileTestTool v{0}" -f $Version) --notes-file $tempNotesFile
         if ($LASTEXITCODE -ne 0) {
             throw "gh release create failed"
         }
@@ -76,7 +74,7 @@ function Get-ReleaseNotes {
         return $DefaultNotes
     }
 
-    # 尝试作为绝对路径，如果不是则相对于项目根目录
+    # Try as absolute path, if not then relative to project root
     $notesPath = if ([System.IO.Path]::IsPathRooted($NotesFile)) {
         $NotesFile
     } else {
@@ -102,7 +100,7 @@ function Get-ReleaseNotes {
     }
 }
 
-$repoRoot    = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
+$repoRoot    = (Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path))
 $buildDir    = Join-Path $repoRoot "dist/MobileTestTool"
 $packageDir  = Join-Path $repoRoot "dist"
 $packageName = "MobileTestTool_$Version.zip"
@@ -111,7 +109,7 @@ $manifestDir = Join-Path $repoRoot "releases"
 $manifestPath = Join-Path $manifestDir "latest.json"
 $versionFile = Join-Path $repoRoot "core\version.py"
 
-# 更新版本号
+# Update version number
 Write-Host "=== step 0: update version.py ==="
 if (-not (Test-Path $versionFile)) {
     throw "Version file not found: $versionFile"
@@ -126,7 +124,9 @@ $oldVersion = if ($versionContent -match 'APP_VERSION = "([^"]+)"') {
 
 if ($oldVersion -and $oldVersion -ne $Version) {
     Write-Host "Updating version from $oldVersion to $Version"
-    $versionContent = $versionContent -replace 'APP_VERSION = "[^"]+"', "APP_VERSION = `"$Version`""
+    $versionPattern = 'APP_VERSION = "[^"]+"'
+    $versionReplacement = "APP_VERSION = `"$Version`""
+    $versionContent = $versionContent -replace $versionPattern, $versionReplacement
     [System.IO.File]::WriteAllText($versionFile, $versionContent, (New-Object System.Text.UTF8Encoding($false)))
     Write-Host "Version updated successfully"
 } elseif ($oldVersion -eq $Version) {
@@ -137,7 +137,8 @@ if ($oldVersion -and $oldVersion -ne $Version) {
 
 if (-not $SkipPackage) {
     Write-Host "=== step 1: run build_pyqt.bat ==="
-    & (Join-Path $repoRoot "scripts\build_pyqt.bat")
+    $buildScript = Join-Path $repoRoot "scripts\build_pyqt.bat"
+    & $buildScript
 
     Write-Host "=== step 2: compress onedir folder ==="
     if (-not (Test-Path $buildDir)) {
@@ -146,7 +147,12 @@ if (-not $SkipPackage) {
     if (Test-Path $packagePath) {
         Remove-Item $packagePath
     }
-    Compress-Archive -Path (Join-Path $buildDir "*") -DestinationPath $packagePath
+    $buildItems = Get-ChildItem -Path $buildDir
+    $buildPaths = @()
+    foreach ($item in $buildItems) {
+        $buildPaths += $item.FullName
+    }
+    Compress-Archive -Path $buildPaths -DestinationPath $packagePath
     Write-Host ("Created package: {0}" -f $packagePath)
 } else {
     Write-Host "=== step 1 & 2 skipped (SkipPackage enabled) ==="
@@ -156,14 +162,16 @@ if (-not $SkipPackage) {
 }
 
 Write-Host "=== step 3: compute SHA256 ==="
-$sha256 = (Get-FileHash $packagePath -Algorithm SHA256).Hash.ToLower()
+$hashObj = Get-FileHash -Path $packagePath -Algorithm SHA256
+$hashStr = $hashObj.Hash
+$sha256 = $hashStr.ToLower()
 Write-Host ("SHA256: {0}" -f $sha256)
 
 if ($SkipPublish) {
     Write-Host "=== step 4: SKIPPED (SkipPublish enabled) ==="
-    Write-Host "警告: 由于使用了 -SkipPublish，不会生成 latest.json"
-    Write-Host "原因: latest.json 指向的下载链接需要对应的 GitHub Release 才能正常工作"
-    Write-Host "如果后续需要发布此版本，请运行不带 -SkipPublish 的完整发布流程"
+    Write-Host "Warning: latest.json will not be generated because -SkipPublish is used"
+    Write-Host "Reason: latest.json download links require corresponding GitHub Release to work properly"
+    Write-Host "If you need to publish this version later, run the full release process without -SkipPublish"
     Write-Host ""
     Write-Host "SkipPublish enabled. Packaging complete."
     Write-Host ("Package: {0}" -f $packagePath)
@@ -177,7 +185,7 @@ if (-not (Test-Path $manifestDir)) {
 }
 
 $downloadUrl = "https://github.com/pranvil/MobileTestTool/releases/download/v$Version/$packageName"
-# 读取一次release notes，确保latest.json和GitHub release使用相同内容
+# Read release notes once to ensure latest.json and GitHub release use the same content
 $releaseNotes = Get-ReleaseNotes -NotesFile $NotesFile -RepoRoot $repoRoot -DefaultNotes "- Add release notes here" -Trim
 
 $manifest = [ordered]@{
@@ -240,7 +248,7 @@ if ($tagExists) {
 Invoke-Git "tag" "-a" ("v{0}" -f $Version) "-m" ("Release v{0}" -f $Version)
 Invoke-Git "push" "origin" ("v{0}" -f $Version)
 
-# 复用之前读取的release notes，确保与latest.json内容一致
+# Reuse previously read release notes to ensure consistency with latest.json content
 $notesForRelease = $releaseNotes
 
 Invoke-GhReleaseCreate -Version $Version -Package $packagePath -Notes $notesForRelease
