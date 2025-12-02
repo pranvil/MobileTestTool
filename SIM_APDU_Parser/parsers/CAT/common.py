@@ -3,43 +3,48 @@ from SIM_APDU_Parser.core.models import ParseNode
 
 def _hex2int(h): return int(h, 16) if h else 0
 
+# Event List (19/99 tag) 事件映射表
+EVENT_MAP = {
+    '00': 'MT call',
+    '01': 'Call connected',
+    '02': 'Call disconnected',
+    '03': 'Location status',
+    '04': 'User activity',
+    '05': 'Idle screen available',
+    '06': 'Card reader status',
+    '07': 'Language selection',
+    '08': 'Browser termination',
+    '09': 'Data available',
+    '0A': 'Channel status',
+    '0B': 'Access Technology Change (single access technology)',
+    '0C': 'Display parameters changed',
+    '0D': 'Local connection',
+    '0E': 'Network Search Mode Change',
+    '0F': 'Browsing status',
+    '10': 'Frames Information Change',
+    '11': '(I-)WLAN Access Status',         # Defined in 3GPP TS 31.111
+    '12': 'Network Rejection',              # Defined in 3GPP TS 31.111
+    '13': 'HCI connectivity event',
+    '14': 'Access Technology Change (multiple access technologies)',
+    '15': 'CSG cell selection',             # Defined in 3GPP TS 31.111
+    '16': 'Contactless state request',
+    '17': 'IMS Registration',               # Defined in 3GPP TS 31.111
+    '18': 'Incoming IMS data',              # Defined in 3GPP TS 31.111
+    '19': 'Profile Container',
+    # '1A': 'Void',                         # 1A is Void in standard
+    '1B': 'Secured Profile Container',
+    '1C': 'Poll Interval Negotiation',
+    '1D': 'Data Connection Status Change',  # Defined in 3GPP TS 31.111 
+    '1E': 'CAG cell selection',             # Defined in 3GPP TS 31.111 
+    '1F': 'Slices Status Change'            # Defined in 3GPP TS 31.111 
+}
+
 def parse_event_list_info(value_hex: str) -> str:
     """解析Event List (19/99 tag)的内容"""
-    event_map = {
-        '00': 'MT call',
-        '01': 'Call connected',
-        '02': 'Call disconnected',
-        '03': 'Location status',
-        '04': 'User activity',
-        '05': 'Idle screen available',
-        '06': 'Card reader status',
-        '07': 'Language selection',
-        '08': 'Browser termination',
-        '09': 'Data available',
-        '0A': 'Channel status',
-        '0B': 'Access Technology Change (single access technology)',
-        '0C': 'Display parameters changed',
-        '0D': 'Local connection',
-        '0E': 'Network Search Mode Change',
-        '0F': 'Browsing status',
-        '10': 'Frames Information Change',
-        '11': '(I-)WLAN Access Status',
-        '12': 'Network Rejection',
-        '13': 'HCI connectivity event',
-        '14': 'Access Technology Change (multiple access technologies)',
-        '15': 'CSG cell selection',
-        '16': 'Contactless state request',
-        '17': 'IMS Registration',
-        '18': 'Incoming IMS data',
-        '19': 'Profile Container',
-        '1B': 'Secured Profile Container',
-        '1C': 'Poll Interval Negotiation',
-    }
-    
     events = []
     for i in range(0, len(value_hex), 2):
         event_code = value_hex[i:i+2]
-        event_name = event_map.get(event_code, f'Unknown event ({event_code})')
+        event_name = EVENT_MAP.get(event_code, f'Unknown event ({event_code})')
         events.append(event_name)
     
     return ', '.join(events)
@@ -47,42 +52,11 @@ def parse_event_list_info(value_hex: str) -> str:
 
 def parse_event_list_to_nodes(value_hex: str) -> ParseNode:
     """解析Event List (19/99 tag)的内容，返回包含子节点的ParseNode"""
-    event_map = {
-        '00': 'MT call',
-        '01': 'Call connected',
-        '02': 'Call disconnected',
-        '03': 'Location status',
-        '04': 'User activity',
-        '05': 'Idle screen available',
-        '06': 'Card reader status',
-        '07': 'Language selection',
-        '08': 'Browser termination',
-        '09': 'Data available',
-        '0A': 'Channel status',
-        '0B': 'Access Technology Change (single access technology)',
-        '0C': 'Display parameters changed',
-        '0D': 'Local connection',
-        '0E': 'Network Search Mode Change',
-        '0F': 'Browsing status',
-        '10': 'Frames Information Change',
-        '11': '(I-)WLAN Access Status',
-        '12': 'Network Rejection',
-        '13': 'HCI connectivity event',
-        '14': 'Access Technology Change (multiple access technologies)',
-        '15': 'CSG cell selection',
-        '16': 'Contactless state request',
-        '17': 'IMS Registration',
-        '18': 'Incoming IMS data',
-        '19': 'Profile Container',
-        '1B': 'Secured Profile Container',
-        '1C': 'Poll Interval Negotiation',
-    }
-    
     root = ParseNode(name="Event List (19)")
     
     for i in range(0, len(value_hex), 2):
         event_code = value_hex[i:i+2]
-        event_name = event_map.get(event_code, f'Unknown event ({event_code})')
+        event_name = EVENT_MAP.get(event_code, f'Unknown event ({event_code})')
         root.children.append(ParseNode(name=f"Event {event_code}", value=event_name))
     
     return root
