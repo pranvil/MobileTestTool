@@ -7,7 +7,12 @@ from SIM_APDU_Parser.core.models import ParseNode
 from SIM_APDU_Parser.parsers.CAT.common import (
     parse_comp_tlvs_to_nodes, EVENT_MAP, parse_event_list_to_nodes,
     parse_location_status_text, parse_location_info_text, device_identities_text,
-    parse_access_tech_text
+    parse_access_tech_text, parse_tlvs_from_dict, parse_network_access_name_text,
+    parse_data_connection_status_text, parse_data_connection_type_text,
+    parse_esm_cause_text, parse_transaction_identifier_text,
+    parse_date_time_timezone_text, parse_pdp_pdn_pdu_type_text,
+    parse_address_pdp_pdn_pdu_type_text, parse_timer_identifier_text,
+    parse_timer_value_text
 )
 from SIM_APDU_Parser.parsers.CAT.terminal_profile_parser import TerminalProfileParser
 from SIM_APDU_Parser.parsers.CAT.terminal_capability_parser import TerminalCapabilityParser
@@ -710,72 +715,16 @@ class TerminalToUiccParser:
         if tlv_data is None:
             tlv_data = {}
         
-        # 1. 解析 Device identities (Tag 02/82) - Mandatory
-        device_identities_tag = None
-        device_identities_value = None
-        for tag in ('02', '82'):
-            if tag in tlv_data:
-                device_identities_tag = tag
-                device_identities_value = tlv_data[tag]
-                break
-        
-        if device_identities_value:
-            # 使用 common.py 中的解析函数
-            device_identities_info = device_identities_text(device_identities_value)
-            root.children.append(ParseNode(
-                name=f"Device identities ({device_identities_tag})",
-                value=device_identities_info
-            ))
-        else:
-            # Device identities 是强制字段，如果没找到应该警告
-            root.children.append(ParseNode(name="Warning", value="Device identities (02/82) not found"))
-        
-        # 2. 解析 Location status 数据对象 (Tag 1B/9B) - Mandatory
-        location_status_tag = None
-        location_status_value = None
-        for tag in ('1B', '9B'):
-            if tag in tlv_data:
-                location_status_tag = tag
-                location_status_value = tlv_data[tag]
-                break
-        
-        if location_status_value:
-            # 使用 common.py 中的解析函数
-            location_status_info = parse_location_status_text(location_status_value)
-            root.children.append(ParseNode(
-                name=f"Location status ({location_status_tag})",
-                value=location_status_info
-            ))
-        else:
-            # Location status 是强制字段，如果没找到应该警告
-            root.children.append(ParseNode(name="Warning", value="Location status data object (1B/9B) not found"))
-        
-        # 3. 解析 Location Information 数据对象 (Tag 13/93) - Conditional
-        location_info_tag = None
-        location_info_value = None
-        for tag in ('13', '93'):
-            if tag in tlv_data:
-                location_info_tag = tag
-                location_info_value = tlv_data[tag]
-                break
-        
-        if location_info_value:
-            # 使用 common.py 中的解析函数
-            location_info_text = parse_location_info_text(location_info_value)
-            root.children.append(ParseNode(
-                name=f"Location Information ({location_info_tag})",
-                value=location_info_text
-            ))
-        
-        # 显示其他未解析的 TLV 数据（排除已解析的和 Event List）
-        parsed_tags = {'19', '99', '02', '82', '1B', '9B', '13', '93'}
-        other_tlvs = {tag: val for tag, val in tlv_data.items() if tag not in parsed_tags}
-        if other_tlvs:
-            for tag, val in other_tlvs.items():
-                root.children.append(ParseNode(
-                    name=f"TLV {tag}",
-                    value=f"Length: {len(val)//2}, Data: {val[:60]}{'...' if len(val) > 60 else ''}"
-                ))
+        # 使用通用函数解析 TLV
+        # 必需字段：Device identities, Location status
+        # 可选字段：Location Information
+        parse_tlvs_from_dict(
+            root=root,
+            tlv_data=tlv_data,
+            required_tags=[('02', '82'), ('1B', '9B')],  # Device identities, Location status
+            optional_tags=[('13', '93')],  # Location Information
+            exclude_tags={'19', '99'}  # Event List
+        )
     
     def _parse_event_user_activity(self, root: ParseNode, payload_hex: str, tlv_data: dict = None):
         """解析 Event: User activity (04) - 占位符"""
@@ -810,64 +759,14 @@ class TerminalToUiccParser:
         if tlv_data is None:
             tlv_data = {}
         
-        # 1. 解析 Device identities (Tag 02/82) - Mandatory
-        device_identities_tag = None
-        device_identities_value = None
-        for tag in ('02', '82'):
-            if tag in tlv_data:
-                device_identities_tag = tag
-                device_identities_value = tlv_data[tag]
-                break
-        
-        if device_identities_value:
-            device_identities_info = device_identities_text(device_identities_value)
-            root.children.append(ParseNode(
-                name=f"Device identities ({device_identities_tag})",
-                value=device_identities_info
-            ))
-        else:
-            root.children.append(ParseNode(name="Warning", value="Device identities (02/82) not found"))
-        
-        # 2. 解析 Access Technology (Tag 3F/BF) - Mandatory
-        access_tech_tag = None
-        access_tech_value = None
-        for tag in ('3F', 'BF'):
-            if tag in tlv_data:
-                access_tech_tag = tag
-                access_tech_value = tlv_data[tag]
-                break
-        
-        if access_tech_value:
-            # Access Technology 数据对象结构：
-            # Byte 1: Tag (3F/BF) - 已经在 tlv_data 中去掉了
-            # Byte 2: Length (1 byte) - 已经在 tlv_data 中去掉了
-            # Byte 3+: Technology value(s) - 对于 single，应该是1字节
-            
-            # access_tech_value 已经是去掉了 tag 和 length 的值部分
-            # 对于 single access technology，应该只有1个字节
-            if len(access_tech_value) >= 2:
-                access_tech_info = parse_access_tech_text(access_tech_value)
-                root.children.append(ParseNode(
-                    name=f"Access Technology ({access_tech_tag})",
-                    value=access_tech_info
-                ))
-            else:
-                root.children.append(ParseNode(
-                    name=f"Access Technology ({access_tech_tag})",
-                    value=f"Invalid data: {access_tech_value}"
-                ))
-        else:
-            root.children.append(ParseNode(name="Warning", value="Access Technology (3F/BF) not found"))
-        
-        # 显示其他未解析的 TLV 数据（排除已解析的和 Event List）
-        parsed_tags = {'19', '99', '02', '82', '3F', 'BF'}
-        other_tlvs = {tag: val for tag, val in tlv_data.items() if tag not in parsed_tags}
-        if other_tlvs:
-            for tag, val in other_tlvs.items():
-                root.children.append(ParseNode(
-                    name=f"TLV {tag}",
-                    value=f"Length: {len(val)//2}, Data: {val[:60]}{'...' if len(val) > 60 else ''}"
-                ))
+        # 使用通用函数解析 TLV
+        # 必需字段：Device identities, Access Technology
+        parse_tlvs_from_dict(
+            root=root,
+            tlv_data=tlv_data,
+            required_tags=[('02', '82'), ('3F', 'BF')],  # Device identities, Access Technology
+            exclude_tags={'19', '99'}  # Event List
+        )
 
     def _parse_event_display_parameters_changed(self, root: ParseNode, payload_hex: str, tlv_data: dict = None):
         """解析 Event: Display parameters changed (0C) - 占位符"""
@@ -906,64 +805,14 @@ class TerminalToUiccParser:
         if tlv_data is None:
             tlv_data = {}
         
-        # 1. 解析 Device identities (Tag 02/82) - Mandatory
-        device_identities_tag = None
-        device_identities_value = None
-        for tag in ('02', '82'):
-            if tag in tlv_data:
-                device_identities_tag = tag
-                device_identities_value = tlv_data[tag]
-                break
-        
-        if device_identities_value:
-            device_identities_info = device_identities_text(device_identities_value)
-            root.children.append(ParseNode(
-                name=f"Device identities ({device_identities_tag})",
-                value=device_identities_info
-            ))
-        else:
-            root.children.append(ParseNode(name="Warning", value="Device identities (02/82) not found"))
-        
-        # 2. 解析 Access Technology (Tag 3F/BF) - Mandatory
-        access_tech_tag = None
-        access_tech_value = None
-        for tag in ('3F', 'BF'):
-            if tag in tlv_data:
-                access_tech_tag = tag
-                access_tech_value = tlv_data[tag]
-                break
-        
-        if access_tech_value:
-            # Access Technology 数据对象结构：
-            # Byte 1: Tag (3F/BF) - 已经在 tlv_data 中去掉了
-            # Byte 2: Length (1 byte) - 已经在 tlv_data 中去掉了
-            # Byte 3+: Technology values - 对于 multiple，包含所有当前连接的接入技术
-            
-            # access_tech_value 已经是去掉了 tag 和 length 的值部分
-            # 对于 multiple access technologies，可能包含多个字节
-            if len(access_tech_value) >= 2:
-                access_tech_info = parse_access_tech_text(access_tech_value)
-                root.children.append(ParseNode(
-                    name=f"Access Technology ({access_tech_tag})",
-                    value=access_tech_info
-                ))
-            else:
-                root.children.append(ParseNode(
-                    name=f"Access Technology ({access_tech_tag})",
-                    value=f"Invalid data: {access_tech_value}"
-                ))
-        else:
-            root.children.append(ParseNode(name="Warning", value="Access Technology (3F/BF) not found"))
-        
-        # 显示其他未解析的 TLV 数据（排除已解析的和 Event List）
-        parsed_tags = {'19', '99', '02', '82', '3F', 'BF'}
-        other_tlvs = {tag: val for tag, val in tlv_data.items() if tag not in parsed_tags}
-        if other_tlvs:
-            for tag, val in other_tlvs.items():
-                root.children.append(ParseNode(
-                    name=f"TLV {tag}",
-                    value=f"Length: {len(val)//2}, Data: {val[:60]}{'...' if len(val) > 60 else ''}"
-                ))
+        # 使用通用函数解析 TLV
+        # 必需字段：Device identities, Access Technology
+        parse_tlvs_from_dict(
+            root=root,
+            tlv_data=tlv_data,
+            required_tags=[('02', '82'), ('3F', 'BF')],  # Device identities, Access Technology
+            exclude_tags={'19', '99'}  # Event List
+        )
 
     def _parse_event_csg_cell_selection(self, root: ParseNode, payload_hex: str, tlv_data: dict = None):
         """解析 Event: CSG cell selection (15) - 占位符"""
@@ -974,8 +823,122 @@ class TerminalToUiccParser:
         root.children.append(ParseNode(name="Event Data", value=payload_hex))
 
     def _parse_event_ims_registration(self, root: ParseNode, payload_hex: str, tlv_data: dict = None):
-        """解析 Event: IMS Registration (17) - 占位符"""
-        root.children.append(ParseNode(name="Event Data", value=payload_hex))
+        """解析 Event: IMS Registration (17)"""
+        if tlv_data is None:
+            tlv_data = {}
+        
+        # 使用通用函数解析必需字段
+        # 必需字段：Device identities
+        # 注意：IMPU List (77/F7) 和 IMS Status Code (78/F8) 需要手动解析，所以排除它们避免显示原始数据
+        parse_tlvs_from_dict(
+            root=root,
+            tlv_data=tlv_data,
+            required_tags=[
+                ('02', '82')  # Device identities
+            ],
+            optional_tags=[],
+            exclude_tags={'19', '99', '77', 'F7', '78', 'F8'}  # Event List, IMPU List, IMS Status Code
+        )
+        
+        # 手动解析 IMPU List (77/F7) - 包含嵌套的 URI TLV
+        for tag in ('77', 'F7'):
+            tag_upper = tag.upper()
+            if tag_upper in tlv_data:
+                impu_list_node = ParseNode(name=f"IMPU List ({tag_upper})")
+                self._parse_impu_list(impu_list_node, tlv_data[tag_upper])
+                root.children.append(impu_list_node)
+                break
+        
+        # 手动解析 IMS Status Code (78/F8) - ASCII 格式的数字序列
+        for tag in ('78', 'F8'):
+            tag_upper = tag.upper()
+            if tag_upper in tlv_data:
+                status_code = self._parse_ims_status_code(tlv_data[tag_upper])
+                root.children.append(ParseNode(
+                    name=f"IMS Status Code ({tag_upper})",
+                    value=status_code
+                ))
+                break
+    
+    def _parse_impu_list(self, root: ParseNode, value_hex: str):
+        """解析 IMPU List (77/F7) - 包含嵌套的 URI TLV (80)"""
+        if not value_hex or len(value_hex) < 2:
+            root.children.append(ParseNode(name="Error", value="Invalid IMPU List data"))
+            return
+        
+        idx = 0
+        n = len(value_hex)
+        uri_count = 0
+        
+        # IMPU List 包含一个或多个 URI TLV 数据对象
+        # URI TLV Tag: '80'
+        # URI TLV Length: Z
+        # URI TLV Value: UTF-8 编码的 IMPU (SIP URI 或 TEL URI)
+        while idx < n:
+            if idx + 2 > n:
+                break
+            
+            tag = value_hex[idx:idx+2].upper()
+            idx += 2
+            
+            if tag != '80':
+                # 不是 URI TLV，可能是数据错误
+                root.children.append(ParseNode(
+                    name="Warning",
+                    value=f"Unexpected tag {tag} in IMPU List at position {idx//2}"
+                ))
+                break
+            
+            if idx + 2 > n:
+                break
+            
+            # 读取长度
+            length = int(value_hex[idx:idx+2], 16)
+            idx += 2
+            
+            if idx + length * 2 > n:
+                # 数据不完整
+                root.children.append(ParseNode(
+                    name="Warning",
+                    value=f"Incomplete URI TLV at position {idx//2}"
+                ))
+                break
+            
+            # 读取 URI 值（UTF-8 编码）
+            uri_hex = value_hex[idx:idx+length*2]
+            idx += length * 2
+            
+            # 解码 UTF-8
+            try:
+                uri_bytes = bytes.fromhex(uri_hex)
+                uri_str = uri_bytes.decode('utf-8', errors='replace')
+                uri_count += 1
+                root.children.append(ParseNode(
+                    name=f"IMPU {uri_count}",
+                    value=uri_str
+                ))
+            except Exception as e:
+                root.children.append(ParseNode(
+                    name=f"IMPU {uri_count + 1} (Decode Error)",
+                    value=f"Error: {e}, Raw: {uri_hex[:60]}{'...' if len(uri_hex) > 60 else ''}"
+                ))
+                uri_count += 1
+        
+        if uri_count == 0:
+            root.children.append(ParseNode(name="Info", value="No IMPU found in list"))
+    
+    def _parse_ims_status_code(self, value_hex: str) -> str:
+        """解析 IMS Status Code (78/F8) - ASCII 格式的数字序列"""
+        if not value_hex:
+            return "Invalid data"
+        
+        try:
+            # IMS Status Code 是 ASCII 格式的数字序列（例如 "200", "403"）
+            status_bytes = bytes.fromhex(value_hex)
+            status_str = status_bytes.decode('ascii', errors='replace')
+            return status_str
+        except Exception as e:
+            return f"Decode error: {e}, Raw: {value_hex[:60]}{'...' if len(value_hex) > 60 else ''}"
 
     def _parse_event_incoming_ims_data(self, root: ParseNode, payload_hex: str, tlv_data: dict = None):
         """解析 Event: Incoming IMS data (18) - 占位符"""
@@ -994,8 +957,33 @@ class TerminalToUiccParser:
         root.children.append(ParseNode(name="Event Data", value=payload_hex))
 
     def _parse_event_data_connection_status_change(self, root: ParseNode, payload_hex: str, tlv_data: dict = None):
-        """解析 Event: Data Connection Status Change (1D) - 占位符"""
-        root.children.append(ParseNode(name="Event Data", value=payload_hex))
+        """解析 Event: Data Connection Status Change (1D)"""
+        if tlv_data is None:
+            tlv_data = {}
+        
+        # 使用通用函数解析所有已知字段
+        # 必需字段：Device identities, Data connection status, Data connection type, Transaction identifier, Location status
+        # 可选字段：Location Information, Access Technology, Network Access Name, Date-Time and Time zone, Address/PDP/PDN/PDU Type, (E/5G)SM cause
+        parse_tlvs_from_dict(
+            root=root,
+            tlv_data=tlv_data,
+            required_tags=[
+                ('02', '82'),  # Device identities
+                ('1D', '9D'),  # Data connection status
+                ('2A', 'AA'),  # Data connection type
+                ('1C', '9C'),  # Transaction identifier
+                ('1B', '9B')   # Location status
+            ],
+            optional_tags=[
+                ('13', '93'),  # Location Information
+                ('3F', 'BF'),  # Access Technology
+                ('47', 'C7'),  # Network Access Name
+                ('26', 'A6'),  # Date-Time and Time zone
+                ('0B', '8B'),  # Address / PDP/PDN/PDU Type
+                ('2E', 'AE')   # (E/5G)SM cause
+            ],
+            exclude_tags={'19', '99'}  # Event List
+        )
 
     def _parse_event_cag_cell_selection(self, root: ParseNode, payload_hex: str, tlv_data: dict = None):
         """解析 Event: CAG cell selection (1E) - 占位符"""
@@ -1006,8 +994,77 @@ class TerminalToUiccParser:
         root.children.append(ParseNode(name="Event Data", value=payload_hex))
     
     def _parse_timer_expiration(self, root: ParseNode, payload_hex: str):
-        """解析 Timer Expiration (D7) - 占位符"""
-        root.children.append(ParseNode(name="Data", value=payload_hex))
+        """解析 Timer Expiration (D7)"""
+        if not payload_hex or len(payload_hex) < 2:
+            root.children.append(ParseNode(name="Data", value=payload_hex))
+            return
+        
+        idx = 0
+        n = len(payload_hex)
+        
+        # 跳过 D7 tag (已经在 _parse_envelope 中识别)
+        if payload_hex[:2].upper() == 'D7':
+            idx += 2
+        
+        # 解析长度字段（可能是1字节或2字节）
+        if idx + 2 > n:
+            root.children.append(ParseNode(name="Data", value=payload_hex))
+            return
+        
+        # 读取第一个字节作为长度
+        length_byte1 = int(payload_hex[idx:idx+2], 16)
+        idx += 2
+        
+        # 如果长度字节的最高位是1，表示是2字节长度
+        if length_byte1 & 0x80:
+            if idx + 2 > n:
+                root.children.append(ParseNode(name="Data", value=payload_hex))
+                return
+            length = ((length_byte1 & 0x7F) << 8) | int(payload_hex[idx:idx+2], 16)
+            idx += 2
+        else:
+            length = length_byte1
+        
+        # 解析 TLV 数据
+        tlv_data = {}
+        data_start = idx
+        
+        while idx < n and idx < data_start + length * 2:
+            if idx + 4 > n:
+                break
+            
+            tag = payload_hex[idx:idx+2].upper()
+            idx += 2
+            
+            if idx + 2 > n:
+                break
+            
+            ln = int(payload_hex[idx:idx+2], 16)
+            idx += 2
+            
+            if idx + 2 * ln > n:
+                val = payload_hex[idx:]
+                idx = n
+            else:
+                val = payload_hex[idx:idx+2*ln]
+                idx += 2 * ln
+            
+            # 存储 TLV 数据
+            tlv_data[tag] = val
+        
+        # 使用通用函数解析已知字段
+        # 必需字段：Device identities, Timer identifier, Timer value
+        parse_tlvs_from_dict(
+            root=root,
+            tlv_data=tlv_data,
+            required_tags=[
+                ('02', '82'),  # Device identities
+                ('24', 'A4'),  # Timer identifier
+                ('25', 'A5')   # Timer value
+            ],
+            optional_tags=[],
+            exclude_tags=set()
+        )
     
     def _parse_reserved_intra_uicc(self, root: ParseNode, payload_hex: str):
         """解析 Reserved for intra-UICC communication (D8) - 占位符"""

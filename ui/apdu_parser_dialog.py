@@ -6,6 +6,7 @@ APDU 解析器对话框 - 集成 SIM_APDU_Parser 核心功能
 
 import os
 import sys
+import re
 from typing import List, Optional
 from PyQt5.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QPushButton, 
                            QLabel, QTextEdit, QTreeWidget, QTreeWidgetItem,
@@ -260,6 +261,11 @@ class ApduParserDialog(QDialog):
         self.search_details_checkbox = QCheckBox("搜索右侧详情")
         self.search_details_checkbox.stateChanged.connect(self.filter_apdu_list)
         search_toolbar_layout.addWidget(self.search_details_checkbox)
+        
+        # 使用正则表达式复选框
+        self.use_regex_checkbox = QCheckBox("使用正则表达式")
+        self.use_regex_checkbox.stateChanged.connect(self.filter_apdu_list)
+        search_toolbar_layout.addWidget(self.use_regex_checkbox)
         
         # 解析单条APDU按钮
         self.parse_single_btn = QPushButton("解析单条 APDU")
@@ -583,13 +589,25 @@ class ApduParserDialog(QDialog):
     
     def filter_apdu_list(self):
         """过滤APDU列表"""
-        filter_text = self.search_edit.text().lower()
+        filter_text = self.search_edit.text()
         search_details = self.search_details_checkbox.isChecked()
+        use_regex = self.use_regex_checkbox.isChecked()
         
         # 获取选中的筛选类别
         filter_cat = self.filter_cat_action.isChecked()
         filter_esim = self.filter_esim_action.isChecked()
         filter_generic = self.filter_generic_action.isChecked()
+        
+        # 如果使用正则表达式，编译正则表达式
+        regex_pattern = None
+        if use_regex and filter_text:
+            try:
+                regex_pattern = re.compile(filter_text, re.IGNORECASE)
+            except re.error as e:
+                # 正则表达式错误，显示错误信息但不阻止搜索
+                QMessageBox.warning(self, "正则表达式错误", f"无效的正则表达式: {e}\n将使用普通文本搜索。")
+                use_regex = False
+                regex_pattern = None
         
         for i in range(self.apdu_tree.topLevelItemCount()):
             item = self.apdu_tree.topLevelItem(i)
@@ -611,13 +629,19 @@ class ApduParserDialog(QDialog):
             text_match = True
             if filter_text:
                 # 搜索标题
-                search_text = item.text(2).lower()
+                search_text = item.text(2)
                 
                 # 如果启用搜索右侧详情，也搜索解析结果
                 if search_details and result and result.root:
-                    search_text += self.get_parse_tree_text(result.root).lower()
+                    search_text += " " + self.get_parse_tree_text(result.root)
                 
-                text_match = filter_text in search_text
+                # 根据是否使用正则表达式进行匹配
+                if use_regex and regex_pattern:
+                    # 使用正则表达式搜索（不区分大小写）
+                    text_match = bool(regex_pattern.search(search_text))
+                else:
+                    # 使用普通文本搜索（不区分大小写）
+                    text_match = filter_text.lower() in search_text.lower()
             
             # 综合筛选
             item.setHidden(not (category_match and text_match))
@@ -644,6 +668,7 @@ class ApduParserDialog(QDialog):
         
         # 重置搜索详情选项
         self.search_details_checkbox.setChecked(False)
+        self.use_regex_checkbox.setChecked(False)
         
         # 应用筛选
         self.filter_apdu_list()

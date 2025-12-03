@@ -3,6 +3,128 @@ from SIM_APDU_Parser.core.models import ParseNode
 
 def _hex2int(h): return int(h, 16) if h else 0
 
+# ========== TLV 解析器注册表 ==========
+# 用于统一管理所有 COMPREHENSION-TLV data objects 的解析函数
+# 格式: {tag: (parser_function, display_name)}
+# tag 可以是单个字符串或元组（支持多个 tag 变体）
+TLV_PARSER_REGISTRY = {}
+
+def register_tlv_parser(tags, parser_func, display_name):
+    """
+    注册 TLV 解析器
+    
+    Args:
+        tags: Tag 字符串或元组（如 '02' 或 ('02', '82')）
+        parser_func: 解析函数，接受 value_hex 参数，返回解析后的字符串
+        display_name: 显示名称（如 "Device identities"）
+    """
+    if isinstance(tags, str):
+        tags = (tags,)
+    
+    for tag in tags:
+        TLV_PARSER_REGISTRY[tag.upper()] = (parser_func, display_name)
+
+def get_tlv_parser(tag):
+    """
+    获取 TLV 解析器
+    
+    Args:
+        tag: TLV tag 字符串
+        
+    Returns:
+        (parser_func, display_name) 或 (None, None)
+    """
+    return TLV_PARSER_REGISTRY.get(tag.upper(), (None, None))
+
+def parse_tlv_to_node(tag: str, value_hex: str) -> ParseNode:
+    """
+    通用的 TLV 解析函数，根据 tag 自动调用对应的解析器
+    
+    Args:
+        tag: TLV tag 字符串
+        value_hex: TLV 的值部分（已去掉 tag 和 length）
+        
+    Returns:
+        ParseNode 对象
+    """
+    parser_func, display_name = get_tlv_parser(tag)
+    
+    if parser_func:
+        try:
+            parsed_value = parser_func(value_hex)
+            name = f"{display_name} ({tag})" if display_name else f"TLV {tag}"
+            return ParseNode(name=name, value=parsed_value)
+        except Exception as e:
+            return ParseNode(name=f"TLV {tag} (Parse Error)", value=f"Error: {e}, Raw: {value_hex[:60]}")
+    else:
+        # 没有注册的解析器，显示原始数据
+        return ParseNode(name=f"TLV {tag}", value=f"Length: {len(value_hex)//2}, Data: {value_hex[:60]}{'...' if len(value_hex) > 60 else ''}")
+
+def parse_tlvs_from_dict(root: ParseNode, tlv_data: dict, required_tags: list = None, optional_tags: list = None, exclude_tags: set = None):
+    """
+    通用的 TLV 解析函数，从 tlv_data 字典中解析指定的 TLV
+    
+    Args:
+        root: 根 ParseNode，解析结果会添加到其 children
+        tlv_data: TLV 数据字典 {tag: value_hex}
+        required_tags: 必需标签列表，格式: [('02', '82'), ('1B', '9B')] 或 ['02', '82']
+        optional_tags: 可选标签列表，格式同上
+        exclude_tags: 排除的标签集合（如 Event List），不会显示为原始数据
+    """
+    if exclude_tags is None:
+        exclude_tags = {'19', '99'}  # 默认排除 Event List
+    
+    parsed_tags = set()
+    
+    # 解析必需标签
+    if required_tags:
+        for tag_group in required_tags:
+            if isinstance(tag_group, str):
+                tag_group = (tag_group,)
+            
+            found = False
+            for tag in tag_group:
+                tag_upper = tag.upper()
+                if tag_upper in tlv_data:
+                    node = parse_tlv_to_node(tag_upper, tlv_data[tag_upper])
+                    root.children.append(node)
+                    parsed_tags.add(tag_upper)
+                    found = True
+                    break
+            
+            if not found:
+                # 必需标签未找到，显示警告
+                tag_str = '/'.join(tag_group)
+                root.children.append(ParseNode(
+                    name="Warning",
+                    value=f"Required TLV ({tag_str}) not found"
+                ))
+    
+    # 解析可选标签
+    if optional_tags:
+        for tag_group in optional_tags:
+            if isinstance(tag_group, str):
+                tag_group = (tag_group,)
+            
+            for tag in tag_group:
+                tag_upper = tag.upper()
+                if tag_upper in tlv_data:
+                    node = parse_tlv_to_node(tag_upper, tlv_data[tag_upper])
+                    root.children.append(node)
+                    parsed_tags.add(tag_upper)
+                    break
+    
+    # 显示其他未解析的 TLV 数据
+    all_excluded = exclude_tags | parsed_tags
+    other_tlvs = {tag: val for tag, val in tlv_data.items() if tag.upper() not in all_excluded}
+    if other_tlvs:
+        for tag, val in other_tlvs.items():
+            node = parse_tlv_to_node(tag, val)
+            root.children.append(node)
+
+# ========== 注册所有已实现的 TLV 解析器 ==========
+# 注意：这些函数需要在注册之前定义，所以注册代码放在文件末尾
+
 # Event List (19/99 tag) 事件映射表
 EVENT_MAP = {
     '00': 'MT call',
@@ -318,6 +440,36 @@ def parse_timer_identifier_text(v:str)->str:
     m={'01':'Timer 1','02':'Timer 2','03':'Timer 3','04':'Timer 4','05':'Timer 5','06':'Timer 6','07':'Timer 7','08':'Timer 8'}
     return m.get(v, v)
 
+def parse_timer_value_text(value_hex: str) -> str:
+    """解析 Timer value (25/A5 tag) - 3字节 BCD 码 (Hour, Minute, Second)"""
+    if not value_hex or len(value_hex) < 6:
+        return f"Invalid data: {value_hex}"
+    
+    # Timer value 数据对象结构：
+    # Byte 1: Tag (25/A5) - 已经在调用时去掉了
+    # Byte 2: Length = '03' - 已经在调用时去掉了
+    # Byte 3-5: Timer value (3 bytes BCD: Hour, Minute, Second)
+    
+    # value_hex 已经是去掉了 tag 和 length 的值部分
+    # 应该是 3 字节 = 6 个十六进制字符
+    if len(value_hex) < 6:
+        return f"Invalid length: expected 6 hex chars, got {len(value_hex)}"
+    
+    try:
+        # 解析 BCD 编码
+        hour_hex = value_hex[0:2]
+        minute_hex = value_hex[2:4]
+        second_hex = value_hex[4:6]
+        
+        # BCD 解码
+        hour = int(hour_hex, 16)
+        minute = int(minute_hex, 16)
+        second = int(second_hex, 16)
+        
+        return f"{hour:02d}:{minute:02d}:{second:02d} (Timer elapsed time)"
+    except Exception as e:
+        return f"Parse error: {e}, Raw: {value_hex}"
+
 def parse_imei_text(v:str)->str:
     out=""
     for i in range(0,len(v),2):
@@ -423,6 +575,238 @@ def parse_location_status_text(value_hex: str) -> str:
     
     return result
 
+def parse_data_connection_status_text(value_hex: str) -> str:
+    """解析 Data connection status (1D/9D tag, 8.137)"""
+    if not value_hex or len(value_hex) < 2:
+        return f"Invalid data: {value_hex}"
+    
+    # Data connection status 数据对象结构：
+    # Byte 1: Tag (1D/9D) - 已经在调用时去掉了
+    # Byte 2: Length = '01' - 已经在调用时去掉了
+    # Byte 3: Data connection status value (1 byte)
+    
+    status_byte = value_hex[:2]
+    status_code = int(status_byte, 16)
+    
+    status_map = {
+        0x00: 'Successful',
+        0x01: 'Rejected',
+        0x02: 'Dropped/Deactivated'
+    }
+    
+    status_description = status_map.get(status_code, f'RFU (0x{status_code:02X})')
+    
+    return f"{status_description} (0x{status_byte})"
+
+def parse_data_connection_type_text(value_hex: str) -> str:
+    """解析 Data connection type (2A/AA tag, 8.138)"""
+    if not value_hex or len(value_hex) < 2:
+        return f"Invalid data: {value_hex}"
+    
+    # Data connection type 数据对象结构：
+    # Byte 1: Tag (2A/AA) - 已经在调用时去掉了
+    # Byte 2: Length = '01' - 已经在调用时去掉了
+    # Byte 3: Data connection type (1 byte)
+    
+    type_byte = value_hex[:2]
+    type_code = int(type_byte, 16)
+    
+    type_map = {
+        0x00: 'PDP connection (2G/3G)',
+        0x01: 'PDN connection (4G)',
+        0x02: 'PDU connection (5G)'
+    }
+    
+    type_description = type_map.get(type_code, f'RFU (0x{type_code:02X})')
+    
+    return f"{type_description} (0x{type_byte})"
+
+def parse_esm_cause_text(value_hex: str) -> str:
+    """解析 (E/5G)SM cause (2E/AE tag, 8.139) - 直接显示 cause value"""
+    if not value_hex or len(value_hex) < 2:
+        return f"Invalid data: {value_hex}"
+    
+    # (E/5G)SM cause 数据对象结构：
+    # Byte 1: Tag (2E/AE) - 已经在调用时去掉了
+    # Byte 2: Length = '01' - 已经在调用时去掉了
+    # Byte 3: (E/5G)SM cause value (1 byte)
+    
+    # 直接显示 value
+    return value_hex[:2]
+
+def parse_transaction_identifier_text(value_hex: str) -> str:
+    """解析 Transaction identifier (1C/9C tag, 8.28)"""
+    if not value_hex or len(value_hex) < 2:
+        return f"Invalid data: {value_hex}"
+    
+    # Transaction identifier 数据对象结构：
+    # Byte 1: Tag (1C/9C) - 已经在调用时去掉了
+    # Byte 2: Length (X) - 已经在调用时去掉了
+    # Byte 3 to X+2: Transaction identifier list
+    
+    # value_hex 已经是去掉了 tag 和 length 的值部分
+    # 每个字节定义一个 transaction identifier
+    identifiers = []
+    for i in range(0, len(value_hex), 2):
+        if i + 2 > len(value_hex):
+            break
+        ti_byte = value_hex[i:i+2]
+        ti_value = int(ti_byte, 16)
+        
+        # 解析 TI: bits 5-7 = TI value, bit 8 = TI flag
+        ti_value_part = (ti_value >> 1) & 0x07  # bits 5-7
+        ti_flag = (ti_value >> 0) & 0x01  # bit 8
+        
+        identifiers.append(f"TI={ti_value_part}, Flag={ti_flag} (0x{ti_byte})")
+    
+    return ", ".join(identifiers) if identifiers else f"Raw: {value_hex}"
+
+def parse_date_time_timezone_text(value_hex: str) -> str:
+    """解析 Date-Time and Time zone (26/A6 tag, 8.39) - 按照 TS 123 040 格式（半字节交换 BCD 码）"""
+    if not value_hex or len(value_hex) < 14:
+        return f"Invalid data: {value_hex}"
+    
+    # Date-Time and Time zone 数据对象结构：
+    # Byte 1: Tag (26/A6) - 已经在调用时去掉了
+    # Byte 2: Length = '07' - 已经在调用时去掉了
+    # Byte 3-9: Date-Time and Time zone (7 bytes)
+    # 按照 TS 123 040 格式：半字节交换 BCD 码
+    # 规则：低4位是十位，高4位是个位，结果 = 十位 * 10 + 个位
+    
+    # value_hex 已经是去掉了 tag 和 length 的值部分
+    # 应该是 7 字节 = 14 个十六进制字符
+    if len(value_hex) < 14:
+        return f"Invalid length: expected 14 hex chars, got {len(value_hex)}"
+    
+    try:
+        # 解析半字节交换 BCD 编码
+        # 例如：52 (hex) = 0101 0010 (binary)
+        # 低4位：0010 = 2（十位）
+        # 高4位：0101 = 5（个位）
+        # 结果：2 * 10 + 5 = 25
+        def parse_bcd_swapped(hex_byte):
+            """解析半字节交换 BCD：52 -> 25"""
+            val = int(hex_byte, 16)
+            low_nibble = val & 0x0F  # 低4位（十位）
+            high_nibble = (val >> 4) & 0x0F  # 高4位（个位）
+            return low_nibble * 10 + high_nibble
+        
+        year_hex = value_hex[0:2]
+        month_hex = value_hex[2:4]
+        day_hex = value_hex[4:6]
+        hour_hex = value_hex[6:8]
+        minute_hex = value_hex[8:10]
+        second_hex = value_hex[10:12]
+        timezone_hex = value_hex[12:14]
+        
+        # BCD 解码（半字节交换）
+        year = parse_bcd_swapped(year_hex)
+        month = parse_bcd_swapped(month_hex)
+        day = parse_bcd_swapped(day_hex)
+        hour = parse_bcd_swapped(hour_hex)
+        minute = parse_bcd_swapped(minute_hex)
+        second = parse_bcd_swapped(second_hex)
+        
+        # Time zone 处理（也采用半字节交换，但包含符号位）
+        timezone_val = int(timezone_hex, 16)
+        if timezone_val == 0xFF:
+            timezone_str = "Unknown"
+        else:
+            # Time zone 编码：低4位的最高位（bit 3）是符号位，其余是十位；高4位是个位
+            # 例如：29 (hex) = 0010 1001 (binary)
+            # 低4位：1001 -> bit 3 = 1（负号），低3位 = 001（十位 = 1）
+            # 高4位：0010 -> 个位 = 2
+            # 值：-12 个 15 分钟 = -180 分钟 = -3 小时
+            low_nibble = timezone_val & 0x0F
+            high_nibble = (timezone_val >> 4) & 0x0F
+            
+            # 符号位：bit 3 of low_nibble
+            sign_bit = (low_nibble >> 3) & 0x01
+            sign = "-" if sign_bit == 1 else "+"
+            
+            # 十位：低4位的低3位
+            tens = low_nibble & 0x07
+            # 个位：高4位
+            ones = high_nibble
+            
+            # 计算时区值（以15分钟为单位）
+            tz_quarters = tens * 10 + ones
+            tz_minutes = tz_quarters * 15
+            tz_hours = tz_minutes // 60
+            tz_mins = tz_minutes % 60
+            
+            timezone_str = f"{sign}{tz_hours:02d}:{tz_mins:02d}"
+        
+        return f"{2000+year}年{month:02d}月{day:02d}日 {hour:02d}:{minute:02d}:{second:02d} (Timezone: {timezone_str})"
+    except Exception as e:
+        return f"Parse error: {e}, Raw: {value_hex}"
+
+def parse_address_pdp_pdn_pdu_type_text(value_hex: str) -> str:
+    """解析 Address / PDP/PDN/PDU Type (0B/8B tag)"""
+    if not value_hex or len(value_hex) < 2:
+        return f"Invalid data: {value_hex}"
+    
+    # Address / PDP/PDN/PDU Type 数据对象结构：
+    # Byte 1: Tag (0B/8B) - 已经在调用时去掉了
+    # Byte 2: Length = '01' - 已经在调用时去掉了
+    # Byte 3: Type value (1 byte)
+    
+    type_byte = value_hex[:2]
+    type_code = int(type_byte, 16)
+    
+    # Address / PDP/PDN/PDU Type coding
+    type_map = {
+        0x00: 'IPv4',
+        0x01: 'IPv6',
+        0x03: 'IPv4v6',
+        0x05: 'Non-IP'
+    }
+    
+    type_description = type_map.get(type_code, f'RFU (0x{type_code:02X})')
+    
+    return f"{type_description} (0x{type_byte})"
+
+def parse_pdp_pdn_pdu_type_text(value_hex: str) -> str:
+    """解析 PDP/PDN/PDU type (0C/8C tag, 8.142)"""
+    if not value_hex or len(value_hex) < 2:
+        return f"Invalid data: {value_hex}"
+    
+    # PDP/PDN/PDU type 数据对象结构：
+    # Byte 1: Tag (0C/8C) - 已经在调用时去掉了
+    # Byte 2: Length = '01' - 已经在调用时去掉了
+    # Byte 3: PDP/PDN type or PDU Session type (1 byte)
+    
+    type_byte = value_hex[:2]
+    type_code = int(type_byte, 16)
+    
+    # PDP/PDN type coding
+    pdp_pdn_map = {
+        0x00: 'IPv4',
+        0x01: 'IPv6',
+        0x03: 'IPv4v6',
+        0x04: 'PPP',
+        0x05: 'non IP'
+    }
+    
+    # PDU Session type coding
+    pdu_map = {
+        0x00: 'IPv4',
+        0x01: 'IPv6',
+        0x03: 'IPv4v6',
+        0x04: 'Unstructured',
+        0x05: 'Ethernet'
+    }
+    
+    # 注意：根据 Access Technology 的值来区分是 PDP/PDN 还是 PDU
+    # 这里先显示两种可能的解释
+    pdp_pdn_desc = pdp_pdn_map.get(type_code, 'RFU')
+    pdu_desc = pdu_map.get(type_code, 'RFU')
+    
+    if pdp_pdn_desc == pdu_desc:
+        return f"{pdp_pdn_desc} (0x{type_byte})"
+    else:
+        return f"PDP/PDN: {pdp_pdn_desc} or PDU: {pdu_desc} (0x{type_byte})"
+
 def parse_alpha_identifier_text(value_hex: str) -> str:
     """解析Alpha Identifier (05/85 tag)"""
     try:
@@ -457,19 +841,76 @@ def parse_sms_tpdu_text(value_hex: str) -> str:
     return f"SMS TPDU: {tpdu_name}, Data: {value_hex[2:]}"
 
 def parse_network_access_name_text(value_hex: str) -> str:
-    """解析Network Access Name (47/C7 tag)"""
+    """解析Network Access Name (47/C7 tag) - 按照 TS 23.003 Label 格式"""
     if len(value_hex) < 2:
         return value_hex
     
     try:
-        # 跳过第一个字节，解码剩余部分
-        if len(value_hex) >= 4:
-            decoded = bytes.fromhex(value_hex[2:]).decode('ascii', errors='replace')
-            return decoded
-        else:
-            return value_hex
-    except Exception:
-        return value_hex
+        # 按照 TS 23.003 编码：Label 格式
+        # 每个 label 的第一个字节是长度，后面是 ASCII 字符
+        # 例如：08 69 6E 74... -> "internet"
+        # 显示时需要将长度字节转换为点号分隔
+        
+        idx = 0
+        labels = []
+        n = len(value_hex)
+        
+        # 检查第一个字节是否是有效的长度（0-63，通常 Label 长度不会超过 63）
+        first_byte = int(value_hex[0:2], 16) if len(value_hex) >= 2 else 0
+        
+        # 如果第一个字节看起来不像长度（> 63 或已经是 ASCII 字符），可能是点号分隔格式
+        # 尝试按点号分隔格式解析
+        if first_byte > 63 or (first_byte >= 0x20 and first_byte <= 0x7E):
+            # 可能是点号分隔格式，直接解码
+            try:
+                decoded = bytes.fromhex(value_hex).decode('ascii', errors='replace')
+                # 如果包含点号，直接返回
+                if '.' in decoded:
+                    return decoded
+                # 否则尝试按 Label 格式解析
+            except:
+                pass
+        
+        # 按 Label 格式解析
+        while idx < n:
+            if idx + 2 > n:
+                break
+            
+            # 读取 label 长度
+            label_len = int(value_hex[idx:idx+2], 16)
+            idx += 2
+            
+            if label_len == 0:
+                break  # 空 label 表示结束
+            
+            # 检查长度是否合理（Label 长度通常不超过 63）
+            if label_len > 63:
+                # 长度不合理，可能是数据格式错误，尝试按点号分隔格式解析
+                try:
+                    decoded = bytes.fromhex(value_hex).decode('ascii', errors='replace')
+                    return decoded
+                except:
+                    return value_hex
+            
+            if idx + label_len * 2 > n:
+                # 数据不完整
+                labels.append(value_hex[idx:])
+                break
+            
+            # 读取 label 内容（ASCII）
+            label_bytes = bytes.fromhex(value_hex[idx:idx+label_len*2])
+            try:
+                label_str = label_bytes.decode('ascii', errors='replace')
+                labels.append(label_str)
+            except:
+                labels.append(label_bytes.hex())
+            
+            idx += label_len * 2
+        
+        # 用点号连接所有 labels
+        return '.'.join(labels) if labels else value_hex
+    except Exception as e:
+        return f"Parse error: {e}, Raw: {value_hex}"
 
 def parse_terminal_profile_text(value_hex: str) -> str:
     """解析TERMINAL PROFILE (80/10 tag)"""
@@ -606,8 +1047,16 @@ def parse_comp_tlvs_to_nodes(hexstr: str) -> tuple[ParseNode, str]:
         elif is_tag("38","B8"):
             root.children.append(ParseNode(name="Channel status (38)", value=parse_channel_status_text(val)))
         elif is_tag("0B","8B"):
-            sms_info = parse_sms_tpdu_text(val)
-            root.children.append(ParseNode(name="SMS TPDU (0B)", value=sms_info))
+            # '0B'/'8B' 可能用于 Address / PDP/PDN/PDU Type 或 SMS TPDU
+            # 优先尝试解析为 Address / PDP/PDN/PDU Type（更常见）
+            if len(val) == 2:
+                # 1字节长度，可能是 Address / PDP/PDN/PDU Type
+                address_type_info = parse_address_pdp_pdn_pdu_type_text(val)
+                root.children.append(ParseNode(name="Address / PDP/PDN/PDU Type (0B)", value=address_type_info))
+            else:
+                # 其他长度，可能是 SMS TPDU
+                sms_info = parse_sms_tpdu_text(val)
+                root.children.append(ParseNode(name="SMS TPDU (0B)", value=sms_info))
         elif is_tag("39","B9"):
             root.children.append(ParseNode(name="Buffer size (39)", value=str(int(val or "0",16))))
         elif is_tag("47","C7"):
@@ -638,6 +1087,10 @@ def parse_comp_tlvs_to_nodes(hexstr: str) -> tuple[ParseNode, str]:
         elif is_tag("19","99"):
             event_list_node = parse_event_list_to_nodes(val)
             root.children.append(event_list_node)
+        elif is_tag("2E","AE"):
+            # (E/5G)SM cause (2E/AE tag)
+            esm_cause_info = parse_esm_cause_text(val)
+            root.children.append(ParseNode(name="(E/5G)SM cause (2E)", value=esm_cause_info))
         elif is_tag("2F","AF"):
             root.children.append(ParseNode(name="AID (2F)", value=val))
         elif is_tag("3E","BE"):
@@ -654,13 +1107,15 @@ def parse_comp_tlvs_to_nodes(hexstr: str) -> tuple[ParseNode, str]:
         elif is_tag("A4","24"):
             root.children.append(ParseNode(name="Timer identifier (A4)", value=parse_timer_identifier_text(val)))
         elif is_tag("A5","25"):
-            root.children.append(ParseNode(name="Timer (A5)", value=f"{val[0:2]}:{val[2:4]}:{val[4:6]}" if len(val)>=6 else val))
+            timer_value_info = parse_timer_value_text(val)
+            root.children.append(ParseNode(name="Timer value (A5)", value=timer_value_info))
         elif is_tag("21","A1"):
             root.children.append(ParseNode(name="Card ATR (21)", value=val))
         elif is_tag("E0","60"):
             root.children.append(ParseNode(name="MAC (E0)", value=val))
         elif is_tag("A6","26"):
-            root.children.append(ParseNode(name="Date/Time/TZ (A6)", value=val))
+            date_time_info = parse_date_time_timezone_text(val)
+            root.children.append(ParseNode(name="Date/Time/TZ (A6)", value=date_time_info))
         elif is_tag("6C","EC"):
             root.children.append(ParseNode(name="MMS Transfer Status (6C)", value=val))
         elif is_tag("7E","FE"):
@@ -679,7 +1134,13 @@ def parse_comp_tlvs_to_nodes(hexstr: str) -> tuple[ParseNode, str]:
         elif is_tag("0A","8A"):
             root.children.append(ParseNode(name="USSD string (0A)", value=val))
         elif is_tag("0C","8C"):
-            root.children.append(ParseNode(name="PDP/PDN/PDU type / Cell Broadcast page / PDU session establishment parameters (0C)", value=val))
+            # 根据上下文判断是 PDP/PDN/PDU type 还是其他用途
+            # 如果是1字节长度，可能是 PDP/PDN/PDU type
+            if len(val) == 2:
+                pdp_pdn_pdu_info = parse_pdp_pdn_pdu_type_text(val)
+                root.children.append(ParseNode(name="PDP/PDN/PDU type (0C)", value=pdp_pdn_pdu_info))
+            else:
+                root.children.append(ParseNode(name="PDP/PDN/PDU type / Cell Broadcast page / PDU session establishment parameters (0C)", value=val))
         elif is_tag("0D","8D"):
             root.children.append(ParseNode(name="Text string (0D)", value=val))
         elif is_tag("0E","8E"):
@@ -705,9 +1166,16 @@ def parse_comp_tlvs_to_nodes(hexstr: str) -> tuple[ParseNode, str]:
             location_status_info = parse_location_status_text(val)
             root.children.append(ParseNode(name="Location status (1B)", value=location_status_info))
         elif is_tag("1C","9C"):
-            root.children.append(ParseNode(name="Transaction identifier (1C)", value=val))
+            transaction_info = parse_transaction_identifier_text(val)
+            root.children.append(ParseNode(name="Transaction identifier (1C)", value=transaction_info))
         elif is_tag("1D","9D"):
-            root.children.append(ParseNode(name="BCCH channel list (1D)", value=val))
+            # '1D'/'9D' 可能用于 Data connection status 或 BCCH channel list
+            # 如果长度是1字节，可能是 Data connection status
+            if len(val) == 2:
+                data_conn_status_info = parse_data_connection_status_text(val)
+                root.children.append(ParseNode(name="Data connection status (1D)", value=data_conn_status_info))
+            else:
+                root.children.append(ParseNode(name="BCCH channel list (1D)", value=val))
         elif is_tag("1E","9E"):
             root.children.append(ParseNode(name="Icon identifier (1E)", value=val))
         elif is_tag("1F","9F"):
@@ -723,7 +1191,13 @@ def parse_comp_tlvs_to_nodes(hexstr: str) -> tuple[ParseNode, str]:
         elif is_tag("29","A9"):
             root.children.append(ParseNode(name="AT Response (29)", value=val))
         elif is_tag("2A","AA"):
-            root.children.append(ParseNode(name="BC Repeat Indicator / Data connection type (2A)", value=val))
+            # '2A'/'AA' 可能用于 Data connection type 或 BC Repeat Indicator
+            # 如果长度是1字节，可能是 Data connection type
+            if len(val) == 2:
+                data_conn_type_info = parse_data_connection_type_text(val)
+                root.children.append(ParseNode(name="Data connection type (2A)", value=data_conn_type_info))
+            else:
+                root.children.append(ParseNode(name="BC Repeat Indicator (2A)", value=val))
         elif is_tag("2B","AB"):
             root.children.append(ParseNode(name="Immediate response (2B)", value=val))
         elif is_tag("2C","AC"):
@@ -731,7 +1205,13 @@ def parse_comp_tlvs_to_nodes(hexstr: str) -> tuple[ParseNode, str]:
         elif is_tag("2D","AD"):
             root.children.append(ParseNode(name="Language (2D)", value=val))
         elif is_tag("2E","AE"):
-            root.children.append(ParseNode(name="Timing Advance / E/5G (2E)", value=val))
+            # '2E'/'AE' 可能用于 (E/5G)SM cause 或 Timing Advance
+            # 如果长度是1字节，可能是 (E/5G)SM cause
+            if len(val) == 2:
+                esm_cause_info = parse_esm_cause_text(val)
+                root.children.append(ParseNode(name="(E/5G)SM cause (2E)", value=esm_cause_info))
+            else:
+                root.children.append(ParseNode(name="Timing Advance (2E)", value=val))
         elif is_tag("30","B0"):
             root.children.append(ParseNode(name="Browser Identity (30)", value=val))
         elif is_tag("32","B2"):
@@ -835,3 +1315,37 @@ def group_similar_tags(nodes: list) -> list:
             result.append(parent_node)
     
     return result
+
+# ========== 注册所有已实现的 TLV 解析器 ==========
+# 在文件末尾注册，确保所有解析函数都已定义
+
+# 注册已实现的 TLV 解析器
+register_tlv_parser(('02', '82'), device_identities_text, "Device identities")
+register_tlv_parser(('06', '86'), parse_address_text, "Address")
+register_tlv_parser(('13', '93'), parse_location_info_text, "Location Information")
+register_tlv_parser(('1B', '9B'), parse_location_status_text, "Location status")
+register_tlv_parser(('3F', 'BF'), parse_access_tech_text, "Access Technology")
+register_tlv_parser(('05', '85'), parse_alpha_identifier_text, "Alpha identifier")
+register_tlv_parser(('0A', '8A'), lambda v: v, "USSD string")  # TODO: 实现 USSD 解析
+register_tlv_parser(('09', '89'), lambda v: v, "SS string")  # TODO: 实现 SS string 解析
+register_tlv_parser(('04', '84'), parse_duration_text, "Duration")
+register_tlv_parser(('38', 'B8'), parse_channel_status_text, "Channel status")
+register_tlv_parser(('0B', '8B'), parse_address_pdp_pdn_pdu_type_text, "Address / PDP/PDN/PDU Type")
+# 注意：'0B'/'8B' 可能也用于 SMS TPDU，需要根据上下文判断
+register_tlv_parser(('47', 'C7'), parse_network_access_name_text, "Network Access Name")
+register_tlv_parser(('B5', '35'), parse_bearer_description_text, "Bearer description")
+register_tlv_parser(('14', '94'), parse_imei_text, "IMEI")
+register_tlv_parser(('62', 'E2'), parse_imei_text, "IMEISV")
+register_tlv_parser(('3E', 'BE'), parse_data_destination_address_text, "Data destination address")
+register_tlv_parser(('A4', '24'), parse_timer_identifier_text, "Timer identifier")
+register_tlv_parser(('A5', '25'), parse_timer_value_text, "Timer value")
+register_tlv_parser(('0F', '8F'), parse_item_ecat_client_identity_text, "Item")
+register_tlv_parser(('12', '92'), parse_file_list_text, "File List")
+# Data Connection Status Change 相关
+register_tlv_parser(('1D', '9D'), parse_data_connection_status_text, "Data connection status")
+register_tlv_parser(('2A', 'AA'), parse_data_connection_type_text, "Data connection type")
+register_tlv_parser(('2E', 'AE'), parse_esm_cause_text, "(E/5G)SM cause")
+register_tlv_parser(('1C', '9C'), parse_transaction_identifier_text, "Transaction identifier")
+register_tlv_parser(('26', 'A6'), parse_date_time_timezone_text, "Date-Time and Time zone")
+register_tlv_parser(('0C', '8C'), parse_pdp_pdn_pdu_type_text, "PDP/PDN/PDU type")
+# 注意：Event List (19/99) 使用特殊的 parse_event_list_to_nodes 函数，不在这里注册
