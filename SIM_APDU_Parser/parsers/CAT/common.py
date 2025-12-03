@@ -290,8 +290,29 @@ def parse_channel_status_text(value_hex: str) -> str:
     return f"Channel {ch}, {est}" + (f", {further}" if further else "")
 
 def parse_access_tech_text(value_hex: str) -> str:
-    m={"00":"GSM","03":"UTRAN","08":"E-UTRAN","0A":"NG-RAN"}
-    return ", ".join(m.get(value_hex[i:i+2],"UNK") for i in range(0,len(value_hex),2))
+    """解析 Access Technology (3F/BF tag)"""
+    access_tech_map = {
+        "00": "GSM",
+        "01": "TIA/EIA-553",
+        "02": "TIA/EIA-136-270",
+        "03": "UTRAN",
+        "04": "TETRA",
+        "05": "TIA/EIA-95-B",
+        "06": "cdma2000 1x (TIA-2000.2)",
+        "07": "cdma2000 HRPD (TIA-856)",
+        "08": "E-UTRAN",
+        "09": "eHRPD",
+        "0A": "3GPP NG-RAN",
+        "0B": "3GPP Satellite NG-RAN"
+    }
+    
+    technologies = []
+    for i in range(0, len(value_hex), 2):
+        tech_code = value_hex[i:i+2]
+        tech_name = access_tech_map.get(tech_code, f"Reserved (0x{tech_code})")
+        technologies.append(tech_name)
+    
+    return ", ".join(technologies)
 
 def parse_timer_identifier_text(v:str)->str:
     m={'01':'Timer 1','02':'Timer 2','03':'Timer 3','04':'Timer 4','05':'Timer 5','06':'Timer 6','07':'Timer 7','08':'Timer 8'}
@@ -371,6 +392,36 @@ def parse_location_info_text(value_hex: str) -> str:
         return f"Invalid location info length: {len(value_hex)//2} bytes"
     
     return f"MCCMNC: {mccmnc}, TAC: {tac}, CELL ID: {cell_id}"
+
+def parse_location_status_text(value_hex: str) -> str:
+    """解析 Location status (1B/9B tag)"""
+    if not value_hex or len(value_hex) < 2:
+        return f"Invalid data: {value_hex}"
+    
+    # Location status 数据对象结构：
+    # Byte 1: Tag (1B/9B) - 已经在调用时去掉了
+    # Byte 2: Length (1 byte) - 已经在调用时去掉了
+    # Byte 3: Location status value (1 byte)
+    
+    # value_hex 已经是去掉了 tag 和 length 的值部分
+    # 所以第一个字节就是 status value
+    status_byte = value_hex[:2]
+    status_code = int(status_byte, 16)
+    
+    # 根据编码显示状态
+    status_map = {
+        0x00: 'Normal service',
+        0x01: 'Limited service',
+        0x02: 'No service'
+    }
+    
+    status_description = status_map.get(status_code, f'Unknown status (0x{status_code:02X})')
+    
+    result = f"{status_description} (0x{status_byte})"
+    if len(value_hex) > 2:
+        result += f", Additional data: {value_hex[2:]}"
+    
+    return result
 
 def parse_alpha_identifier_text(value_hex: str) -> str:
     """解析Alpha Identifier (05/85 tag)"""
@@ -651,7 +702,8 @@ def parse_comp_tlvs_to_nodes(hexstr: str) -> tuple[ParseNode, str]:
         elif is_tag("1A","9A"):
             root.children.append(ParseNode(name="Cause (1A)", value=val))
         elif is_tag("1B","9B"):
-            root.children.append(ParseNode(name="Location status (1B)", value=val))
+            location_status_info = parse_location_status_text(val)
+            root.children.append(ParseNode(name="Location status (1B)", value=location_status_info))
         elif is_tag("1C","9C"):
             root.children.append(ParseNode(name="Transaction identifier (1C)", value=val))
         elif is_tag("1D","9D"):
