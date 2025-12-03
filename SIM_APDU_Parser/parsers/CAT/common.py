@@ -399,17 +399,125 @@ def parse_address_text(value_hex: str) -> str:
             dn += raw[i+1:i+2] + raw[i:i+1]
     return f"TON={ton}, NPI={npi}, Dial={dn}"
 
-def parse_channel_status_text(value_hex: str) -> str:
-    if len(value_hex) < 2: return value_hex
-    b3 = int(value_hex[:2],16)
-    ch = b3 & 0x07
-    est = "BIP channel established" if (b3>>7)&1 else "BIP channel not established"
-    further = ""
-    if len(value_hex) >= 4:
-        b4 = value_hex[2:4]
-        if b4 == "00": further = "No further info"
-        elif b4 == "05": further = "Link dropped"
-    return f"Channel {ch}, {est}" + (f", {further}" if further else "")
+class ChannelMode:
+    """Channel mode enumeration for Channel Status parsing"""
+    GENERAL = "GENERAL"             # CS, Packet, IMS, Local, Default
+    UICC_SERVER = "UICC_SERVER"     # TCP Server mode
+    TERMINAL_SERVER = "TERM_SERVER" # TCP Client / Direct mode
+
+def parse_channel_status_text(value_hex: str, mode: str = ChannelMode.GENERAL) -> str:
+    """
+    解析 Channel status (38/B8 tag, 8.56)
+    
+    Reference: ETSI TS 102 223 V18.2.0 Clause 8.56 / 3GPP TS 31.111 V18.11.0 Clause 8.56
+    
+    Args:
+        value_hex: Channel status 的值部分（已去掉 tag 和 length），2字节的十六进制字符串
+        mode: Channel mode，可选值：ChannelMode.GENERAL, ChannelMode.UICC_SERVER, ChannelMode.TERMINAL_SERVER
+    
+    Returns:
+        解析后的字符串描述
+    """
+    if not value_hex or len(value_hex) < 4:
+        return f"Invalid data: {value_hex}"
+    
+    # value_hex 应该是 2 字节 = 4 个十六进制字符
+    if len(value_hex) < 4:
+        return f"Invalid length: expected 4 hex chars, got {len(value_hex)}"
+    
+    try:
+        # 转换为字节
+        data = bytes.fromhex(value_hex)
+        if len(data) != 2:
+            return f"Invalid length: expected 2 bytes, got {len(data)}"
+        
+        byte1 = data[0]
+        byte2 = data[1]
+        
+        # --- Byte 1: Channel ID and Status ---
+        channel_id = byte1 & 0x07  # Bits 1-3
+        
+        if channel_id == 0:
+            channel_desc = "No channel available"
+        else:
+            channel_desc = f"Channel {channel_id}"
+        
+        status_parts = [channel_desc]
+        
+        # 根据模式解析状态
+        status_desc = "Unknown"
+        
+        if mode == ChannelMode.GENERAL:
+            # GENERAL mode (CS, Packet, IMS, Local, Default)
+            # Bit 8 indicates link status
+            is_established = (byte1 & 0x80) != 0
+            status_desc = "Link Established" if is_established else "Link Not Established"
+            
+        elif mode == ChannelMode.UICC_SERVER:
+            # UICC Server Mode: Bits 7-8 indicate TCP state
+            tcp_state = (byte1 >> 6) & 0x03
+            if tcp_state == 0:
+                status_desc = "TCP Closed"
+            elif tcp_state == 1:
+                status_desc = "TCP Listen"
+            elif tcp_state == 2:
+                status_desc = "TCP Established"
+            else:
+                status_desc = "Reserved"
+                
+        elif mode == ChannelMode.TERMINAL_SERVER:
+            # Terminal Server Mode: Bits 7-8 indicate TCP/Direct state
+            tcp_state = (byte1 >> 6) & 0x03
+            if tcp_state == 0:
+                status_desc = "Closed"
+            elif tcp_state == 2:
+                status_desc = "Established"
+            else:
+                status_desc = "Reserved"
+        
+        status_parts.append(status_desc)
+        
+        # --- Byte 2: Further Info ---
+        info_map = {
+            0x00: "No further info",
+            0x01: "Not used",
+            0x02: "Not used",
+            0x03: "Not used",
+            0x04: "Not used",
+            0x05: "Link dropped (network failure or user cancellation)"
+        }
+        further_info = info_map.get(byte2, f"Reserved (0x{byte2:02X})")
+        status_parts.append(further_info)
+        
+        return ", ".join(status_parts)
+    except Exception as e:
+        return f"Parse error: {e}, Raw: {value_hex}"
+
+def parse_channel_data_length_text(value_hex: str) -> str:
+    """解析 Channel data length (37/B7 tag, 8.54)"""
+    if not value_hex or len(value_hex) < 2:
+        return f"Invalid data: {value_hex}"
+    
+    # Channel data length 数据对象结构：
+    # Byte 1: Tag (37/B7) - 已经在调用时去掉了
+    # Byte 2: Length = '01' - 已经在调用时去掉了
+    # Byte 3: Channel data length (1 byte)
+    
+    # value_hex 已经是去掉了 tag 和 length 的值部分
+    # 应该是 1 字节 = 2 个十六进制字符
+    if len(value_hex) < 2:
+        return f"Invalid length: expected 2 hex chars, got {len(value_hex)}"
+    
+    try:
+        length_hex = value_hex[:2]
+        length_value = int(length_hex, 16)
+        
+        if length_value == 0xFF:
+            return "more than 255 bytes are available"
+        else:
+            return f"{length_value} bytes"
+    except Exception as e:
+        return f"Parse error: {e}, Raw: {value_hex}"
 
 def parse_access_tech_text(value_hex: str) -> str:
     """解析 Access Technology (3F/BF tag)"""
@@ -478,7 +586,11 @@ def parse_imei_text(v:str)->str:
     return out
 
 def parse_bearer_description_text(value_hex: str) -> str:
-    """解析Bearer Description (35/B5 tag)"""
+    """
+    解析Bearer Description (35/B5 tag, 8.52)
+    
+    Reference: TS 31.111 8.52
+    """
     bearer_type_map = {
         '01': 'CSD',
         '02': 'GPRS / UTRAN packet service / E-UTRAN / Satellite E-UTRAN / NG-RAN / Satellite NG-RAN',
@@ -492,37 +604,177 @@ def parse_bearer_description_text(value_hex: str) -> str:
         '0A': '(I-)WLAN',
         '0B': 'E-UTRAN / Satellite E-UTRAN / NG-RAN / Satellite NG-RAN / mapped UTRAN packet service',
         '0C': 'NG-RAN / Satellite NG-RAN',
+        '0D': 'Reserved for 3GPP',
+        '0E': 'Reserved for 3GPP',
     }
     
     if len(value_hex) < 2:
-        return "Invalid bearer description"
+        return "Invalid bearer description: too short"
     
     bearer_type = value_hex[:2]
-    bearer_parameters = value_hex[2:]
+    bearer_parameters_hex = value_hex[2:]
     bearer_type_description = bearer_type_map.get(bearer_type, 'Unknown Bearer Type')
     
-    return f"Bearer type: {bearer_type_description}, Bearer parameters: {bearer_parameters}"
+    # 解析 Bearer parameters 根据类型
+    params_desc = _parse_bearer_parameters(bearer_type, bearer_parameters_hex)
+    
+    if params_desc:
+        return f"Bearer type: {bearer_type_description}, Parameters: {params_desc}"
+    elif bearer_parameters_hex:
+        # 有参数但未解析，显示原始值
+        return f"Bearer type: {bearer_type_description}, Parameters: {bearer_parameters_hex}"
+    else:
+        # 没有参数，不显示 Parameters 部分
+        return f"Bearer type: {bearer_type_description}"
+
+def _parse_bearer_parameters(bearer_type: str, params_hex: str) -> str:
+    """
+    解析 Bearer parameters 根据 Bearer type (8.52.1-8.52.6)
+    
+    Args:
+        bearer_type: Bearer type 代码 (如 '01', '02', '09' 等)
+        params_hex: Bearer parameters 的十六进制字符串
+    
+    Returns:
+        解析后的参数字符串描述
+    """
+    if not params_hex:
+        return ""
+    
+    try:
+        if bearer_type == '01':  # CSD (8.52.1, X=3)
+            if len(params_hex) < 6:
+                return f"Incomplete CSD parameters: {params_hex}"
+            # Byte 4: Data rate (speed)
+            data_rate = params_hex[0:2]
+            # Byte 5: Bearer service (name)
+            bearer_service = params_hex[2:4]
+            # Byte 6: Connection element (ce)
+            connection_element = params_hex[4:6]
+            return f"Data rate: 0x{data_rate}, Bearer service: 0x{bearer_service}, Connection element: 0x{connection_element}"
+        
+        elif bearer_type == '02':  # GPRS/UTRAN (8.52.2, X=6)
+            if len(params_hex) < 12:
+                return f"Incomplete GPRS/UTRAN parameters: {params_hex}"
+            # Byte 4-9: QoS parameters
+            precedence = params_hex[0:2]
+            delay = params_hex[2:4]
+            reliability = params_hex[4:6]
+            peak = params_hex[6:8]
+            mean = params_hex[8:10]
+            pdp_type = params_hex[10:12]
+            pdp_type_desc = "IP" if pdp_type == '02' else ("Non-IP" if pdp_type == '07' else f"Reserved (0x{pdp_type})")
+            return f"Precedence: 0x{precedence}, Delay: 0x{delay}, Reliability: 0x{reliability}, Peak: 0x{peak}, Mean: 0x{mean}, PDP type: {pdp_type_desc}"
+        
+        elif bearer_type == '09':  # UTRAN with extended parameters (8.52.3, X=17)
+            if len(params_hex) < 34:
+                return f"Incomplete UTRAN extended parameters: {params_hex}"
+            # Byte 4-20: Extended QoS parameters
+            traffic_class = params_hex[0:2]
+            max_bitrate_ul = params_hex[2:6]
+            max_bitrate_dl = params_hex[6:10]
+            guaranteed_bitrate_ul = params_hex[10:14]
+            guaranteed_bitrate_dl = params_hex[14:18]
+            delivery_order = params_hex[18:20]
+            max_sdu_size = params_hex[20:22]
+            sdu_error_ratio = params_hex[22:24]
+            residual_bit_error_ratio = params_hex[24:26]
+            delivery_erroneous_sdus = params_hex[26:28]
+            transfer_delay = params_hex[28:30]
+            traffic_handling_priority = params_hex[30:32]
+            pdp_type = params_hex[32:34]
+            return (f"Traffic class: 0x{traffic_class}, Max bitrate UL: 0x{max_bitrate_ul}, "
+                   f"Max bitrate DL: 0x{max_bitrate_dl}, Guaranteed bitrate UL: 0x{guaranteed_bitrate_ul}, "
+                   f"Guaranteed bitrate DL: 0x{guaranteed_bitrate_dl}, Delivery order: 0x{delivery_order}, "
+                   f"Max SDU size: 0x{max_sdu_size}, SDU error ratio: 0x{sdu_error_ratio}, "
+                   f"Residual bit error ratio: 0x{residual_bit_error_ratio}, Delivery erroneous SDUs: 0x{delivery_erroneous_sdus}, "
+                   f"Transfer delay: 0x{transfer_delay}, Traffic handling priority: 0x{traffic_handling_priority}, "
+                   f"PDP type: 0x{pdp_type}")
+        
+        elif bearer_type == '0A':  # (I-)WLAN (8.52.4, X=0)
+            return "RFU (no parameters)"
+        
+        elif bearer_type == '0B':  # E-UTRAN/NG-RAN mapped (8.52.5, X=2/6/10/14)
+            if len(params_hex) < 4:
+                return f"Incomplete E-UTRAN parameters: {params_hex}"
+            # Byte 4: QCI (always present)
+            qci = params_hex[0:2]
+            # Byte 5 to X+2: Additional QoS parameters (if GBR)
+            # Byte X+3: PDP type
+            if len(params_hex) >= 4:
+                pdp_type = params_hex[-2:] if len(params_hex) >= 4 else "N/A"
+                additional_params = params_hex[2:-2] if len(params_hex) > 4 else ""
+                if additional_params:
+                    return f"QCI: 0x{qci}, Additional QoS: {additional_params}, PDP type: 0x{pdp_type}"
+                else:
+                    return f"QCI: 0x{qci}, PDP type: 0x{pdp_type}"
+            return f"QCI: 0x{qci}"
+        
+        elif bearer_type == '0C':  # NG-RAN/Satellite NG-RAN (8.52.6, X=1+)
+            if len(params_hex) < 2:
+                return f"Incomplete NG-RAN parameters: {params_hex}"
+            # Byte 4: PDU session type
+            pdu_session_type = params_hex[0:2]
+            # Further bytes: RFU
+            rfu = params_hex[2:] if len(params_hex) > 2 else ""
+            if rfu:
+                return f"PDU session type: 0x{pdu_session_type}, RFU: {rfu}"
+            return f"PDU session type: 0x{pdu_session_type}"
+        
+        elif bearer_type == '03':  # Default bearer for requested transport layer
+            # Bearer type '03' 可能没有参数，或者参数格式未在规范中详细说明
+            if params_hex:
+                return params_hex  # 如果有参数，返回原始值
+            else:
+                return ""  # 没有参数，返回空字符串
+        
+        else:
+            # 其他类型，返回原始参数
+            return params_hex if params_hex else ""
+    
+    except Exception as e:
+        return f"Parse error: {e}, Raw: {params_hex}"
 
 def parse_data_destination_address_text(value_hex: str) -> str:
-    """解析Data Destination Address (3E/BE tag)"""
+    """
+    解析Data Destination Address / Other Address (3E/BE tag, 8.58)
+    
+    Reference: TS 31.111 8.58
+    """
+    # Null address: Length = '00', no Value part
+    if not value_hex or value_hex == "":
+        return "Null address (terminal shall request dynamic address)"
+    
     if len(value_hex) < 2:
-        return "Unknown IP type"
+        return f"Invalid address: too short ({value_hex})"
     
-    ip_type_byte = value_hex[0:2]
-    ip_address = []
+    address_type = value_hex[0:2]
+    address_data = value_hex[2:]
     
-    if ip_type_byte == "21":  # IPv4
-        for i in range(2, len(value_hex), 2):
-            byte = int(value_hex[i:i+2], 16)
-            ip_address.append(str(byte))
-        return f"IPV4: {'.'.join(ip_address)}"
-    elif ip_type_byte == "57":  # IPv6
-        for i in range(2, len(value_hex), 4):
-            byte_pair = value_hex[i:i+4]
-            ip_address.append(byte_pair)
-        return f"IPV6: {':'.join(ip_address)}"
+    if address_type == "21":  # IPv4 (8.58)
+        # IPv4 address: 4 bytes (octet 4-7)
+        if len(address_data) < 8:
+            return f"Incomplete IPv4 address: {address_data}"
+        ip_bytes = []
+        for i in range(0, 8, 2):
+            byte_val = int(address_data[i:i+2], 16)
+            ip_bytes.append(str(byte_val))
+        return f"IPv4: {'.'.join(ip_bytes)}"
+    
+    elif address_type == "57":  # IPv6 (8.58)
+        # IPv6 address: 16 bytes (octet 4-19) = 32 hex chars
+        if len(address_data) < 32:
+            return f"Incomplete IPv6 address: {address_data}"
+        ipv6_groups = []
+        for i in range(0, 32, 4):
+            group_hex = address_data[i:i+4]
+            # Convert to integer and format as hex (remove leading zeros)
+            group_int = int(group_hex, 16)
+            ipv6_groups.append(f"{group_int:x}")
+        return f"IPv6: {':'.join(ipv6_groups)}"
+    
     else:
-        return "Unknown IP type"
+        return f"Reserved address type: 0x{address_type}, Address data: {address_data}"
 
 def parse_location_info_text(value_hex: str) -> str:
     """解析Location Info (13/93 tag)"""
@@ -807,6 +1059,201 @@ def parse_pdp_pdn_pdu_type_text(value_hex: str) -> str:
     else:
         return f"PDP/PDN: {pdp_pdn_desc} or PDU: {pdu_desc} (0x{type_byte})"
 
+def parse_media_type_text(value_hex: str) -> str:
+    """解析 Media Type (8.132)"""
+    if not value_hex or len(value_hex) < 2:
+        return f"Invalid data: {value_hex}"
+    
+    # Media Type 数据对象结构：
+    # Byte 1: Tag - 已经在调用时去掉了
+    # Byte 2: Length = '01' - 已经在调用时去掉了
+    # Byte 3: Media type value (1 byte) - bitmap
+    
+    # value_hex 已经是去掉了 tag 和 length 的值部分
+    # 应该是 1 字节 = 2 个十六进制字符
+    if len(value_hex) < 2:
+        return f"Invalid length: expected 2 hex chars, got {len(value_hex)}"
+    
+    try:
+        media_type_byte = value_hex[:2]
+        media_type_value = int(media_type_byte, 16)
+        
+        # 解析 bitmap
+        # b1: Bit = 1 if the type of media is voice
+        # b2: Bit = 1 if the type of media is video
+        # b3-b8: RFU (Reserved for Future Use)
+        
+        media_types = []
+        
+        # b1 (bit 0, 最低位)
+        if media_type_value & 0x01:
+            media_types.append("Voice")
+        
+        # b2 (bit 1)
+        if media_type_value & 0x02:
+            media_types.append("Video")
+        
+        # 检查 RFU bits (b3-b8, bits 2-7) 是否都为0
+        rfu_bits = (media_type_value >> 2) & 0x3F
+        if rfu_bits != 0:
+            media_types.append(f"RFU bits set: 0x{rfu_bits:02X}")
+        
+        if not media_types:
+            return f"No media type set (0x{media_type_byte})"
+        
+        return ", ".join(media_types) + f" (0x{media_type_byte})"
+    except Exception as e:
+        return f"Parse error: {e}, Raw: {value_hex}"
+
+def parse_ims_call_disconnection_cause_text(value_hex: str) -> str:
+    """解析 IMS call disconnection cause (55/D5 tag, 8.133)"""
+    if not value_hex or len(value_hex) < 6:
+        return f"Invalid data: {value_hex}"
+    
+    # IMS call disconnection cause 数据对象结构：
+    # Byte 1: Tag (55/D5) - 已经在调用时去掉了
+    # Byte 2: Length = '03' - 已经在调用时去掉了
+    # Byte 3: Protocol (1 byte)
+    # Byte 4-5: Cause (2 bytes)
+    
+    # value_hex 已经是去掉了 tag 和 length 的值部分
+    # 应该是 3 字节 = 6 个十六进制字符
+    if len(value_hex) < 6:
+        return f"Invalid length: expected 6 hex chars, got {len(value_hex)}"
+    
+    try:
+        protocol_hex = value_hex[0:2]
+        cause_hex = value_hex[2:6]
+        
+        protocol_value = int(protocol_hex, 16)
+        cause_value = int(cause_hex, 16)
+        
+        # Protocol 编码
+        protocol_map = {
+            0x01: 'SIP',
+            0x02: 'Q.850'
+        }
+        
+        protocol_desc = protocol_map.get(protocol_value, f'RFU (0x{protocol_hex})')
+        
+        return f"Protocol: {protocol_desc}, Cause: {cause_value} (0x{cause_hex})"
+    except Exception as e:
+        return f"Parse error: {e}, Raw: {value_hex}"
+
+def parse_cause_text(value_hex: str) -> str:
+    """解析 Cause (1A/9A tag, 8.26) - 仅显示 hex 值"""
+    # Cause 数据对象结构：
+    # Byte 1: Tag (1A/9A) - 已经在调用时去掉了
+    # Byte 2: Length (X) - 已经在调用时去掉了
+    # Byte 3 to X+2: Cause value
+    
+    # 直接显示 hex 值，不解析
+    return value_hex if value_hex else ""
+
+def parse_buffer_size_text(value_hex: str) -> str:
+    """
+    解析 Buffer size (39/B9 tag, 8.55)
+    
+    Reference: TS 31.111 8.55
+    """
+    if not value_hex:
+        return "Invalid buffer size"
+    try:
+        # Buffer size 是一个整数（字节数）
+        buffer_size = int(value_hex, 16)
+        return f"{buffer_size} bytes"
+    except Exception as e:
+        return f"Parse error: {e}, Raw: {value_hex}"
+
+def parse_icon_identifier_text(value_hex: str) -> str:
+    """
+    解析 Icon identifier (1E/9E tag, 8.31)
+    
+    Reference: TS 31.111 8.31
+    """
+    if not value_hex:
+        return "Invalid icon identifier"
+    try:
+        # Icon identifier 通常是 1-2 字节的标识符
+        icon_id = int(value_hex, 16)
+        return f"Icon ID: {icon_id} (0x{value_hex})"
+    except Exception as e:
+        return f"Parse error: {e}, Raw: {value_hex}"
+
+def parse_iwlan_identifier_text(value_hex: str) -> str:
+    """
+    解析 I-WLAN Identifier (4A/CA tag, 8.83)
+    
+    Reference: TS 31.111 8.83
+    TODO: 实现详细解析逻辑
+    """
+    if not value_hex:
+        return "Invalid I-WLAN identifier"
+    return f"I-WLAN Identifier: {value_hex}"
+
+def parse_text_attribute_text(value_hex: str) -> str:
+    """
+    解析 Text Attribute (50/D0 tag, 8.70/8.72)
+    
+    Reference: TS 31.111 8.70, 8.72
+    TODO: 实现详细解析逻辑
+    """
+    if not value_hex:
+        return "Invalid text attribute"
+    return f"Text Attribute: {value_hex}"
+
+def parse_frame_identifier_text(value_hex: str) -> str:
+    """
+    解析 Frame Identifier (68/E8 tag, 8.80/8.82)
+    
+    Reference: TS 31.111 8.80, 8.82
+    TODO: 实现详细解析逻辑
+    """
+    if not value_hex:
+        return "Invalid frame identifier"
+    try:
+        frame_id = int(value_hex, 16)
+        return f"Frame ID: {frame_id} (0x{value_hex})"
+    except Exception as e:
+        return f"Parse error: {e}, Raw: {value_hex}"
+
+def parse_iari_text(value_hex: str) -> str:
+    """
+    解析 IARI (76/F6 tag, 8.110)
+    
+    Reference: TS 31.111 8.110
+    TODO: 实现详细解析逻辑
+    """
+    if not value_hex:
+        return "Invalid IARI"
+    return f"IARI: {value_hex}"
+
+def parse_transport_level_text(value_hex: str) -> str:
+    """
+    解析 UICC/terminal interface transport level (3C/BC tag, 8.59)
+    
+    Reference: TS 31.111 8.59
+    """
+    if not value_hex or len(value_hex) < 2:
+        return "Invalid transport level"
+    try:
+        transport_type = value_hex[:2]
+        port_hex = value_hex[2:] if len(value_hex) > 2 else "00"
+        port = int(port_hex, 16)
+        
+        transport_map = {
+            "01": "UDP client remote",
+            "02": "TCP client remote",
+            "03": "TCP server",
+            "04": "UDP client local",
+            "05": "TCP client local",
+            "06": "direct"
+        }
+        transport_desc = transport_map.get(transport_type, f"Unknown (0x{transport_type})")
+        return f"{transport_desc}, port={port}"
+    except Exception as e:
+        return f"Parse error: {e}, Raw: {value_hex}"
+
 def parse_alpha_identifier_text(value_hex: str) -> str:
     """解析Alpha Identifier (05/85 tag)"""
     try:
@@ -1058,14 +1505,14 @@ def parse_comp_tlvs_to_nodes(hexstr: str) -> tuple[ParseNode, str]:
                 sms_info = parse_sms_tpdu_text(val)
                 root.children.append(ParseNode(name="SMS TPDU (0B)", value=sms_info))
         elif is_tag("39","B9"):
-            root.children.append(ParseNode(name="Buffer size (39)", value=str(int(val or "0",16))))
+            buffer_info = parse_buffer_size_text(val)
+            root.children.append(ParseNode(name="Buffer size (39)", value=buffer_info))
         elif is_tag("47","C7"):
             network_info = parse_network_access_name_text(val)
             root.children.append(ParseNode(name="Network Access Name (47)", value=network_info))
         elif is_tag("3C","BC"):
-            t = val[:2]; port = int(val[2:] or "0",16)
-            pm = {"01":"UDP client remote","02":"TCP client remote","03":"TCP server","04":"UDP client local","05":"TCP client local","06":"direct"}
-            root.children.append(ParseNode(name="Transport Protocol (3C)", value=f"{pm.get(t,'?')}, port={port}"))
+            transport_info = parse_transport_level_text(val)
+            root.children.append(ParseNode(name="UICC/terminal interface transport level (3C)", value=transport_info))
         elif is_tag("FD","7D"):
             if len(val)>=6:
                 mccmnc_raw = val[:6]
@@ -1099,7 +1546,8 @@ def parse_comp_tlvs_to_nodes(hexstr: str) -> tuple[ParseNode, str]:
         elif is_tag("36","B6"):
             root.children.append(ParseNode(name="Channel data (36)", value=val))
         elif is_tag("37","B7"):
-            root.children.append(ParseNode(name="Channel data length (37)", value=val))
+            channel_data_length_info = parse_channel_data_length_text(val)
+            root.children.append(ParseNode(name="Channel data length (37)", value=channel_data_length_info))
         elif is_tag("3F","BF"):
             root.children.append(ParseNode(name="Access Technology (3F)", value=parse_access_tech_text(val)))
         elif is_tag("A2","22"):
@@ -1119,7 +1567,13 @@ def parse_comp_tlvs_to_nodes(hexstr: str) -> tuple[ParseNode, str]:
         elif is_tag("6C","EC"):
             root.children.append(ParseNode(name="MMS Transfer Status (6C)", value=val))
         elif is_tag("7E","FE"):
-            root.children.append(ParseNode(name="CSG ID list (7E)", value=val))
+            # '7E'/'FE' 可能用于 Media Type (8.132) 或 CSG ID list
+            # Media Type 长度固定为 1 字节，CSG ID list 长度更长
+            if len(val) == 2:  # 1 字节 = Media Type
+                media_type_info = parse_media_type_text(val)
+                root.children.append(ParseNode(name="Media Type (7E)", value=media_type_info))
+            else:  # 其他长度 = CSG ID list
+                root.children.append(ParseNode(name="CSG ID list (7E)", value=val))
         elif is_tag("56","D6"):
             root.children.append(ParseNode(name="CSG ID (56)", value=val))
         elif is_tag("57","D7"):
@@ -1161,7 +1615,8 @@ def parse_comp_tlvs_to_nodes(hexstr: str) -> tuple[ParseNode, str]:
         elif is_tag("17","97"):
             root.children.append(ParseNode(name="Default Text / Items Next Action Indicator (17)", value=val))
         elif is_tag("1A","9A"):
-            root.children.append(ParseNode(name="Cause (1A)", value=val))
+            cause_info = parse_cause_text(val)
+            root.children.append(ParseNode(name="Cause (1A)", value=cause_info))
         elif is_tag("1B","9B"):
             location_status_info = parse_location_status_text(val)
             root.children.append(ParseNode(name="Location status (1B)", value=location_status_info))
@@ -1177,7 +1632,20 @@ def parse_comp_tlvs_to_nodes(hexstr: str) -> tuple[ParseNode, str]:
             else:
                 root.children.append(ParseNode(name="BCCH channel list (1D)", value=val))
         elif is_tag("1E","9E"):
-            root.children.append(ParseNode(name="Icon identifier (1E)", value=val))
+            icon_info = parse_icon_identifier_text(val)
+            root.children.append(ParseNode(name="Icon identifier (1E)", value=icon_info))
+        elif is_tag("4A","CA"):
+            iwlan_info = parse_iwlan_identifier_text(val)
+            root.children.append(ParseNode(name="I-WLAN Identifier (4A)", value=iwlan_info))
+        elif is_tag("50","D0"):
+            text_attr_info = parse_text_attribute_text(val)
+            root.children.append(ParseNode(name="Text Attribute (50)", value=text_attr_info))
+        elif is_tag("68","E8"):
+            frame_info = parse_frame_identifier_text(val)
+            root.children.append(ParseNode(name="Frame Identifier (68)", value=frame_info))
+        elif is_tag("76","F6"):
+            iari_info = parse_iari_text(val)
+            root.children.append(ParseNode(name="IARI (76)", value=iari_info))
         elif is_tag("1F","9F"):
             root.children.append(ParseNode(name="Item Icon identifier list (1F)", value=val))
         elif is_tag("20","A0"):
@@ -1229,8 +1697,22 @@ def parse_comp_tlvs_to_nodes(hexstr: str) -> tuple[ParseNode, str]:
         elif is_tag("40","C0"):
             dns_info = parse_data_destination_address_text(val)
             root.children.append(ParseNode(name="Display parameters / DNS server address (40)", value=dns_info))
+        elif is_tag("55","D5"):
+            ims_cause_info = parse_ims_call_disconnection_cause_text(val)
+            root.children.append(ParseNode(name="IMS call disconnection cause (55)", value=ims_cause_info))
         else:
-            root.children.append(ParseNode(name=f"TLV {tag}", value=f"len={ln}", hint=val[:120]))
+            # 对于未硬编码的 tag，尝试使用注册的 TLV 解析器
+            parser_func, display_name = get_tlv_parser(tag)
+            if parser_func:
+                try:
+                    parsed_value = parser_func(val)
+                    name = f"{display_name} ({tag})" if display_name else f"TLV {tag}"
+                    root.children.append(ParseNode(name=name, value=parsed_value))
+                except Exception as e:
+                    root.children.append(ParseNode(name=f"TLV {tag} (Parse Error)", value=f"Error: {e}, Raw: {val[:60]}"))
+            else:
+                # 没有注册的解析器，显示原始数据
+                root.children.append(ParseNode(name=f"TLV {tag}", value=f"len={ln}", hint=val[:120]))
     
     # 对子节点进行分组处理
     root.children = group_similar_tags(root.children)
@@ -1330,6 +1812,7 @@ register_tlv_parser(('0A', '8A'), lambda v: v, "USSD string")  # TODO: 实现 US
 register_tlv_parser(('09', '89'), lambda v: v, "SS string")  # TODO: 实现 SS string 解析
 register_tlv_parser(('04', '84'), parse_duration_text, "Duration")
 register_tlv_parser(('38', 'B8'), parse_channel_status_text, "Channel status")
+register_tlv_parser(('37', 'B7'), parse_channel_data_length_text, "Channel data length")
 register_tlv_parser(('0B', '8B'), parse_address_pdp_pdn_pdu_type_text, "Address / PDP/PDN/PDU Type")
 # 注意：'0B'/'8B' 可能也用于 SMS TPDU，需要根据上下文判断
 register_tlv_parser(('47', 'C7'), parse_network_access_name_text, "Network Access Name")
@@ -1348,4 +1831,15 @@ register_tlv_parser(('2E', 'AE'), parse_esm_cause_text, "(E/5G)SM cause")
 register_tlv_parser(('1C', '9C'), parse_transaction_identifier_text, "Transaction identifier")
 register_tlv_parser(('26', 'A6'), parse_date_time_timezone_text, "Date-Time and Time zone")
 register_tlv_parser(('0C', '8C'), parse_pdp_pdn_pdu_type_text, "PDP/PDN/PDU type")
+register_tlv_parser(('7E', 'FE'), parse_media_type_text, "Media Type")
+register_tlv_parser(('1A', '9A'), parse_cause_text, "Cause")
+register_tlv_parser(('55', 'D5'), parse_ims_call_disconnection_cause_text, "IMS call disconnection cause")
+# OPEN CHANNEL 相关
+register_tlv_parser(('39', 'B9'), parse_buffer_size_text, "Buffer size")
+register_tlv_parser(('1E', '9E'), parse_icon_identifier_text, "Icon identifier")
+register_tlv_parser(('4A', 'CA'), parse_iwlan_identifier_text, "I-WLAN Identifier")
+register_tlv_parser(('3C', 'BC'), parse_transport_level_text, "UICC/terminal interface transport level")
+register_tlv_parser(('50', 'D0'), parse_text_attribute_text, "Text Attribute")
+register_tlv_parser(('68', 'E8'), parse_frame_identifier_text, "Frame Identifier")
+register_tlv_parser(('76', 'F6'), parse_iari_text, "IARI")
 # 注意：Event List (19/99) 使用特殊的 parse_event_list_to_nodes 函数，不在这里注册

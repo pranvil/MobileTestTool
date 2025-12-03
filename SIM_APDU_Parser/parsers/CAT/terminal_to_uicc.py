@@ -12,7 +12,7 @@ from SIM_APDU_Parser.parsers.CAT.common import (
     parse_esm_cause_text, parse_transaction_identifier_text,
     parse_date_time_timezone_text, parse_pdp_pdn_pdu_type_text,
     parse_address_pdp_pdn_pdu_type_text, parse_timer_identifier_text,
-    parse_timer_value_text
+    parse_timer_value_text, parse_media_type_text
 )
 from SIM_APDU_Parser.parsers.CAT.terminal_profile_parser import TerminalProfileParser
 from SIM_APDU_Parser.parsers.CAT.terminal_capability_parser import TerminalCapabilityParser
@@ -703,12 +703,52 @@ class TerminalToUiccParser:
         root.children.append(ParseNode(name="Event Data", value=payload_hex))
 
     def _parse_event_call_connected(self, root: ParseNode, payload_hex: str, tlv_data: dict = None):
-        """解析 Event: Call connected (01) - 占位符"""
-        root.children.append(ParseNode(name="Event Data", value=payload_hex))
+        """解析 Event: Call connected (01)"""
+        if tlv_data is None:
+            tlv_data = {}
+        
+        # 根据 TS 31.111 7.5.2A.2，Call connected 事件包含：
+        # 必需字段：Event list (19/99), Device identities (02/82), Transaction identifier (1C/9C)
+        # 可选字段：Media Type (7E/FE, 8.132)
+        
+        # 使用通用函数解析必需字段和可选字段
+        parse_tlvs_from_dict(
+            root=root,
+            tlv_data=tlv_data,
+            required_tags=[
+                ('02', '82'),  # Device identities
+                ('1C', '9C')  # Transaction identifier
+            ],
+            optional_tags=[
+                ('7E', 'FE')  # Media Type (8.132)
+            ],
+            exclude_tags={'19', '99'}  # Event List
+        )
 
     def _parse_event_call_disconnected(self, root: ParseNode, payload_hex: str, tlv_data: dict = None):
-        """解析 Event: Call disconnected (02) - 占位符"""
-        root.children.append(ParseNode(name="Event Data", value=payload_hex))
+        """解析 Event: Call disconnected (02)"""
+        if tlv_data is None:
+            tlv_data = {}
+        
+        # 根据 TS 31.111 7.5.3A.2，Call disconnected 事件包含：
+        # 必需字段：Event list (19/99), Device identities (02/82), Transaction identifier (1C/9C)
+        # 可选字段：Cause (1A/9A, 8.26), Media Type (7E/FE, 8.132), IMS call disconnection cause (55/D5, 8.133)
+        
+        # 使用通用函数解析必需字段和可选字段
+        parse_tlvs_from_dict(
+            root=root,
+            tlv_data=tlv_data,
+            required_tags=[
+                ('02', '82'),  # Device identities
+                ('1C', '9C')  # Transaction identifier
+            ],
+            optional_tags=[
+                ('1A', '9A'),  # Cause (8.26)
+                ('7E', 'FE'),  # Media Type (8.132)
+                ('55', 'D5')   # IMS call disconnection cause (8.133)
+            ],
+            exclude_tags={'19', '99'}  # Event List
+        )
     
     def _parse_event_location_status(self, root: ParseNode, payload_hex: str, tlv_data: dict = None):
         """解析 Event: Location status (03)"""
@@ -747,12 +787,49 @@ class TerminalToUiccParser:
         root.children.append(ParseNode(name="Event Data", value=payload_hex))
 
     def _parse_event_data_available(self, root: ParseNode, payload_hex: str, tlv_data: dict = None):
-        """解析 Event: Data available (09) - 占位符"""
-        root.children.append(ParseNode(name="Event Data", value=payload_hex))
+        """解析 Event: Data available (09)"""
+        if tlv_data is None:
+            tlv_data = {}
+        
+        # 根据 TS 31.111 7.5.10.2，Data available 事件包含：
+        # 必需字段：Event list (19/99), Device identities (02/82), Channel status (38/B8), Channel data length (37/B7)
+        
+        # 使用通用函数解析必需字段
+        parse_tlvs_from_dict(
+            root=root,
+            tlv_data=tlv_data,
+            required_tags=[
+                ('02', '82'),  # Device identities
+                ('38', 'B8'),  # Channel status (8.56)
+                ('37', 'B7')  # Channel data length (8.54)
+            ],
+            optional_tags=[],
+            exclude_tags={'19', '99'}  # Event List
+        )
 
     def _parse_event_channel_status(self, root: ParseNode, payload_hex: str, tlv_data: dict = None):
-        """解析 Event: Channel status (0A) - 占位符"""
-        root.children.append(ParseNode(name="Event Data", value=payload_hex))
+        """解析 Event: Channel status (0A)"""
+        if tlv_data is None:
+            tlv_data = {}
+        
+        # 根据 TS 31.111 7.5.11.2，Channel status 事件包含：
+        # 必需字段：Event list (19/99), Device identities (02/82), Channel status (38/B8)
+        # 可选字段：Bearer Description (35/B5), Other address (local address) (3E/BE)
+        
+        # 使用通用函数解析必需字段和可选字段
+        parse_tlvs_from_dict(
+            root=root,
+            tlv_data=tlv_data,
+            required_tags=[
+                ('02', '82'),  # Device identities
+                ('38', 'B8'),  # Channel status (8.56)
+            ],
+            optional_tags=[
+                ('35', 'B5'),  # Bearer Description (8.52) - 条件可选
+                ('3E', 'BE'),  # Other address (local address) (8.58) - 条件可选
+            ],
+            exclude_tags={'19', '99'}  # Event List
+        )
 
     def _parse_event_access_technology_change_single(self, root: ParseNode, payload_hex: str, tlv_data: dict = None):
         """解析 Event: Access Technology Change (single access technology) (0B)"""

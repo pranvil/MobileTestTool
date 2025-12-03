@@ -20,7 +20,7 @@ class UiccToTerminalParser:
             payload_hex: 去掉CLA/INS/P1/P2/LC后的数据部分，或者91开头的完整数据
         """
         if cla == 0xD0:
-            # Proactive UICC Command (D0)
+            # Proactive Command (D0)
             return self._parse_proactive_command(payload_hex)
         elif cla == 0x91 and len(payload_hex) == 4:
             # Proactive Command Pending (91) - 2字节数据
@@ -32,9 +32,9 @@ class UiccToTerminalParser:
             return ParseNode(name=f"Unknown UICC->Terminal Command (0x{cla_str} {ins_str})", value=payload_hex)
     
     def _parse_proactive_command(self, payload_hex: str) -> ParseNode:
-        """解析 Proactive UICC Command (D0)"""
+        """解析 Proactive Command (D0)"""
         comp_root, first = parse_comp_tlvs_to_nodes(payload_hex)
-        title = "CAT: Proactive UICC Command (D0)" + (f" - {first}" if first else "")
+        title = "CAT: Proactive Command (D0)" + (f" - {first}" if first else "")
         root = ParseNode(name=title)
         root.children.extend(comp_root.children)
         return root

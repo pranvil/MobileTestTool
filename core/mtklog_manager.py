@@ -29,7 +29,7 @@ try:
     APKUTILS_AVAILABLE = True
 except ImportError:
     APKUTILS_AVAILABLE = False
-    print("警告: apkutils库未安装，无法检查APK包名。请使用 'pip install apkutils' 安装。")
+    # 不再在模块导入时打印警告，而是在实际需要使用该功能时再提示用户
 
 # 检测是否在PyInstaller打包环境中运行
 def is_pyinstaller():

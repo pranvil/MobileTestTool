@@ -309,6 +309,8 @@ class ApduParserDialog(QDialog):
         self.apdu_tree = QTreeWidget()
         self.apdu_tree.setHeaderLabels(["序号", "方向", "标题"])
         self.apdu_tree.itemClicked.connect(self.on_apdu_selected)
+        # 添加 currentItemChanged 信号以支持键盘导航
+        self.apdu_tree.currentItemChanged.connect(self.on_apdu_selected)
         # 设置APDU树的大小策略，让它占据所有可用空间
         self.apdu_tree.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         # 启用上下文菜单
@@ -546,8 +548,11 @@ class ApduParserDialog(QDialog):
         }
         return color_map.get(direction, "#7f7f7f")
     
-    def on_apdu_selected(self, item: QTreeWidgetItem):
-        """APDU项被选中"""
+    def on_apdu_selected(self, item: QTreeWidgetItem, previous: QTreeWidgetItem = None):
+        """处理APDU项选择（支持鼠标点击和键盘导航）"""
+        if not item:
+            return
+        
         result = item.data(0, Qt.UserRole)
         if not result:
             return
