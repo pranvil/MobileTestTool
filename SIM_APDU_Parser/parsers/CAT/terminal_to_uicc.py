@@ -45,7 +45,7 @@ ENVELOPE_TYPE_MAP = {
 class TerminalToUiccParser:
     """手机发给UICC的CAT命令解析器"""
     
-    def parse_command(self, cla: int, ins: int, payload_hex: str) -> ParseNode:
+    def parse_command(self, cla: int, ins: int, payload_hex: str, le: int = None) -> ParseNode:
         """
         解析手机发给UICC的CAT命令
         
@@ -53,6 +53,7 @@ class TerminalToUiccParser:
             cla: CLA字节
             ins: INS字节  
             payload_hex: 去掉CLA/INS/P1/P2/LC后的数据部分
+            le: Le字段（期望返回的数据长度），可选
         """
         if cla == 0x80 and ins == 0x10:
             # TERMINAL PROFILE (8010)
@@ -65,7 +66,7 @@ class TerminalToUiccParser:
             return self._parse_envelope(payload_hex)
         elif cla == 0x80 and ins == 0x12:
             # FETCH (8012)
-            return self._parse_fetch(payload_hex)
+            return self._parse_fetch(payload_hex, le)
         elif cla == 0x80 and ins == 0xAA:
             # TERMINAL CAPABILITY (80AA)
             return self._parse_terminal_capability(payload_hex)
@@ -1183,11 +1184,36 @@ class TerminalToUiccParser:
         """解析 Reserved (E1-E4) - 占位符"""
         root.children.append(ParseNode(name="Data", value=payload_hex))
     
-    def _parse_fetch(self, payload_hex: str) -> ParseNode:
-        """解析 FETCH (8012) - 直接显示数据部分"""
+    def _parse_fetch(self, payload_hex: str, le: int = None) -> ParseNode:
+        """
+        解析 FETCH (8012)
+        
+        Args:
+            payload_hex: 数据部分（FETCH 通常没有数据，只有 Le）
+            le: Le字段（期望返回的数据长度）
+        """
         title = "CAT: FETCH"
         root = ParseNode(name=title)
-        root.children.append(ParseNode(name="Data", value=payload_hex))
+        
+        # 如果有 Le 字段，显示数据长度
+        if le is not None:
+            root.children.append(ParseNode(name="Data length", value=str(le)))
+        elif payload_hex:
+            # 如果没有 Le 但 payload_hex 不为空，可能是 Le 在 payload_hex 中
+            # FETCH 命令格式：8012 P1 P2 Le
+            # 如果 payload_hex 是 1 字节，可能是 Le
+            if len(payload_hex) == 2:
+                try:
+                    le_value = int(payload_hex, 16)
+                    root.children.append(ParseNode(name="Data length", value=str(le_value)))
+                except ValueError:
+                    root.children.append(ParseNode(name="Data length", value=payload_hex))
+            else:
+                root.children.append(ParseNode(name="Data length", value=payload_hex))
+        else:
+            # 既没有 Le 也没有 payload_hex，显示未知
+            root.children.append(ParseNode(name="Data length", value="Unknown"))
+        
         return root
     
     def _parse_terminal_capability(self, payload_hex: str) -> ParseNode:

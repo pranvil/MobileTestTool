@@ -22,9 +22,16 @@ class CatParser(IParser):
             direction = "TERMINAL=>UICC"
             # 手机发给UICC的命令
             payload = msg.raw[10:] if len(msg.raw) > 10 else ""  # Skip APDU header
+            # 对于 FETCH 命令，Le 字段在 APDU header 之后（位置 8-9，即第5个字节）
+            le = None
+            if hdr.ins == 0x12 and len(msg.raw) >= 10:  # FETCH (8012)
+                try:
+                    le = int(msg.raw[8:10], 16)
+                except (ValueError, IndexError):
+                    pass
             from SIM_APDU_Parser.parsers.CAT.terminal_to_uicc import TerminalToUiccParser
             parser = TerminalToUiccParser()
-            root = parser.parse_command(hdr.cla, hdr.ins, payload)
+            root = parser.parse_command(hdr.cla, hdr.ins, payload, le)
         elif msg.raw.startswith("D0") or (msg.raw.startswith("91") and len(msg.raw) == 4):
             direction = "UICC=>TERMINAL"
             # UICC发给手机的命令

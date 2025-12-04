@@ -1,10 +1,10 @@
 {
-    "version":  "0.9.6.4.2",
-    "download_url":  "https://github.com/pranvil/MobileTestTool/releases/download/v0.9.6.4.2/MobileTestTool_0.9.6.4.2.zip",
-    "sha256":  "25b12e7af923b9c97d8b2a3bbdf2c88bc5abdedfa5f1f4e8aa8e3cac061edfeb",
-    "file_name":  "MobileTestTool_0.9.6.4.2.zip",
-    "file_size":  115501068,
-    "release_notes":  "## Release Note\r\n- 自定义card宽度随按钮宽度动态调整\r\n- card改名字，button会丢失\r\n- 3GPP decode 协议错误修复\r\n## Known issue\r\n- 概率性功能失效，但是重新打开软件会恢复",
-    "published_at":  "2025-12-01T17:56:31Z",
+    "version":  "0.9.6.4.3",
+    "download_url":  "https://github.com/pranvil/MobileTestTool/releases/download/v0.9.6.4.3/MobileTestTool_0.9.6.4.3.zip",
+    "sha256":  "ae7f0e0747e88ded15c01931b70955c3adc1aadd37a80dc8525b01541bc25487",
+    "file_name":  "MobileTestTool_0.9.6.4.3.zip",
+    "file_size":  115507214,
+    "release_notes":  "## Release Note\r\n- 更新APDU解析器，解析更多内容\r\n## Known issue\r\n- 概率性功能失效，但是重新打开软件会恢复",
+    "published_at":  "2025-12-04T01:17:51Z",
     "mandatory":  false
 }
