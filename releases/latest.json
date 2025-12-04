@@ -1,10 +1,10 @@
 {
     "version":  "0.9.6.4.3",
     "download_url":  "https://github.com/pranvil/MobileTestTool/releases/download/v0.9.6.4.3/MobileTestTool_0.9.6.4.3.zip",
-    "sha256":  "ae7f0e0747e88ded15c01931b70955c3adc1aadd37a80dc8525b01541bc25487",
+    "sha256":  "ac01f05745459b4e23764e636247a2a3eac22554e322b452c2a2378c6bc80372",
     "file_name":  "MobileTestTool_0.9.6.4.3.zip",
-    "file_size":  115507214,
+    "file_size":  115507194,
     "release_notes":  "## Release Note\r\n- 更新APDU解析器，解析更多内容\r\n## Known issue\r\n- 概率性功能失效，但是重新打开软件会恢复",
-    "published_at":  "2025-12-04T01:17:51Z",
+    "published_at":  "2025-12-04T06:03:51Z",
     "mandatory":  false
 }
