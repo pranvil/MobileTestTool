@@ -351,6 +351,8 @@ Get-Content $manifestPath
 Write-Host ""
 
 Write-Host "=== step 6: git commit and push ==="
+
+# 需要一起提交到 Git 的文件（按你原来的习惯保留）
 $filesToStage = @(
     "scripts/release.ps1",
     "config/latest.json.example",
@@ -361,55 +363,80 @@ $filesToStage = @(
 foreach ($file in $filesToStage) {
     $fullPath = Join-Path $repoRoot $file
     if (Test-Path $fullPath) {
+        Write-Host "Staging $file"
         Invoke-Git "add" $file
+    }
+    else {
+        Write-Host "Skip missing file: $file"
     }
 }
 
+# 如果有暂存修改，就提交一次版本
 git diff --cached --quiet
 if ($LASTEXITCODE -ne 0) {
-    Invoke-Git "commit" "-m" ("Prepare release v{0}" -f $Version)
-} else {
-    Write-Host "No staged changes. Skip commit."
+    $commitMessage = "chore: release v$Version"
+    Write-Host "Committing release changes: $commitMessage"
+    Invoke-Git "commit" "-m" $commitMessage
+}
+else {
+    Write-Host "No staged changes detected. Skipping commit."
 }
 
+# 推送主分支到 GitHub（origin）
+Write-Host "Pushing 'main' to 'origin' (GitHub)..."
 Invoke-Git "push" "origin" "main"
 
+# 检查是否配置了 gitee 这个 remote，如果有就同步过去
+$remotes = (git remote) -split "`n" | ForEach-Object { $_.Trim() } | Where-Object { $_ }
+if ($remotes -contains "gitee") {
+    Write-Host "Pushing 'main' to 'gitee'..."
+    Invoke-Git "push" "gitee" "main"
+}
+else {
+    Write-Host "No 'gitee' remote configured. Skipping push of 'main' to Gitee."
+}
+
 Write-Host "=== step 7: tags and GitHub release ==="
-$tagExists = $false
-try {
-    git rev-parse --verify ("refs/tags/v{0}" -f $Version) --quiet | Out-Null
-    if ($LASTEXITCODE -eq 0) { $tagExists = $true }
-} catch {
-    $tagExists = $false
+
+# 版本号对应的 tag 名
+$tagName = "v$Version"
+
+# 如果本地已有同名 tag，先删掉再重建，避免冲突
+$existingTag = git tag --list $tagName
+if ($existingTag) {
+    Write-Host "Tag $tagName already exists locally. Deleting and recreating..."
+    Invoke-Git "tag" "-d" $tagName
 }
 
-if ($tagExists) {
-    Write-Host "Tag v$Version exists. Recreating..."
-    Invoke-Git "tag" "-d" ("v{0}" -f $Version)
+Write-Host "Creating tag $tagName..."
+Invoke-Git "tag" "-a" $tagName "-m" ("Release {0}" -f $Version)
+
+# 把 tag 推到 GitHub（origin）
+Write-Host "Pushing tag $tagName to 'origin' (GitHub)..."
+Invoke-Git "push" "origin" $tagName
+
+# 如果有 gitee 远程，把 tag 同步到 Gitee
+if ($remotes -contains "gitee") {
+    Write-Host "Pushing tag $tagName to 'gitee'..."
+    Invoke-Git "push" "gitee" $tagName
 }
-
-Invoke-Git "tag" "-a" ("v{0}" -f $Version) "-m" ("Release v{0}" -f $Version)
-Invoke-Git "push" "origin" ("v{0}" -f $Version)
-
-# Reuse previously read release notes to ensure consistency with latest.json content
-$notesForRelease = $releaseNotes
+else {
+    Write-Host "No 'gitee' remote configured. Skipping push of tag to Gitee."
+}
 
 Write-Host "=== step 7a: GitHub release ==="
-$ghCmd = Get-Command gh -ErrorAction SilentlyContinue
-if ($ghCmd) {
+
+try {
+    # 这里沿用你原来的 GitHub Release 函数和变量
     Invoke-GhReleaseCreate -Version $Version -Package $packagePath -Notes $notesForRelease
-} else {
-    Write-Host "Warning: GitHub CLI (gh) not found in PATH. Skipping GitHub release."
-    Write-Host "To publish to GitHub, install GitHub CLI or add it to PATH."
-    Write-Host "You can install it from: https://cli.github.com/"
+}
+catch {
+    Write-Error "Failed to create GitHub release: $_"
+    throw
 }
 
-if ($GiteeOwner -and $GiteeRepo -and $GiteeToken) {
-    Write-Host "=== step 7b: Gitee release ==="
-    Invoke-GiteeReleaseCreate -Version $Version -Package $packagePath -Notes $notesForRelease -Owner $GiteeOwner -Repo $GiteeRepo -Token $GiteeToken
-} else {
-    Write-Host "=== step 7b: Gitee release skipped (not configured) ==="
-    Write-Host "To enable Gitee release, provide: -GiteeOwner [owner] -GiteeRepo [repo] -GiteeToken [token]"
-}
+Write-Host "=== step 7b: Gitee release ==="
+Write-Host "Gitee release creation is currently skipped."
+Write-Host "Code and tags have been pushed to the 'gitee' remote (if configured)."
 
 Write-Host "=== all done ==="

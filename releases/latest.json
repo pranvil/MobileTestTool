@@ -1,11 +1,11 @@
 {
     "version":  "0.9.6.4.4",
     "download_url":  "https://github.com/pranvil/MobileTestTool/releases/download/v0.9.6.4.4/MobileTestTool_0.9.6.4.4.zip",
-    "sha256":  "c0cc4825259f3e99816110c84743d834f07ab8bbf1aa153941be02aa0d4d4b94",
+    "sha256":  "df46da7444b6a6780c24a6c6af267dd26648d8cd08ba170aa14fabd415fefa9a",
     "file_name":  "MobileTestTool_0.9.6.4.4.zip",
-    "file_size":  93864086,
+    "file_size":  93863064,
     "release_notes":  "## Release Note\r\n- 开放英文界面，但翻译没有完成\r\n- 下载地址更新\r\n## Known issue\r\n- 概率性功能失效，但是重新打开软件会恢复",
-    "published_at":  "2025-12-07T07:26:45Z",
+    "published_at":  "2025-12-07T07:51:52Z",
     "mandatory":  false,
     "download_urls":  [
                           {
