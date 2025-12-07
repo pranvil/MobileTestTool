@@ -436,7 +436,26 @@ catch {
 }
 
 Write-Host "=== step 7b: Gitee release ==="
-Write-Host "Gitee release creation is currently skipped."
-Write-Host "Code and tags have been pushed to the 'gitee' remote (if configured)."
 
+if ($GiteeOwner -and $GiteeRepo -and $GiteeToken) {
+    try {
+        Invoke-GiteeReleaseCreate `
+            -Version $Version `
+            -Package $packagePath `
+            -Notes $notesForRelease `
+            -Owner $GiteeOwner `
+            -Repo $GiteeRepo `
+            -Token $GiteeToken
+
+        Write-Host "Gitee release created successfully."
+    }
+    catch {
+        Write-Error "Failed to create Gitee release: $_"
+    }
+}
+else {
+    Write-Host "Gitee config not set. Skipping Gitee release creation."
+}
+
+Write-Host "Code and tags have been pushed to the 'gitee' remote (if configured)."
 Write-Host "=== all done ==="
