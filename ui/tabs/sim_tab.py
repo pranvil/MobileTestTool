@@ -96,9 +96,9 @@ class SimTab(QWidget):
         v.setSpacing(4)  # 紧凑的标题和卡片之间的间距
         
         # 标题
-        title = QLabel("SIM APDU 解析器")
-        title.setProperty("class", "section-title")
-        v.addWidget(title)
+        self.sim_apdu_title = QLabel(self.lang_manager.tr("SIM APDU 解析器"))
+        self.sim_apdu_title.setProperty("class", "section-title")
+        v.addWidget(self.sim_apdu_title)
         
         # 卡片
         card = QFrame()
@@ -112,7 +112,7 @@ class SimTab(QWidget):
         # 按钮行
         row = QHBoxLayout()
         
-        self.launch_apdu_btn = QPushButton("启动 APDU 解析器")
+        self.launch_apdu_btn = QPushButton(self.lang_manager.tr("启动 APDU 解析器"))
         self.launch_apdu_btn.clicked.connect(self.launch_apdu_parser)
         row.addWidget(self.launch_apdu_btn)
         
@@ -132,9 +132,9 @@ class SimTab(QWidget):
         v.setSpacing(4)  # 紧凑的标题和卡片之间的间距
         
         # 标题
-        title = QLabel("SIM 卡读写工具")
-        title.setProperty("class", "section-title")
-        v.addWidget(title)
+        self.sim_reader_title = QLabel(self.lang_manager.tr("SIM 卡读写工具"))
+        self.sim_reader_title.setProperty("class", "section-title")
+        v.addWidget(self.sim_reader_title)
         
         # 卡片
         card = QFrame()
@@ -148,7 +148,7 @@ class SimTab(QWidget):
         # 按钮行
         row = QHBoxLayout()
         
-        self.launch_reader_btn = QPushButton("启动 SIM 卡读写工具")
+        self.launch_reader_btn = QPushButton(self.lang_manager.tr("启动 SIM 卡读写工具"))
         self.launch_reader_btn.clicked.connect(self.launch_sim_reader)
         row.addWidget(self.launch_reader_btn)
         
@@ -187,3 +187,23 @@ class SimTab(QWidget):
         except Exception as e:
             QMessageBox.critical(self, "错误", f"启动失败：\n{str(e)}")
             self.status_message.emit(f"SIM 卡读写工具启动失败：{str(e)}")
+    
+    def refresh_texts(self, lang_manager=None):
+        """刷新所有文本（用于语言切换）"""
+        if lang_manager:
+            self.lang_manager = lang_manager
+        
+        if not self.lang_manager:
+            return
+        
+        # 刷新标题
+        if hasattr(self, 'sim_apdu_title'):
+            self.sim_apdu_title.setText(self.lang_manager.tr("SIM APDU 解析器"))
+        if hasattr(self, 'sim_reader_title'):
+            self.sim_reader_title.setText(self.lang_manager.tr("SIM 卡读写工具"))
+        
+        # 刷新按钮
+        if hasattr(self, 'launch_apdu_btn'):
+            self.launch_apdu_btn.setText(self.lang_manager.tr("启动 APDU 解析器"))
+        if hasattr(self, 'launch_reader_btn'):
+            self.launch_reader_btn.setText(self.lang_manager.tr("启动 SIM 卡读写工具"))

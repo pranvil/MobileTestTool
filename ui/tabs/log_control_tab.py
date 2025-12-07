@@ -351,6 +351,25 @@ class LogControlTab(QWidget):
         if hasattr(self, 'tcpdump_btn'):
             self.tcpdump_btn.setText(self.lang_manager.tr("TCPDUMP"))
         
+        # 刷新log操作按钮
+        if hasattr(self, 'merge_mtklog_btn'):
+            self.merge_mtklog_btn.setText(self.lang_manager.tr("合并MTKlog"))
+        if hasattr(self, 'extract_pcap_from_mtklog_btn'):
+            self.extract_pcap_from_mtklog_btn.setText(self.lang_manager.tr("MTKlog提取pcap"))
+        if hasattr(self, 'merge_pcap_btn'):
+            self.merge_pcap_btn.setText(self.lang_manager.tr("合并PCAP"))
+        if hasattr(self, 'extract_pcap_from_qualcomm_log_btn'):
+            self.extract_pcap_from_qualcomm_log_btn.setText(self.lang_manager.tr("高通log提取pcap"))
+        if hasattr(self, 'parse_3gpp_btn'):
+            self.parse_3gpp_btn.setText(self.lang_manager.tr("3GPP解码器"))
+        if hasattr(self, 'mtk_sip_decode_btn'):
+            self.mtk_sip_decode_btn.setText(self.lang_manager.tr("MTK SIP DECODE"))
+        
+        # 刷新log操作标签
+        for label in self.findChildren(QLabel):
+            if label.text() in ["log操作:", "Log Operations:"]:
+                label.setText(self.lang_manager.tr("log操作:"))
+        
         # 刷新组标题标签
         self._refresh_section_titles()
     

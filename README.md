@@ -304,6 +304,7 @@ pyinstaller --clean MobileTestTool_pyqt.spec
 #### 版本描述 `latest.json` 示例
 `config/latest.json.example` 提供了一个完整示例，可直接复制后按需修改：
 
+**基础格式（单下载源）**：
 ```json
 {
   "version": "0.9.4",
@@ -316,6 +317,45 @@ pyinstaller --clean MobileTestTool_pyqt.spec
   "mandatory": false
 }
 ```
+
+**多下载源格式（支持按地区和平台自动选择）**：
+```json
+{
+  "version": "0.9.4",
+  "download_url": "https://github.com/pranvil/MobileTestTool/releases/download/v0.9.4/MobileTestTool_0.9.4.zip",
+  "sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+  "file_name": "MobileTestTool_0.9.4.zip",
+  "file_size": 123456789,
+  "release_notes": "- 修复已知问题\n- 优化日志处理性能",
+  "published_at": "2025-10-31T08:00:00Z",
+  "mandatory": false,
+  "download_urls": [
+    {
+      "url": "https://github.com/pranvil/MobileTestTool/releases/download/v0.9.4/MobileTestTool_0.9.4.zip",
+      "region": "us",
+      "platform": "windows",
+      "priority": 10
+    },
+    {
+      "url": "https://gitee.com/pranvil/MobileTestTool/releases/download/v0.9.4/MobileTestTool_0.9.4.zip",
+      "region": "cn",
+      "platform": "windows",
+      "priority": 20
+    }
+  ]
+}
+```
+
+**多下载源功能说明**：
+- 程序会自动检测用户所在地区（基于系统时区）和运行平台（Windows/Mac/Linux）
+- 根据 `region` 和 `platform` 匹配度以及 `priority` 优先级，自动选择最佳下载源
+- **地区匹配规则**：
+  - 中国用户：优先选择 `region="cn"` 的下载源（如 Gitee）
+  - 美国用户：优先选择 `region="us"` 的下载源（如 GitHub）
+  - 其他国家用户：优先选择 `region="default"` 的下载源（如 GitHub）
+- **推荐配置**：务必配置一个 `region="default"` 的通用源，确保所有国家用户都能正常下载
+- 如果配置中没有完全匹配的源，会选择平台匹配度最高的源
+- 如果所有源都不匹配，将使用 `download_url` 作为默认下载地址
 
 #### 发布流程建议
 - 将最新安装包上传至可公开访问的静态存储（如对象存储、Nginx 静态站点、GitHub Releases）。

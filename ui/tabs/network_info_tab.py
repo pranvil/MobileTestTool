@@ -214,7 +214,7 @@ class NetworkInfoTab(QWidget):
         self.network_table.setColumnCount(1)
         self.network_table.setHorizontalHeaderLabels([self.lang_manager.tr("提示")])
         
-        item = QTableWidgetItem(self.lang_manager.tr("点击self.lang_manager.tr('开始')按钮获取网络信息"))
+        item = QTableWidgetItem(self.lang_manager.tr("点击") + self.lang_manager.tr("开始") + self.lang_manager.tr("按钮获取网络信息"))
         item.setTextAlignment(Qt.AlignCenter)
         item.setForeground(Qt.gray)
         self.network_table.setItem(0, 0, item)
@@ -233,7 +233,7 @@ class NetworkInfoTab(QWidget):
                 # 停止时立即改变状态
                 # 检查信号连接状态
                 try:
-                    receivers = QObject.receivers(self.stop_network_info)
+                    receivers = QObject.receivers(self, self.stop_network_info)
                     logger.debug(f"信号对象: stop_network_info")
                     logger.debug(f"信号接收器数量: {receivers}")
                     if receivers == 0:
@@ -255,7 +255,7 @@ class NetworkInfoTab(QWidget):
                 # 开始时只发送信号，等待成功回调再改变状态
                 # 检查信号连接状态
                 try:
-                    receivers = QObject.receivers(self.start_network_info)
+                    receivers = QObject.receivers(self, self.start_network_info)
                     logger.debug(f"信号对象: start_network_info")
                     logger.debug(f"信号接收器数量: {receivers}")
                     if receivers == 0:
@@ -287,7 +287,7 @@ class NetworkInfoTab(QWidget):
                 # 停止时立即改变状态
                 # 检查信号连接状态
                 try:
-                    receivers = QObject.receivers(self.stop_ping)
+                    receivers = QObject.receivers(self, self.stop_ping)
                     logger.debug(f"信号对象: stop_ping")
                     logger.debug(f"信号接收器数量: {receivers}")
                     if receivers == 0:
@@ -313,7 +313,7 @@ class NetworkInfoTab(QWidget):
                 
                 # 检查信号连接状态
                 try:
-                    receivers = QObject.receivers(self.start_ping)
+                    receivers = QObject.receivers(self, self.start_ping)
                     logger.debug(f"信号对象: start_ping")
                     logger.debug(f"信号接收器数量: {receivers}")
                     logger.debug(f"Ping目标: {ping_target}")

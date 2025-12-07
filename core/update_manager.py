@@ -7,14 +7,16 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import platform
 import threading
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
 from dataclasses import dataclass
 from typing import Any, Callable, Optional, Tuple, Union
 
-from core.update_manifest import LatestManifest
+from core.update_manifest import LatestManifest, DownloadSource
 
 ProgressCallback = Callable[[int, Optional[int]], None]
 
@@ -74,6 +76,8 @@ class UpdateManager:
         self.chunk_size = chunk_size
         self.logger = logger
         self._cancel_event = threading.Event()
+        self._detected_region: Optional[str] = None
+        self._detected_platform: Optional[str] = None
 
     # ------------------------------------------------------------------
     # 公共接口
@@ -196,9 +200,11 @@ class UpdateManager:
         filename = self._determine_filename(manifest)
         target_path = os.path.join(target_dir, filename)
 
-        request = urllib.request.Request(manifest.download_url, headers={"User-Agent": self.USER_AGENT})
+        # 智能选择最佳下载URL
+        download_url = self._select_best_download_url(manifest)
+        request = urllib.request.Request(download_url, headers={"User-Agent": self.USER_AGENT})
 
-        self._log(f"开始下载安装包: {manifest.download_url}")
+        self._log(f"开始下载安装包: {download_url}")
 
         try:
             with urllib.request.urlopen(request, timeout=self.timeout) as response:
@@ -331,6 +337,144 @@ class UpdateManager:
                 self.logger(message)
             except Exception:
                 pass
+
+    # ------------------------------------------------------------------
+    # 下载源选择相关方法
+    # ------------------------------------------------------------------
+    def _detect_region(self) -> str:
+        """检测用户所在地区（基于时区）"""
+        
+        if self._detected_region:
+            return self._detected_region
+        
+        try:
+            # 获取系统时区
+            if platform.system() == "Windows":
+                import winreg
+                try:
+                    key = winreg.OpenKey(
+                        winreg.HKEY_LOCAL_MACHINE,
+                        r"SYSTEM\CurrentControlSet\Control\TimeZoneInformation"
+                    )
+                    timezone_name = winreg.QueryValueEx(key, "TimeZoneKeyName")[0]
+                    winreg.CloseKey(key)
+                    
+                    # 判断是否为中国时区
+                    if "China" in timezone_name or "Beijing" in timezone_name or "Shanghai" in timezone_name:
+                        self._detected_region = "cn"
+                        return "cn"
+                except Exception:
+                    pass
+            else:
+                # Linux/Mac: 读取 /etc/timezone 或使用环境变量
+                try:
+                    import subprocess
+                    result = subprocess.run(
+                        ["timedatectl", "show", "--property=Timezone", "--value"],
+                        capture_output=True,
+                        text=True,
+                        timeout=2
+                    )
+                    if result.returncode == 0:
+                        tz = result.stdout.strip()
+                        if "Asia/Shanghai" in tz or "Asia/Beijing" in tz or "Asia/Chongqing" in tz:
+                            self._detected_region = "cn"
+                            return "cn"
+                except Exception:
+                    pass
+            
+            # 尝试通过IP地理位置检测（可选，需要网络请求）
+            # 这里使用简单的时区判断，如果需要更准确可以调用IP地理位置API
+            offset = time.timezone if (time.daylight == 0) else time.altzone
+            # UTC+8 通常是中国的时区
+            if offset == -28800:  # UTC+8
+                self._detected_region = "cn"
+                return "cn"
+            
+        except Exception:
+            pass
+        
+        # 默认返回 "default" 或 "us"
+        self._detected_region = "default"
+        return "default"
+
+    def _detect_platform(self) -> str:
+        """检测当前运行平台"""
+        
+        if self._detected_platform:
+            return self._detected_platform
+        
+        system = platform.system().lower()
+        if system == "windows":
+            self._detected_platform = "windows"
+        elif system == "darwin":
+            self._detected_platform = "mac"
+        elif system == "linux":
+            self._detected_platform = "linux"
+        else:
+            self._detected_platform = "all"
+        
+        return self._detected_platform
+
+    def _select_best_download_url(self, manifest: LatestManifest) -> str:
+        """根据用户地区和平台选择最佳下载URL"""
+        
+        # 如果没有配置多个下载源，使用默认URL
+        if not manifest.download_urls:
+            return manifest.download_url
+        
+        detected_region = self._detect_region()
+        detected_platform = self._detect_platform()
+        
+        self._log(f"检测到地区: {detected_region}, 平台: {detected_platform}")
+        
+        # 评分系统：匹配度越高，分数越高
+        best_source: Optional[DownloadSource] = None
+        best_score = -1
+        
+        for source in manifest.download_urls:
+            score = 0
+            
+            # 地区匹配评分
+            if source.region:
+                region_lower = source.region.lower()
+                if region_lower == detected_region.lower():
+                    score += 100  # 完全匹配（如 detected_region="cn" 匹配 region="cn"）
+                elif region_lower == "default":
+                    # 默认源：适用于所有未明确匹配的地区
+                    # 如果用户地区是 "default"（其他国家），这个源会得到高分
+                    if detected_region == "default":
+                        score += 100  # 其他国家用户匹配 default 源
+                    else:
+                        score += 5   # 特定地区用户也可以使用 default 源，但优先级较低
+            else:
+                # 未指定地区：作为通用源，适用于所有地区
+                score += 5  # 通用源，优先级较低
+            
+            # 平台匹配评分
+            if source.platform:
+                platform_lower = source.platform.lower()
+                if platform_lower == detected_platform.lower():
+                    score += 50  # 平台完全匹配
+                elif platform_lower == "all":
+                    score += 25  # 通用平台
+            else:
+                score += 25  # 未指定平台，作为通用源
+            
+            # 优先级加分
+            score += source.priority
+            
+            if score > best_score:
+                best_score = score
+                best_source = source
+        
+        if best_source:
+            self._log(f"选择下载源: {best_source.url} (评分: {best_score}, 地区: {best_source.region or '通用'}, 平台: {best_source.platform or '通用'})")
+            return best_source.url
+        
+        # 如果所有源都不匹配（理论上不应该发生），使用默认URL
+        self._log(f"未找到匹配的下载源，使用默认URL: {manifest.download_url}")
+        return manifest.download_url
 
 
 __all__ = [

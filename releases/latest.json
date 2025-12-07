@@ -1,10 +1,30 @@
 {
-    "version":  "0.9.6.4.3",
-    "download_url":  "https://github.com/pranvil/MobileTestTool/releases/download/v0.9.6.4.3/MobileTestTool_0.9.6.4.3.zip",
-    "sha256":  "ac01f05745459b4e23764e636247a2a3eac22554e322b452c2a2378c6bc80372",
-    "file_name":  "MobileTestTool_0.9.6.4.3.zip",
-    "file_size":  115507194,
-    "release_notes":  "## Release Note\r\n- 更新APDU解析器，解析更多内容\r\n## Known issue\r\n- 概率性功能失效，但是重新打开软件会恢复",
-    "published_at":  "2025-12-04T06:03:51Z",
-    "mandatory":  false
+    "version":  "0.9.6.4.4",
+    "download_url":  "https://github.com/pranvil/MobileTestTool/releases/download/v0.9.6.4.4/MobileTestTool_0.9.6.4.4.zip",
+    "sha256":  "58809c4ad2d90cb84ecc8ec79d50e839abb58c6e77570419902f04b9d29d683e",
+    "file_name":  "MobileTestTool_0.9.6.4.4.zip",
+    "file_size":  93854783,
+    "release_notes":  "## Release Note\r\n- 开放英文界面，但翻译没有完成\r\n- 下载地址更新\r\n## Known issue\r\n- 概率性功能失效，但是重新打开软件会恢复",
+    "published_at":  "2025-12-07T05:12:06Z",
+    "mandatory":  false,
+    "download_urls":  [
+                          {
+                              "region":  "us",
+                              "url":  "https://github.com/pranvil/MobileTestTool/releases/download/v0.9.6.4.4/MobileTestTool_0.9.6.4.4.zip",
+                              "priority":  10,
+                              "platform":  "windows"
+                          },
+                          {
+                              "region":  "cn",
+                              "url":  "https://gitee.com/pranvil/MobileTestTool/releases/download/v0.9.6.4.4/MobileTestTool_0.9.6.4.4.zip",
+                              "priority":  20,
+                              "platform":  "windows"
+                          },
+                          {
+                              "region":  "default",
+                              "url":  "https://github.com/pranvil/MobileTestTool/releases/download/v0.9.6.4.4/MobileTestTool_0.9.6.4.4.zip",
+                              "priority":  5,
+                              "platform":  "all"
+                          }
+                      ]
 }

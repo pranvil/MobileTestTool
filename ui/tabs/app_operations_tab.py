@@ -273,7 +273,7 @@ class AppOperationsTab(QWidget):
                 signal_obj = getattr(self, signal_name)
                 try:
                     # 使用 QObject.receivers() 静态方法检查信号接收器数量
-                    receivers = QObject.receivers(signal_obj)
+                    receivers = QObject.receivers(self, signal_obj)
                     logger.debug(f"信号对象: {signal_name}")
                     logger.debug(f"信号接收器数量: {receivers}")
                     if receivers == 0:

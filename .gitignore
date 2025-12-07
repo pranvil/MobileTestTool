@@ -120,10 +120,13 @@ Thumbs.db
 *.log
 temp/
 logs/
-c:\log\
+c:\log\*
 *.tmp
 *.temp
 missing_translations.txt
+
+# Gitee configuration (contains sensitive tokens)
+.gitee-config.ps1
 
 # Build artifacts
 build/
@@ -140,3 +143,4 @@ COLLECT-*.toc
 EXE-*.toc
 PKG-*.toc
 PYZ-*.toc
+nul

@@ -184,15 +184,34 @@ class ApduParserDialog(QDialog):
         self.current_file = None
         self.parse_results = []
         
+        # 获取语言管理器
+        if parent and hasattr(parent, 'lang_manager'):
+            self.lang_manager = parent.lang_manager
+        else:
+            from core.language_manager import LanguageManager
+            self.lang_manager = LanguageManager.get_instance()
+        
+        # 连接语言切换信号
+        if self.lang_manager:
+            self.lang_manager.language_changed.connect(self._on_language_changed)
+        
         # 设置窗口标志，允许最小化和最大化
         # 使用 Qt.Dialog 但添加 WindowMinMaxButtonsHint 以支持最大化按钮
         self.setWindowFlags(Qt.Dialog | Qt.WindowMinMaxButtonsHint | Qt.WindowCloseButtonHint)
         
         self.setup_ui()
+    
+    def tr(self, text):
+        """安全地获取翻译文本"""
+        return self.lang_manager.tr(text) if self.lang_manager else text
+    
+    def _on_language_changed(self, new_lang):
+        """语言切换处理"""
+        self.refresh_texts()
         
     def setup_ui(self):
         """设置UI"""
-        self.setWindowTitle("APDU 解析器")
+        self.setWindowTitle(self.tr("APDU 解析器"))
         self.setMinimumSize(800, 600)
         self.setGeometry(100, 100, 1200, 800)
         
@@ -207,29 +226,31 @@ class ApduParserDialog(QDialog):
         toolbar_layout.setContentsMargins(0, 0, 0, 0)  # 移除工具栏边距
         
         # 文件选择
-        self.file_label = QLabel("未选择文件")
+        self.file_label = QLabel(self.tr("未选择文件"))
         self.file_label.setStyleSheet("font-weight: bold; color: #666;")
         toolbar_layout.addWidget(self.file_label)
         
-        self.load_btn = QPushButton("加载文件")
+        self.load_btn = QPushButton(self.tr("加载文件"))
         self.load_btn.clicked.connect(self.load_file)
         toolbar_layout.addWidget(self.load_btn)
         
         # 解析选项
-        toolbar_layout.addWidget(QLabel("解析器:"))
+        parser_label = QLabel(self.tr("解析器:"))
+        toolbar_layout.addWidget(parser_label)
         self.parser_combo = QComboBox()
-        self.parser_combo.addItems(["MTK", "通用", "Qualcomm"])
+        self.parser_combo.addItems(["MTK", self.tr("通用"), "Qualcomm"])
         toolbar_layout.addWidget(self.parser_combo)
         
         # 解析按钮
-        self.parse_btn = QPushButton("开始解析")
+        self.parse_btn = QPushButton(self.tr("开始解析"))
         self.parse_btn.clicked.connect(self.start_parse)
         self.parse_btn.setEnabled(False)
         toolbar_layout.addWidget(self.parse_btn)
         
         # 筛选类别下拉菜单
-        toolbar_layout.addWidget(QLabel("筛选类别:"))
-        self.filter_btn = QPushButton("全部")
+        filter_label = QLabel(self.tr("筛选类别:"))
+        toolbar_layout.addWidget(filter_label)
+        self.filter_btn = QPushButton(self.tr("全部"))
         self.filter_btn.setCheckable(False)
         toolbar_layout.addWidget(self.filter_btn)
         
@@ -242,39 +263,40 @@ class ApduParserDialog(QDialog):
         search_toolbar_layout.setContentsMargins(0, 0, 0, 0)  # 移除工具栏边距
         
         # 搜索框
-        search_toolbar_layout.addWidget(QLabel("搜索:"))
+        search_label = QLabel(self.tr("搜索:"))
+        search_toolbar_layout.addWidget(search_label)
         self.search_edit = QLineEdit()
         self.search_edit.textChanged.connect(self.filter_apdu_list)
         search_toolbar_layout.addWidget(self.search_edit)
         
         # 搜索按钮
-        self.search_btn = QPushButton("Search")
+        self.search_btn = QPushButton(self.tr("Search"))
         self.search_btn.clicked.connect(self.filter_apdu_list)
         search_toolbar_layout.addWidget(self.search_btn)
         
         # 清除筛选按钮
-        self.clear_filter_btn = QPushButton("清除筛选")
+        self.clear_filter_btn = QPushButton(self.tr("清除筛选"))
         self.clear_filter_btn.clicked.connect(self.clear_filters)
         search_toolbar_layout.addWidget(self.clear_filter_btn)
         
         # 搜索右侧详情复选框
-        self.search_details_checkbox = QCheckBox("搜索右侧详情")
+        self.search_details_checkbox = QCheckBox(self.tr("搜索右侧详情"))
         self.search_details_checkbox.stateChanged.connect(self.filter_apdu_list)
         search_toolbar_layout.addWidget(self.search_details_checkbox)
         
         # 使用正则表达式复选框
-        self.use_regex_checkbox = QCheckBox("使用正则表达式")
+        self.use_regex_checkbox = QCheckBox(self.tr("使用正则表达式"))
         self.use_regex_checkbox.stateChanged.connect(self.filter_apdu_list)
         search_toolbar_layout.addWidget(self.use_regex_checkbox)
         
         # 解析单条APDU按钮
-        self.parse_single_btn = QPushButton("解析单条 APDU")
+        self.parse_single_btn = QPushButton(self.tr("解析单条 APDU"))
         self.parse_single_btn.clicked.connect(self.parse_single_apdu)
         self.parse_single_btn.setEnabled(True)  # 默认启用，允许手动输入APDU
         search_toolbar_layout.addWidget(self.parse_single_btn)
         
         # 状态标签
-        self.status_label = QLabel("就绪")
+        self.status_label = QLabel(self.tr("就绪"))
         self.status_label.setStyleSheet("color: #666; font-style: italic;")
         search_toolbar_layout.addWidget(self.status_label)
         
@@ -921,3 +943,51 @@ class ApduParserDialog(QDialog):
             # 递归处理子项
             if item.childCount() > 0:
                 self._collect_parse_items(item, lines, level + 1)
+    
+    def refresh_texts(self):
+        """刷新所有文本（用于语言切换）"""
+        if not self.lang_manager:
+            return
+        
+        # 刷新窗口标题
+        self.setWindowTitle(self.tr("APDU 解析器"))
+        
+        # 刷新工具栏文本
+        if hasattr(self, 'file_label'):
+            if self.current_file:
+                self.file_label.setText(self.current_file)
+            else:
+                self.file_label.setText(self.tr("未选择文件"))
+        if hasattr(self, 'load_btn'):
+            self.load_btn.setText(self.tr("加载文件"))
+        if hasattr(self, 'parse_btn'):
+            self.parse_btn.setText(self.tr("开始解析"))
+        if hasattr(self, 'filter_btn'):
+            self.filter_btn.setText(self.tr("全部"))
+        
+        # 刷新搜索工具栏文本
+        if hasattr(self, 'search_btn'):
+            self.search_btn.setText(self.tr("Search"))
+        if hasattr(self, 'clear_filter_btn'):
+            self.clear_filter_btn.setText(self.tr("清除筛选"))
+        if hasattr(self, 'search_details_checkbox'):
+            self.search_details_checkbox.setText(self.tr("搜索右侧详情"))
+        if hasattr(self, 'use_regex_checkbox'):
+            self.use_regex_checkbox.setText(self.tr("使用正则表达式"))
+        if hasattr(self, 'parse_single_btn'):
+            self.parse_single_btn.setText(self.tr("解析单条 APDU"))
+        if hasattr(self, 'status_label'):
+            if self.status_label.text() == "就绪" or self.status_label.text() == "Ready":
+                self.status_label.setText(self.tr("就绪"))
+            elif "正在解析" in self.status_label.text() or "Parsing" in self.status_label.text():
+                self.status_label.setText(self.tr("正在解析..."))
+        
+        # 刷新标签文本（需要查找所有QLabel）
+        for label in self.findChildren(QLabel):
+            current_text = label.text()
+            if current_text == "解析器:":
+                label.setText(self.tr("解析器:"))
+            elif current_text == "筛选类别:":
+                label.setText(self.tr("筛选类别:"))
+            elif current_text == "搜索:":
+                label.setText(self.tr("搜索:"))

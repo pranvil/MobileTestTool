@@ -1312,7 +1312,7 @@ class MainWindow(QMainWindow):
             self.other_tab.show_pr_translation_dialog.connect(self._on_show_pr_translation_dialog)
             # 验证信号连接是否成功
             try:
-                receivers = QObject.receivers(self.other_tab.show_pr_translation_dialog)
+                receivers = QObject.receivers(self.other_tab, self.other_tab.show_pr_translation_dialog)
                 logger.debug(f"show_pr_translation_dialog 信号接收器数量: {receivers}")
                 if receivers > 0:
                     logger.debug("✓ show_pr_translation_dialog 信号连接成功")
@@ -1413,13 +1413,15 @@ class MainWindow(QMainWindow):
             raise
     
     def _get_tab_name(self, tab_id, all_tabs):
-        """获取Tab名称"""
+        """获取Tab名称（已翻译）"""
         # 首先在all_tabs中查找
         for tab in all_tabs:
             if tab['id'] == tab_id:
-                return tab['name']
+                # 获取原始名称并翻译
+                original_name = tab['name']
+                return self.lang_manager.tr(original_name) if self.lang_manager else original_name
         
-        # 如果找不到，使用默认映射（直接使用中文名称，避免翻译失败）
+        # 如果找不到，使用默认映射并翻译
         default_names = {
             'log_control': 'Log控制',
             'log_filter': 'Log过滤',
@@ -1432,8 +1434,9 @@ class MainWindow(QMainWindow):
             'sim': 'SIM'
         }
         
-        result = default_names.get(tab_id, tab_id)
-        return result
+        original_name = default_names.get(tab_id, tab_id)
+        # 翻译名称
+        return self.lang_manager.tr(original_name) if self.lang_manager else original_name
     
     def _create_custom_tab_instance(self, custom_tab):
         """创建自定义Tab实例"""

@@ -3,7 +3,10 @@ param(
     [string]$Version,
     [string]$NotesFile = "",
     [switch]$SkipPublish,
-    [switch]$SkipPackage
+    [switch]$SkipPackage,
+    [string]$GiteeOwner = "",
+    [string]$GiteeRepo = "",
+    [string]$GiteeToken = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -62,6 +65,77 @@ function Invoke-GhReleaseCreate {
     }
 }
 
+function Invoke-GiteeReleaseCreate {
+    param(
+        [string]$Version,
+        [string]$Package,
+        [string]$Notes,
+        [string]$Owner,
+        [string]$Repo,
+        [string]$Token
+    )
+
+    if (-not $Owner -or -not $Repo -or -not $Token) {
+        Write-Warning "Gitee release skipped: Missing Owner, Repo, or Token. Please provide -GiteeOwner, -GiteeRepo, and -GiteeToken parameters."
+        return
+    }
+
+    Write-Host "Creating Gitee release for v$Version..."
+
+    # Gitee API endpoint (access_token as query parameter)
+    $apiBaseUrl = "https://gitee.com/api/v5/repos/$Owner/$Repo"
+    $apiUrl = "$apiBaseUrl/releases?access_token=$Token"
+    
+    # Check if release exists
+    $checkUrl = "$apiBaseUrl/releases/tags/v$Version?access_token=$Token"
+    $headers = @{
+        "Content-Type" = "application/json"
+    }
+
+    try {
+        $response = Invoke-RestMethod -Uri $checkUrl -Method Get -Headers $headers -ErrorAction SilentlyContinue
+        if ($response -and $response.id) {
+            Write-Host "Release v$Version exists. Deleting before recreating..."
+            $deleteUrl = "$apiBaseUrl/releases/$($response.id)?access_token=$Token"
+            Invoke-RestMethod -Uri $deleteUrl -Method Delete -Headers $headers
+        }
+    } catch {
+        # Release doesn't exist, continue
+    }
+
+    # Create release
+    $releaseBody = @{
+        tag_name = "v$Version"
+        name = "MobileTestTool v$Version"
+        body = $Notes
+        prerelease = $false
+    } | ConvertTo-Json -Depth 3
+
+    try {
+        $releaseResponse = Invoke-RestMethod -Uri $apiUrl -Method Post -Headers $headers -Body $releaseBody -ContentType "application/json"
+        Write-Host "Gitee release created: $($releaseResponse.html_url)" -ForegroundColor Green
+        
+        # Gitee API file upload is complex, so we'll prompt for manual upload
+        Write-Host ""
+        Write-Host "==========================================" -ForegroundColor Yellow
+        Write-Host "Gitee Release created successfully!" -ForegroundColor Green
+        Write-Host "Release URL: $($releaseResponse.html_url)" -ForegroundColor Cyan
+        Write-Host ""
+        Write-Host "Please manually upload the package file:" -ForegroundColor Yellow
+        Write-Host "  1. Open: $($releaseResponse.html_url)" -ForegroundColor Cyan
+        Write-Host "  2. Click 'Upload Attachment' button" -ForegroundColor Cyan
+        Write-Host "  3. Select file: $Package" -ForegroundColor Cyan
+        Write-Host "  4. Wait for upload to complete" -ForegroundColor Cyan
+        Write-Host ""
+        Write-Host "Package file location: $Package" -ForegroundColor White
+        Write-Host "==========================================" -ForegroundColor Yellow
+        Write-Host ""
+    } catch {
+        Write-Error "Failed to create Gitee release: $_"
+        throw
+    }
+}
+
 function Get-ReleaseNotes {
     param(
         [string]$NotesFile,
@@ -116,18 +190,25 @@ if (-not (Test-Path $versionFile)) {
 }
 
 $versionContent = Get-Content $versionFile -Raw -Encoding UTF8
-$oldVersion = if ($versionContent -match 'APP_VERSION = "([^"]+)"') {
-    $matches[1]
-} else {
-    $null
+
+# Use single quotes for regex to avoid escaping issues
+$oldVersion = $null
+if ($versionContent -match 'APP_VERSION = "([^"]+)"') {
+    $oldVersion = $matches[1]
 }
 
 if ($oldVersion -and $oldVersion -ne $Version) {
     Write-Host "Updating version from $oldVersion to $Version"
-    $versionPattern = 'APP_VERSION = "[^"]+"'
-    $versionReplacement = "APP_VERSION = `"$Version`""
+
+    $versionPattern     = 'APP_VERSION = "[^"]+"'
+    $versionReplacement = 'APP_VERSION = "' + $Version + '"'
+
     $versionContent = $versionContent -replace $versionPattern, $versionReplacement
-    [System.IO.File]::WriteAllText($versionFile, $versionContent, (New-Object System.Text.UTF8Encoding($false)))
+    [System.IO.File]::WriteAllText(
+        $versionFile,
+        $versionContent,
+        (New-Object System.Text.UTF8Encoding($false))
+    )
     Write-Host "Version updated successfully"
 } elseif ($oldVersion -eq $Version) {
     Write-Host "Version already matches: $Version"
@@ -155,7 +236,7 @@ if (-not $SkipPackage) {
     Compress-Archive -Path $buildPaths -DestinationPath $packagePath
     Write-Host ("Created package: {0}" -f $packagePath)
 } else {
-    Write-Host "=== step 1 & 2 skipped (SkipPackage enabled) ==="
+    Write-Host "=== step 1 and 2 skipped (SkipPackage enabled) ==="
     if (-not (Test-Path $packagePath)) {
         throw ("Existing package not found: {0}. Cannot continue with -SkipPackage." -f $packagePath)
     }
@@ -184,19 +265,50 @@ if (-not (Test-Path $manifestDir)) {
     New-Item -ItemType Directory -Path $manifestDir | Out-Null
 }
 
-$downloadUrl = "https://github.com/pranvil/MobileTestTool/releases/download/v$Version/$packageName"
-# Read release notes once to ensure latest.json and GitHub release use the same content
+$githubDownloadUrl = "https://github.com/pranvil/MobileTestTool/releases/download/v$Version/$packageName"
+# Read release notes once to ensure latest.json and releases use the same content
 $releaseNotes = Get-ReleaseNotes -NotesFile $NotesFile -RepoRoot $repoRoot -DefaultNotes "- Add release notes here" -Trim
+
+# Build download_urls array
+$downloadUrls = @()
+
+# GitHub source (US and default)
+$downloadUrls += @{
+    url = $githubDownloadUrl
+    region = "us"
+    platform = "windows"
+    priority = 10
+}
+
+# Gitee source (CN) - if configured
+if ($GiteeOwner -and $GiteeRepo) {
+    $giteeDownloadUrl = "https://gitee.com/$GiteeOwner/$GiteeRepo/releases/download/v$Version/$packageName"
+    $downloadUrls += @{
+        url = $giteeDownloadUrl
+        region = "cn"
+        platform = "windows"
+        priority = 20
+    }
+}
+
+# Default source (for other countries)
+$downloadUrls += @{
+    url = $githubDownloadUrl
+    region = "default"
+    platform = "all"
+    priority = 5
+}
 
 $manifest = [ordered]@{
     version       = $Version
-    download_url  = $downloadUrl
+    download_url  = $githubDownloadUrl  # Default fallback
     sha256        = $sha256
     file_name     = $packageName
     file_size     = (Get-Item $packagePath).Length
     release_notes = $releaseNotes
     published_at  = (Get-Date).ToUniversalTime().ToString("s") + "Z"
     mandatory     = $false
+    download_urls = $downloadUrls
 }
 
 $manifestJson = $manifest | ConvertTo-Json -Depth 3
@@ -207,7 +319,7 @@ Write-Host "=== step 5: summary ==="
 Get-Content $manifestPath
 Write-Host ""
 
-Write-Host "=== step 6: git commit & push ==="
+Write-Host "=== step 6: git commit and push ==="
 $filesToStage = @(
     "scripts/release.ps1",
     "config/latest.json.example",
@@ -231,7 +343,7 @@ if ($LASTEXITCODE -ne 0) {
 
 Invoke-Git "push" "origin" "main"
 
-Write-Host "=== step 7: tags & GitHub release ==="
+Write-Host "=== step 7: tags and GitHub release ==="
 $tagExists = $false
 try {
     git rev-parse --verify ("refs/tags/v{0}" -f $Version) --quiet | Out-Null
@@ -251,6 +363,15 @@ Invoke-Git "push" "origin" ("v{0}" -f $Version)
 # Reuse previously read release notes to ensure consistency with latest.json content
 $notesForRelease = $releaseNotes
 
+Write-Host "=== step 7a: GitHub release ==="
 Invoke-GhReleaseCreate -Version $Version -Package $packagePath -Notes $notesForRelease
+
+if ($GiteeOwner -and $GiteeRepo -and $GiteeToken) {
+    Write-Host "=== step 7b: Gitee release ==="
+    Invoke-GiteeReleaseCreate -Version $Version -Package $packagePath -Notes $notesForRelease -Owner $GiteeOwner -Repo $GiteeRepo -Token $GiteeToken
+} else {
+    Write-Host "=== step 7b: Gitee release skipped (not configured) ==="
+    Write-Host "To enable Gitee release, provide: -GiteeOwner [owner] -GiteeRepo [repo] -GiteeToken [token]"
+}
 
 Write-Host "=== all done ==="
