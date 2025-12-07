@@ -37,6 +37,15 @@ function Invoke-GhReleaseCreate {
     }
     $ghPath = $ghCmd.Source
 
+    # Check if GitHub CLI is authenticated
+    $authStatus = & $ghPath auth status 2>&1
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "Error: GitHub CLI is not authenticated." -ForegroundColor Red
+        Write-Host "Please run: gh auth login" -ForegroundColor Yellow
+        Write-Host "Or set the GH_TOKEN environment variable with a GitHub API token." -ForegroundColor Yellow
+        throw "GitHub CLI authentication required. Run 'gh auth login' or set GH_TOKEN environment variable."
+    }
+
     $releaseExists = $false
     try {
         & $ghPath release view ("v{0}" -f $Version) 1>$null 2>$null
@@ -56,7 +65,12 @@ function Invoke-GhReleaseCreate {
         [System.IO.File]::WriteAllText($tempNotesFile, $Notes, (New-Object System.Text.UTF8Encoding($false)))
         & $ghPath release create ("v{0}" -f $Version) $Package --title ("MobileTestTool v{0}" -f $Version) --notes-file $tempNotesFile
         if ($LASTEXITCODE -ne 0) {
-            throw "gh release create failed"
+            Write-Host "Error: GitHub release creation failed." -ForegroundColor Red
+            Write-Host "Please check:" -ForegroundColor Yellow
+            Write-Host "  1. GitHub CLI is authenticated (run: gh auth login)" -ForegroundColor Yellow
+            Write-Host "  2. You have permission to create releases in this repository" -ForegroundColor Yellow
+            Write-Host "  3. Network connection is working" -ForegroundColor Yellow
+            throw "gh release create failed. Check authentication and permissions."
         }
     } finally {
         if (Test-Path $tempNotesFile) {
