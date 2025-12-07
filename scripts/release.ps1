@@ -96,6 +96,22 @@ function Invoke-GiteeReleaseCreate {
 
     Write-Host "Creating Gitee release for v$Version..."
 
+    # Get current commit SHA for target_commitish
+    $targetCommitish = "main"  # Default to main branch
+    try {
+        $currentBranch = git rev-parse --abbrev-ref HEAD
+        if ($LASTEXITCODE -eq 0 -and $currentBranch) {
+            $targetCommitish = $currentBranch
+        }
+        # Try to get the commit SHA instead
+        $commitSha = git rev-parse HEAD
+        if ($LASTEXITCODE -eq 0 -and $commitSha) {
+            $targetCommitish = $commitSha.Trim()
+        }
+    } catch {
+        Write-Host "Warning: Could not determine target commit, using 'main' branch" -ForegroundColor Yellow
+    }
+
     # Gitee API endpoint (access_token as query parameter)
     $apiBaseUrl = "https://gitee.com/api/v5/repos/$Owner/$Repo"
     $apiUrl = "$apiBaseUrl/releases?access_token=$Token"
@@ -123,6 +139,7 @@ function Invoke-GiteeReleaseCreate {
         name = "MobileTestTool v$Version"
         body = $Notes
         prerelease = $false
+        target_commitish = $targetCommitish
     } | ConvertTo-Json -Depth 3
 
     try {
