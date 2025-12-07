@@ -89,89 +89,83 @@ function Invoke-GiteeReleaseCreate {
         [string]$Token
     )
 
-    Write-Host "Creating Gitee release for v$Version..."
-
-    # 确保描述不为空，否则 Gitee 会报 “发行版的描述不能为空”
-    if ([string]::IsNullOrWhiteSpace($Notes)) {
-        $Notes = "MobileTestTool v$Version"
+    if (-not $Owner -or -not $Repo -or -not $Token) {
+        Write-Warning "Gitee release skipped: Missing Owner, Repo, or Token. Please provide -GiteeOwner, -GiteeRepo, and -GiteeToken parameters."
+        return
     }
 
-    # 尝试确定 target_commitish（提交 SHA 优先，其次分支名）
-    $targetCommitish = "main"
-    try {
-        $currentBranch = git rev-parse --abbrev-ref HEAD 2>$null
-        if ($LASTEXITCODE -eq 0 -and $currentBranch) {
-            $targetCommitish = $currentBranch.Trim()
-        }
+    Write-Host "Creating Gitee release for v$Version..."
 
-        $commitSha = git rev-parse HEAD 2>$null
+    # Get current commit SHA for target_commitish
+    $targetCommitish = "main"  # Default to main branch
+    try {
+        $currentBranch = git rev-parse --abbrev-ref HEAD
+        if ($LASTEXITCODE -eq 0 -and $currentBranch) {
+            $targetCommitish = $currentBranch
+        }
+        # Try to get the commit SHA instead
+        $commitSha = git rev-parse HEAD
         if ($LASTEXITCODE -eq 0 -and $commitSha) {
             $targetCommitish = $commitSha.Trim()
         }
     } catch {
-        Write-Host "Warning: could not determine target commit, using '$targetCommitish'"
+        Write-Host "Warning: Could not determine target commit, using 'main' branch" -ForegroundColor Yellow
     }
 
+    # Gitee API endpoint (access_token as query parameter)
     $apiBaseUrl = "https://gitee.com/api/v5/repos/$Owner/$Repo"
-    $checkUrl   = "$apiBaseUrl/releases/tags/v$Version?access_token=$Token"
-    $createUrl  = "$apiBaseUrl/releases?access_token=$Token"
+    $apiUrl = "$apiBaseUrl/releases?access_token=$Token"
+    
+    # Check if release exists
+    $checkUrl = "$apiBaseUrl/releases/tags/v$Version?access_token=$Token"
+    $headers = @{
+        "Content-Type" = "application/json"
+    }
 
-    $headers = @{ Accept = "application/json" }
-
-    # 如果已有同 tag 的 Release，先删掉，避免重复
     try {
-        $existing = Invoke-RestMethod -Uri $checkUrl -Method Get -Headers $headers -ErrorAction SilentlyContinue
-        if ($existing -and $existing.id) {
-            Write-Host "Gitee release v$Version already exists. Deleting..."
-            $deleteUrl = "$apiBaseUrl/releases/$($existing.id)?access_token=$Token"
-            Invoke-RestMethod -Uri $deleteUrl -Method Delete -Headers $headers -ErrorAction Stop | Out-Null
+        $response = Invoke-RestMethod -Uri $checkUrl -Method Get -Headers $headers -ErrorAction SilentlyContinue
+        if ($response -and $response.id) {
+            Write-Host "Release v$Version exists. Deleting before recreating..."
+            $deleteUrl = "$apiBaseUrl/releases/$($response.id)?access_token=$Token"
+            Invoke-RestMethod -Uri $deleteUrl -Method Delete -Headers $headers
         }
     } catch {
-        Write-Host "No existing Gitee release for tag v$Version, continue to create."
+        # Release doesn't exist, continue
     }
 
-    # 创建 Release 的请求体
-    $bodyObj = @{
-        tag_name         = "v$Version"
-        name             = "MobileTestTool v$Version"
-        body             = $Notes
+    # Create release
+    $releaseBody = @{
+        tag_name = "v$Version"
+        name = "MobileTestTool v$Version"
+        body = $Notes
+        prerelease = $false
         target_commitish = $targetCommitish
-        prerelease       = $false
-    }
-
-    $bodyJson = $bodyObj | ConvertTo-Json -Depth 3
+    } | ConvertTo-Json -Depth 3
 
     try {
-        $resp = Invoke-RestMethod -Uri $createUrl -Method Post -Headers $headers -Body $bodyJson -ContentType "application/json" -ErrorAction Stop
-        Write-Host "Gitee release created: $($resp.html_url)"
+        $releaseResponse = Invoke-RestMethod -Uri $apiUrl -Method Post -Headers $headers -Body $releaseBody -ContentType "application/json"
+        Write-Host "Gitee release created: $($releaseResponse.html_url)" -ForegroundColor Green
+        
+        # Gitee API file upload is complex, so we'll prompt for manual upload
+        Write-Host ""
+        Write-Host "==========================================" -ForegroundColor Yellow
+        Write-Host "Gitee Release created successfully!" -ForegroundColor Green
+        Write-Host "Release URL: $($releaseResponse.html_url)" -ForegroundColor Cyan
+        Write-Host ""
+        Write-Host "Please manually upload the package file:" -ForegroundColor Yellow
+        Write-Host "  1. Open: $($releaseResponse.html_url)" -ForegroundColor Cyan
+        Write-Host "  2. Click 'Upload Attachment' button" -ForegroundColor Cyan
+        Write-Host "  3. Select file: $Package" -ForegroundColor Cyan
+        Write-Host "  4. Wait for upload to complete" -ForegroundColor Cyan
+        Write-Host ""
+        Write-Host "Package file location: $Package" -ForegroundColor White
+        Write-Host "==========================================" -ForegroundColor Yellow
+        Write-Host ""
     } catch {
         Write-Error "Failed to create Gitee release: $_"
         throw
     }
-
-    # ===== 下面是用 gitee-release-cli 上传附件 =====
-    if (Test-Path $Package) {
-        $cli = Get-Command "gitee-release" -ErrorAction SilentlyContinue
-        if ($null -eq $cli) {
-            Write-Host "gitee-release CLI not found. Skipping asset upload."
-            Write-Host "You can install it with: npm install -g gitee-release-cli"
-        }
-        else {
-            Write-Host "Uploading asset '$Package' to latest Gitee release via gitee-release-cli..."
-
-            $pkgPath = (Resolve-Path $Package).Path
-
-            # 给【最新的发行版】上传附件：gitee-release assets upload /path/to/file.zip
-            # 我们刚刚才创建这个版本，它就是最新的
-            Write-Host "Running: gitee-release assets upload `"$pkgPath`""
-            & gitee-release assets upload "$pkgPath"
-        }
-    }
-    else {
-        Write-Host "Package file not found: $Package. Skip Gitee asset upload."
-    }
 }
-
 
 function Get-ReleaseNotes {
     param(
@@ -434,7 +428,7 @@ Write-Host "=== step 7a: GitHub release ==="
 
 try {
     # 这里沿用你原来的 GitHub Release 函数和变量
-    Invoke-GhReleaseCreate -Version $Version -Package $packagePath -Notes $releaseNotes
+    Invoke-GhReleaseCreate -Version $Version -Package $packagePath -Notes $notesForRelease
 }
 catch {
     Write-Error "Failed to create GitHub release: $_"
@@ -442,26 +436,7 @@ catch {
 }
 
 Write-Host "=== step 7b: Gitee release ==="
-
-if ($GiteeOwner -and $GiteeRepo -and $GiteeToken) {
-    try {
-        Invoke-GiteeReleaseCreate `
-            -Version $Version `
-            -Package $packagePath `
-            -Notes $releaseNotes `
-            -Owner $GiteeOwner `
-            -Repo $GiteeRepo `
-            -Token $GiteeToken
-
-        Write-Host "Gitee release created successfully."
-    }
-    catch {
-        Write-Error "Failed to create Gitee release: $_"
-    }
-}
-else {
-    Write-Host "Gitee config not set. Skipping Gitee release creation."
-}
-
+Write-Host "Gitee release creation is currently skipped."
 Write-Host "Code and tags have been pushed to the 'gitee' remote (if configured)."
+
 Write-Host "=== all done ==="
