@@ -166,7 +166,6 @@ function Invoke-GiteeReleaseCreate {
         throw
     }
 }
-
 function Get-ReleaseNotes {
     param(
         [string]$NotesFile,
