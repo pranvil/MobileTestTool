@@ -143,32 +143,28 @@ function Invoke-GiteeReleaseCreate {
 
     try {
         $resp = Invoke-RestMethod -Uri $createUrl -Method Post -Headers $headers -Body $bodyJson -ContentType "application/json" -ErrorAction Stop
-        Write-Host "Gitee release created: $($resp.html_url)"
+        Write-Host "Gitee release created successfully!" -ForegroundColor Green
+        Write-Host ""
+        Write-Host "==========================================" -ForegroundColor Yellow
+        Write-Host "Gitee Release 创建成功！" -ForegroundColor Green
+        Write-Host "==========================================" -ForegroundColor Yellow
+        Write-Host ""
+        Write-Host "Release 地址: $($resp.html_url)" -ForegroundColor Cyan
+        Write-Host ""
+        Write-Host "请手动上传 ZIP 文件:" -ForegroundColor Yellow
+        Write-Host "  1. 打开上述 Release 地址" -ForegroundColor White
+        Write-Host "  2. 点击 '上传附件' 或 'Upload Attachment' 按钮" -ForegroundColor White
+        Write-Host "  3. 选择文件: $Package" -ForegroundColor White
+        Write-Host "  4. 等待上传完成" -ForegroundColor White
+        Write-Host ""
+        Write-Host "需要上传的文件路径:" -ForegroundColor Cyan
+        Write-Host "  $Package" -ForegroundColor White
+        Write-Host ""
+        Write-Host "==========================================" -ForegroundColor Yellow
+        Write-Host ""
     } catch {
         Write-Error "Failed to create Gitee release: $_"
         throw
-    }
-
-    # ===== 下面是用 gitee-release-cli 上传附件 =====
-    if (Test-Path $Package) {
-        $cli = Get-Command "gitee-release" -ErrorAction SilentlyContinue
-        if ($null -eq $cli) {
-            Write-Host "gitee-release CLI not found. Skipping asset upload."
-            Write-Host "You can install it with: npm install -g gitee-release-cli"
-        }
-        else {
-            Write-Host "Uploading asset '$Package' to latest Gitee release via gitee-release-cli..."
-
-            $pkgPath = (Resolve-Path $Package).Path
-
-            # 给【最新的发行版】上传附件：gitee-release assets upload /path/to/file.zip
-            # 我们刚刚才创建这个版本，它就是最新的
-            Write-Host "Running: gitee-release assets upload `"$pkgPath`""
-            & gitee-release assets upload "$pkgPath"
-        }
-    }
-    else {
-        Write-Host "Package file not found: $Package. Skip Gitee asset upload."
     }
 }
 
@@ -452,11 +448,10 @@ if ($GiteeOwner -and $GiteeRepo -and $GiteeToken) {
             -Owner $GiteeOwner `
             -Repo $GiteeRepo `
             -Token $GiteeToken
-
-        Write-Host "Gitee release created successfully."
     }
     catch {
-        Write-Error "Failed to create Gitee release: $_"
+        Write-Host "Gitee release creation failed. Please check the error message above." -ForegroundColor Red
+        # 不抛出异常，允许脚本继续执行完成
     }
 }
 else {
