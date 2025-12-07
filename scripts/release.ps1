@@ -96,6 +96,12 @@ function Invoke-GiteeReleaseCreate {
 
     Write-Host "Creating Gitee release for v$Version..."
 
+    # Ensure Notes is not empty (Gitee API requires non-empty body)
+    if ([string]::IsNullOrWhiteSpace($Notes)) {
+        $Notes = "Release v$Version"
+        Write-Host "Warning: Release notes are empty, using default description" -ForegroundColor Yellow
+    }
+
     # Get current commit SHA for target_commitish
     $targetCommitish = "main"  # Default to main branch
     try {
@@ -428,7 +434,7 @@ Write-Host "=== step 7a: GitHub release ==="
 
 try {
     # 这里沿用你原来的 GitHub Release 函数和变量
-    Invoke-GhReleaseCreate -Version $Version -Package $packagePath -Notes $notesForRelease
+    Invoke-GhReleaseCreate -Version $Version -Package $packagePath -Notes $releaseNotes
 }
 catch {
     Write-Error "Failed to create GitHub release: $_"
@@ -442,7 +448,7 @@ if ($GiteeOwner -and $GiteeRepo -and $GiteeToken) {
         Invoke-GiteeReleaseCreate `
             -Version $Version `
             -Package $packagePath `
-            -Notes $notesForRelease `
+            -Notes $releaseNotes `
             -Owner $GiteeOwner `
             -Repo $GiteeRepo `
             -Token $GiteeToken
