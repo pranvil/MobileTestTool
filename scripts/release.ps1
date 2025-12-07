@@ -364,7 +364,14 @@ Invoke-Git "push" "origin" ("v{0}" -f $Version)
 $notesForRelease = $releaseNotes
 
 Write-Host "=== step 7a: GitHub release ==="
-Invoke-GhReleaseCreate -Version $Version -Package $packagePath -Notes $notesForRelease
+$ghCmd = Get-Command gh -ErrorAction SilentlyContinue
+if ($ghCmd) {
+    Invoke-GhReleaseCreate -Version $Version -Package $packagePath -Notes $notesForRelease
+} else {
+    Write-Host "Warning: GitHub CLI (gh) not found in PATH. Skipping GitHub release."
+    Write-Host "To publish to GitHub, install GitHub CLI or add it to PATH."
+    Write-Host "You can install it from: https://cli.github.com/"
+}
 
 if ($GiteeOwner -and $GiteeRepo -and $GiteeToken) {
     Write-Host "=== step 7b: Gitee release ==="
