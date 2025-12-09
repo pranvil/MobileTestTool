@@ -31,7 +31,7 @@ git clone <repository-url>
 cd MobileTestTool
 
 # 2. 安装依赖
-pip install -r requirements_pyqt.txt
+pip install -r requirements.txt
 
 # 3. 运行程序
 python main.py

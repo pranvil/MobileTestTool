@@ -616,6 +616,14 @@ class ApduParserDialog(QDialog):
     
     def filter_apdu_list(self):
         """过滤APDU列表"""
+        # 保存当前选中的项（用于筛选后恢复选中状态）
+        current_item = self.apdu_tree.currentItem()
+        saved_raw = None
+        if current_item:
+            result = current_item.data(0, Qt.UserRole)
+            if result and hasattr(result, 'message'):
+                saved_raw = result.message.raw
+        
         filter_text = self.search_edit.text()
         search_details = self.search_details_checkbox.isChecked()
         use_regex = self.use_regex_checkbox.isChecked()
@@ -672,6 +680,18 @@ class ApduParserDialog(QDialog):
             
             # 综合筛选
             item.setHidden(not (category_match and text_match))
+        
+        # 尝试恢复之前选中的项
+        if saved_raw:
+            for i in range(self.apdu_tree.topLevelItemCount()):
+                item = self.apdu_tree.topLevelItem(i)
+                if not item.isHidden():
+                    result = item.data(0, Qt.UserRole)
+                    if result and hasattr(result, 'message') and result.message.raw == saved_raw:
+                        # 找到之前选中的项，恢复选中状态
+                        self.apdu_tree.setCurrentItem(item)
+                        self.apdu_tree.scrollToItem(item)
+                        break
     
     def get_parse_tree_text(self, node) -> str:
         """递归获取解析树的所有文本"""

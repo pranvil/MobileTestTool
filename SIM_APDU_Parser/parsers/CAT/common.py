@@ -36,13 +36,14 @@ def get_tlv_parser(tag):
     """
     return TLV_PARSER_REGISTRY.get(tag.upper(), (None, None))
 
-def parse_tlv_to_node(tag: str, value_hex: str) -> ParseNode:
+def parse_tlv_to_node(tag: str, value_hex: str, root: ParseNode = None) -> ParseNode:
     """
     通用的 TLV 解析函数，根据 tag 自动调用对应的解析器
     
     Args:
         tag: TLV tag 字符串
         value_hex: TLV 的值部分（已去掉 tag 和 length）
+        root: 可选的根节点，用于获取上下文信息（如event类型）
         
     Returns:
         ParseNode 对象
@@ -51,7 +52,18 @@ def parse_tlv_to_node(tag: str, value_hex: str) -> ParseNode:
     
     if parser_func:
         try:
-            parsed_value = parser_func(value_hex)
+            # 对于1C/9C标签，需要从root节点获取event信息
+            if tag.upper() in ('1C', '9C') and root is not None:
+                event_type = _get_event_from_root(root)
+                # 检查解析器是否支持event_type参数
+                import inspect
+                sig = inspect.signature(parser_func)
+                if 'event_type' in sig.parameters:
+                    parsed_value = parser_func(value_hex, event_type=event_type)
+                else:
+                    parsed_value = parser_func(value_hex)
+            else:
+                parsed_value = parser_func(value_hex)
             name = f"{display_name} ({tag})" if display_name else f"TLV {tag}"
             return ParseNode(name=name, value=parsed_value)
         except Exception as e:
@@ -86,7 +98,7 @@ def parse_tlvs_from_dict(root: ParseNode, tlv_data: dict, required_tags: list = 
             for tag in tag_group:
                 tag_upper = tag.upper()
                 if tag_upper in tlv_data:
-                    node = parse_tlv_to_node(tag_upper, tlv_data[tag_upper])
+                    node = parse_tlv_to_node(tag_upper, tlv_data[tag_upper], root)
                     root.children.append(node)
                     parsed_tags.add(tag_upper)
                     found = True
@@ -109,7 +121,7 @@ def parse_tlvs_from_dict(root: ParseNode, tlv_data: dict, required_tags: list = 
             for tag in tag_group:
                 tag_upper = tag.upper()
                 if tag_upper in tlv_data:
-                    node = parse_tlv_to_node(tag_upper, tlv_data[tag_upper])
+                    node = parse_tlv_to_node(tag_upper, tlv_data[tag_upper], root)
                     root.children.append(node)
                     parsed_tags.add(tag_upper)
                     break
@@ -119,7 +131,7 @@ def parse_tlvs_from_dict(root: ParseNode, tlv_data: dict, required_tags: list = 
     other_tlvs = {tag: val for tag, val in tlv_data.items() if tag.upper() not in all_excluded}
     if other_tlvs:
         for tag, val in other_tlvs.items():
-            node = parse_tlv_to_node(tag, val)
+            node = parse_tlv_to_node(tag, val, root)
             root.children.append(node)
 
 # ========== 注册所有已实现的 TLV 解析器 ==========
@@ -383,8 +395,8 @@ def parse_duration_text(value_hex: str) -> str:
     if len(value_hex) != 4: return f"{value_hex}"
     unit_map = {"00":"minutes","01":"seconds","02":"tenths"}
     unit = unit_map.get(value_hex[:2],"?"); val = _hex2int(value_hex[2:])
-    if unit == "tenths": return f"{val/10:.1f} seconds"
-    return f"{val} {unit}"
+    if unit == "tenths": return f"{val/10:.1f} seconds ({value_hex})"
+    return f"{val} {unit} ({value_hex})"
 
 def parse_address_text(value_hex: str) -> str:
     if len(value_hex) < 2: return value_hex
@@ -397,7 +409,7 @@ def parse_address_text(value_hex: str) -> str:
     for i in range(0,len(raw),2):
         if i+2<=len(raw):
             dn += raw[i+1:i+2] + raw[i:i+1]
-    return f"TON={ton}, NPI={npi}, Dial={dn}"
+    return f"TON={ton}, NPI={npi}, Dial={dn} ({value_hex})"
 
 class ChannelMode:
     """Channel mode enumeration for Channel Status parsing"""
@@ -489,7 +501,7 @@ def parse_channel_status_text(value_hex: str, mode: str = ChannelMode.GENERAL) -
         further_info = info_map.get(byte2, f"Reserved (0x{byte2:02X})")
         status_parts.append(further_info)
         
-        return ", ".join(status_parts)
+        return ", ".join(status_parts) + f" ({value_hex})"
     except Exception as e:
         return f"Parse error: {e}, Raw: {value_hex}"
 
@@ -513,9 +525,9 @@ def parse_channel_data_length_text(value_hex: str) -> str:
         length_value = int(length_hex, 16)
         
         if length_value == 0xFF:
-            return "more than 255 bytes are available"
+            return f"more than 255 bytes are available ({value_hex})"
         else:
-            return f"{length_value} bytes"
+            return f"{length_value} bytes ({value_hex})"
     except Exception as e:
         return f"Parse error: {e}, Raw: {value_hex}"
 
@@ -540,13 +552,15 @@ def parse_access_tech_text(value_hex: str) -> str:
     for i in range(0, len(value_hex), 2):
         tech_code = value_hex[i:i+2]
         tech_name = access_tech_map.get(tech_code, f"Reserved (0x{tech_code})")
-        technologies.append(tech_name)
+        technologies.append(f"{tech_name} (0x{tech_code})")
     
-    return ", ".join(technologies)
+    result = ", ".join(technologies)
+    return f"{result} (Raw: {value_hex})"
 
 def parse_timer_identifier_text(v:str)->str:
     m={'01':'Timer 1','02':'Timer 2','03':'Timer 3','04':'Timer 4','05':'Timer 5','06':'Timer 6','07':'Timer 7','08':'Timer 8'}
-    return m.get(v, v)
+    result = m.get(v, v)
+    return f"{result} ({v})" if result != v else v
 
 def parse_timer_value_text(value_hex: str) -> str:
     """解析 Timer value (25/A5 tag) - 3字节 BCD 码 (Hour, Minute, Second)"""
@@ -574,7 +588,7 @@ def parse_timer_value_text(value_hex: str) -> str:
         minute = int(minute_hex, 16)
         second = int(second_hex, 16)
         
-        return f"{hour:02d}:{minute:02d}:{second:02d} (Timer elapsed time)"
+        return f"{hour:02d}:{minute:02d}:{second:02d} (Timer elapsed time) ({value_hex})"
     except Exception as e:
         return f"Parse error: {e}, Raw: {value_hex}"
 
@@ -583,7 +597,7 @@ def parse_imei_text(v:str)->str:
     for i in range(0,len(v),2):
         b=v[i:i+2]
         if len(b)==2: out += b[1]+b[0]
-    return out
+    return f"{out} ({v})"
 
 def parse_bearer_description_text(value_hex: str) -> str:
     """
@@ -619,13 +633,13 @@ def parse_bearer_description_text(value_hex: str) -> str:
     params_desc = _parse_bearer_parameters(bearer_type, bearer_parameters_hex)
     
     if params_desc:
-        return f"Bearer type: {bearer_type_description}, Parameters: {params_desc}"
+        return f"Bearer type: {bearer_type_description}, Parameters: {params_desc} ({value_hex})"
     elif bearer_parameters_hex:
         # 有参数但未解析，显示原始值
-        return f"Bearer type: {bearer_type_description}, Parameters: {bearer_parameters_hex}"
+        return f"Bearer type: {bearer_type_description}, Parameters: {bearer_parameters_hex} ({value_hex})"
     else:
         # 没有参数，不显示 Parameters 部分
-        return f"Bearer type: {bearer_type_description}"
+        return f"Bearer type: {bearer_type_description} ({value_hex})"
 
 def _parse_bearer_parameters(bearer_type: str, params_hex: str) -> str:
     """
@@ -759,22 +773,22 @@ def parse_data_destination_address_text(value_hex: str) -> str:
         for i in range(0, 8, 2):
             byte_val = int(address_data[i:i+2], 16)
             ip_bytes.append(str(byte_val))
-        return f"IPv4: {'.'.join(ip_bytes)}"
+        return f"IPv4: {'.'.join(ip_bytes)} ({value_hex})"
     
     elif address_type == "57":  # IPv6 (8.58)
         # IPv6 address: 16 bytes (octet 4-19) = 32 hex chars
         if len(address_data) < 32:
-            return f"Incomplete IPv6 address: {address_data}"
+            return f"Incomplete IPv6 address: {address_data} ({value_hex})"
         ipv6_groups = []
         for i in range(0, 32, 4):
             group_hex = address_data[i:i+4]
             # Convert to integer and format as hex (remove leading zeros)
             group_int = int(group_hex, 16)
             ipv6_groups.append(f"{group_int:x}")
-        return f"IPv6: {':'.join(ipv6_groups)}"
+        return f"IPv6: {':'.join(ipv6_groups)} ({value_hex})"
     
     else:
-        return f"Reserved address type: 0x{address_type}, Address data: {address_data}"
+        return f"Reserved address type: 0x{address_type}, Address data: {address_data} ({value_hex})"
 
 def parse_location_info_text(value_hex: str) -> str:
     """解析Location Info (13/93 tag)"""
@@ -884,10 +898,29 @@ def parse_esm_cause_text(value_hex: str) -> str:
     # Byte 3: (E/5G)SM cause value (1 byte)
     
     # 直接显示 value
-    return value_hex[:2]
+    return f"0x{value_hex[:2]} ({value_hex[:2]})"
 
-def parse_transaction_identifier_text(value_hex: str) -> str:
-    """解析 Transaction identifier (1C/9C tag, 8.28)"""
+def _get_event_from_root(root: ParseNode) -> str:
+    """从root节点中提取event类型"""
+    # 查找Event List节点
+    for child in root.children:
+        if child.name == "Event List (19)":
+            # 查找第一个Event子节点
+            for event_child in child.children:
+                if event_child.name.startswith("Event "):
+                    # 提取event代码（如"Event 02" -> "02"）
+                    event_code = event_child.name.split()[1] if len(event_child.name.split()) > 1 else None
+                    if event_code:
+                        return EVENT_MAP.get(event_code, "")
+    return None
+
+def parse_transaction_identifier_text(value_hex: str, event_type: str = None) -> str:
+    """解析 Transaction identifier (1C/9C tag, 8.28)
+    
+    Args:
+        value_hex: TLV的值部分（已去掉tag和length）
+        event_type: 事件类型（如'Call connected', 'Call disconnected', 'MT call'），用于增强解析
+    """
     if not value_hex or len(value_hex) < 2:
         return f"Invalid data: {value_hex}"
     
@@ -905,11 +938,35 @@ def parse_transaction_identifier_text(value_hex: str) -> str:
         ti_byte = value_hex[i:i+2]
         ti_value = int(ti_byte, 16)
         
-        # 解析 TI: bits 5-7 = TI value, bit 8 = TI flag
+        # 解析 TI: bits 5-7 = TI value, bit 8 = TI flag (最高位)
         ti_value_part = (ti_value >> 1) & 0x07  # bits 5-7
-        ti_flag = (ti_value >> 0) & 0x01  # bit 8
+        bit_8 = (ti_value >> 7) & 0x01  # bit 8 (最高位)
         
-        identifiers.append(f"TI={ti_value_part}, Flag={ti_flag} (0x{ti_byte})")
+        # 根据event类型进行增强解析
+        if event_type and event_type.strip():  # 确保event_type不为None且不为空字符串
+            if event_type == 'Call connected':
+                if bit_8 == 1:
+                    result = "Call connected"
+                else:
+                    result = "状态未知"
+            elif event_type == 'MT call':
+                if bit_8 == 0:
+                    result = "MT CALL event"
+                else:
+                    result = "状态未知"
+            elif event_type == 'Call disconnected':
+                if bit_8 == 0:
+                    result = "MO disconnects the call"
+                else:
+                    result = "MT disconnects the call"
+            else:
+                # 其他event类型，直接显示值
+                result = f"TI={ti_value_part}, Flag={bit_8} (0x{ti_byte})"
+            
+            identifiers.append(f"{result} (0x{ti_byte})")
+        else:
+            # 没有event信息，使用默认解析
+            identifiers.append(f"TI={ti_value_part}, Flag={bit_8} (0x{ti_byte})")
     
     return ", ".join(identifiers) if identifiers else f"Raw: {value_hex}"
 
@@ -989,7 +1046,7 @@ def parse_date_time_timezone_text(value_hex: str) -> str:
             
             timezone_str = f"{sign}{tz_hours:02d}:{tz_mins:02d}"
         
-        return f"{2000+year}年{month:02d}月{day:02d}日 {hour:02d}:{minute:02d}:{second:02d} (Timezone: {timezone_str})"
+        return f"{2000+year}年{month:02d}月{day:02d}日 {hour:02d}:{minute:02d}:{second:02d} (Timezone: {timezone_str}) ({value_hex})"
     except Exception as e:
         return f"Parse error: {e}, Raw: {value_hex}"
 
@@ -1136,7 +1193,7 @@ def parse_ims_call_disconnection_cause_text(value_hex: str) -> str:
         
         protocol_desc = protocol_map.get(protocol_value, f'RFU (0x{protocol_hex})')
         
-        return f"Protocol: {protocol_desc}, Cause: {cause_value} (0x{cause_hex})"
+        return f"Protocol: {protocol_desc}, Cause: {cause_value} (0x{cause_hex}) ({value_hex})"
     except Exception as e:
         return f"Parse error: {e}, Raw: {value_hex}"
 
@@ -1148,7 +1205,7 @@ def parse_cause_text(value_hex: str) -> str:
     # Byte 3 to X+2: Cause value
     
     # 直接显示 hex 值，不解析
-    return value_hex if value_hex else ""
+    return f"{value_hex} ({value_hex})" if value_hex else ""
 
 def parse_buffer_size_text(value_hex: str) -> str:
     """
@@ -1161,7 +1218,7 @@ def parse_buffer_size_text(value_hex: str) -> str:
     try:
         # Buffer size 是一个整数（字节数）
         buffer_size = int(value_hex, 16)
-        return f"{buffer_size} bytes"
+        return f"{buffer_size} bytes ({value_hex})"
     except Exception as e:
         return f"Parse error: {e}, Raw: {value_hex}"
 
@@ -1200,7 +1257,7 @@ def parse_text_attribute_text(value_hex: str) -> str:
     """
     if not value_hex:
         return "Invalid text attribute"
-    return f"Text Attribute: {value_hex}"
+    return f"Text Attribute: {value_hex} ({value_hex})"
 
 def parse_frame_identifier_text(value_hex: str) -> str:
     """
@@ -1226,7 +1283,7 @@ def parse_iari_text(value_hex: str) -> str:
     """
     if not value_hex:
         return "Invalid IARI"
-    return f"IARI: {value_hex}"
+    return f"IARI: {value_hex} ({value_hex})"
 
 def parse_transport_level_text(value_hex: str) -> str:
     """
@@ -1250,9 +1307,40 @@ def parse_transport_level_text(value_hex: str) -> str:
             "06": "direct"
         }
         transport_desc = transport_map.get(transport_type, f"Unknown (0x{transport_type})")
-        return f"{transport_desc}, port={port}"
+        return f"{transport_desc}, port={port} ({value_hex})"
     except Exception as e:
         return f"Parse error: {e}, Raw: {value_hex}"
+
+def parse_measurement_qualifier_text(value_hex: str) -> str:
+    """解析 UTRAN/E-UTRAN/NG-RAN/Satellite NG-RAN Measurement Qualifier (69/E9 tag)"""
+    if not value_hex or len(value_hex) < 2:
+        return f"Invalid data: {value_hex}"
+    
+    # Measurement Qualifier 数据对象结构：
+    # Byte 1: Tag (69/E9) - 已经在调用时去掉了
+    # Byte 2: Length = '01' - 已经在调用时去掉了
+    # Byte 3: Measurement Qualifier value (1 byte)
+    
+    qualifier_byte = value_hex[:2]
+    qualifier_map = {
+        '01': 'UTRAN Intra-frequency measurements',
+        '02': 'UTRAN Inter-frequency measurements',
+        '03': 'UTRAN Inter-RAT (GERAN) measurements',
+        '04': 'UTRAN Inter-RAT (E-UTRAN) measurements',
+        '05': 'E-UTRAN/Satellite E-UTRAN Intra-frequency measurements',
+        '06': 'E-UTRAN/Satellite E-UTRAN Inter-frequency measurements',
+        '07': 'E-UTRAN/Satellite E-UTRAN Inter-RAT (GERAN) measurements',
+        '08': 'E-UTRAN/Satellite E-UTRAN Inter-RAT (UTRAN) measurements',
+        '09': 'E-UTRAN/Satellite E-UTRAN Inter-RAT (NR) measurements',
+        '0A': 'NG-RAN/Satellite NG-RAN Intra-frequency measurements',
+        '0B': 'NG-RAN/Satellite NG-RAN Inter-frequency measurements',
+        '0C': 'NG-RAN/Satellite NG-RAN Inter-RAT (E-UTRAN) measurements',
+        '0D': 'NG-RAN/Satellite NG-RAN Inter-RAT (UTRAN) measurements'
+    }
+    
+    qualifier_desc = qualifier_map.get(qualifier_byte.upper(), f'Reserved (0x{qualifier_byte})')
+    
+    return f"{qualifier_desc} ({value_hex})"
 
 def parse_alpha_identifier_text(value_hex: str) -> str:
     """解析Alpha Identifier (05/85 tag)"""
@@ -1285,7 +1373,7 @@ def parse_sms_tpdu_text(value_hex: str) -> str:
     }
     
     tpdu_name = tpdu_map.get(tpdu_type, f'Unknown TPDU ({tpdu_type})')
-    return f"SMS TPDU: {tpdu_name}, Data: {value_hex[2:]}"
+    return f"SMS TPDU: {tpdu_name}, Data: {value_hex[2:]} ({value_hex})"
 
 def parse_network_access_name_text(value_hex: str) -> str:
     """解析Network Access Name (47/C7 tag) - 按照 TS 23.003 Label 格式"""
@@ -1355,7 +1443,8 @@ def parse_network_access_name_text(value_hex: str) -> str:
             idx += label_len * 2
         
         # 用点号连接所有 labels
-        return '.'.join(labels) if labels else value_hex
+        result = '.'.join(labels) if labels else value_hex
+        return f"{result} ({value_hex})"
     except Exception as e:
         return f"Parse error: {e}, Raw: {value_hex}"
 
@@ -1462,7 +1551,7 @@ def parse_file_list_text(value_hex: str) -> str:
         else:
             result += f", Raw data: {files_hex}"
         
-        return result
+        return f"{result} ({value_hex})"
         
     except Exception as e:
         return f"File list parse error: {value_hex}"
@@ -1621,7 +1710,9 @@ def parse_comp_tlvs_to_nodes(hexstr: str) -> tuple[ParseNode, str]:
             location_status_info = parse_location_status_text(val)
             root.children.append(ParseNode(name="Location status (1B)", value=location_status_info))
         elif is_tag("1C","9C"):
-            transaction_info = parse_transaction_identifier_text(val)
+            # 从已解析的节点中获取event类型
+            event_type = _get_event_from_root(root)
+            transaction_info = parse_transaction_identifier_text(val, event_type)
             root.children.append(ParseNode(name="Transaction identifier (1C)", value=transaction_info))
         elif is_tag("1D","9D"):
             # '1D'/'9D' 可能用于 Data connection status 或 BCCH channel list
@@ -1643,6 +1734,9 @@ def parse_comp_tlvs_to_nodes(hexstr: str) -> tuple[ParseNode, str]:
         elif is_tag("68","E8"):
             frame_info = parse_frame_identifier_text(val)
             root.children.append(ParseNode(name="Frame Identifier (68)", value=frame_info))
+        elif is_tag("69","E9"):
+            measurement_qualifier_info = parse_measurement_qualifier_text(val)
+            root.children.append(ParseNode(name="Measurement Qualifier (69)", value=measurement_qualifier_info))
         elif is_tag("76","F6"):
             iari_info = parse_iari_text(val)
             root.children.append(ParseNode(name="IARI (76)", value=iari_info))
@@ -1742,15 +1836,15 @@ def parse_item_ecat_client_identity_text(value_hex: str) -> str:
         ascii_hex = value_hex[2:]
         
         if len(ascii_hex) == 0:
-            return f"Identifier: {identifier_hex} ({identifier})"
+            return f"Identifier: {identifier_hex} ({identifier}) ({value_hex})"
         
         # 解码ASCII
         try:
             ascii_bytes = bytes.fromhex(ascii_hex)
             ascii_string = ascii_bytes.decode('ascii', errors='ignore')
-            return f"Identifier: {identifier_hex}: '{ascii_string}'"
+            return f"Identifier: {identifier_hex}: '{ascii_string}' ({value_hex})"
         except Exception as e:
-            return f"Identifier: {identifier_hex} ({identifier}), ASCII解码错误: {e}"
+            return f"Identifier: {identifier_hex} ({identifier}), ASCII解码错误: {e} ({value_hex})"
             
     except Exception as e:
         return f"解析错误: {e}"
@@ -1841,5 +1935,6 @@ register_tlv_parser(('4A', 'CA'), parse_iwlan_identifier_text, "I-WLAN Identifie
 register_tlv_parser(('3C', 'BC'), parse_transport_level_text, "UICC/terminal interface transport level")
 register_tlv_parser(('50', 'D0'), parse_text_attribute_text, "Text Attribute")
 register_tlv_parser(('68', 'E8'), parse_frame_identifier_text, "Frame Identifier")
+register_tlv_parser(('69', 'E9'), parse_measurement_qualifier_text, "Measurement Qualifier")
 register_tlv_parser(('76', 'F6'), parse_iari_text, "IARI")
 # 注意：Event List (19/99) 使用特殊的 parse_event_list_to_nodes 函数，不在这里注册

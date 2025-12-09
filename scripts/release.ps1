@@ -9,6 +9,13 @@ param(
     [string]$GiteeToken = ""
 )
 
+# 设置控制台输出编码为 UTF-8，避免中文乱码
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+$OutputEncoding = [System.Text.Encoding]::UTF8
+if ($PSVersionTable.PSVersion.Major -ge 6) {
+    $PSDefaultParameterValues['*:Encoding'] = 'utf8'
+}
+
 $ErrorActionPreference = "Stop"
 
 function Invoke-Git {
@@ -143,21 +150,20 @@ function Invoke-GiteeReleaseCreate {
 
     try {
         $resp = Invoke-RestMethod -Uri $createUrl -Method Post -Headers $headers -Body $bodyJson -ContentType "application/json" -ErrorAction Stop
-        Write-Host "Gitee release created successfully!" -ForegroundColor Green
         Write-Host ""
         Write-Host "==========================================" -ForegroundColor Yellow
-        Write-Host "Gitee Release 创建成功！" -ForegroundColor Green
+        Write-Host "Gitee Release Created Successfully!" -ForegroundColor Green
         Write-Host "==========================================" -ForegroundColor Yellow
         Write-Host ""
-        Write-Host "Release 地址: $($resp.html_url)" -ForegroundColor Cyan
+        Write-Host "Release URL: $($resp.html_url)" -ForegroundColor Cyan
         Write-Host ""
-        Write-Host "请手动上传 ZIP 文件:" -ForegroundColor Yellow
-        Write-Host "  1. 打开上述 Release 地址" -ForegroundColor White
-        Write-Host "  2. 点击 '上传附件' 或 'Upload Attachment' 按钮" -ForegroundColor White
-        Write-Host "  3. 选择文件: $Package" -ForegroundColor White
-        Write-Host "  4. 等待上传完成" -ForegroundColor White
+        Write-Host "Please manually upload the ZIP file:" -ForegroundColor Yellow
+        Write-Host "  1. Open the Release URL above" -ForegroundColor White
+        Write-Host "  2. Click 'Upload Attachment' or '上传附件' button" -ForegroundColor White
+        Write-Host "  3. Select file: $Package" -ForegroundColor White
+        Write-Host "  4. Wait for upload to complete" -ForegroundColor White
         Write-Host ""
-        Write-Host "需要上传的文件路径:" -ForegroundColor Cyan
+        Write-Host "File to upload:" -ForegroundColor Cyan
         Write-Host "  $Package" -ForegroundColor White
         Write-Host ""
         Write-Host "==========================================" -ForegroundColor Yellow
@@ -177,8 +183,16 @@ function Get-ReleaseNotes {
         [switch]$Trim
     )
 
+    # If NotesFile is not provided, try to auto-detect docs/notes.md
     if (-not $NotesFile) {
-        return $DefaultNotes
+        $defaultNotesPath = Join-Path $RepoRoot "docs\notes.md"
+        if (Test-Path $defaultNotesPath) {
+            Write-Host "Auto-detected release notes from: docs\notes.md" -ForegroundColor Cyan
+            $NotesFile = "docs\notes.md"
+        } else {
+            Write-Host "No NotesFile provided and docs\notes.md not found. Using default notes." -ForegroundColor Yellow
+            return $DefaultNotes
+        }
     }
 
     # Try as absolute path, if not then relative to project root
@@ -203,6 +217,7 @@ function Get-ReleaseNotes {
             return $content
         }
     } else {
+        Write-Host "Release notes file not found: $NotesFile. Using default notes." -ForegroundColor Yellow
         return $DefaultNotes
     }
 }
