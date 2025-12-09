@@ -141,21 +141,7 @@ if exist "dist\updater.exe" (
         )
     )
     echo 清理临时文件...
-    REM 尝试多次删除，确保文件被删除
     del /f /q "dist\updater.exe" 2>nul
-    if exist "dist\updater.exe" (
-        echo 等待文件释放...
-        timeout /t 1 /nobreak >nul
-    del /f /q "dist\updater.exe" 2>nul
-        if exist "dist\updater.exe" (
-            echo 警告：无法删除 dist\updater.exe，文件可能被占用
-            echo 请手动删除该文件，或关闭可能占用它的程序后重试
-        ) else (
-            echo 临时文件已清理
-        )
-    ) else (
-        echo 临时文件已清理
-    )
 ) else (
     echo 警告：未找到更新器可执行文件 (dist\updater.exe)
 )
