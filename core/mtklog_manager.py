@@ -618,7 +618,7 @@ class MTKLogWorker(QThread):
                 
                 if video_manager and video_manager.is_recording:
                     print(f"[DEBUG] {self.tr('检测到video_manager正在录制，调用stop_recording()停止录制')}")
-                    video_manager.stop_recording()
+                    video_manager.stop_recording(open_folder=False)  # 不弹出视频文件夹
                     # 记录video_manager的引用，后续用于移动视频文件
                     self._video_manager = video_manager
                     
@@ -816,6 +816,10 @@ class MTKLogWorker(QThread):
                             
                             if moved_count > 0:
                                 print(f"[DEBUG] {self.tr('成功移动')} {moved_count} {self.tr('个视频文件到log文件夹')}")
+                                # 显示视频已保存消息（在移动完成后）
+                                mtklog_manager = self.parent()
+                                if mtklog_manager and hasattr(mtklog_manager, 'status_message'):
+                                    mtklog_manager.status_message.emit(f"{self.lang_manager.tr('视频已保存 -')} {moved_count}{self.lang_manager.tr('个文件')}")
                             
                             # 如果源目录为空，尝试删除
                             try:
