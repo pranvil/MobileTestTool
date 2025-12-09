@@ -1,28 +1,28 @@
 {
-    "version":  "0.9.6.4.4",
-    "download_url":  "https://github.com/pranvil/MobileTestTool/releases/download/v0.9.6.4.4/MobileTestTool_0.9.6.4.4.zip",
-    "sha256":  "df46da7444b6a6780c24a6c6af267dd26648d8cd08ba170aa14fabd415fefa9a",
-    "file_name":  "MobileTestTool_0.9.6.4.4.zip",
-    "file_size":  93863064,
-    "release_notes":  "\n## Release Note\n- 开放英文界面，但翻译没有完成\n- 下载地址更新\n## Known issue\n- 概率性功能失效，但是重新打开软件会恢复\n",
-    "published_at":  "2025-12-07T09:22:02Z",
+    "version":  "0.9.6.4.5",
+    "download_url":  "https://github.com/pranvil/MobileTestTool/releases/download/v0.9.6.4.5/MobileTestTool_0.9.6.4.5.zip",
+    "sha256":  "6f1538a38194cdaa625ba2b282901b47b0b40c0716ee428e00be5238d97c4e63",
+    "file_name":  "MobileTestTool_0.9.6.4.5.zip",
+    "file_size":  115528118,
+    "release_notes":  "## Release Note\n- APDU添加ctrl+F搜索功能\n- 优化APDU搜索体验\n- 添加更多 CAT命令解析\n## Known issue\n- 概率性功能失效，但是重新打开软件会恢复",
+    "published_at":  "2025-12-09T17:41:42Z",
     "mandatory":  false,
     "download_urls":  [
                           {
                               "region":  "us",
-                              "url":  "https://github.com/pranvil/MobileTestTool/releases/download/v0.9.6.4.4/MobileTestTool_0.9.6.4.4.zip",
+                              "url":  "https://github.com/pranvil/MobileTestTool/releases/download/v0.9.6.4.5/MobileTestTool_0.9.6.4.5.zip",
                               "priority":  10,
                               "platform":  "windows"
                           },
                           {
                               "region":  "cn",
-                              "url":  "https://gitee.com/pranvil/MobileTestTool/releases/download/v0.9.6.4.4/MobileTestTool_0.9.6.4.4.zip",
+                              "url":  "https://gitee.com/pranvil/MobileTestTool/releases/download/v0.9.6.4.5/MobileTestTool_0.9.6.4.5.zip",
                               "priority":  20,
                               "platform":  "windows"
                           },
                           {
                               "region":  "default",
-                              "url":  "https://github.com/pranvil/MobileTestTool/releases/download/v0.9.6.4.4/MobileTestTool_0.9.6.4.4.zip",
+                              "url":  "https://github.com/pranvil/MobileTestTool/releases/download/v0.9.6.4.5/MobileTestTool_0.9.6.4.5.zip",
                               "priority":  5,
                               "platform":  "all"
                           }
