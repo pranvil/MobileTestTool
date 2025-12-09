@@ -1,11 +1,11 @@
 {
     "version":  "0.9.6.4.5",
     "download_url":  "https://github.com/pranvil/MobileTestTool/releases/download/v0.9.6.4.5/MobileTestTool_0.9.6.4.5.zip",
-    "sha256":  "6f1538a38194cdaa625ba2b282901b47b0b40c0716ee428e00be5238d97c4e63",
+    "sha256":  "0a6eed10cef40706481cf3d73c2cc9d2600add1e1aa02dca81df7b5677395d02",
     "file_name":  "MobileTestTool_0.9.6.4.5.zip",
-    "file_size":  115528118,
+    "file_size":  101440550,
     "release_notes":  "## Release Note\n- APDU添加ctrl+F搜索功能\n- 优化APDU搜索体验\n- 添加更多 CAT命令解析\n- pull MTKlog的时候不再单独打开video folder\n## Known issue\n- 概率性功能失效，但是重新打开软件会恢复",
-    "published_at":  "2025-12-09T17:51:28Z",
+    "published_at":  "2025-12-09T21:09:28Z",
     "mandatory":  false,
     "download_urls":  [
                           {
