@@ -12,9 +12,9 @@ from PyQt5.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QPushButton,
                            QLabel, QTextEdit, QTreeWidget, QTreeWidgetItem,
                            QFileDialog, QMessageBox, QSplitter,
                            QProgressBar, QComboBox, QCheckBox, QLineEdit,
-                           QSizePolicy, QApplication, QWidget, QFrame)
+                           QSizePolicy, QApplication, QWidget, QFrame, QShortcut)
 from PyQt5.QtCore import Qt, QThread, pyqtSignal, QTimer
-from PyQt5.QtGui import QFont, QColor, QPalette
+from PyQt5.QtGui import QFont, QColor, QPalette, QKeySequence
 from ui.widgets.shadow_utils import add_card_shadow
 
 # 延迟导入 SIM_APDU_Parser 核心模块
@@ -184,6 +184,13 @@ class ApduParserDialog(QDialog):
         self.current_file = None
         self.parse_results = []
         
+        # 搜索相关变量
+        self.search_results = []  # 存储匹配的项索引
+        self.current_search_index = -1  # 当前搜索结果的索引
+        self.search_keyword = ""  # 当前搜索关键字
+        self.search_details = True  # 是否搜索右侧解析详情
+        self.use_regex = False  # 是否使用正则表达式
+        
         # 获取语言管理器
         if parent and hasattr(parent, 'lang_manager'):
             self.lang_manager = parent.lang_manager
@@ -200,6 +207,7 @@ class ApduParserDialog(QDialog):
         self.setWindowFlags(Qt.Dialog | Qt.WindowMinMaxButtonsHint | Qt.WindowCloseButtonHint)
         
         self.setup_ui()
+        self.setup_shortcuts()
     
     def tr(self, text):
         """安全地获取翻译文本"""
@@ -402,6 +410,20 @@ class ApduParserDialog(QDialog):
         
         # 初始化可复选下拉菜单
         self.setup_filter_combo()
+    
+    def setup_shortcuts(self):
+        """设置快捷键"""
+        # Ctrl+F - 打开搜索对话框
+        shortcut_search = QShortcut(QKeySequence("Ctrl+F"), self)
+        shortcut_search.activated.connect(self.show_search_dialog)
+        
+        # F3 - 查找下一个
+        shortcut_next = QShortcut(QKeySequence("F3"), self)
+        shortcut_next.activated.connect(self.find_next)
+        
+        # Shift+F3 - 查找上一个
+        shortcut_prev = QShortcut(QKeySequence("Shift+F3"), self)
+        shortcut_prev.activated.connect(self.find_previous)
         
     def setup_filter_combo(self):
         """设置可复选的下拉菜单"""
@@ -699,6 +721,239 @@ class ApduParserDialog(QDialog):
         for child in node.children:
             text += " " + self.get_parse_tree_text(child)
         return text
+    
+    def show_search_dialog(self):
+        """显示搜索对话框"""
+        from PyQt5.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QCheckBox
+        
+        # 创建搜索对话框
+        search_dialog = QDialog(self)
+        search_dialog.setWindowTitle(self.tr("搜索APDU消息"))
+        search_dialog.setModal(False)  # 非模态对话框
+        search_dialog.setMinimumWidth(400)
+        
+        layout = QVBoxLayout(search_dialog)
+        
+        # 搜索输入框
+        input_layout = QHBoxLayout()
+        input_layout.addWidget(QLabel(self.tr("搜索:")))
+        search_input = QLineEdit()
+        search_input.setText(self.search_keyword)  # 如果有之前的搜索关键字，恢复它
+        search_input.selectAll()  # 选中所有文本以便快速输入
+        input_layout.addWidget(search_input)
+        layout.addLayout(input_layout)
+        
+        # 复选框选项
+        options_layout = QHBoxLayout()
+        search_details_checkbox = QCheckBox(self.tr("搜索右侧解析详情"))
+        search_details_checkbox.setChecked(self.search_details)
+        search_details_checkbox.setToolTip(self.tr("勾选后会在解析结果中搜索，包括所有字段和说明"))
+        
+        use_regex_checkbox = QCheckBox(self.tr("使用正则表达式"))
+        use_regex_checkbox.setChecked(self.use_regex)
+        use_regex_checkbox.setToolTip(self.tr("勾选后使用正则表达式进行搜索"))
+        
+        options_layout.addWidget(search_details_checkbox)
+        options_layout.addWidget(use_regex_checkbox)
+        options_layout.addStretch()
+        layout.addLayout(options_layout)
+        
+        # 按钮
+        button_layout = QHBoxLayout()
+        btn_prev = QPushButton(self.tr("上一条 (Shift+F3)"))
+        btn_next = QPushButton(self.tr("下一条 (F3)"))
+        btn_close = QPushButton(self.tr("关闭"))
+        
+        button_layout.addWidget(btn_prev)
+        button_layout.addWidget(btn_next)
+        button_layout.addStretch()
+        button_layout.addWidget(btn_close)
+        layout.addLayout(button_layout)
+        
+        # 状态标签
+        status_label = QLabel("")
+        layout.addWidget(status_label)
+        
+        # 连接信号
+        def on_search():
+            keyword = search_input.text()
+            self.search_details = search_details_checkbox.isChecked()
+            self.use_regex = use_regex_checkbox.isChecked()
+            
+            if keyword:
+                self.search_in_apdu_list(keyword, self.search_details, self.use_regex)
+                self.update_search_status(status_label)
+            else:
+                self.search_results = []
+                self.current_search_index = -1
+                status_label.setText("")
+        
+        def on_option_changed():
+            # 当选项改变时，如果有关键字，重新搜索
+            if search_input.text():
+                on_search()
+        
+        def on_find_next():
+            self.find_next()
+            self.update_search_status(status_label)
+        
+        def on_find_prev():
+            self.find_previous()
+            self.update_search_status(status_label)
+        
+        search_input.textChanged.connect(on_search)
+        search_details_checkbox.stateChanged.connect(on_option_changed)
+        use_regex_checkbox.stateChanged.connect(on_option_changed)
+        search_input.returnPressed.connect(on_find_next)  # 回车键查找下一个
+        btn_next.clicked.connect(on_find_next)
+        btn_prev.clicked.connect(on_find_prev)
+        btn_close.clicked.connect(search_dialog.close)
+        
+        # 设置焦点到搜索框
+        search_input.setFocus()
+        
+        # 显示对话框
+        search_dialog.show()
+        
+        # 如果有关键字，立即搜索
+        if search_input.text():
+            on_search()
+    
+    def search_in_apdu_list(self, keyword: str, search_details: bool = True, use_regex: bool = False):
+        """在APDU列表中搜索
+        
+        Args:
+            keyword: 搜索关键字
+            search_details: 是否搜索右侧解析详情
+            use_regex: 是否使用正则表达式
+        """
+        self.search_keyword = keyword
+        self.search_results = []
+        
+        if not keyword:
+            return
+        
+        # 如果使用正则表达式，编译正则表达式
+        regex_pattern = None
+        if use_regex:
+            try:
+                regex_pattern = re.compile(keyword, re.IGNORECASE)
+            except re.error as e:
+                # 正则表达式错误，显示错误信息但不阻止搜索
+                QMessageBox.warning(self, self.tr("正则表达式错误"), 
+                                  self.tr(f"无效的正则表达式: {e}\n将使用普通文本搜索。"))
+                use_regex = False
+                regex_pattern = None
+        
+        keyword_lower = keyword.lower() if not use_regex else None
+        
+        # 搜索所有可见的APDU项
+        for i in range(self.apdu_tree.topLevelItemCount()):
+            item = self.apdu_tree.topLevelItem(i)
+            if item.isHidden():
+                continue
+            
+            result = item.data(0, Qt.UserRole)
+            if not result:
+                continue
+            
+            # 搜索标题
+            search_text = item.text(2)
+            
+            # 搜索原始数据
+            if hasattr(result, 'message') and hasattr(result.message, 'raw'):
+                search_text += " " + result.message.raw
+            
+            # 搜索解析结果（根据复选框决定）
+            if search_details and result and hasattr(result, 'root') and result.root:
+                search_text += " " + self.get_parse_tree_text(result.root)
+            
+            # 检查是否匹配
+            if use_regex and regex_pattern:
+                # 使用正则表达式搜索（不区分大小写）
+                text_match = bool(regex_pattern.search(search_text))
+            else:
+                # 使用普通文本搜索（不区分大小写）
+                text_match = keyword_lower in search_text.lower()
+            
+            if text_match:
+                self.search_results.append(i)
+        
+        # 如果有搜索结果，定位到第一个
+        if self.search_results:
+            self.current_search_index = 0
+            self.highlight_search_result()
+        else:
+            self.current_search_index = -1
+    
+    def highlight_search_result(self):
+        """高亮当前搜索结果"""
+        if not self.search_results or self.current_search_index < 0:
+            return
+        
+        if self.current_search_index >= len(self.search_results):
+            return
+        
+        # 获取匹配的项索引
+        item_index = self.search_results[self.current_search_index]
+        item = self.apdu_tree.topLevelItem(item_index)
+        
+        if item:
+            # 选中该项
+            self.apdu_tree.setCurrentItem(item)
+            self.apdu_tree.scrollToItem(item)
+            
+            # 触发选择事件以更新右侧详情
+            self.on_apdu_selected(item)
+    
+    def find_next(self):
+        """查找下一个匹配项"""
+        if not self.search_results:
+            # 如果没有搜索结果，尝试使用搜索框中的关键字重新搜索
+            if self.search_edit.text():
+                self.search_in_apdu_list(
+                    self.search_edit.text(),
+                    self.search_details_checkbox.isChecked() if hasattr(self, 'search_details_checkbox') else True,
+                    self.use_regex_checkbox.isChecked() if hasattr(self, 'use_regex_checkbox') else False
+                )
+            else:
+                return
+        
+        if self.current_search_index < 0:
+            self.current_search_index = 0
+        else:
+            self.current_search_index = (self.current_search_index + 1) % len(self.search_results)
+        
+        self.highlight_search_result()
+    
+    def find_previous(self):
+        """查找上一个匹配项"""
+        if not self.search_results:
+            # 如果没有搜索结果，尝试使用搜索框中的关键字重新搜索
+            if self.search_edit.text():
+                self.search_in_apdu_list(
+                    self.search_edit.text(),
+                    self.search_details_checkbox.isChecked() if hasattr(self, 'search_details_checkbox') else True,
+                    self.use_regex_checkbox.isChecked() if hasattr(self, 'use_regex_checkbox') else False
+                )
+            else:
+                return
+        
+        if self.current_search_index < 0:
+            self.current_search_index = len(self.search_results) - 1
+        else:
+            self.current_search_index = (self.current_search_index - 1) % len(self.search_results)
+        
+        self.highlight_search_result()
+    
+    def update_search_status(self, status_label):
+        """更新搜索状态标签"""
+        if not self.search_results:
+            status_label.setText(self.tr("未找到匹配项"))
+        else:
+            status_label.setText(
+                self.tr(f"找到 {len(self.search_results)} 个匹配项，当前第 {self.current_search_index + 1} 个")
+            )
     
     def clear_filters(self):
         """清除所有筛选"""
