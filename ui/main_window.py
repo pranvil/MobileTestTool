@@ -3555,8 +3555,9 @@ class MainWindow(QMainWindow):
         self.append_log.emit(self.lang_manager.tr("视频录制已停止") + "\n", None)
     
     def _on_video_saved(self, folder, count):
-        """视频保存完成"""
-        self.append_log.emit(f"{self.tr('视频已保存到: ')}{folder} ({count}{self.tr('个文件)')}\n", None)
+        """视频保存完成（仅在直接点击停止录制按钮时调用）"""
+        if count > 0:
+            self.append_log.emit(f"{self.tr('视频已保存到: ')}{folder} ({count}{self.tr('个文件)')}\n", None)
     
     def _on_video_status(self, message):
         """录制状态消息"""

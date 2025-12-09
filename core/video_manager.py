@@ -185,8 +185,12 @@ class VideoManager(QObject):
         finally:
             self.is_recording = False
     
-    def stop_recording(self):
-        """停止录制"""
+    def stop_recording(self, open_folder=True):
+        """停止录制
+        
+        Args:
+            open_folder: 是否在保存完成后打开视频文件夹，默认为True
+        """
         if not self.is_recording:
             return
         
@@ -212,14 +216,18 @@ class VideoManager(QObject):
         time.sleep(2)
         
         # 在后台线程中保存视频
-        save_thread = threading.Thread(target=self._save_videos, daemon=True)
+        save_thread = threading.Thread(target=self._save_videos, args=(open_folder,), daemon=True)
         save_thread.start()
         
         self.recording_stopped.emit()
         self.status_message.emit(self.lang_manager.tr("正在保存视频..."))
     
-    def _save_videos(self):
-        """保存视频文件"""
+    def _save_videos(self, open_folder=True):
+        """保存视频文件
+        
+        Args:
+            open_folder: 是否在保存完成后打开视频文件夹，默认为True
+        """
         device = self.device_manager.validate_device_selection()
         if not device:
             return
@@ -329,10 +337,14 @@ class VideoManager(QObject):
             self.recorded_files.clear()
             
             if saved_count > 0:
-                # 打开视频文件夹
-                os.startfile(video_dir)
-                self.video_saved.emit(video_dir, saved_count)
-                self.status_message.emit(f"{self.lang_manager.tr('视频已保存 -')} {saved_count}{self.lang_manager.tr('个文件')}")
+                # 根据参数决定是否打开视频文件夹
+                if open_folder:
+                    os.startfile(video_dir)
+                # 只有在open_folder=True时才发出信号（直接点击停止录制按钮时显示消息）
+                # 如果open_folder=False（从mtklog_manager调用），不发出信号，消息将在mtklog_manager中显示
+                if open_folder:
+                    self.video_saved.emit(video_dir, saved_count)
+                    self.status_message.emit(f"{self.lang_manager.tr('视频已保存 -')} {saved_count}{self.lang_manager.tr('个文件')}")
             else:
                 self.status_message.emit(self.lang_manager.tr("没有成功保存任何视频文件"))
                 
