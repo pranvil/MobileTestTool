@@ -392,7 +392,36 @@ Invoke-Git "push" "origin" "main"
 $remotes = (git remote) -split "`n" | ForEach-Object { $_.Trim() } | Where-Object { $_ }
 if ($remotes -contains "gitee") {
     Write-Host "Pushing 'main' to 'gitee'..."
-    Invoke-Git "push" "gitee" "main"
+    
+    # 先 fetch gitee 的最新状态
+    Write-Host "Fetching latest from 'gitee'..."
+    Invoke-Git "fetch" "gitee"
+    
+    # 检查是否可以快进推送
+    $canFastForward = $true
+    try {
+        # 检查 gitee/main 是否在本地 main 的历史中
+        $mergeBase = git merge-base main gitee/main 2>$null
+        $giteeMainCommit = git rev-parse gitee/main 2>$null
+        if ($LASTEXITCODE -eq 0 -and $mergeBase -and $giteeMainCommit) {
+            if ($mergeBase -ne $giteeMainCommit) {
+                $canFastForward = $false
+                Write-Host "Warning: 'gitee/main' has diverged from local 'main'. Using force-with-lease to push." -ForegroundColor Yellow
+            }
+        }
+    } catch {
+        $canFastForward = $false
+        Write-Host "Warning: Could not determine merge base. Using force-with-lease to push." -ForegroundColor Yellow
+    }
+    
+    if ($canFastForward) {
+        Invoke-Git "push" "gitee" "main"
+    } else {
+        # 使用 --force-with-lease 进行安全强制推送
+        # 这比 --force 更安全，只有在远程没有被其他人更新时才会推送
+        Write-Host "Using '--force-with-lease' to push to 'gitee'..." -ForegroundColor Yellow
+        Invoke-Git "push" "gitee" "main" "--force-with-lease"
+    }
 }
 else {
     Write-Host "No 'gitee' remote configured. Skipping push of 'main' to Gitee."
@@ -420,7 +449,8 @@ Invoke-Git "push" "origin" $tagName
 # 如果有 gitee 远程，把 tag 同步到 Gitee
 if ($remotes -contains "gitee") {
     Write-Host "Pushing tag $tagName to 'gitee'..."
-    Invoke-Git "push" "gitee" $tagName
+    # Tag 推送使用 --force，因为同一个 tag 可能在不同提交上
+    Invoke-Git "push" "gitee" $tagName "--force"
 }
 else {
     Write-Host "No 'gitee' remote configured. Skipping push of tag to Gitee."
