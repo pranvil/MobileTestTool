@@ -63,8 +63,13 @@ def _set_application_icon(app):
             icon_path = os.path.join(os.path.dirname(__file__), 'icon.ico')
         
         if os.path.exists(icon_path):
-            app.setWindowIcon(QIcon(icon_path))
-            logger.info(f"应用程序图标已设置: {icon_path}")
+            icon = QIcon(icon_path)
+            # 验证图标是否有效
+            if not icon.isNull() and icon.availableSizes() != []:
+                app.setWindowIcon(icon)
+                logger.info(f"应用程序图标已设置: {icon_path}")
+            else:
+                logger.warning(f"图标文件无效: {icon_path}")
         else:
             logger.warning(f"图标文件不存在: {icon_path}")
     except Exception as e:

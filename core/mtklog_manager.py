@@ -854,6 +854,7 @@ class MTKLogWorker(QThread):
                     ("/sdcard/Screen Recorder/.", "Screen_Recorder"),
                     ("/storage/emulated/0/Screen Recorder/.", "Screen_Recorder_Storage"),
                     ("/sdcard/DCIM/ViewMe/.", "ViewMe_DCIM"),
+                    ("/sdcard/Screen Recorder.", "Screen_Recorder"),
                     ("/storage/emulated/0/Pictures/Screenshots/.", "Screenshots_Storage"),
                     ("/sdcard/Pictures/Screenshots/.", "Screenshots_DCIM")
                 ]

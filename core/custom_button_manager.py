@@ -154,6 +154,7 @@ class CustomButtonManager(QObject):
             normalized_btn_card = ' '.join(btn_card.split()) if btn_card else ''
             if normalized_btn_card == normalized_card_name:
                 result.append(btn)
+        logger.debug(f"[按钮管理器] 获取按钮 - Tab: '{tab_name}', Card: '{card_name}', 数量: {len(result)}, 顺序: {[btn.get('name', '') for btn in result]}")
         return result
     
     def get_available_tabs(self):
@@ -363,8 +364,8 @@ class CustomButtonManager(QObject):
                     new_buttons.append(btn)
 
             self.buttons = new_buttons
-            return self.save_buttons()
-            self.buttons = new_buttons
+            # 不发送信号，因为UI已经通过拖动更新了，不需要重新加载
+            logger.debug(f"[按钮排序] 保存排序后的按钮顺序: {[btn.get('name', '') for btn in ordered_buttons]}")
             return self.save_buttons(emit_signal=False)
 
         except Exception as e:

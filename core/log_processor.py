@@ -299,20 +299,23 @@ class PyQtLogProcessor(QObject):
             self.filtering_stopped.emit()
             self.status_message.emit(self.lang_manager.tr("日志过滤已停止"))
             self.worker = None
+        except Exception as e:
+            self.status_message.emit(f"{self.lang_manager.tr('停止日志过滤失败:')} {str(e)}")
     
     def cleanup(self):
         """清理工作线程，在窗口关闭时调用"""
-        if self.is_running:
-            self.stop_filtering()
-            
-            # 重置性能统计
-            self.performance_update.emit("")
-            
-            # 发出过滤状态变化信号
-            self.filter_state_changed.emit(False, "")
-            
+        try:
+            if self.is_running:
+                self.stop_filtering()
+                
+                # 重置性能统计
+                self.performance_update.emit("")
+                
+                # 发出过滤状态变化信号
+                self.filter_state_changed.emit(False, "")
         except Exception as e:
-            self.status_message.emit(f"{self.lang_manager.tr('停止日志过滤失败:')} {str(e)}")
+            # 清理时的异常可以忽略，避免影响程序关闭
+            pass
     
     def clear_device_logs(self):
         """清除设备日志缓存"""

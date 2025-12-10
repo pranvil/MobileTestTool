@@ -116,6 +116,9 @@ class DraggableCustomButton(QPushButton):
         if not button_id:
             return
 
+        button_name = self.button_data.get('name', '')
+        logger.debug(f"[拖动开始] 按钮ID: {button_id}, 按钮名称: {button_name}, Tab: {self.container.tab_name}, Card: {self.container.card_name}")
+
         drag = QDrag(self)
         mime = QMimeData()
         payload = {
@@ -125,6 +128,20 @@ class DraggableCustomButton(QPushButton):
         }
         mime.setData(CUSTOM_BUTTON_MIME_TYPE, json.dumps(payload).encode('utf-8'))
         drag.setMimeData(mime)
+        
+        # 设置拖动预览图像，避免 QPixmap 警告
+        # 创建一个按钮的快照作为拖动预览
+        try:
+            from PyQt5.QtGui import QPixmap, QPainter
+            pixmap = QPixmap(self.size())
+            pixmap.fill(Qt.transparent)
+            self.render(pixmap)
+            if not pixmap.isNull():
+                drag.setPixmap(pixmap)
+        except Exception:
+            # 如果创建预览失败，使用默认行为（不设置预览）
+            pass
+        
         drag.exec_(Qt.MoveAction)
 
 
@@ -166,9 +183,10 @@ class CustomButtonContainer(QWidget):
         button = DraggableCustomButton(button_data, self)
         button.clicked.connect(lambda checked=False, data=button_data: self.main_window.execute_custom_button_command(data))
 
-        insert_pos = max(0, self._layout.count() - 1)
-        self._layout.insertWidget(insert_pos, button)
+        # 直接添加到布局末尾，保持按钮顺序
+        self._layout.addWidget(button)
         self._button_widgets[button_data.get('id')] = button
+        logger.debug(f"[按钮容器] 添加按钮: {button_data.get('name', '')} (ID: {button_data.get('id', '')}) 到布局末尾")
         return button
 
     def dragEnterEvent(self, event):
@@ -200,23 +218,58 @@ class CustomButtonContainer(QWidget):
             event.ignore()
             return
 
-        source_index = buttons.index(button)
-        target_index = self._determine_target_index(event.pos(), buttons)
+        # 记录拖动前的按钮顺序
+        button_names_before = [btn.button_data.get('name', '') for btn in buttons]
+        button_ids_before = [btn.button_data.get('id', '') for btn in buttons]
+        logger.debug(f"[拖动前] 按钮顺序: {button_names_before}")
+        logger.debug(f"[拖动前] 按钮ID顺序: {button_ids_before}")
 
-        if target_index == source_index or target_index == source_index + 1:
+        source_index = buttons.index(button)
+        source_button_name = button.button_data.get('name', '')
+        logger.debug(f"[拖动] 源按钮: {source_button_name} (索引: {source_index})")
+
+        mouse_pos = event.pos()
+        logger.debug(f"[拖动] 鼠标位置: x={mouse_pos.x()}, y={mouse_pos.y()}")
+
+        target_index = self._determine_target_index(mouse_pos, buttons)
+        logger.debug(f"[拖动] 初始目标索引: {target_index}")
+
+        # 如果目标位置和源位置相同，或者目标位置紧挨着源位置（不需要移动），则忽略
+        if target_index == source_index:
+            logger.debug(f"[拖动] 目标索引等于源索引，忽略拖动")
             event.ignore()
             return
 
+        # 移除源按钮
+        logger.debug(f"[拖动] 移除源按钮 (索引: {source_index})")
         self._layout.removeWidget(button)
 
+        # 计算正确的插入位置
+        original_target_index = target_index
+        # 如果目标索引在源索引之后，需要减1（因为源按钮已被移除）
         if target_index > source_index:
             target_index -= 1
+            logger.debug(f"[拖动] 目标索引在源索引之后，调整: {original_target_index} -> {target_index}")
 
+        # 确保目标索引在有效范围内
         target_index = max(0, min(target_index, self._layout.count()))
+        logger.debug(f"[拖动] 最终目标索引: {target_index} (布局中当前项目数: {self._layout.count()})")
+        
+        # 插入到目标位置
+        logger.debug(f"[拖动] 插入按钮到索引: {target_index}")
         self._layout.insertWidget(target_index, button)
         event.acceptProposedAction()
 
+        # 记录拖动后的按钮顺序
+        buttons_after = self._ordered_buttons()
+        button_names_after = [btn.button_data.get('name', '') for btn in buttons_after]
+        button_ids_after = [btn.button_data.get('id', '') for btn in buttons_after]
+        logger.debug(f"[拖动后] 按钮顺序: {button_names_after}")
+        logger.debug(f"[拖动后] 按钮ID顺序: {button_ids_after}")
+
+        # 发送排序变更信号
         ordered_ids = self._current_button_ids()
+        logger.debug(f"[拖动] 发送排序变更信号，ID顺序: {ordered_ids}")
         self.order_changed.emit(self.tab_name, self.card_name, ordered_ids)
 
     def _ordered_buttons(self):
@@ -232,12 +285,55 @@ class CustomButtonContainer(QWidget):
         return [btn.button_data.get('id') for btn in self._ordered_buttons() if btn.button_data.get('id')]
 
     def _determine_target_index(self, pos, buttons):
+        """
+        根据鼠标位置确定目标插入索引
+        
+        Args:
+            pos: 鼠标位置（QPoint，相对于容器的坐标）
+            buttons: 按钮列表
+            
+        Returns:
+            int: 目标索引位置（插入位置，在指定索引的按钮之前）
+        """
+        if not buttons:
+            logger.debug(f"[目标索引] 按钮列表为空，返回 0")
+            return 0
+        
+        # 默认插入到末尾
         target_index = len(buttons)
+        logger.debug(f"[目标索引] 初始目标索引: {target_index} (末尾)")
+        logger.debug(f"[目标索引] 鼠标位置: x={pos.x()}, y={pos.y()}")
+        
+        # 遍历所有按钮，找到鼠标应该在的位置
+        # 使用按钮的左边界作为判断标准，更直观
         for index, btn in enumerate(buttons):
-            center_x = btn.geometry().center().x()
-            if pos.x() < center_x:
+            btn_rect = btn.geometry()
+            btn_left = btn_rect.left()
+            btn_right = btn_rect.right()
+            btn_center_x = btn_rect.center().x()
+            btn_name = btn.button_data.get('name', '')
+            
+            logger.debug(f"[目标索引] 按钮[{index}] {btn_name}: left={btn_left}, right={btn_right}, center={btn_center_x}, 宽度={btn_rect.width()}")
+            
+            # 如果鼠标在按钮的左侧一半区域内，插入到该按钮之前
+            # 这样可以更准确地判断用户想要插入的位置
+            if pos.x() < btn_left:
                 target_index = index
+                logger.debug(f"[目标索引] 鼠标在按钮[{index}]左侧，目标索引设为: {target_index}")
                 break
+            # 如果鼠标在按钮上，根据位置判断是插入到之前还是之后
+            elif btn_left <= pos.x() <= btn_right:
+                if pos.x() < btn_center_x:
+                    # 在按钮左侧一半，插入到该按钮之前
+                    target_index = index
+                    logger.debug(f"[目标索引] 鼠标在按钮[{index}]左侧一半，目标索引设为: {target_index}")
+                else:
+                    # 在按钮右侧一半，插入到该按钮之后
+                    target_index = index + 1
+                    logger.debug(f"[目标索引] 鼠标在按钮[{index}]右侧一半，目标索引设为: {target_index}")
+                break
+        
+        logger.debug(f"[目标索引] 最终确定的目标索引: {target_index}")
         return target_index
 
     def _accepts_event(self, mime_data):
@@ -828,8 +924,13 @@ class MainWindow(QMainWindow):
             icon_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'icon.ico')
         
         if os.path.exists(icon_path):
-            self.setWindowIcon(QIcon(icon_path))
-            logger.info(f"窗口图标已设置: {icon_path}")
+            icon = QIcon(icon_path)
+            # 验证图标是否有效
+            if not icon.isNull() and icon.availableSizes() != []:
+                self.setWindowIcon(icon)
+                logger.info(f"窗口图标已设置: {icon_path}")
+            else:
+                logger.warning(f"图标文件无效: {icon_path}")
         else:
             logger.warning(f"图标文件不存在: {icon_path}")
     
@@ -4130,9 +4231,13 @@ class MainWindow(QMainWindow):
                 if container is None:
                     return
                 container.clear_buttons()
-                for btn_data in buttons:
+                logger.debug(f"[按钮加载] 准备加载 {len(buttons)} 个按钮到 '{card_name}'，顺序: {[btn.get('name', '') for btn in buttons]}")
+                for idx, btn_data in enumerate(buttons):
                     container.add_custom_button(btn_data)
-                    logger.debug(f"{self.lang_manager.tr('添加自定义按钮')} '{btn_data['name']}' {self.lang_manager.tr('到')} '{card_name}'")
+                    logger.debug(f"[按钮加载] [{idx}] 添加按钮: '{btn_data.get('name', '')}' (ID: {btn_data.get('id', '')})")
+                # 验证最终顺序
+                final_order = [btn.button_data.get('name', '') for btn in container._ordered_buttons()]
+                logger.debug(f"[按钮加载] 加载完成后，容器中的按钮顺序: {final_order}")
             else:
                 logger.warning(f"{self.lang_manager.tr('未找到合适的按钮布局')}")
             
@@ -5025,4 +5130,5 @@ class MainWindow(QMainWindow):
                 self._update_worker.reject_download()
             else:
                 logger.debug("MainWindow: no worker instance when rejecting download")
+
 

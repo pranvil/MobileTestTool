@@ -450,6 +450,12 @@ class PyQtHeraConfigManager(QObject):
     def configure_collect_data(self):
         """赫拉测试数据收集"""
         self.hera_manager.configure_collect_data()
+    
+    def cleanup(self):
+        """清理工作线程，在窗口关闭时调用"""
+        if hasattr(self, 'hera_manager') and self.hera_manager:
+            if hasattr(self.hera_manager, 'cleanup'):
+                self.hera_manager.cleanup()
 
 
 class VenvWorker(QThread):
@@ -1049,7 +1055,7 @@ class OtherOperationsWorker(QThread):
                 error_msg = (
                     f"{self.tr('找不到PCAP_Gen_2.0.exe:')} {pcap_gen_exe}\n\n"
                     f"{self.tr('请安装高通Packet Capture (PCAP) Generator，并且把路径添加到工具配置中。')}\n"
-                    f"{self.tr('示例路径:')} PCAP_Generator_PCAP_Gen_2.0 - C:\Program Files (x86)\Qualcomm\PCAP_Generator\PCAP_Gen_2.0\Release"
+                    f"{self.tr('示例路径:')} PCAP_Generator_PCAP_Gen_2.0 - C:\\Program Files (x86)\\Qualcomm\\PCAP_Generator\\PCAP_Gen_2.0\\Release"
                 )
                 return {'success': False, 'error': error_msg}
             

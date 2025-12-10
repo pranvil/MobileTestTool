@@ -716,6 +716,15 @@ class PyQtEcholocateManager(QObject):
             
             # 启动线程
             self.worker.start()
+            
+            # 显示进度对话框
+            progress_dialog.exec_()
+            
+            return True
+            
+        except Exception as e:
+            QMessageBox.critical(None, self.tr("错误"), f"开始voice_intent测试失败: {str(e)}")
+            return False
     
     def cleanup(self):
         """清理工作线程，在窗口关闭时调用"""
@@ -729,15 +738,6 @@ class PyQtEcholocateManager(QObject):
                 pass
             finally:
                 self.worker = None
-            
-            # 显示进度对话框
-            progress_dialog.exec_()
-            
-            return True
-            
-        except Exception as e:
-            QMessageBox.critical(None, self.tr("错误"), f"开始voice_intent测试失败: {str(e)}")
-            return False
     
     def _update_progress(self, dialog, progress, status):
         """更新进度"""

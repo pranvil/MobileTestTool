@@ -9,6 +9,10 @@ from PyQt5.QtWidgets import (QToolBar, QWidget, QHBoxLayout, QLabel,
 from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtGui import QIcon
 from core.resource_utils import get_icon_path
+import os
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class DeviceToolBar(QToolBar):
@@ -38,14 +42,41 @@ class DeviceToolBar(QToolBar):
         self.setup_icons()
         self.setup_toolbar()
     
+    def _load_icon_safely(self, icon_name):
+        """
+        安全地加载图标，避免空 pixmap 警告
+        
+        Args:
+            icon_name: 图标文件名（如 "refresh.png"）
+            
+        Returns:
+            QIcon: 成功加载的图标，失败则返回空的 QIcon
+        """
+        icon_path = get_icon_path(icon_name)
+        
+        # 检查文件是否存在
+        if not os.path.exists(icon_path):
+            logger.warning(f"图标文件不存在: {icon_path}")
+            return QIcon()
+        
+        # 加载图标
+        icon = QIcon(icon_path)
+        
+        # 验证图标是否有效（检查是否有任何可用尺寸）
+        if icon.isNull() or icon.availableSizes() == []:
+            logger.warning(f"图标加载失败或无效: {icon_path}")
+            return QIcon()
+        
+        return icon
+    
     def setup_icons(self):
         """设置图标"""
-        # 工具栏图标
-        self.refresh_icon = QIcon(get_icon_path('refresh.png'))
-        self.screenshot_icon = QIcon(get_icon_path('screenshot.png'))
-        self.record_icon = QIcon(get_icon_path('record.png'))
-        self.theme_dark_icon = QIcon(get_icon_path('theme_dark.png'))
-        self.theme_light_icon = QIcon(get_icon_path('theme_light.png'))
+        # 工具栏图标 - 使用安全加载方法
+        self.refresh_icon = self._load_icon_safely('refresh.png')
+        self.screenshot_icon = self._load_icon_safely('screenshot.png')
+        self.record_icon = self._load_icon_safely('record.png')
+        self.theme_dark_icon = self._load_icon_safely('theme_dark.png')
+        self.theme_light_icon = self._load_icon_safely('theme_light.png')
         
     def setup_toolbar(self):
         """设置工具栏"""
