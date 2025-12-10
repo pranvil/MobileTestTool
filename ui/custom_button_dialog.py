@@ -531,15 +531,15 @@ class ButtonEditDialog(QDialog):
             self.advanced_group.setVisible(False)
             return
         
-        # 显示/隐藏高级设置
-        if button_type in ["adb", "system", "python"]:
-            # ADB命令、系统命令、Python脚本：使用脚本/命令输入区域
+        # 显示/隐藏高级设置 - 统一使用脚本/命令输入区域（多行文本输入框）
+        if button_type in ["adb", "system", "python", "file", "program", "url"]:
+            # 所有类型都使用脚本/命令输入区域（多行文本输入框）
             self.script_edit.setVisible(True)
             self.script_edit.setMaximumHeight(300)
             self.path_edit.setVisible(False)
             self.file_browse_btn.setVisible(False)
             self.folder_browse_btn.setVisible(False)
-            self.advanced_title.setText(self.tr("脚本\\命令"))  # 更新标题文本
+            self.advanced_title.setText(self.tr("脚本\\命令"))  # 统一使用"脚本\命令"标题
             self.advanced_group.setVisible(True)
             
             # 设置占位符
@@ -547,33 +547,14 @@ class ButtonEditDialog(QDialog):
                 self.script_edit.setPlaceholderText(self.tr("输入ADB命令（多行支持，不需要加 'adb -s {device}'）...\n例如：reboot\n例如：shell dumpsys battery"))
             elif button_type == "system":
                 self.script_edit.setPlaceholderText(self.tr("输入系统命令（多行支持）...\n例如：dir\n例如：ipconfig /all"))
-            else:  # python
+            elif button_type == "python":
                 self.script_edit.setPlaceholderText(self.tr("输入Python脚本代码..."))
-        elif button_type in ["file", "program"]:
-            # 打开文件和运行程序：使用路径输入和浏览按钮
-            self.script_edit.setVisible(False)
-            self.path_edit.setVisible(True)
-            self.advanced_title.setText(self.tr("文件选择"))  # 更新标题文本
-            self.advanced_group.setVisible(True)
-            
-            # 设置占位符和按钮可见性
-            if button_type == "file":
-                self.path_edit.setPlaceholderText(self.tr("例如：C:\\Users\\用户名\\Desktop\\文件.txt 或文件夹路径"))
-                self.file_browse_btn.setVisible(True)  # 显示浏览文件按钮
-                self.folder_browse_btn.setVisible(True)  # 显示浏览文件夹按钮
-            else:  # program
-                self.path_edit.setPlaceholderText(self.tr("例如：C:\\Program Files\\Notepad++\\notepad++.exe"))
-                self.file_browse_btn.setVisible(True)  # 只显示浏览文件按钮
-                self.folder_browse_btn.setVisible(False)  # 隐藏浏览文件夹按钮
-        elif button_type == "url":
-            # 打开网页：使用路径输入，但不显示浏览按钮
-            self.script_edit.setVisible(False)
-            self.path_edit.setVisible(True)
-            self.file_browse_btn.setVisible(False)
-            self.folder_browse_btn.setVisible(False)
-            self.advanced_title.setText(self.tr("网页地址"))  # 更新标题文本
-            self.advanced_group.setVisible(True)
-            self.path_edit.setPlaceholderText(self.tr("例如：https://www.example.com 或 www.example.com"))
+            elif button_type == "file":
+                self.script_edit.setPlaceholderText(self.tr("输入文件或文件夹路径（多行支持）...\n例如：C:\\Users\\用户名\\Desktop\\文件.txt\n例如：C:\\Users\\用户名\\Documents\\项目文件夹"))
+            elif button_type == "program":
+                self.script_edit.setPlaceholderText(self.tr("输入程序路径（多行支持）...\n例如：C:\\Program Files\\Notepad++\\notepad++.exe\n例如：D:\\Tools\\script.py"))
+            elif button_type == "url":
+                self.script_edit.setPlaceholderText(self.tr("输入网页地址（多行支持）...\n例如：https://www.example.com\n例如：www.google.com"))
         else:
             self.script_edit.setVisible(False)
             self.path_edit.setVisible(False)
@@ -642,18 +623,15 @@ class ButtonEditDialog(QDialog):
         if index >= 0:
             self.type_combo.setCurrentIndex(index)
         
-        # 根据类型加载内容
+        # 根据类型加载内容 - 统一加载到script_edit
         command = self.button_data.get('command', '')
-        if button_type in ['adb', 'system']:
-            # ADB命令和系统命令：加载到script_edit
+        if button_type in ['adb', 'system', 'file', 'program', 'url']:
+            # ADB命令、系统命令、打开文件、运行程序、打开网页：加载到script_edit
             self.script_edit.setPlainText(command)
         elif button_type == 'python':
             # Python脚本：加载script字段到script_edit
             script = self.button_data.get('script', '')
             self.script_edit.setPlainText(script)
-        elif button_type in ['file', 'program', 'url']:
-            # 文件和程序、网页地址：加载到path_edit
-            self.path_edit.setText(command)
         
         tab = self.button_data.get('tab', '')
         if tab:
@@ -711,20 +689,24 @@ class ButtonEditDialog(QDialog):
                 return
         elif button_type in [self.tr("打开文件"), self.tr("运行程序")]:
             # 验证文件路径
-            command = self.path_edit.text().strip()
+            command = self.script_edit.toPlainText().strip()
             if not command:
                 QMessageBox.warning(self, self.tr("验证失败"), "请输入文件或程序路径")
                 return
             import os
-            if not os.path.exists(command):
-                QMessageBox.warning(
-                    self, self.tr("验证失败"), 
-                    f"{self.tr('文件/程序不存在:')}\n{command}\n\n{self.tr('请检查路径是否正确')}"
-                )
-                return
+            # 验证每行路径（支持多行）
+            lines = command.split('\n')
+            for line in lines:
+                line = line.strip()
+                if line and not os.path.exists(line):
+                    QMessageBox.warning(
+                        self, self.tr("验证失败"), 
+                        f"{self.tr('文件/程序不存在:')}\n{line}\n\n{self.tr('请检查路径是否正确')}"
+                    )
+                    return
         elif button_type == self.tr("打开网页"):
             # 验证网页地址
-            url = self.path_edit.text().strip()
+            url = self.script_edit.toPlainText().strip()
             if not url:
                 QMessageBox.warning(self, self.tr("验证失败"), "请输入网页地址")
                 return
@@ -745,15 +727,14 @@ class ButtonEditDialog(QDialog):
         }
         button_type = type_map.get(current_text, "adb")
         
-        # 根据类型获取command字段
-        if button_type in ['adb', 'system']:
-            # ADB命令和系统命令：从script_edit获取
+        # 根据类型获取command字段 - 统一从script_edit获取
+        if button_type in ['adb', 'system', 'file', 'program', 'url']:
+            # ADB命令、系统命令、打开文件、运行程序、打开网页：从script_edit获取
             command = self.script_edit.toPlainText().strip()
-        elif button_type in ['file', 'program', 'url']:
-            # 文件和程序、网页地址：从path_edit获取
-            command = self.path_edit.text().strip()
+        elif button_type == 'python':
+            # Python脚本：command可以为空，使用script字段
+            command = ''
         else:
-            # Python脚本：command可以为空
             command = ''
         
         data = {
