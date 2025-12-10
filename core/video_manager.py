@@ -222,6 +222,30 @@ class VideoManager(QObject):
         self.recording_stopped.emit()
         self.status_message.emit(self.lang_manager.tr("正在保存视频..."))
     
+    def cleanup(self):
+        """清理录制进程，在窗口关闭时调用"""
+        try:
+            # 如果正在录制，停止录制
+            if self.is_recording:
+                self.stop_recording(open_folder=False)
+            
+            # 确保录制进程被清理
+            if self.recording_process:
+                try:
+                    if self.recording_process.poll() is None:
+                        self.recording_process.terminate()
+                        self.recording_process.wait(timeout=3)
+                except Exception:
+                    try:
+                        self.recording_process.kill()
+                        self.recording_process.wait(timeout=1)
+                    except Exception:
+                        pass
+                finally:
+                    self.recording_process = None
+        except Exception:
+            pass  # 清理时的异常可以忽略
+    
     def _save_videos(self, open_folder=True):
         """保存视频文件
         

@@ -126,6 +126,19 @@ class PyQtAEELogManager(QObject):
         self.is_running = False
         self.waiting_thread = None
     
+    def cleanup(self):
+        """清理工作线程，在窗口关闭时调用"""
+        if self.waiting_thread and self.waiting_thread.isRunning():
+            try:
+                self.waiting_thread.wait(3000)
+                if self.waiting_thread.isRunning():
+                    self.waiting_thread.terminate()
+                    self.waiting_thread.wait(1000)
+            except Exception:
+                pass
+            finally:
+                self.waiting_thread = None
+    
     def tr(self, text):
         """安全地获取翻译文本"""
         return self.lang_manager.tr(text) if self.lang_manager else text

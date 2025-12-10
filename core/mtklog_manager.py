@@ -12,6 +12,7 @@ import time
 import re
 import sys
 import shutil
+import shlex
 from PyQt5.QtCore import QObject, pyqtSignal, QThread, QMutex
 from PyQt5.QtWidgets import QMessageBox, QInputDialog, QFileDialog, QDialog, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton, QDialogButtonBox, QFrame
 
@@ -852,10 +853,6 @@ class MTKLogWorker(QThread):
                 media_commands = [
                     ("/sdcard/DCIM/Screen Recorder/.", "Screen_Recorder_DCIM"),
                     ("/sdcard/Screen Recorder/.", "Screen_Recorder"),
-                    ("/storage/emulated/0/Screen Recorder/.", "Screen_Recorder_Storage"),
-                    ("/sdcard/DCIM/ViewMe/.", "ViewMe_DCIM"),
-                    ("/sdcard/Screen Recorder.", "Screen_Recorder"),
-                    ("/storage/emulated/0/Pictures/Screenshots/.", "Screenshots_Storage"),
                     ("/sdcard/Pictures/Screenshots/.", "Screenshots_DCIM")
                 ]
                 pull_commands.extend(media_commands)
@@ -874,7 +871,11 @@ class MTKLogWorker(QThread):
                     print(f"[DEBUG] {self.tr('检查文件夹:')} {source_path} -> {folder_name}")
                     
                     # 先检查文件夹是否存在
-                    check_cmd = ["adb", "-s", self.device, "shell", "test", "-d", source_path]
+                    # 对于包含空格的路径，需要在 shell 命令中正确转义
+                    # 使用 shlex.quote 来转义路径，然后将整个 shell 命令作为字符串传递
+                    escaped_path = shlex.quote(source_path)
+                    shell_cmd = f"test -d {escaped_path}"
+                    check_cmd = ["adb", "-s", self.device, "shell", shell_cmd]
                     check_result = subprocess.run(check_cmd, capture_output=True, text=True, timeout=10,
                                                 creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0)
                     print(f"[DEBUG] {self.tr('检查命令结果 - returncode:')} {check_result.returncode}, stdout: {check_result.stdout.strip()}, stderr: {check_result.stderr.strip()}")

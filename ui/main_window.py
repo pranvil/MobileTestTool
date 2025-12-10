@@ -4907,9 +4907,15 @@ class MainWindow(QMainWindow):
     def closeEvent(self, event):
         """窗口关闭事件"""
         try:
-            # 停止网络信息获取
-            if hasattr(self, 'network_info_manager') and self.network_info_manager.is_running:
-                self.network_info_manager.stop_network_info()
+            # 停止网络信息获取（cleanup 会处理）
+            if hasattr(self, 'network_info_manager') and self.network_info_manager:
+                try:
+                    if hasattr(self.network_info_manager, 'cleanup'):
+                        self.network_info_manager.cleanup()
+                    elif self.network_info_manager.is_running:
+                        self.network_info_manager.stop_network_info()
+                except Exception as e:
+                    logger.exception(f"{self.lang_manager.tr('清理网络信息管理器失败:')} {e}")
             
             # 停止MTKLOG
             if hasattr(self, 'mtklog_manager') and self.mtklog_manager.is_running:
@@ -4919,9 +4925,15 @@ class MainWindow(QMainWindow):
             if hasattr(self, 'adblog_manager') and self.adblog_manager.is_running:
                 self.adblog_manager.stop_adblog()
             
-            # 停止录制
-            if hasattr(self, 'video_manager') and self.video_manager.is_recording:
-                self.video_manager.stop_recording()
+            # 停止录制（cleanup 会处理）
+            if hasattr(self, 'video_manager') and self.video_manager:
+                try:
+                    if hasattr(self.video_manager, 'cleanup'):
+                        self.video_manager.cleanup()
+                    elif self.video_manager.is_recording:
+                        self.video_manager.stop_recording()
+                except Exception as e:
+                    logger.exception(f"{self.lang_manager.tr('清理视频管理器失败:')} {e}")
             
             # 清理所有自定义按钮工作线程中的进程（防止孤儿进程）
             if hasattr(self, '_button_command_workers'):
@@ -5016,6 +5028,30 @@ class MainWindow(QMainWindow):
                         self.log_processor.cleanup()
                 except Exception as e:
                     logger.exception(f"{self.lang_manager.tr('清理日志处理器失败:')} {e}")
+            
+            # 清理网络信息管理器（确保清理ping和网络信息线程）
+            if hasattr(self, 'network_info_manager') and self.network_info_manager:
+                try:
+                    if hasattr(self.network_info_manager, 'cleanup'):
+                        self.network_info_manager.cleanup()
+                except Exception as e:
+                    logger.exception(f"{self.lang_manager.tr('清理网络信息管理器失败:')} {e}")
+            
+            # 清理视频管理器（确保清理录制进程）
+            if hasattr(self, 'video_manager') and self.video_manager:
+                try:
+                    if hasattr(self.video_manager, 'cleanup'):
+                        self.video_manager.cleanup()
+                except Exception as e:
+                    logger.exception(f"{self.lang_manager.tr('清理视频管理器失败:')} {e}")
+            
+            # 清理AEE日志管理器的工作线程
+            if hasattr(self, 'aee_log_manager') and self.aee_log_manager:
+                try:
+                    if hasattr(self.aee_log_manager, 'cleanup'):
+                        self.aee_log_manager.cleanup()
+                except Exception as e:
+                    logger.exception(f"{self.lang_manager.tr('清理AEE日志管理器失败:')} {e}")
             
             # 清理Root&Remount工作线程
             if hasattr(self, '_root_remount_worker') and self._root_remount_worker:

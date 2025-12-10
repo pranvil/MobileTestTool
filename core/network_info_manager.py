@@ -638,6 +638,42 @@ class PyQtNetworkInfoManager(QObject):
                 self.ping_worker = None
                 self.stop_event = None
     
+    def cleanup(self):
+        """清理工作线程和进程，在窗口关闭时调用"""
+        try:
+            # 停止网络信息获取
+            if self.is_running:
+                self.stop_network_info()
+            
+            # 停止Ping测试
+            if self.ping_worker and self.ping_worker.is_alive():
+                self.stop_ping()
+            
+            # 确保所有线程都已停止
+            if self.network_worker and self.network_worker.is_alive():
+                try:
+                    if self.stop_event:
+                        self.stop_event.set()
+                    self.network_worker.join(timeout=2)
+                except Exception:
+                    pass
+                finally:
+                    self.network_worker = None
+            
+            if self.ping_worker and self.ping_worker.is_alive():
+                try:
+                    if self.stop_event:
+                        self.stop_event.set()
+                    if hasattr(self.ping_worker, 'stop'):
+                        self.ping_worker.stop()
+                    self.ping_worker.join(timeout=2)
+                except Exception:
+                    pass
+                finally:
+                    self.ping_worker = None
+        except Exception:
+            pass  # 清理时的异常可以忽略
+    
     def _on_network_info_updated(self, network_info):
         """网络信息更新"""
         try:
