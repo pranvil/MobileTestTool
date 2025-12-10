@@ -14,7 +14,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from dataclasses import dataclass
-from typing import Any, Callable, Optional, Tuple, Union
+from typing import Any, Callable, List, Optional, Tuple, Union
 
 from core.update_manifest import LatestManifest, DownloadSource
 
@@ -190,7 +190,7 @@ class UpdateManager:
         manifest: LatestManifest,
         progress_callback: Optional[ProgressCallback] = None,
     ) -> DownloadResult:
-        """下载安装包并进行 SHA-256 校验"""
+        """下载安装包并进行 SHA-256 校验，支持多下载源回退"""
 
         self._cancel_event.clear()
 
@@ -200,11 +200,51 @@ class UpdateManager:
         filename = self._determine_filename(manifest)
         target_path = os.path.join(target_dir, filename)
 
-        # 智能选择最佳下载URL
-        download_url = self._select_best_download_url(manifest)
-        request = urllib.request.Request(download_url, headers={"User-Agent": self.USER_AGENT})
+        # 收集所有可用的下载URL（包括首选和备选）
+        download_urls = self._collect_download_urls(manifest)
+        
+        if not download_urls:
+            raise DownloadError("没有可用的下载源")
 
-        self._log(f"开始下载安装包: {download_url}")
+        # 尝试每个下载源，直到成功
+        last_error: Optional[Exception] = None
+        for idx, download_url in enumerate(download_urls):
+            try:
+                self._log(f"尝试下载源 {idx + 1}/{len(download_urls)}: {download_url}")
+                return self._download_from_url(download_url, target_path, manifest, progress_callback)
+            except (DownloadError, IntegrityError) as exc:
+                last_error = exc
+                # 如果是最后一个源，直接抛出错误
+                if idx == len(download_urls) - 1:
+                    raise
+                # 否则记录错误并尝试下一个源
+                self._log(f"下载源 {idx + 1} 失败: {exc}，尝试下一个下载源...")
+                # 清理可能的部分下载文件
+                try:
+                    if os.path.exists(target_path):
+                        os.remove(target_path)
+                except FileNotFoundError:
+                    pass
+                continue
+            except Exception as exc:
+                # 其他未预期的错误，直接抛出
+                raise DownloadError(f"下载过程中发生未预期的错误: {exc}") from exc
+
+        # 理论上不应该到达这里，但为了类型安全
+        if last_error:
+            raise last_error
+        raise DownloadError("所有下载源都失败")
+
+    def _download_from_url(
+        self,
+        download_url: str,
+        target_path: str,
+        manifest: LatestManifest,
+        progress_callback: Optional[ProgressCallback] = None,
+    ) -> DownloadResult:
+        """从指定URL下载安装包并进行 SHA-256 校验"""
+
+        request = urllib.request.Request(download_url, headers={"User-Agent": self.USER_AGENT})
 
         try:
             with urllib.request.urlopen(request, timeout=self.timeout) as response:
@@ -253,6 +293,38 @@ class UpdateManager:
         file_size = os.path.getsize(target_path)
         self._log(f"安装包下载完成，大小 {file_size} 字节")
         return DownloadResult(file_path=target_path, file_size=file_size, sha256=digest)
+
+    def _collect_download_urls(self, manifest: LatestManifest) -> List[str]:
+        """收集所有可用的下载URL，按优先级排序"""
+        
+        urls: List[str] = []
+        url_set: set[str] = set()  # 用于去重
+        
+        # 首先添加最佳下载源（通过智能选择）
+        best_url = self._select_best_download_url(manifest)
+        if best_url and best_url not in url_set:
+            urls.append(best_url)
+            url_set.add(best_url)
+        
+        # 如果有多个下载源，添加其他源作为备选
+        if manifest.download_urls:
+            # 按优先级排序（优先级高的在前）
+            sorted_sources = sorted(
+                manifest.download_urls,
+                key=lambda s: s.priority,
+                reverse=True
+            )
+            for source in sorted_sources:
+                if source.url and source.url not in url_set:
+                    urls.append(source.url)
+                    url_set.add(source.url)
+        
+        # 最后添加默认下载URL作为兜底
+        if manifest.download_url and manifest.download_url not in url_set:
+            urls.append(manifest.download_url)
+            url_set.add(manifest.download_url)
+        
+        return urls
 
     def cancel_download(self) -> None:
         """请求取消当前下载"""
