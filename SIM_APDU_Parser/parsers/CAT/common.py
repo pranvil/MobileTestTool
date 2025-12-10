@@ -33,8 +33,83 @@ def get_tlv_parser(tag):
         
     Returns:
         (parser_func, display_name) 或 (None, None)
-    """
+"""
     return TLV_PARSER_REGISTRY.get(tag.upper(), (None, None))
+
+def parse_tlv_structure_recursive(value_hex: str, max_depth: int = 10) -> ParseNode:
+    """
+    递归解析TLV结构，尝试将value_hex解析为嵌套的TLV结构
+    
+    Args:
+        value_hex: 要解析的十六进制字符串（不包含tag和length）
+        max_depth: 最大递归深度，防止无限递归
+        
+    Returns:
+        ParseNode对象，包含解析后的TLV结构树
+    """
+    if max_depth <= 0 or not value_hex or len(value_hex) < 4:
+        # 无法解析为TLV结构，返回原始数据
+        return None
+    
+    root = ParseNode(name="TLV Structure", value=f"Length: {len(value_hex)//2} bytes (0x{value_hex})")
+    idx = 0
+    n = len(value_hex)
+    parsed_count = 0
+    
+    while idx + 4 <= n:
+        # 尝试读取Tag (1字节)
+        tag = value_hex[idx:idx+2].upper()
+        idx += 2
+        
+        # 尝试读取Length (1字节)
+        if idx + 2 > n:
+            break
+        try:
+            length = int(value_hex[idx:idx+2], 16)
+            idx += 2
+        except ValueError:
+            break
+        
+        # 读取Value
+        if length == 0:
+            # 长度为0，跳过
+            continue
+        
+        if idx + length * 2 > n:
+            # 数据不完整，停止解析
+            break
+        
+        val_hex = value_hex[idx:idx+length*2]
+        idx += length * 2
+        
+        # 尝试递归解析value部分
+        child_node = parse_tlv_structure_recursive(val_hex, max_depth - 1)
+        if child_node and len(child_node.children) > 0:
+            # 如果value部分包含嵌套TLV，创建父节点
+            tlv_node = ParseNode(name=f"TLV {tag}", value=f"Length: {length} bytes")
+            tlv_node.children.append(child_node)
+            root.children.append(tlv_node)
+        else:
+            # 无法递归解析，作为叶子节点
+            # 尝试使用注册的解析器
+            parser_func, display_name = get_tlv_parser(tag)
+            if parser_func:
+                try:
+                    parsed_value = parser_func(val_hex)
+                    name = f"{display_name} ({tag})" if display_name else f"TLV {tag}"
+                    root.children.append(ParseNode(name=name, value=parsed_value))
+                except:
+                    root.children.append(ParseNode(name=f"TLV {tag}", value=f"Length: {length} bytes, Value: (0x{val_hex})"))
+            else:
+                root.children.append(ParseNode(name=f"TLV {tag}", value=f"Length: {length} bytes, Value: (0x{val_hex})"))
+        
+        parsed_count += 1
+    
+    if parsed_count == 0:
+        # 没有成功解析任何TLV，返回None
+        return None
+    
+    return root
 
 def parse_tlv_to_node(tag: str, value_hex: str, root: ParseNode = None) -> ParseNode:
     """
@@ -69,8 +144,15 @@ def parse_tlv_to_node(tag: str, value_hex: str, root: ParseNode = None) -> Parse
         except Exception as e:
             return ParseNode(name=f"TLV {tag} (Parse Error)", value=f"Error: {e}, Raw: {value_hex[:60]}")
     else:
-        # 没有注册的解析器，显示原始数据
-        return ParseNode(name=f"TLV {tag}", value=f"Length: {len(value_hex)//2}, Data: {value_hex[:60]}{'...' if len(value_hex) > 60 else ''}")
+        # 没有注册的解析器，尝试按TLV格式解析
+        tlv_structure = parse_tlv_structure_recursive(value_hex)
+        if tlv_structure and len(tlv_structure.children) > 0:
+            # 成功解析为TLV结构，返回解析后的树
+            tlv_structure.name = f"TLV {tag}"
+            return tlv_structure
+        else:
+            # 无法解析为TLV结构，显示原始数据
+            return ParseNode(name=f"TLV {tag}", value=f"Length: {len(value_hex)//2} bytes, Data: (0x{value_hex})")
 
 def parse_tlvs_from_dict(root: ParseNode, tlv_data: dict, required_tags: list = None, optional_tags: list = None, exclude_tags: set = None):
     """
@@ -261,9 +343,9 @@ def device_identities_text(value_hex: str) -> str:
                "12":"Additional Reader 2","13":"Additional Reader 3","14":"Additional Reader 4","15":"Additional Reader 5",
                "16":"Additional Reader 6","17":"Additional Reader 7","21":"Channel 1","22":"Channel 2","23":"Channel 3",
                "24":"Channel 4","25":"Channel 5","26":"Channel 6","27":"Channel 7","81":"UICC","82":"Terminal","83":"Network"}
-    if len(value_hex) < 4: return "Unknown device identities"
+    if len(value_hex) < 4: return f"Unknown device identities (0x{value_hex})"
     s = value_hex[:2].upper(); d = value_hex[2:4].upper()
-    return f"{dev_map.get(s,'?')} -> {dev_map.get(d,'?')}"
+    return f"{dev_map.get(s,'?')} -> {dev_map.get(d,'?')} (0x{value_hex})"
 
 def result_details_text(value_hex: str) -> str:
     """解析Result Details (03/83 tag) - 完整的result details映射"""
@@ -389,14 +471,14 @@ def result_details_text(value_hex: str) -> str:
         )
         additional_info = f", Additional Info: {additional_info_description}"
 
-    return f"Result: {result_description}{additional_info}"
+    return f"Result: {result_description}{additional_info} (0x{value_hex})"
 
 def parse_duration_text(value_hex: str) -> str:
-    if len(value_hex) != 4: return f"{value_hex}"
+    if len(value_hex) != 4: return f"{value_hex} (0x{value_hex})"
     unit_map = {"00":"minutes","01":"seconds","02":"tenths"}
     unit = unit_map.get(value_hex[:2],"?"); val = _hex2int(value_hex[2:])
-    if unit == "tenths": return f"{val/10:.1f} seconds ({value_hex})"
-    return f"{val} {unit} ({value_hex})"
+    if unit == "tenths": return f"{val/10:.1f} seconds (0x{value_hex})"
+    return f"{val} {unit} (0x{value_hex})"
 
 def parse_address_text(value_hex: str) -> str:
     if len(value_hex) < 2: return value_hex
@@ -409,7 +491,7 @@ def parse_address_text(value_hex: str) -> str:
     for i in range(0,len(raw),2):
         if i+2<=len(raw):
             dn += raw[i+1:i+2] + raw[i:i+1]
-    return f"TON={ton}, NPI={npi}, Dial={dn} ({value_hex})"
+    return f"TON={ton}, NPI={npi}, Dial={dn} (0x{value_hex})"
 
 class ChannelMode:
     """Channel mode enumeration for Channel Status parsing"""
@@ -501,7 +583,7 @@ def parse_channel_status_text(value_hex: str, mode: str = ChannelMode.GENERAL) -
         further_info = info_map.get(byte2, f"Reserved (0x{byte2:02X})")
         status_parts.append(further_info)
         
-        return ", ".join(status_parts) + f" ({value_hex})"
+        return ", ".join(status_parts) + f" (0x{value_hex})"
     except Exception as e:
         return f"Parse error: {e}, Raw: {value_hex}"
 
@@ -555,12 +637,12 @@ def parse_access_tech_text(value_hex: str) -> str:
         technologies.append(f"{tech_name} (0x{tech_code})")
     
     result = ", ".join(technologies)
-    return f"{result} (Raw: {value_hex})"
+    return result
 
 def parse_timer_identifier_text(v:str)->str:
     m={'01':'Timer 1','02':'Timer 2','03':'Timer 3','04':'Timer 4','05':'Timer 5','06':'Timer 6','07':'Timer 7','08':'Timer 8'}
     result = m.get(v, v)
-    return f"{result} ({v})" if result != v else v
+    return f"{result} (0x{v})" if result != v else f"{v} (0x{v})"
 
 def parse_timer_value_text(value_hex: str) -> str:
     """解析 Timer value (25/A5 tag) - 3字节 BCD 码 (Hour, Minute, Second)"""
@@ -588,7 +670,7 @@ def parse_timer_value_text(value_hex: str) -> str:
         minute = int(minute_hex, 16)
         second = int(second_hex, 16)
         
-        return f"{hour:02d}:{minute:02d}:{second:02d} (Timer elapsed time) ({value_hex})"
+        return f"{hour:02d}:{minute:02d}:{second:02d} (Timer elapsed time) (0x{value_hex})"
     except Exception as e:
         return f"Parse error: {e}, Raw: {value_hex}"
 
@@ -597,7 +679,7 @@ def parse_imei_text(v:str)->str:
     for i in range(0,len(v),2):
         b=v[i:i+2]
         if len(b)==2: out += b[1]+b[0]
-    return f"{out} ({v})"
+    return f"{out} (0x{v})"
 
 def parse_bearer_description_text(value_hex: str) -> str:
     """
@@ -633,13 +715,13 @@ def parse_bearer_description_text(value_hex: str) -> str:
     params_desc = _parse_bearer_parameters(bearer_type, bearer_parameters_hex)
     
     if params_desc:
-        return f"Bearer type: {bearer_type_description}, Parameters: {params_desc} ({value_hex})"
+        return f"Bearer type: {bearer_type_description}, Parameters: {params_desc} (0x{value_hex})"
     elif bearer_parameters_hex:
         # 有参数但未解析，显示原始值
-        return f"Bearer type: {bearer_type_description}, Parameters: {bearer_parameters_hex} ({value_hex})"
+        return f"Bearer type: {bearer_type_description}, Parameters: {bearer_parameters_hex} (0x{value_hex})"
     else:
         # 没有参数，不显示 Parameters 部分
-        return f"Bearer type: {bearer_type_description} ({value_hex})"
+        return f"Bearer type: {bearer_type_description} (0x{value_hex})"
 
 def _parse_bearer_parameters(bearer_type: str, params_hex: str) -> str:
     """
@@ -773,28 +855,28 @@ def parse_data_destination_address_text(value_hex: str) -> str:
         for i in range(0, 8, 2):
             byte_val = int(address_data[i:i+2], 16)
             ip_bytes.append(str(byte_val))
-        return f"IPv4: {'.'.join(ip_bytes)} ({value_hex})"
+        return f"IPv4: {'.'.join(ip_bytes)} (0x{value_hex})"
     
     elif address_type == "57":  # IPv6 (8.58)
         # IPv6 address: 16 bytes (octet 4-19) = 32 hex chars
         if len(address_data) < 32:
-            return f"Incomplete IPv6 address: {address_data} ({value_hex})"
+            return f"Incomplete IPv6 address: {address_data} (0x{value_hex})"
         ipv6_groups = []
         for i in range(0, 32, 4):
             group_hex = address_data[i:i+4]
             # Convert to integer and format as hex (remove leading zeros)
             group_int = int(group_hex, 16)
             ipv6_groups.append(f"{group_int:x}")
-        return f"IPv6: {':'.join(ipv6_groups)} ({value_hex})"
+        return f"IPv6: {':'.join(ipv6_groups)} (0x{value_hex})"
     
     else:
-        return f"Reserved address type: 0x{address_type}, Address data: {address_data} ({value_hex})"
+        return f"Reserved address type: 0x{address_type}, Address data: {address_data} (0x{value_hex})"
 
 def parse_location_info_text(value_hex: str) -> str:
     """解析Location Info (13/93 tag)"""
     # Decode MCCMNC
     if len(value_hex) < 6:
-        return "Location info length error"
+        return f"Location info length error (0x{value_hex})"
     
     mccmnc_bytes = value_hex[:6]
     mccmnc = f"{mccmnc_bytes[1]}{mccmnc_bytes[0]}{mccmnc_bytes[3]}{mccmnc_bytes[5]}{mccmnc_bytes[4]}{mccmnc_bytes[2]}"
@@ -807,9 +889,9 @@ def parse_location_info_text(value_hex: str) -> str:
         tac = value_hex[6:10]
         cell_id = value_hex[10:]
     else:
-        return f"Invalid location info length: {len(value_hex)//2} bytes"
+        return f"Invalid location info length: {len(value_hex)//2} bytes (0x{value_hex})"
     
-    return f"MCCMNC: {mccmnc}, TAC: {tac}, CELL ID: {cell_id}"
+    return f"MCCMNC: {mccmnc}, TAC: {tac}, CELL ID: {cell_id} (0x{value_hex})"
 
 def parse_location_status_text(value_hex: str) -> str:
     """解析 Location status (1B/9B tag)"""
@@ -1046,7 +1128,7 @@ def parse_date_time_timezone_text(value_hex: str) -> str:
             
             timezone_str = f"{sign}{tz_hours:02d}:{tz_mins:02d}"
         
-        return f"{2000+year}年{month:02d}月{day:02d}日 {hour:02d}:{minute:02d}:{second:02d} (Timezone: {timezone_str}) ({value_hex})"
+        return f"{2000+year}年{month:02d}月{day:02d}日 {hour:02d}:{minute:02d}:{second:02d} (Timezone: {timezone_str}) (0x{value_hex})"
     except Exception as e:
         return f"Parse error: {e}, Raw: {value_hex}"
 
@@ -1218,7 +1300,7 @@ def parse_buffer_size_text(value_hex: str) -> str:
     try:
         # Buffer size 是一个整数（字节数）
         buffer_size = int(value_hex, 16)
-        return f"{buffer_size} bytes ({value_hex})"
+        return f"{buffer_size} bytes (0x{value_hex})"
     except Exception as e:
         return f"Parse error: {e}, Raw: {value_hex}"
 
@@ -1307,7 +1389,7 @@ def parse_transport_level_text(value_hex: str) -> str:
             "06": "direct"
         }
         transport_desc = transport_map.get(transport_type, f"Unknown (0x{transport_type})")
-        return f"{transport_desc}, port={port} ({value_hex})"
+        return f"{transport_desc}, port={port} (0x{value_hex})"
     except Exception as e:
         return f"Parse error: {e}, Raw: {value_hex}"
 
@@ -1338,9 +1420,10 @@ def parse_measurement_qualifier_text(value_hex: str) -> str:
         '0D': 'NG-RAN/Satellite NG-RAN Inter-RAT (UTRAN) measurements'
     }
     
-    qualifier_desc = qualifier_map.get(qualifier_byte.upper(), f'Reserved (0x{qualifier_byte})')
+    qualifier_desc = qualifier_map.get(qualifier_byte.upper(), f'Reserved')
     
-    return f"{qualifier_desc} ({value_hex})"
+    # 统一格式：描述文本 (0x值)
+    return f"{qualifier_desc} (0x{qualifier_byte})"
 
 def parse_alpha_identifier_text(value_hex: str) -> str:
     """解析Alpha Identifier (05/85 tag)"""
@@ -1399,9 +1482,9 @@ def parse_network_access_name_text(value_hex: str) -> str:
             # 可能是点号分隔格式，直接解码
             try:
                 decoded = bytes.fromhex(value_hex).decode('ascii', errors='replace')
-                # 如果包含点号，直接返回
+                # 如果包含点号，返回解码结果和 raw data
                 if '.' in decoded:
-                    return decoded
+                    return f"{decoded} (0x{value_hex})"
                 # 否则尝试按 Label 格式解析
             except:
                 pass
@@ -1423,9 +1506,9 @@ def parse_network_access_name_text(value_hex: str) -> str:
                 # 长度不合理，可能是数据格式错误，尝试按点号分隔格式解析
                 try:
                     decoded = bytes.fromhex(value_hex).decode('ascii', errors='replace')
-                    return decoded
+                    return f"{decoded} (0x{value_hex})"
                 except:
-                    return value_hex
+                    return f"{value_hex} (0x{value_hex})"
             
             if idx + label_len * 2 > n:
                 # 数据不完整
@@ -1444,7 +1527,8 @@ def parse_network_access_name_text(value_hex: str) -> str:
         
         # 用点号连接所有 labels
         result = '.'.join(labels) if labels else value_hex
-        return f"{result} ({value_hex})"
+        # 统一格式：描述文本 (0x值)
+        return f"{result} (0x{value_hex})"
     except Exception as e:
         return f"Parse error: {e}, Raw: {value_hex}"
 
@@ -1805,8 +1889,15 @@ def parse_comp_tlvs_to_nodes(hexstr: str) -> tuple[ParseNode, str]:
                 except Exception as e:
                     root.children.append(ParseNode(name=f"TLV {tag} (Parse Error)", value=f"Error: {e}, Raw: {val[:60]}"))
             else:
-                # 没有注册的解析器，显示原始数据
-                root.children.append(ParseNode(name=f"TLV {tag}", value=f"len={ln}", hint=val[:120]))
+                # 没有注册的解析器，尝试按TLV格式解析
+                tlv_structure = parse_tlv_structure_recursive(val)
+                if tlv_structure and len(tlv_structure.children) > 0:
+                    # 成功解析为TLV结构，添加解析后的树
+                    tlv_structure.name = f"TLV {tag}"
+                    root.children.append(tlv_structure)
+                else:
+                    # 无法解析为TLV结构，显示原始数据
+                    root.children.append(ParseNode(name=f"TLV {tag}", value=f"Length: {ln} bytes, Value: (0x{val})"))
     
     # 对子节点进行分组处理
     root.children = group_similar_tags(root.children)

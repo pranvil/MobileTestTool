@@ -152,6 +152,22 @@ a = Analysis(
         'PyQt5.Qt3DLogic',
         'PyQt5.Qt3DAnimation',
         'PyQt5.Qt3DExtras',
+        # 排除不需要的科学计算库（代码中未使用）
+        'matplotlib',
+        'matplotlib.backends',
+        'matplotlib.pyplot',
+        'contourpy',
+        'kiwisolver',
+        # 注意：numpy 可能是某些依赖的间接依赖，如果排除后运行出错，需要移除这行
+        # 'numpy',  # 暂时注释，如果确认不需要再取消注释
+        # 排除不需要的 PIL 格式支持（如果不需要 AVIF 等新格式）
+        'PIL._avif',  # AVIF 格式支持，约 7.5MB，如果不需要可以排除
+        # 排除不需要的测试和开发工具
+        'pytest',
+        'unittest',
+        'doctest',
+        'pdb',
+        'ipdb',
     ],
     win_no_prefer_redirects=False,
     win_private_assemblies=False,

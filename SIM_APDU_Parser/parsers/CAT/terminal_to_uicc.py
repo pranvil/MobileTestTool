@@ -6,13 +6,7 @@
 from SIM_APDU_Parser.core.models import ParseNode
 from SIM_APDU_Parser.parsers.CAT.common import (
     parse_comp_tlvs_to_nodes, EVENT_MAP, parse_event_list_to_nodes,
-    parse_location_status_text, parse_location_info_text, device_identities_text,
-    parse_access_tech_text, parse_tlvs_from_dict, parse_network_access_name_text,
-    parse_data_connection_status_text, parse_data_connection_type_text,
-    parse_esm_cause_text, parse_transaction_identifier_text,
-    parse_date_time_timezone_text, parse_pdp_pdn_pdu_type_text,
-    parse_address_pdp_pdn_pdu_type_text, parse_timer_identifier_text,
-    parse_timer_value_text, parse_media_type_text
+    parse_tlvs_from_dict
 )
 from SIM_APDU_Parser.parsers.CAT.terminal_profile_parser import TerminalProfileParser
 from SIM_APDU_Parser.parsers.CAT.terminal_capability_parser import TerminalCapabilityParser
@@ -224,24 +218,20 @@ class TerminalToUiccParser:
     
     def _parse_call_control_tlv(self, root: ParseNode, tag: str, value_hex: str):
         """解析 Call Control 中的各个 TLV 字段"""
-        from SIM_APDU_Parser.parsers.CAT.common import (
-            device_identities_text, parse_address_text, parse_location_info_text,
-            parse_alpha_identifier_text
-        )
+        from SIM_APDU_Parser.parsers.CAT.common import parse_tlv_to_node, get_tlv_parser
         
-        if tag in ('02', '82'):
-            # Device identities (Mandatory)
-            root.children.append(ParseNode(
-                name="Device identities (82)",
-                value=device_identities_text(value_hex)
-            ))
-        elif tag in ('06', '86'):
-            # Address (Mandatory - for call setup)
-            root.children.append(ParseNode(
-                name="Address (86)",
-                value=parse_address_text(value_hex)
-            ))
-        elif tag in ('09', '89'):
+        # 检查是否有注册的解析器
+        parser_func, display_name = get_tlv_parser(tag)
+        
+        # 对于已注册的TLV解析器，使用统一的解析函数
+        # 这样可以确保和Event Download使用相同的解析逻辑
+        if parser_func:
+            node = parse_tlv_to_node(tag, value_hex, root)
+            root.children.append(node)
+            return
+        
+        # 对于未注册的特殊TLV，进行特殊处理
+        if tag in ('09', '89'):
             # SS String (Mandatory - for supplementary service)
             root.children.append(ParseNode(
                 name="SS String (89)",
@@ -280,24 +270,9 @@ class TerminalToUiccParser:
                 name="Capability Configuration Parameters (87)",
                 value=value_hex  # TODO: 实现 Capability Configuration 解析
             ))
-        elif tag in ('05', '85'):
-            # Subaddress (Optional)
-            root.children.append(ParseNode(
-                name="Subaddress (85)",
-                value=parse_alpha_identifier_text(value_hex)  # 可能不是完全正确，但先这样
-            ))
-        elif tag in ('13', '93'):
-            # Location Information (Conditional)
-            root.children.append(ParseNode(
-                name="Location Information (13)",
-                value=parse_location_info_text(value_hex)
-            ))
         else:
-            # 未知 tag，显示原始数据
-            root.children.append(ParseNode(
-                name=f"Unknown TLV ({tag})",
-                value=value_hex
-            ))
+            # 对于未注册的TLV，使用parse_tlv_to_node的默认处理（包括TLV格式解析）
+            root.children.append(node)
     
     def _parse_eps_pdn_connection_activation(self, root: ParseNode, value_hex: str):
         """解析 EPS PDN Connection Activation Parameters (FC/7C) - NAS 消息"""
