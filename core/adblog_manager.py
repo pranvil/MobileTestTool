@@ -917,6 +917,22 @@ class PyQtADBLogManager(QObject):
             self.adblog_exported.emit(folder)
             return False
     
+    def cleanup(self):
+        """清理工作线程，在窗口关闭时调用"""
+        if self.worker and self.worker.isRunning():
+            try:
+                self.worker.wait(3000)
+                if self.worker.isRunning():
+                    self.worker.terminate()
+                    self.worker.wait(1000)
+            except Exception:
+                pass
+            finally:
+                self.worker = None
+        # 如果还在运行，调用 stop_adblog
+        if self.is_running:
+            self.stop_adblog()
+    
     def stop_adblog(self):
         """停止ADB Log（通用方法，兼容应用程序关闭时调用）"""
         if not self.is_running:

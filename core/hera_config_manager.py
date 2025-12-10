@@ -158,7 +158,11 @@ class HeraConfigWorker(QThread):
         if self.output_dir is None:
             try:
                 base_log_dir = self.get_storage_path()
-                self.output_dir = f"{base_log_dir}\\hera"
+                # 生成时间戳 YYYYMMDD_hhmm
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M")
+                # 创建文件夹名：hera_SN_YYYYMMDD_hhmm (self.device 已经是设备序列号)
+                folder_name = f"hera_{self.device}_{timestamp}"
+                self.output_dir = f"{base_log_dir}\\{folder_name}"
                 os.makedirs(self.output_dir, exist_ok=True)
             except Exception as e:
                 self.progress.emit(f"⚠️ {self.tr('创建输出目录失败:')} {str(e)}")
@@ -279,7 +283,7 @@ class HeraConfigWorker(QThread):
         """安装uiautomator APK"""
         try:
             # 检查是否已安装
-            result = run_adb_command(['adb', 'shell', 'pm', 'list', 'packages', 'com.github.uiautomator'], 
+            result = run_adb_command(['adb', '-s', self.device, 'shell', 'pm', 'list', 'packages', 'com.github.uiautomator'], 
                                    capture_output=True, text=True)
             if 'com.github.uiautomator' in result.stdout:
                 self.progress.emit(f"✅ {self.tr('uiautomator APK已安装')}")
@@ -292,8 +296,8 @@ class HeraConfigWorker(QThread):
             test_path = get_apk_path("app-uiautomator-test.apk")
             
             if os.path.exists(app_path) and os.path.exists(test_path):
-                run_adb_command(['adb', 'install', '-r', app_path], check=True)
-                run_adb_command(['adb', 'install', '-r', test_path], check=True)
+                run_adb_command(['adb', '-s', self.device, 'install', '-r', app_path], check=True)
+                run_adb_command(['adb', '-s', self.device, 'install', '-r', test_path], check=True)
                 self.progress.emit(f"✅ {self.tr('uiautomator APK安装成功')}")
                 return True
             else:
@@ -332,8 +336,8 @@ class HeraConfigWorker(QThread):
     def _unlock_device(self):
         """解锁设备"""
         try:
-            run_adb_command(['adb', 'shell', 'input', 'keyevent', '82'], check=True)
-            run_adb_command(['adb', 'shell', 'input', 'keyevent', '82'], check=True)
+            run_adb_command(['adb', '-s', self.device, 'shell', 'input', 'keyevent', '82'], check=True)
+            run_adb_command(['adb', '-s', self.device, 'shell', 'input', 'keyevent', '82'], check=True)
             time.sleep(1)
         except Exception as e:
             self.progress.emit(f"❌ {self.tr('解锁设备失败:')} {str(e)}")
@@ -524,7 +528,7 @@ class HeraConfigWorker(QThread):
     def _check_heserver_running(self):
         """检查heserver是否运行"""
         try:
-            result = run_adb_command(['adb', 'shell', 'ps', '-A'], capture_output=True, text=True)
+            result = run_adb_command(['adb', '-s', self.device, 'shell', 'ps', '-A'], capture_output=True, text=True)
             if 'heserver' in result.stdout:
                 self.progress.emit(f"✅ {self.tr('heserver正在运行')}")
                 return True
@@ -541,7 +545,7 @@ class HeraConfigWorker(QThread):
             output_dir = self._ensure_output_directory()
             output_file = os.path.join(output_dir, 'dumpfeature.txt')
             with open(output_file, 'w', encoding='utf-8') as f:
-                run_adb_command(['adb', 'shell', 'dumpsys', 'feature'], stdout=f, check=True)
+                run_adb_command(['adb', '-s', self.device, 'shell', 'dumpsys', 'feature'], stdout=f, check=True)
             self.progress.emit(f"✅ {self.tr('Feature信息已导出到:')} {output_file}")
         except Exception as e:
             self.progress.emit(f"❌ {self.tr('导出Feature信息失败:')} {str(e)}")
@@ -549,7 +553,7 @@ class HeraConfigWorker(QThread):
     def _check_heraeye_feature(self):
         """检查heraeye feature状态"""
         try:
-            result = run_adb_command(['adb', 'shell', 'feature', 'query', 'heraeye'], 
+            result = run_adb_command(['adb', '-s', self.device, 'shell', 'feature', 'query', 'heraeye'], 
                                    capture_output=True, text=True)
             if '{"name":"enable","value":"true"}' in result.stdout:
                 self.progress.emit(f"✅ {self.tr('Heraeye feature已启用')}")
@@ -564,7 +568,7 @@ class HeraConfigWorker(QThread):
     def _check_uxp_enable(self):
         """检查UXP启用状态"""
         try:
-            result = run_adb_command(['adb', 'shell', 'getprop', 'ro.product.uxp.enable'], 
+            result = run_adb_command(['adb', '-s', self.device, 'shell', 'getprop', 'ro.product.uxp.enable'], 
                                    capture_output=True, text=True)
             if result.stdout.strip().lower() == 'true':
                 self.progress.emit(f"✅ {self.tr('UXP已启用')}")
@@ -583,10 +587,10 @@ class HeraConfigWorker(QThread):
             output_dir = self._ensure_output_directory()
             output_file = os.path.join(output_dir, 'onlinesupport1.txt')
             with open(output_file, 'w', encoding='utf-8') as f:
-                run_adb_command(['adb', 'shell', 'dumpsys', 'activity', 'service', 'Onlinesupport'], stdout=f, check=True)
+                run_adb_command(['adb', '-s', self.device, 'shell', 'dumpsys', 'activity', 'service', 'Onlinesupport'], stdout=f, check=True)
             
             # 检查注册状态
-            result = run_adb_command(['adb', 'shell', 'dumpsys', 'activity', 'service', 'Onlinesupport'], 
+            result = run_adb_command(['adb', '-s', self.device, 'shell', 'dumpsys', 'activity', 'service', 'Onlinesupport'], 
                                    capture_output=True, text=True)
             
             register_status = 'Register: true' in result.stdout
@@ -652,7 +656,7 @@ class HeraConfigWorker(QThread):
                     time.sleep(3)
                     
                     # 检查崩溃日志
-                    result = run_adb_command(['adb', 'logcat', '-b', 'crash', '-d'], 
+                    result = run_adb_command(['adb', '-s', self.device, 'logcat', '-b', 'crash', '-d'], 
                                            capture_output=True, text=True)
                     if "Simulated Crash" in result.stdout:
                         self.progress.emit(f"✅ {self.tr('第')}{i+1}{self.tr('次崩溃日志验证成功')}")
@@ -676,7 +680,7 @@ class HeraConfigWorker(QThread):
     def _press_home(self):
         """按HOME键返回主屏幕"""
         try:
-            run_adb_command(['adb', 'shell', 'input', 'keyevent', 'KEYCODE_HOME'], check=True)
+            run_adb_command(['adb', '-s', self.device, 'shell', 'input', 'keyevent', 'KEYCODE_HOME'], check=True)
             time.sleep(1)
             self.progress.emit(f"✅ {self.tr('已返回主屏幕')}")
         except Exception as e:
@@ -760,7 +764,11 @@ class HeraDataCollectionWorker(QThread):
         if self.output_dir is None:
             try:
                 base_log_dir = self.get_storage_path()
-                self.output_dir = f"{base_log_dir}\\hera"
+                # 生成时间戳 YYYYMMDD_hhmm
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M")
+                # 创建文件夹名：hera_SN_YYYYMMDD_hhmm (self.device 已经是设备序列号)
+                folder_name = f"hera_{self.device}_{timestamp}"
+                self.output_dir = f"{base_log_dir}\\{folder_name}"
                 os.makedirs(self.output_dir, exist_ok=True)
             except Exception as e:
                 self.output_dir = "."
@@ -947,3 +955,21 @@ class PyQtHeraConfigManager(QObject):
             self.status_message.emit(f"[{self.tr('赫拉配置')}] {self.tr('成功:')} {message}")
         else:
             self.status_message.emit(f"[{self.tr('赫拉配置')}] {self.tr('失败:')} {message}")
+        # 清理worker引用
+        if self.worker:
+            self.worker = None
+    
+    def cleanup(self):
+        """清理工作线程，在窗口关闭时调用"""
+        if self.worker and self.worker.isRunning():
+            try:
+                # 等待线程结束（最多等待3秒）
+                self.worker.wait(3000)
+                # 如果还在运行，强制终止
+                if self.worker.isRunning():
+                    self.worker.terminate()
+                    self.worker.wait(1000)
+            except Exception as e:
+                pass  # 忽略清理时的异常
+            finally:
+                self.worker = None

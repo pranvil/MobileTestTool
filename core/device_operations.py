@@ -383,6 +383,19 @@ class PyQtDeviceInfoManager(QObject):
             self._worker.deleteLater()
             self._worker = None
     
+    def cleanup(self):
+        """清理工作线程，在窗口关闭时调用"""
+        if self._worker and self._worker.isRunning():
+            try:
+                self._worker.wait(3000)
+                if self._worker.isRunning():
+                    self._worker.terminate()
+                    self._worker.wait(1000)
+            except Exception:
+                pass
+            finally:
+                self._worker = None
+    
     def set_screen_timeout(self):
         """设置灭屏时间"""
         device = self.device_manager.validate_device_selection()
@@ -2626,6 +2639,19 @@ class PyQtOtherOperationsManager(QObject):
                 self.status_message.emit(error_display)
         
         self.worker = None
+    
+    def cleanup(self):
+        """清理工作线程，在窗口关闭时调用"""
+        if self.worker and self.worker.isRunning():
+            try:
+                self.worker.wait(3000)
+                if self.worker.isRunning():
+                    self.worker.terminate()
+                    self.worker.wait(1000)
+            except Exception:
+                pass
+            finally:
+                self.worker = None
     
     def configure_tools(self):
         """配置MTK工具和Wireshark路径"""

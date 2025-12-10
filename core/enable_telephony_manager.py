@@ -80,6 +80,19 @@ class PyQtTelephonyManager(QObject):
         # 初始化Telephony命令列表
         self._init_telephony_commands()
     
+    def cleanup(self):
+        """清理工作线程，在窗口关闭时调用"""
+        if self.worker and self.worker.isRunning():
+            try:
+                self.worker.wait(3000)
+                if self.worker.isRunning():
+                    self.worker.terminate()
+                    self.worker.wait(1000)
+            except Exception:
+                pass
+            finally:
+                self.worker = None
+    
     def tr(self, text):
         """安全地获取翻译文本"""
         return self.lang_manager.tr(text) if self.lang_manager else text

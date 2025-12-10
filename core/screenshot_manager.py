@@ -137,6 +137,19 @@ class PyQtScreenshotManager(QObject):
         self.lang_manager = parent.lang_manager if parent and hasattr(parent, 'lang_manager') else None
         self.worker = None
     
+    def cleanup(self):
+        """清理工作线程，在窗口关闭时调用"""
+        if self.worker and self.worker.isRunning():
+            try:
+                self.worker.wait(3000)
+                if self.worker.isRunning():
+                    self.worker.terminate()
+                    self.worker.wait(1000)
+            except Exception:
+                pass
+            finally:
+                self.worker = None
+    
     def get_storage_path(self):
         """获取存储路径，优先使用用户配置的路径"""
         # 从父窗口获取工具配置

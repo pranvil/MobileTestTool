@@ -4833,6 +4833,112 @@ class MainWindow(QMainWindow):
                     except Exception as e:
                         logger.exception(f"{self.lang_manager.tr('清理工作线程失败:')} {e}")
             
+            # 清理赫拉配置管理器的工作线程
+            if hasattr(self, 'hera_config_manager') and self.hera_config_manager:
+                try:
+                    self.hera_config_manager.cleanup()
+                except Exception as e:
+                    logger.exception(f"{self.lang_manager.tr('清理赫拉配置管理器失败:')} {e}")
+            
+            # 清理MTKLOG管理器的工作线程
+            if hasattr(self, 'mtklog_manager') and self.mtklog_manager:
+                try:
+                    if hasattr(self.mtklog_manager, 'cleanup'):
+                        self.mtklog_manager.cleanup()
+                except Exception as e:
+                    logger.exception(f"{self.lang_manager.tr('清理MTKLOG管理器失败:')} {e}")
+            
+            # 清理ADB Log管理器的工作线程
+            if hasattr(self, 'adblog_manager') and self.adblog_manager:
+                try:
+                    if hasattr(self.adblog_manager, 'cleanup'):
+                        self.adblog_manager.cleanup()
+                except Exception as e:
+                    logger.exception(f"{self.lang_manager.tr('清理ADB Log管理器失败:')} {e}")
+            
+            # 清理设备信息管理器的工作线程
+            if hasattr(self, 'device_info_manager') and self.device_info_manager:
+                try:
+                    if hasattr(self.device_info_manager, 'cleanup'):
+                        self.device_info_manager.cleanup()
+                except Exception as e:
+                    logger.exception(f"{self.lang_manager.tr('清理设备信息管理器失败:')} {e}")
+            
+            # 清理其他操作管理器的工作线程
+            if hasattr(self, 'other_operations_manager') and self.other_operations_manager:
+                try:
+                    if hasattr(self.other_operations_manager, 'cleanup'):
+                        self.other_operations_manager.cleanup()
+                except Exception as e:
+                    logger.exception(f"{self.lang_manager.tr('清理其他操作管理器失败:')} {e}")
+            
+            # 清理Google日志管理器的工作线程
+            if hasattr(self, 'google_log_manager') and self.google_log_manager:
+                try:
+                    if hasattr(self.google_log_manager, 'cleanup'):
+                        self.google_log_manager.cleanup()
+                except Exception as e:
+                    logger.exception(f"{self.lang_manager.tr('清理Google日志管理器失败:')} {e}")
+            
+            # 清理截图管理器的工作线程
+            if hasattr(self, 'screenshot_manager') and self.screenshot_manager:
+                try:
+                    if hasattr(self.screenshot_manager, 'cleanup'):
+                        self.screenshot_manager.cleanup()
+                except Exception as e:
+                    logger.exception(f"{self.lang_manager.tr('清理截图管理器失败:')} {e}")
+            
+            # 清理Telephony管理器的工作线程
+            if hasattr(self, 'telephony_manager') and self.telephony_manager:
+                try:
+                    if hasattr(self.telephony_manager, 'cleanup'):
+                        self.telephony_manager.cleanup()
+                except Exception as e:
+                    logger.exception(f"{self.lang_manager.tr('清理Telephony管理器失败:')} {e}")
+            
+            # 清理Echolocate管理器的工作线程
+            if hasattr(self, 'echolocate_manager') and self.echolocate_manager:
+                try:
+                    if hasattr(self.echolocate_manager, 'cleanup'):
+                        self.echolocate_manager.cleanup()
+                except Exception as e:
+                    logger.exception(f"{self.lang_manager.tr('清理Echolocate管理器失败:')} {e}")
+            
+            # 清理日志处理器的工作线程
+            if hasattr(self, 'log_processor') and self.log_processor:
+                try:
+                    if hasattr(self.log_processor, 'cleanup'):
+                        self.log_processor.cleanup()
+                except Exception as e:
+                    logger.exception(f"{self.lang_manager.tr('清理日志处理器失败:')} {e}")
+            
+            # 清理Root&Remount工作线程
+            if hasattr(self, '_root_remount_worker') and self._root_remount_worker:
+                try:
+                    if self._root_remount_worker.isRunning():
+                        self._root_remount_worker.wait(3000)
+                        if self._root_remount_worker.isRunning():
+                            self._root_remount_worker.terminate()
+                            self._root_remount_worker.wait(1000)
+                except Exception as e:
+                    logger.exception(f"{self.lang_manager.tr('清理Root&Remount工作线程失败:')} {e}")
+                finally:
+                    self._root_remount_worker = None
+            
+            # 清理更新工作线程
+            if hasattr(self, '_update_worker') and self._update_worker:
+                try:
+                    if self._update_worker.isRunning():
+                        self._update_worker.request_cancel()
+                        self._update_worker.wait(3000)
+                        if self._update_worker.isRunning():
+                            self._update_worker.terminate()
+                            self._update_worker.wait(1000)
+                except Exception as e:
+                    logger.exception(f"{self.lang_manager.tr('清理更新工作线程失败:')} {e}")
+                finally:
+                    self._update_worker = None
+            
             # 接受关闭事件
             event.accept()
             

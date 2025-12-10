@@ -716,6 +716,19 @@ class PyQtEcholocateManager(QObject):
             
             # 启动线程
             self.worker.start()
+    
+    def cleanup(self):
+        """清理工作线程，在窗口关闭时调用"""
+        if hasattr(self, 'worker') and self.worker and self.worker.isRunning():
+            try:
+                self.worker.wait(3000)
+                if self.worker.isRunning():
+                    self.worker.terminate()
+                    self.worker.wait(1000)
+            except Exception:
+                pass
+            finally:
+                self.worker = None
             
             # 显示进度对话框
             progress_dialog.exec_()

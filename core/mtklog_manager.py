@@ -1452,3 +1452,17 @@ class PyQtMTKLogManager(QObject):
         if success:
             self.mtklog_deleted.emit()
         self.status_message.emit(message)
+        self.worker = None
+    
+    def cleanup(self):
+        """清理工作线程，在窗口关闭时调用"""
+        if self.worker and self.worker.isRunning():
+            try:
+                self.worker.wait(3000)
+                if self.worker.isRunning():
+                    self.worker.terminate()
+                    self.worker.wait(1000)
+            except Exception:
+                pass
+            finally:
+                self.worker = None

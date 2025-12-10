@@ -298,6 +298,12 @@ class PyQtLogProcessor(QObject):
             self.is_running = False
             self.filtering_stopped.emit()
             self.status_message.emit(self.lang_manager.tr("日志过滤已停止"))
+            self.worker = None
+    
+    def cleanup(self):
+        """清理工作线程，在窗口关闭时调用"""
+        if self.is_running:
+            self.stop_filtering()
             
             # 重置性能统计
             self.performance_update.emit("")
