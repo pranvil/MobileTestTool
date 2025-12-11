@@ -47,6 +47,8 @@ class CustomButtonManager(QObject):
         super().__init__(parent)
         self.config_file = os.path.expanduser("~/.netui/custom_buttons.json")
         self.buttons = []
+        # 新增：跟踪GUI进程，防止孤儿进程
+        self._gui_processes = []
         # 从父窗口获取语言管理器和Tab配置管理器
         if parent and hasattr(parent, 'lang_manager'):
             self.lang_manager = parent.lang_manager
@@ -765,75 +767,68 @@ class CustomButtonManager(QObject):
         return PyQt5_module
     
     def _execute_python_script(self, script_code, device_id=None, dialog_response_handler=None):
-        """执行Python脚本"""
+        """执行Python脚本（无限制版本 - 允许执行任意代码）
+        
+        警告：此版本移除了所有安全限制，脚本可以：
+        - 导入任意模块
+        - 使用所有内置函数（包括eval、exec、open等）
+        - 访问文件系统
+        - 执行系统命令
+        - 修改主程序状态
+        
+        请确保只在可信环境中使用！
+        
+        注意：如果脚本包含GUI框架（如tkinter），会自动在独立进程中运行以避免冲突。
+        """
         try:
             import io
+            import tempfile
             from contextlib import redirect_stdout, redirect_stderr
+            import subprocess
+            import sys
             
-            # 导入需要的模块
+            # 检测是否包含GUI框架（tkinter、PyQt等）
+            # 这些GUI框架需要在主线程或独立进程中运行
+            has_gui = False
+            gui_keywords = [
+                'import tkinter',
+                'from tkinter',
+                'tk.Tk()',
+                'tkinter.Tk()',
+                'QApplication',
+                'QWidget',
+                'app.mainloop()',
+                '.mainloop()'
+            ]
+            
+            script_lower = script_code.lower()
+            for keyword in gui_keywords:
+                if keyword.lower() in script_lower:
+                    has_gui = True
+                    break
+            
+            # 如果包含GUI，在独立进程中运行
+            if has_gui:
+                return self._execute_gui_script_in_process(script_code, device_id)
+            
+            # 创建无限制的执行环境
+            # 使用完整的__builtins__，允许所有内置函数
+            exec_globals = {
+                '__builtins__': __builtins__,  # 完整的内置函数，无任何限制
+                '__name__': '__main__',
+                '__file__': '<custom_button_script>',
+            }
+            
+            # 导入常用模块到执行环境（可选，脚本也可以自己导入）
             import datetime
             import platform
             import os
-            import sys
             import json
             import math
             import random
             import time
-            import subprocess
             
-            # 创建安全的执行环境
-            # 获取真正的内置函数字典
-            import builtins
-            safe_builtins = {
-                '__import__': __import__,  # 允许使用 import 语句
-                'print': print,
-                'len': len,
-                'str': str,
-                'int': int,
-                'float': float,
-                'list': list,
-                'dict': dict,
-                'range': range,
-                'enumerate': enumerate,
-                'zip': zip,
-                'sorted': sorted,
-                'min': min,
-                'max': max,
-                'sum': sum,
-                'abs': abs,
-                'round': round,
-                'type': type,
-                'isinstance': isinstance,
-                'hasattr': hasattr,
-                'getattr': getattr,
-                'setattr': setattr,
-                'dir': dir,
-            }
-            # 安全地添加 help 函数（如果可用）
-            if hasattr(builtins, 'help'):
-                safe_builtins['help'] = builtins.help
-            
-            # 创建安全的PyQt5模块（如果提供了对话框响应处理器）
-            safe_pyqt5_module = None
-            if dialog_response_handler:
-                safe_pyqt5_module = self._create_safe_pyqt5_module(dialog_response_handler)
-            
-            # 创建自定义的__import__函数，拦截PyQt5导入
-            original_import = safe_builtins['__import__']
-            def safe_import(name, globals=None, locals=None, fromlist=(), level=0):
-                # 如果导入PyQt5.QtWidgets，返回我们的安全包装模块
-                if name == 'PyQt5.QtWidgets' and safe_pyqt5_module:
-                    return safe_pyqt5_module.QtWidgets
-                elif name == 'PyQt5' and safe_pyqt5_module:
-                    return safe_pyqt5_module
-                # 其他导入使用原始方法
-                return original_import(name, globals, locals, fromlist, level)
-            
-            safe_builtins['__import__'] = safe_import
-            
-            safe_globals = {
-                '__builtins__': safe_builtins,
-                '__name__': '__main__',  # 允许使用 if __name__ == "__main__" 模式
+            exec_globals.update({
                 'datetime': datetime,
                 'platform': platform,
                 'os': os,
@@ -843,25 +838,13 @@ class CustomButtonManager(QObject):
                 'random': random,
                 'time': time,
                 'subprocess': subprocess,
-            }
-            
-            # 如果创建了安全的PyQt5模块，直接注入到全局环境
-            if safe_pyqt5_module:
-                safe_globals['PyQt5'] = safe_pyqt5_module
-            
-            # 同时将常用的内置函数添加到全局作用域，确保可以直接访问
-            for key in ['print', 'len', 'str', 'int', 'float', 'list', 'dict', 'range', 'enumerate', 
-                       'zip', 'sorted', 'min', 'max', 'sum', 'abs', 'round', 'type', 'isinstance', 
-                       'hasattr', 'getattr', 'setattr', 'dir']:
-                safe_globals[key] = safe_builtins[key]
-            if 'help' in safe_builtins:
-                safe_globals['help'] = safe_builtins['help']
+            })
             
             # 添加设备ID到全局环境（如果提供）
             if device_id:
-                safe_globals['DEVICE_ID'] = device_id
+                exec_globals['DEVICE_ID'] = device_id
+                print(f"[DEBUG] 设备ID已设置: {device_id}")
                 # 创建一个便捷的adb_shell函数
-                # 使用闭包捕获 device_id
                 current_device_id = device_id
                 def adb_shell_func(cmd):
                     """在脚本中可用的ADB shell命令辅助函数"""
@@ -870,9 +853,82 @@ class CustomButtonManager(QObject):
                     else:
                         full_cmd = ['adb'] + cmd
                     return subprocess.run(full_cmd, capture_output=True, text=True, timeout=30)
-                safe_globals['adb_shell'] = adb_shell_func
+                exec_globals['adb_shell'] = adb_shell_func
+            else:
+                print("[WARNING] 未提供设备ID")
             
-            safe_locals = {}
+            # 如果脚本中使用了 uiautomator2，包装 u2.connect() 以自动使用设备ID
+            # 需要在脚本执行前修改 uiautomator2 模块
+            # 使用模块级别的标记来避免重复包装
+            try:
+                import uiautomator2
+                # 检查是否已经包装过（通过检查函数是否有特定属性）
+                if not hasattr(uiautomator2.connect, '_wrapped_by_custom_button'):
+                    original_connect = uiautomator2.connect
+                    current_device_id_for_u2 = device_id  # 使用闭包捕获设备ID
+                    def u2_connect_with_device(*args, **kwargs):
+                        """包装 u2.connect，如果没有参数则使用 DEVICE_ID"""
+                        if not args and not kwargs:
+                            if current_device_id_for_u2:
+                                print(f"[DEBUG] u2.connect() 自动使用设备ID: {current_device_id_for_u2}")
+                                try:
+                                    return original_connect(current_device_id_for_u2)
+                                except Exception as e:
+                                    print(f"[ERROR] 使用设备ID连接失败: {e}")
+                                    raise
+                            else:
+                                print("[WARNING] 未提供设备ID，使用默认连接方式")
+                                return original_connect()
+                        return original_connect(*args, **kwargs)
+                    # 标记函数已被包装，避免重复包装
+                    u2_connect_with_device._wrapped_by_custom_button = True
+                    u2_connect_with_device._original_connect = original_connect
+                    # 替换模块级别的 connect 函数
+                    uiautomator2.connect = u2_connect_with_device
+                    print("[DEBUG] uiautomator2.connect() 已包装")
+                else:
+                    # 已经包装过，更新设备ID（如果需要）
+                    if device_id and hasattr(uiautomator2.connect, '_original_connect'):
+                        # 重新包装以使用新的设备ID
+                        original_connect = uiautomator2.connect._original_connect
+                        current_device_id_for_u2 = device_id
+                        def u2_connect_with_device(*args, **kwargs):
+                            """包装 u2.connect，如果没有参数则使用 DEVICE_ID"""
+                            if not args and not kwargs:
+                                if current_device_id_for_u2:
+                                    print(f"[DEBUG] u2.connect() 自动使用设备ID: {current_device_id_for_u2}")
+                                    try:
+                                        return original_connect(current_device_id_for_u2)
+                                    except Exception as e:
+                                        print(f"[ERROR] 使用设备ID连接失败: {e}")
+                                        raise
+                                else:
+                                    print("[WARNING] 未提供设备ID，使用默认连接方式")
+                                    return original_connect()
+                            return original_connect(*args, **kwargs)
+                        u2_connect_with_device._wrapped_by_custom_button = True
+                        u2_connect_with_device._original_connect = original_connect
+                        uiautomator2.connect = u2_connect_with_device
+                        print("[DEBUG] uiautomator2.connect() 已更新设备ID")
+                # 也添加到 exec_globals 中，确保脚本可以使用
+                exec_globals['uiautomator2'] = uiautomator2
+                # 确保 u2 别名也能工作
+                exec_globals['u2'] = uiautomator2
+            except ImportError:
+                # uiautomator2 未安装，跳过
+                print("[WARNING] uiautomator2 未安装")
+                pass
+            except Exception as e:
+                print(f"[WARNING] 包装 uiautomator2.connect 失败: {e}")
+            
+            # 如果提供了对话框响应处理器，添加PyQt5支持
+            if dialog_response_handler:
+                safe_pyqt5_module = self._create_safe_pyqt5_module(dialog_response_handler)
+                exec_globals['PyQt5'] = safe_pyqt5_module
+            
+            # 重要：让 locals 和 globals 指向同一个字典
+            # 这样脚本中定义的函数和变量都在同一个命名空间中，可以互相访问
+            exec_locals = exec_globals
             
             # 捕获输出
             output_buffer = io.StringIO()
@@ -880,8 +936,12 @@ class CustomButtonManager(QObject):
             
             try:
                 with redirect_stdout(output_buffer), redirect_stderr(error_buffer):
-                    # 执行脚本
-                    exec(script_code, safe_globals, safe_locals)
+                    # 执行脚本（无任何限制 - 可以导入任意模块、使用任意函数）
+                    # 使用相同的 globals 和 locals，确保所有定义在同一个命名空间
+                    exec(script_code, exec_globals, exec_locals)
+                    
+                    # 不需要在脚本执行后再次包装，因为模块级别的包装已经生效
+                    # u2 对象会引用模块级别的 uiautomator2，所以模块级别的包装就足够了
                 
                 # 获取输出结果
                 stdout_output = output_buffer.getvalue()
@@ -901,10 +961,168 @@ class CustomButtonManager(QObject):
                     
             except Exception as exec_error:
                 # 如果执行过程中出错，返回错误信息
-                return False, f"{self.lang_manager.tr('Python脚本执行错误:')} {str(exec_error)}"
+                import traceback
+                error_trace = traceback.format_exc()
+                return False, f"{self.lang_manager.tr('Python脚本执行错误:')} {str(exec_error)}\n{error_trace}"
             
         except Exception as e:
-            return False, f"{self.lang_manager.tr('Python脚本执行失败:')} {str(e)}"
+            import traceback
+            error_trace = traceback.format_exc()
+            return False, f"{self.lang_manager.tr('Python脚本执行失败:')} {str(e)}\n{error_trace}"
+    
+    def _execute_gui_script_in_process(self, script_code, device_id=None):
+        """在独立进程中执行包含GUI的Python脚本"""
+        try:
+            import tempfile
+            import subprocess
+            import sys
+            import os
+            import threading
+            
+            # 在脚本开头注入设备ID和u2.connect包装（如果提供）
+            # 这样脚本可以使用 DEVICE_ID 变量，并且 u2.connect() 会自动使用设备ID
+            injected_code = ""
+            if device_id:
+                injected_code = f"""# 设备ID由主程序自动注入
+DEVICE_ID = '{device_id}'
+
+# 自动包装 u2.connect() 以使用设备ID
+try:
+    import uiautomator2 as u2
+    _original_u2_connect = u2.connect
+    def _u2_connect_wrapper(*args, **kwargs):
+        # 如果没有提供参数，使用 DEVICE_ID
+        if not args and not kwargs:
+            return _original_u2_connect(DEVICE_ID)
+        return _original_u2_connect(*args, **kwargs)
+    u2.connect = _u2_connect_wrapper
+except ImportError:
+    pass  # uiautomator2 未安装，跳过
+
+"""
+            
+            # 创建临时脚本文件
+            with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False, encoding='utf-8') as f:
+                script_path = f.name
+                f.write(injected_code + script_code)
+            
+            try:
+                # 获取Python解释器路径
+                python_exe = sys.executable
+                
+                # 在独立进程中运行脚本
+                # 使用CREATE_NO_WINDOW标志（Windows）避免显示控制台窗口
+                creation_flags = 0
+                if hasattr(subprocess, 'CREATE_NO_WINDOW'):
+                    creation_flags = subprocess.CREATE_NO_WINDOW
+                
+                process = subprocess.Popen(
+                    [python_exe, script_path],
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True,
+                    encoding='utf-8',
+                    errors='replace',
+                    creationflags=creation_flags
+                )
+                
+                # ✅ 新增：保存进程引用
+                if not hasattr(self, '_gui_processes'):
+                    self._gui_processes = []
+                self._gui_processes.append(process)
+                
+                # ✅ 新增：监控进程退出，自动清理引用
+                def on_process_exit(proc):
+                    """进程退出时的回调"""
+                    try:
+                        if hasattr(self, '_gui_processes') and proc in self._gui_processes:
+                            self._gui_processes.remove(proc)
+                            logger.debug(f"GUI进程已退出，PID: {proc.pid}")
+                    except Exception as e:
+                        logger.exception(f"清理GUI进程引用失败: {e}")
+                
+                # ✅ 新增：使用守护线程监控进程状态
+                def monitor_process():
+                    """监控进程状态"""
+                    try:
+                        process.wait()  # 等待进程结束
+                        on_process_exit(process)
+                    except Exception as e:
+                        logger.exception(f"监控GUI进程失败: {e}")
+                
+                # 启动监控线程（守护线程，主程序退出时自动结束）
+                monitor_thread = threading.Thread(target=monitor_process, daemon=True)
+                monitor_thread.start()
+                
+                logger.debug(f"GUI进程已启动，PID: {process.pid}，当前跟踪的GUI进程数: {len(self._gui_processes)}")
+                
+                # 不等待进程结束（GUI应用会持续运行）
+                # 返回成功信息
+                return True, self.lang_manager.tr("GUI应用已在独立窗口中启动。\n注意：GUI应用会在独立进程中运行，关闭主程序时会自动终止所有GUI进程。")
+                
+            finally:
+                # 延迟删除临时文件（给进程时间读取）
+                # 在实际应用中，可以设置一个定时器来删除
+                pass
+                
+        except Exception as e:
+            import traceback
+            error_trace = traceback.format_exc()
+            return False, f"{self.lang_manager.tr('启动GUI应用失败:')} {str(e)}\n{error_trace}"
+    
+    def cleanup(self):
+        """清理所有GUI进程，防止孤儿进程"""
+        if not hasattr(self, '_gui_processes'):
+            return
+        
+        if not self._gui_processes:
+            return
+        
+        logger.debug(f"开始清理 {len(self._gui_processes)} 个GUI进程")
+        
+        for process in self._gui_processes[:]:  # 创建副本，避免修改时出错
+            try:
+                # 检查进程是否还在运行
+                if process.poll() is None:  # None表示进程还在运行
+                    logger.debug(f"正在终止GUI进程，PID: {process.pid}")
+                    try:
+                        # 先尝试优雅终止
+                        process.terminate()
+                        # 等待进程结束，最多等待2秒
+                        process.wait(timeout=2)
+                        logger.debug(f"GUI进程已优雅终止，PID: {process.pid}")
+                    except subprocess.TimeoutExpired:
+                        # 如果进程没有在2秒内退出，强制杀死
+                        logger.warning(f"GUI进程终止超时，强制kill，PID: {process.pid}")
+                        try:
+                            process.kill()
+                            process.wait(timeout=1)
+                            logger.debug(f"GUI进程已强制终止，PID: {process.pid}")
+                        except Exception as e:
+                            logger.exception(f"强制终止GUI进程失败，PID: {process.pid}: {e}")
+                    except Exception as e:
+                        # terminate失败，尝试kill
+                        logger.warning(f"终止GUI进程失败，尝试kill，PID: {process.pid}: {e}")
+                        try:
+                            process.kill()
+                            process.wait(timeout=1)
+                            logger.debug(f"GUI进程已强制终止，PID: {process.pid}")
+                        except Exception as e2:
+                            logger.exception(f"强制终止GUI进程失败，PID: {process.pid}: {e2}")
+                else:
+                    # 进程已经退出
+                    logger.debug(f"GUI进程已退出，PID: {process.pid}，退出码: {process.returncode}")
+            except Exception as e:
+                logger.exception(f"清理GUI进程时发生错误，PID: {process.pid if hasattr(process, 'pid') else 'unknown'}: {e}")
+            finally:
+                # 从列表中移除（无论成功与否）
+                try:
+                    if process in self._gui_processes:
+                        self._gui_processes.remove(process)
+                except Exception:
+                    pass
+        
+        logger.debug(f"GUI进程清理完成，剩余进程数: {len(self._gui_processes)}")
     
     def _open_file(self, file_path):
         """打开文件或文件夹"""

@@ -4950,6 +4950,14 @@ class MainWindow(QMainWindow):
                     except Exception as e:
                         logger.exception(f"{self.lang_manager.tr('清理工作线程失败:')} {e}")
             
+            # 清理GUI进程（防止孤儿进程）
+            if hasattr(self, 'custom_button_manager') and self.custom_button_manager:
+                try:
+                    if hasattr(self.custom_button_manager, 'cleanup'):
+                        self.custom_button_manager.cleanup()
+                except Exception as e:
+                    logger.exception(f"{self.lang_manager.tr('清理自定义按钮管理器失败:')} {e}")
+            
             # 清理赫拉配置管理器的工作线程
             if hasattr(self, 'hera_config_manager') and self.hera_config_manager:
                 try:
