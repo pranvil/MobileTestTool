@@ -202,6 +202,7 @@ class CustomButtonManager(QObject):
                 'TMO Echolocate': [self.lang_manager.tr('Echolocate 操作'), self.lang_manager.tr('过滤操作')],
                 self.lang_manager.tr('24小时背景数据'): [self.lang_manager.tr('24小时背景数据操作')],
                 self.lang_manager.tr('APP操作'): [self.lang_manager.tr('查询操作'), self.lang_manager.tr('APK操作'), self.lang_manager.tr('进程操作'), self.lang_manager.tr('APP状态操作')],
+                self.lang_manager.tr('SIM'): [self.lang_manager.tr('SIM APDU 解析器'), self.lang_manager.tr('SIM 卡读写工具')],
                 self.lang_manager.tr('其他'): [self.lang_manager.tr('设备信息'), self.lang_manager.tr('赫拉配置'), self.lang_manager.tr('其他操作'), self.lang_manager.tr('log操作')]
             }
             cards.extend(cards_map.get(tab_name, [self.lang_manager.tr('默认')]))

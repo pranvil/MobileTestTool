@@ -43,6 +43,7 @@ class UnifiedManagerDialog(QDialog):
         self.current_selected_tab_id = None
         self.is_selected_custom_tab = False
         self.current_selected_card_name = None  # 当前选中的card名称
+        self.current_selected_card_is_preset = False  # 当前选中的card是否为预置card
         self.all_buttons_data = []  # 存储所有按钮数据用于搜索
         self.search_filter_mode = 0  # 0=全局搜索, 1-7=按列搜索
         self.column_filters = []  # 列级过滤器控件列表 (combo, col_idx, label_text) 元组
@@ -305,12 +306,6 @@ class UnifiedManagerDialog(QDialog):
         self.card_down_btn.setAutoDefault(False)
         self.card_down_btn.setDefault(False)
         custom_card_btn_layout.addWidget(self.card_down_btn)
-
-        self.clear_card_selection_btn = QPushButton("❌ " + self.tr("清除选择"))
-        self.clear_card_selection_btn.clicked.connect(self.clear_card_selection)
-        self.clear_card_selection_btn.setAutoDefault(False)
-        self.clear_card_selection_btn.setDefault(False)
-        custom_card_btn_layout.addWidget(self.clear_card_selection_btn)
         
         custom_card_main_layout.addLayout(custom_card_btn_layout)
         custom_card_container_layout.addWidget(custom_card_group, 1)  # 设置拉伸因子为1，使其能够扩展
@@ -356,7 +351,7 @@ class UnifiedManagerDialog(QDialog):
         search_layout.addWidget(self.search_btn)
         
         self.clear_search_btn = QPushButton("❌ " + self.tr("清除"))
-        self.clear_search_btn.clicked.connect(self.clear_search)
+        self.clear_search_btn.clicked.connect(self.clear_all_filters)
         self.clear_search_btn.setAutoDefault(False)
         self.clear_search_btn.setDefault(False)
         search_layout.addWidget(self.clear_search_btn)
@@ -526,6 +521,22 @@ class UnifiedManagerDialog(QDialog):
 
         self.update_tab_buttons_state()
         self.load_custom_cards()
+        # 清除Card选择，因为Tab变化了
+        if self.custom_card_list:
+            self.custom_card_list.clearSelection()
+            self.current_selected_card_name = None
+            self.current_selected_card_is_preset = False
+            # 启用所有编辑操作按钮
+            if hasattr(self, 'edit_card_btn') and self.edit_card_btn:
+                self.edit_card_btn.setEnabled(True)
+            if hasattr(self, 'delete_card_btn') and self.delete_card_btn:
+                self.delete_card_btn.setEnabled(True)
+            if hasattr(self, 'card_up_btn') and self.card_up_btn:
+                self.card_up_btn.setEnabled(True)
+            if hasattr(self, 'card_down_btn') and self.card_down_btn:
+                self.card_down_btn.setEnabled(True)
+        # 重新应用过滤器，显示该Tab下的所有自定义按钮
+        self.apply_filters()
         logger.debug(f"Tab选择变化: current_selected_tab_id={self.current_selected_tab_id}, is_selected_custom_tab={self.is_selected_custom_tab}")
 
     def _on_splitter_moved(self, pos, index):
@@ -547,6 +558,9 @@ class UnifiedManagerDialog(QDialog):
             else:
                 card_name = item_text
             
+            # 检查是否为预置Card
+            self.current_selected_card_is_preset = current_item.data(Qt.UserRole + 1) == True
+            
             # 获取完整的card信息以验证
             card_id = current_item.data(Qt.UserRole)
             card = next((c for c in self.tab_config_manager.custom_cards if c.get('id') == card_id), None)
@@ -556,59 +570,128 @@ class UnifiedManagerDialog(QDialog):
                 self.current_selected_card_name = card_name
         else:
             self.current_selected_card_name = None
+            self.current_selected_card_is_preset = False
         
-        logger.debug(f"Card选择变化: current_selected_card_name={self.current_selected_card_name}")
+        # 根据Card类型启用/禁用编辑操作按钮
+        is_preset = self.current_selected_card_is_preset
+        if hasattr(self, 'edit_card_btn') and self.edit_card_btn:
+            self.edit_card_btn.setEnabled(not is_preset)
+        if hasattr(self, 'delete_card_btn') and self.delete_card_btn:
+            self.delete_card_btn.setEnabled(not is_preset)
+        if hasattr(self, 'card_up_btn') and self.card_up_btn:
+            self.card_up_btn.setEnabled(not is_preset)
+        if hasattr(self, 'card_down_btn') and self.card_down_btn:
+            self.card_down_btn.setEnabled(not is_preset)
+        
+        logger.debug(f"Card选择变化: current_selected_card_name={self.current_selected_card_name}, is_preset={self.current_selected_card_is_preset}")
         # 重新应用过滤器，更新按钮显示
         self.apply_filters()
     
-    def clear_card_selection(self):
-        """清除Card选择"""
-        if self.custom_card_list:
-            self.custom_card_list.clearSelection()
-            self.current_selected_card_name = None
-            logger.debug("Card选择已清除")
-            # 重新应用过滤器，显示所有按钮
-            self.apply_filters()
-
     def load_custom_cards(self):
-        """加载自定义Card列表"""
+        """加载Card列表（包括自定义Card和预置Card）"""
         try:
             if self.custom_card_list is None:
                 return
             
-            # 保存当前选择（如果有）
-            selected_card_id = None
-            current_item = self.custom_card_list.currentItem()
-            if current_item:
-                selected_card_id = current_item.data(Qt.UserRole)
+            # 保存当前选择（如果有）- 只有在Tab和Card都有效时才保存
+            selected_card_name = None
+            selected_card_is_preset = None
+            # 只有在Tab已选中且Card选择状态有效时才尝试恢复Card选择
+            if self.current_selected_tab_id is not None and self.current_selected_card_name is not None:
+                current_item = self.custom_card_list.currentItem()
+                if current_item:
+                    selected_card_name = current_item.text().split(' (')[0] if ' (' in current_item.text() else current_item.text()
+                    # 检查是否为预置Card（通过UserRole+1数据）
+                    selected_card_is_preset = current_item.data(Qt.UserRole + 1) == True
+                # 如果current_item不存在，但current_selected_card_name存在，使用它
+                elif self.current_selected_card_name:
+                    selected_card_name = self.current_selected_card_name
+                    selected_card_is_preset = self.current_selected_card_is_preset
             
             self.custom_card_list.clear()
-            self.current_selected_card_name = None  # 清除选择状态
+            # 注意：不清除current_selected_card_name，因为可能需要在load_custom_cards中恢复选择
+            # 但如果Tab被清除，则应该清除Card选择状态
+            if self.current_selected_tab_id is None:
+                self.current_selected_card_name = None  # 清除选择状态
+                self.current_selected_card_is_preset = False  # 清除预置Card标识
+
+            # 获取所有自定义Card的名称集合，用于区分预置Card和自定义Card
+            custom_card_names = set()
+            for card in self.tab_config_manager.custom_cards:
+                custom_card_names.add(card.get('name', ''))
+
+            cards_to_display = []  # 存储要显示的Card信息列表
 
             if self.current_selected_tab_id is None:
-                cards = self.tab_config_manager.custom_cards
+                # 未选中Tab，显示所有自定义Card
+                for card in self.tab_config_manager.custom_cards:
+                    cards_to_display.append({
+                        'name': card['name'],
+                        'id': card.get('id'),
+                        'is_preset': False,
+                        'tab_name': None
+                    })
             elif self.is_selected_custom_tab and self.current_selected_tab_id:
-                cards = [card for card in self.tab_config_manager.custom_cards if card.get('tab_id') == self.current_selected_tab_id]
+                # 选中自定义Tab，显示该Tab下的自定义Card
+                for card in self.tab_config_manager.custom_cards:
+                    if card.get('tab_id') == self.current_selected_tab_id:
+                        associated_tab = next((tab for tab in self.tab_config_manager.custom_tabs if tab['id'] == self.current_selected_tab_id), None)
+                        tab_name = associated_tab['name'] if associated_tab else ''
+                        cards_to_display.append({
+                            'name': card['name'],
+                            'id': card.get('id'),
+                            'is_preset': False,
+                            'tab_name': tab_name
+                        })
             else:
-                cards = []
+                # 选中预置Tab，显示该Tab下的所有Card（包括预置Card和自定义Card）
+                # 获取Tab名称
+                all_tabs = self.tab_config_manager.get_all_tabs()
+                selected_tab = next((tab for tab in all_tabs if tab['id'] == self.current_selected_tab_id), None)
+                if selected_tab:
+                    tab_name = selected_tab['name']
+                    # 从custom_button_manager获取该Tab下的所有Card
+                    available_cards = self.custom_button_manager.get_available_cards(tab_name)
+                    
+                    for card_name in available_cards:
+                        is_preset = card_name not in custom_card_names
+                        # 如果是自定义Card，获取其ID
+                        card_id = None
+                        if not is_preset:
+                            card = next((c for c in self.tab_config_manager.custom_cards if c.get('name') == card_name), None)
+                            if card:
+                                card_id = card.get('id')
+                        
+                        cards_to_display.append({
+                            'name': card_name,
+                            'id': card_id,
+                            'is_preset': is_preset,
+                            'tab_name': tab_name
+                        })
 
             # 尝试恢复之前的选择
             selected_item = None
-            for card in cards:
-                associated_tab = next((tab for tab in self.tab_config_manager.custom_tabs if tab['id'] == card.get('tab_id')), None)
-                tab_name = associated_tab['name'] if associated_tab else card.get('tab_id', '')
-
+            for card_info in cards_to_display:
+                # 构建显示文本
                 if self.is_selected_custom_tab and self.current_selected_tab_id:
-                    item_text = card['name']
+                    item_text = card_info['name']
                 else:
-                    item_text = f"{card['name']} ({tab_name})"
+                    tab_name_display = card_info['tab_name'] if card_info['tab_name'] else ''
+                    item_text = f"{card_info['name']} ({tab_name_display})" if tab_name_display else card_info['name']
 
                 item = QListWidgetItem(item_text)
-                item.setData(Qt.UserRole, card['id'])
+                # 如果是自定义Card，存储其ID；如果是预置Card，存储None或特殊标识
+                if card_info['id']:
+                    item.setData(Qt.UserRole, card_info['id'])
+                else:
+                    item.setData(Qt.UserRole, None)
+                # 存储是否为预置Card的标识
+                item.setData(Qt.UserRole + 1, card_info['is_preset'])
                 self.custom_card_list.addItem(item)
                 
                 # 如果这是之前选中的card，标记它
-                if selected_card_id and card.get('id') == selected_card_id:
+                if (selected_card_name and card_info['name'] == selected_card_name and 
+                    selected_card_is_preset is not None and card_info['is_preset'] == selected_card_is_preset):
                     selected_item = item
             
             # 恢复选择（但不触发过滤，因为已经在最后会调用apply_filters）
@@ -616,18 +699,12 @@ class UnifiedManagerDialog(QDialog):
                 self.custom_card_list.blockSignals(True)
                 selected_item.setSelected(True)
                 self.custom_card_list.setCurrentItem(selected_item)
-                # 从card对象中获取准确的card名称
-                restored_card_id = selected_item.data(Qt.UserRole)
-                restored_card = next((c for c in cards if c.get('id') == restored_card_id), None)
-                if restored_card:
-                    self.current_selected_card_name = restored_card.get('name', '')
-                else:
-                    # 如果找不到card对象，从显示文本中提取
-                    item_text = selected_item.text()
-                    self.current_selected_card_name = item_text.split(' (')[0] if ' (' in item_text else item_text
+                # 从item中获取card信息
+                self.current_selected_card_name = selected_item.text().split(' (')[0] if ' (' in selected_item.text() else selected_item.text()
+                self.current_selected_card_is_preset = selected_item.data(Qt.UserRole + 1) == True
                 self.custom_card_list.blockSignals(False)
         except Exception as e:
-            logger.exception(f"{self.tr('加载自定义Card失败:')} {e}")
+            logger.exception(f"{self.tr('加载Card失败:')} {e}")
     
     def load_buttons(self):
         """加载按钮到表格"""
@@ -828,7 +905,19 @@ class UnifiedManagerDialog(QDialog):
                 if not match:
                     continue
                 
-                # 应用Card选择过滤器
+                # 应用Tab选择过滤器（如果选中了Tab）
+                if self.current_selected_tab_id:
+                    # 获取Tab名称
+                    all_tabs = self.tab_config_manager.get_all_tabs()
+                    selected_tab = next((tab for tab in all_tabs if tab['id'] == self.current_selected_tab_id), None)
+                    if selected_tab:
+                        tab_name = selected_tab['name']
+                        btn_tab = btn.get('tab', '')
+                        if btn_tab != tab_name:
+                            match = False
+                            continue
+                
+                # 应用Card选择过滤器（如果选中了Card）
                 if self.current_selected_card_name:
                     btn_card = btn.get('card', '')
                     # 规范化card名称进行比较（去除多余空格）
@@ -837,6 +926,11 @@ class UnifiedManagerDialog(QDialog):
                     if normalized_btn_card != normalized_selected_card:
                         match = False
                         continue
+                    
+                    # 如果选中的是预置Card，只显示自定义按钮
+                    # 注意：self.all_buttons_data已经只包含自定义按钮（从custom_button_manager.get_all_buttons()获取）
+                    # 所以当选中预置Card时，只显示匹配该Card的自定义按钮，预置按钮不会显示
+                    # 这个逻辑已经通过使用self.all_buttons_data自动实现
                 
                 # 再应用搜索过滤器（如果有搜索关键词）
                 if keyword:
@@ -935,18 +1029,57 @@ class UnifiedManagerDialog(QDialog):
         except Exception as e:
             logger.exception(f"{self.tr('应用过滤器失败:')} {e}")
     
-    def clear_search(self):
-        """清除搜索，恢复显示所有按钮"""
+    def clear_all_filters(self):
+        """清除所有过滤条件（包括Tab/Card选择和搜索/过滤条件），恢复显示所有按钮"""
         try:
+            # 清除Tab选择
+            if self.tab_list_widget:
+                self.tab_list_widget.blockSignals(True)  # 阻止信号，避免触发on_tab_selection_changed
+                self.tab_list_widget.clearSelection()
+                self.tab_list_widget.blockSignals(False)
+                self.current_selected_tab_id = None
+                self.is_selected_custom_tab = False
+                # 更新Tab按钮状态
+                self.update_tab_buttons_state()
+            
+            # 清除Card选择
+            if self.custom_card_list:
+                self.custom_card_list.blockSignals(True)  # 阻止信号，避免触发on_card_selection_changed
+                self.custom_card_list.clearSelection()
+                self.custom_card_list.blockSignals(False)
+            # 清除Card选择状态变量
+            self.current_selected_card_name = None
+            self.current_selected_card_is_preset = False
+            # 启用所有编辑操作按钮
+            if hasattr(self, 'edit_card_btn') and self.edit_card_btn:
+                self.edit_card_btn.setEnabled(True)
+            if hasattr(self, 'delete_card_btn') and self.delete_card_btn:
+                self.delete_card_btn.setEnabled(True)
+            if hasattr(self, 'card_up_btn') and self.card_up_btn:
+                self.card_up_btn.setEnabled(True)
+            if hasattr(self, 'card_down_btn') and self.card_down_btn:
+                self.card_down_btn.setEnabled(True)
+            
+            # 清除搜索条件
             self.search_input.clear()
             self.search_scope_combo.setCurrentIndex(0)
             # 重置所有列过滤器
             for combo, _, _ in self.column_filters:
                 combo.setCurrentIndex(0)
+            
+            # 重新加载Card列表（显示所有自定义Card）
+            self.load_custom_cards()
+            
             # 重新加载所有按钮
             self.load_buttons()
+            
+            logger.debug("所有过滤条件已清除")
         except Exception as e:
-            logger.exception(f"{self.tr('清除搜索失败:')} {e}")
+            logger.exception(f"{self.tr('清除所有过滤条件失败:')} {e}")
+    
+    def clear_search(self):
+        """清除搜索，恢复显示所有按钮（保留此方法以兼容其他代码）"""
+        self.clear_all_filters()
     
     def on_refresh_clicked(self):
         """刷新按钮点击，保持过滤条件但重新加载数据"""
@@ -1366,7 +1499,17 @@ class UnifiedManagerDialog(QDialog):
             QMessageBox.warning(self, self.tr("警告"), self.tr("请选择要编辑的Card"))
             return
         
+        # 检查是否为预置Card
+        is_preset = current_item.data(Qt.UserRole + 1) == True
+        if is_preset:
+            QMessageBox.warning(self, self.tr("警告"), self.tr("预置Card不能编辑"))
+            return
+        
         card_id = current_item.data(Qt.UserRole)
+        if not card_id:
+            QMessageBox.warning(self, self.tr("警告"), self.tr("无法获取Card ID"))
+            return
+        
         from ui.tab_manager_dialog import CustomCardDialog
         dialog = CustomCardDialog(self.tab_config_manager, card_id=card_id, parent=self)
         if dialog.exec_() == QDialog.Accepted:
@@ -1379,6 +1522,17 @@ class UnifiedManagerDialog(QDialog):
             QMessageBox.warning(self, self.tr("警告"), self.tr("请选择要删除的Card"))
             return
         
+        # 检查是否为预置Card
+        is_preset = current_item.data(Qt.UserRole + 1) == True
+        if is_preset:
+            QMessageBox.warning(self, self.tr("警告"), self.tr("预置Card不能删除"))
+            return
+        
+        card_id = current_item.data(Qt.UserRole)
+        if not card_id:
+            QMessageBox.warning(self, self.tr("警告"), self.tr("无法获取Card ID"))
+            return
+        
         card_name = current_item.text()
         reply = QMessageBox.question(
             self, self.tr("确认删除"),
@@ -1388,7 +1542,6 @@ class UnifiedManagerDialog(QDialog):
         )
         
         if reply == QMessageBox.Yes:
-            card_id = current_item.data(Qt.UserRole)
             if self.tab_config_manager.delete_custom_card(card_id):
                 self.load_custom_cards()
                 QMessageBox.information(self, self.tr("成功"), self.tr("Card已删除"))
@@ -1404,17 +1557,35 @@ class UnifiedManagerDialog(QDialog):
             QMessageBox.warning(self, self.tr("提示"), self.tr("请先选择要移动的Card"))
             return
 
+        current_item = self.custom_card_list.item(current_row)
+        # 检查是否为预置Card
+        is_preset = current_item.data(Qt.UserRole + 1) == True
+        if is_preset:
+            QMessageBox.warning(self, self.tr("警告"), self.tr("预置Card不能移动"))
+            return
+
         new_row = current_row + step
         if new_row < 0 or new_row >= count:
+            return
+
+        # 检查目标位置是否为预置Card
+        target_item = self.custom_card_list.item(new_row)
+        if target_item and target_item.data(Qt.UserRole + 1) == True:
+            QMessageBox.warning(self, self.tr("警告"), self.tr("不能移动到预置Card的位置"))
             return
 
         item = self.custom_card_list.takeItem(current_row)
         self.custom_card_list.insertItem(new_row, item)
         self.custom_card_list.setCurrentRow(new_row)
 
+        # 只收集自定义Card的ID（排除预置Card）
         ordered_ids = []
         for idx in range(self.custom_card_list.count()):
-            ordered_ids.append(self.custom_card_list.item(idx).data(Qt.UserRole))
+            item = self.custom_card_list.item(idx)
+            card_id = item.data(Qt.UserRole)
+            is_preset = item.data(Qt.UserRole + 1) == True
+            if card_id and not is_preset:
+                ordered_ids.append(card_id)
 
         if not self.tab_config_manager.reorder_custom_cards(ordered_ids):
             QMessageBox.warning(self, self.tr("失败"), self.tr("Card排序保存失败，请检查日志"))
