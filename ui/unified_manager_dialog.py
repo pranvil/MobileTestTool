@@ -17,61 +17,81 @@ from PyQt5.QtWidgets import (QDialog, QTabWidget, QVBoxLayout, QHBoxLayout,
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QFont
 
-# 延迟导入，支持 PyInstaller 环境和 SIM Reader 对话框修改 sys.path 的情况
-try:
-    from core.debug_logger import logger
-except ModuleNotFoundError:
-    # 如果导入失败，确保正确的路径在 sys.path 中，并重新导入模块
-    import sys
-    import os
-    import importlib
-    
-    # 修复 sys.path
-    if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
-        # PyInstaller 环境：使用 sys._MEIPASS
-        base_path = sys._MEIPASS
-        if base_path not in sys.path:
-            sys.path.insert(0, base_path)
-    else:
-        # 开发环境：使用 __file__ 计算项目根目录
-        current_file = os.path.abspath(__file__)
-        # ui/unified_manager_dialog.py -> ui -> 项目根目录
-        project_root = os.path.dirname(os.path.dirname(current_file))
+# 延迟导入，支持 PyInstaller 环境，以及 SIM Reader 对话框可能修改 sys.path/sys.modules 的情况
+#
+# 背景：项目中存在多个同名包 `core`（项目根目录、sim_reader/core、SIM_APDU_Parser/core），
+# 如果某个功能临时把 sys.path 调整为优先命中其它 core，会导致后续 `from core.debug_logger` 概率性失败。
+def _load_app_logger():
+    """确保导入到的是项目自身的 core.debug_logger（而不是 sim_reader/core 等同名包）。"""
+    try:
+        from core.debug_logger import logger as _logger
+        return _logger
+    except ModuleNotFoundError:
+        import sys
+        import os
+        import importlib
+
+        # 计算项目根目录（开发环境）或 PyInstaller base_path（打包环境）
+        if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
+            project_root = sys._MEIPASS
+        else:
+            current_file = os.path.abspath(__file__)
+            # ui/unified_manager_dialog.py -> ui -> 项目根目录
+            project_root = os.path.dirname(os.path.dirname(current_file))
+
+        normalized_project_root = os.path.normpath(os.path.abspath(project_root))
+        sim_reader_path = os.path.normpath(os.path.abspath(os.path.join(project_root, "sim_reader")))
+
+        # 修复 sys.path：确保项目根目录（或 _MEIPASS）在最前面
         if project_root not in sys.path:
             sys.path.insert(0, project_root)
-    
-    # 如果模块在 sys.modules 中被删除或损坏，先删除它
-    if 'core.debug_logger' in sys.modules:
-        mod = sys.modules['core.debug_logger']
-        mod_file = getattr(mod, '__file__', None)
-        should_delete = False
-        
-        if mod_file:
-            # 规范化路径以便比较
-            normalized_mod_file = os.path.normpath(os.path.abspath(mod_file))
-            normalized_project_root = os.path.normpath(os.path.abspath(project_root))
-            sim_reader_path = os.path.join(project_root, "sim_reader")
-            normalized_sim_reader_path = os.path.normpath(os.path.abspath(sim_reader_path))
-            
-            # 如果模块文件路径包含 sim_reader，说明是 sim_reader 的模块，需要删除
-            if normalized_sim_reader_path in normalized_mod_file:
-                should_delete = True
-            # 如果模块不在项目根目录中，也需要删除
-            elif normalized_project_root not in normalized_mod_file:
-                should_delete = True
-            # 如果模块文件不存在，也删除
-            elif not os.path.exists(mod_file):
-                should_delete = True
         else:
-            # 模块没有 __file__ 属性，可能是错误的模块，删除
-            should_delete = True
-        
-        if should_delete:
-            del sys.modules['core.debug_logger']
-    
-    # 重新导入模块
-    importlib.import_module('core.debug_logger')
-    from core.debug_logger import logger
+            # 置顶，避免被其它路径抢先命中同名包
+            try:
+                sys.path.remove(project_root)
+            except ValueError:
+                pass
+            sys.path.insert(0, project_root)
+
+        def _module_file(mod):
+            return getattr(mod, "__file__", None) or ""
+
+        def _is_wrong_core_module(mod) -> bool:
+            mod_file = _module_file(mod)
+            if not mod_file:
+                # 没有 __file__ 的 core 很可能是命名空间包/脏状态，宁可清掉重来
+                return True
+            normalized_mod_file = os.path.normpath(os.path.abspath(mod_file))
+            # 来自 sim_reader 的 core，一律视为冲突
+            if sim_reader_path in normalized_mod_file:
+                return True
+            # 不在项目根目录内，也视为冲突（例如被其它子工程的 core 覆盖）
+            if normalized_project_root not in normalized_mod_file:
+                return True
+            # 文件不存在，也视为脏缓存
+            if not os.path.exists(mod_file):
+                return True
+            return False
+
+        # 关键修复：如果 core 包本身已经被错误来源占用，必须先删掉 core 及其所有子模块缓存
+        core_pkg = sys.modules.get("core")
+        if core_pkg is not None and _is_wrong_core_module(core_pkg):
+            for name in list(sys.modules.keys()):
+                if name == "core" or name.startswith("core."):
+                    sys.modules.pop(name, None)
+
+        # 同理：即使 core 包没在 sys.modules，core.debug_logger 也可能有残留缓存
+        if "core.debug_logger" in sys.modules:
+            mod = sys.modules["core.debug_logger"]
+            if _is_wrong_core_module(mod):
+                sys.modules.pop("core.debug_logger", None)
+
+        importlib.invalidate_caches()
+        imported = importlib.import_module("core.debug_logger")
+        return imported.logger
+
+
+logger = _load_app_logger()
 from ui.widgets.drag_drop_table import DragDropButtonTable
 from ui.widgets.shadow_utils import add_card_shadow
 

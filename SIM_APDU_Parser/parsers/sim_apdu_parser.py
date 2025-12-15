@@ -50,15 +50,15 @@ class SimApduParser:
         self.ef_file_names = {
             # DF (Directory Files)
             "3F00": "MF (Master File)",
-            "7F10": "DF_GSM",
-            "7F20": "DF_ISIM", 
-            "7F21": "DF_USIM",
-            "7F22": "DF_CSIM",
-            "2F00": "EF_ICCID",
-            "2F05": "EF_ELP",
-            "2F06": "EF_ARR",
-            "2FE2": "EF_UST",
+            "7F10": "DF_Telecom",
+            "7F20": "DF_GSM", 
+            "5FC0": "DF_5G",
+
             # EF (Elementary Files)
+            "2F05": "EF_PL",
+            "2F00": "DIR",
+            "2F06": "ARR",
+            "2FE2": "ICCID",
             "6F37": "ACM maximum value",
             "6F38": "USIM service table",
             "6F39": "Accumulated call meter",
@@ -101,6 +101,7 @@ class SimApduParser:
             "6F83": "Outgoing call timer",
             "6FAD": "Administrative data or Administrative Data",
             "6FBD": "GBA NAF List",
+            "6FD9": "EHPLMN",
             "6FDB": "EHPLMN Presentation Indication",
             "6FDC": "Last RPLMN Selection Indication",
             "6FDD": "NAF Key Centre Address or NAF Key Centre Address",
@@ -137,12 +138,12 @@ class SimApduParser:
             "6FFC": "XCAP Configuration Data or XCAP Configuration Data",
             "6FFD": "EARFCN List for MTC/NB-IOT UEs",
             "6FFE": "MuD and MiD configuration data or MuD and MiD configuration data",
-            "6F02": "IMS private user identity or Operator controlled signal threshold per access technology",
+            "6F02": "ISIM: IMPI/USIM: OCST",
             "6F03": "Home Network Domain Name",
             "6F04": "IMS public user identity",
             "6F06": "Access Rule Reference or Access rule reference (under ADFUSIM and DFTELECOM)",
-            "6F07": "ISIM Service Table or IMSI",
-            "6F09": "P-CSCF address or Ciphering and integrity keys for packet switched domain",
+            "6F07": "ISIM: ISIM Service Table/USIM: IMSI",
+            "6F09": "ISIM: P-CSCF address /USIM: KeysPS",
             "6F0A": "Access Control to GBA_U API",
             "6F0B": "IMS DC Establishment Indication",
             "6F2C": "De-personalization Control Keys",
@@ -166,9 +167,14 @@ class SimApduParser:
             "6FCB": "Call Forwarding Indication Status",
             "6FCC": "Extension 7",
             "6FCD": "Service Provider Display Information",
+            "6FD7": "EFMSK (MBMS Service Key List)",
+            "6FD8": "EFMUK (MBMS User Key)",
             "6FCE": "MMS Notification",
             "6FCF": "Extension 8",
             "6FD0": "MMS Issuer Connectivity Parameters",
+            "6FDA": "GBA NAF List",
+            "6FD5": "GBA Bootstrapping parameters",
+            "6FD6": "GBA Bootstrapping parameters",
             "4F16": "KAUSF derivation configuration",
             "4F20": "Image data",
             "4F21": "GSM Ciphering key Kc",
@@ -197,6 +203,21 @@ class SimApduParser:
             "4F84": "Operator CSG lists",
             "4F85": "Operator CSG Type",
             "4F86": "Operator HNB name",
+            "4F01": " EF5GS3GPPLOCI (5GS 3GPP location information)",                         
+            "4F02": " EF5GSN3GPPLOCI (5GS non-3GPP location information)",                     
+            "4F03": " EF5GS3GPPNSC (5GS 3GPP Access NAS Security Context)",                    
+            "4F04": " EF5GSN3GPPNSC (5GS non-3GPP Access NAS Security Context)",                
+            "4F05": " EF5GAUTHKEYS",                                                            
+            "4F06": " EFUAC_AIC",                                                              
+            "4F07": " EFSUCI_Calc_Info",                                                        
+            "4F08": " EFOPL5G",                                                                
+            "4F09": " EFSUPI_NAI",                                                              
+            "4F0A": " EFRouting_Indicator",                                                     
+            "4F0B": " EFURSP",                                                                 
+            "4F0C": " EFTN3GPPSNN",                                                            
+            "4F0D": " EFCAG",                                                                   
+            "4F0E": " EFSOR-CMCI",                                                              
+            "4F0F": " EFDRI"   
         }
         
         # SIM->UE状态码映射
@@ -409,22 +430,6 @@ class SimApduParser:
                 # 获取文件名
                 file_name = self._get_file_name(file_id)
                 details.children.append(ParseNode(name="File Name", value=file_name))
-                
-                # 常见DF文件ID映射
-                df_file_id_map = {
-                    "3F00": "MF (Master File)",
-                    "7F10": "DF_GSM",
-                    "7F20": "DF_ISIM",
-                    "7F21": "DF_USIM",
-                    "7F22": "DF_CSIM",
-                    "2F00": "EF_ICCID",
-                    "2F05": "EF_ELP",
-                    "2F06": "EF_ARR",
-                    "2FE2": "EF_UST"
-                }
-                
-                if file_id in df_file_id_map:
-                    details.children.append(ParseNode(name="File Type", value=df_file_id_map[file_id]))
         
         root.children.append(details)
     
