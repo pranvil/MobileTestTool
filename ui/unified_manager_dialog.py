@@ -17,7 +17,61 @@ from PyQt5.QtWidgets import (QDialog, QTabWidget, QVBoxLayout, QHBoxLayout,
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QFont
 
-from core.debug_logger import logger
+# 延迟导入，支持 PyInstaller 环境和 SIM Reader 对话框修改 sys.path 的情况
+try:
+    from core.debug_logger import logger
+except ModuleNotFoundError:
+    # 如果导入失败，确保正确的路径在 sys.path 中，并重新导入模块
+    import sys
+    import os
+    import importlib
+    
+    # 修复 sys.path
+    if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
+        # PyInstaller 环境：使用 sys._MEIPASS
+        base_path = sys._MEIPASS
+        if base_path not in sys.path:
+            sys.path.insert(0, base_path)
+    else:
+        # 开发环境：使用 __file__ 计算项目根目录
+        current_file = os.path.abspath(__file__)
+        # ui/unified_manager_dialog.py -> ui -> 项目根目录
+        project_root = os.path.dirname(os.path.dirname(current_file))
+        if project_root not in sys.path:
+            sys.path.insert(0, project_root)
+    
+    # 如果模块在 sys.modules 中被删除或损坏，先删除它
+    if 'core.debug_logger' in sys.modules:
+        mod = sys.modules['core.debug_logger']
+        mod_file = getattr(mod, '__file__', None)
+        should_delete = False
+        
+        if mod_file:
+            # 规范化路径以便比较
+            normalized_mod_file = os.path.normpath(os.path.abspath(mod_file))
+            normalized_project_root = os.path.normpath(os.path.abspath(project_root))
+            sim_reader_path = os.path.join(project_root, "sim_reader")
+            normalized_sim_reader_path = os.path.normpath(os.path.abspath(sim_reader_path))
+            
+            # 如果模块文件路径包含 sim_reader，说明是 sim_reader 的模块，需要删除
+            if normalized_sim_reader_path in normalized_mod_file:
+                should_delete = True
+            # 如果模块不在项目根目录中，也需要删除
+            elif normalized_project_root not in normalized_mod_file:
+                should_delete = True
+            # 如果模块文件不存在，也删除
+            elif not os.path.exists(mod_file):
+                should_delete = True
+        else:
+            # 模块没有 __file__ 属性，可能是错误的模块，删除
+            should_delete = True
+        
+        if should_delete:
+            del sys.modules['core.debug_logger']
+    
+    # 重新导入模块
+    importlib.import_module('core.debug_logger')
+    from core.debug_logger import logger
 from ui.widgets.drag_drop_table import DragDropButtonTable
 from ui.widgets.shadow_utils import add_card_shadow
 

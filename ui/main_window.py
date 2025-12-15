@@ -117,7 +117,6 @@ class DraggableCustomButton(QPushButton):
             return
 
         button_name = self.button_data.get('name', '')
-        logger.debug(f"[拖动开始] 按钮ID: {button_id}, 按钮名称: {button_name}, Tab: {self.container.tab_name}, Card: {self.container.card_name}")
 
         drag = QDrag(self)
         mime = QMimeData()
@@ -186,7 +185,6 @@ class CustomButtonContainer(QWidget):
         # 直接添加到布局末尾，保持按钮顺序
         self._layout.addWidget(button)
         self._button_widgets[button_data.get('id')] = button
-        logger.debug(f"[按钮容器] 添加按钮: {button_data.get('name', '')} (ID: {button_data.get('id', '')}) 到布局末尾")
         return button
 
     def dragEnterEvent(self, event):
@@ -218,58 +216,33 @@ class CustomButtonContainer(QWidget):
             event.ignore()
             return
 
-        # 记录拖动前的按钮顺序
-        button_names_before = [btn.button_data.get('name', '') for btn in buttons]
-        button_ids_before = [btn.button_data.get('id', '') for btn in buttons]
-        logger.debug(f"[拖动前] 按钮顺序: {button_names_before}")
-        logger.debug(f"[拖动前] 按钮ID顺序: {button_ids_before}")
-
         source_index = buttons.index(button)
-        source_button_name = button.button_data.get('name', '')
-        logger.debug(f"[拖动] 源按钮: {source_button_name} (索引: {source_index})")
-
         mouse_pos = event.pos()
-        logger.debug(f"[拖动] 鼠标位置: x={mouse_pos.x()}, y={mouse_pos.y()}")
-
         target_index = self._determine_target_index(mouse_pos, buttons)
-        logger.debug(f"[拖动] 初始目标索引: {target_index}")
 
         # 如果目标位置和源位置相同，或者目标位置紧挨着源位置（不需要移动），则忽略
         if target_index == source_index:
-            logger.debug(f"[拖动] 目标索引等于源索引，忽略拖动")
             event.ignore()
             return
 
         # 移除源按钮
-        logger.debug(f"[拖动] 移除源按钮 (索引: {source_index})")
         self._layout.removeWidget(button)
 
         # 计算正确的插入位置
-        original_target_index = target_index
         # 如果目标索引在源索引之后，需要减1（因为源按钮已被移除）
         if target_index > source_index:
             target_index -= 1
-            logger.debug(f"[拖动] 目标索引在源索引之后，调整: {original_target_index} -> {target_index}")
 
         # 确保目标索引在有效范围内
         target_index = max(0, min(target_index, self._layout.count()))
-        logger.debug(f"[拖动] 最终目标索引: {target_index} (布局中当前项目数: {self._layout.count()})")
         
         # 插入到目标位置
-        logger.debug(f"[拖动] 插入按钮到索引: {target_index}")
         self._layout.insertWidget(target_index, button)
         event.acceptProposedAction()
 
-        # 记录拖动后的按钮顺序
-        buttons_after = self._ordered_buttons()
-        button_names_after = [btn.button_data.get('name', '') for btn in buttons_after]
-        button_ids_after = [btn.button_data.get('id', '') for btn in buttons_after]
-        logger.debug(f"[拖动后] 按钮顺序: {button_names_after}")
-        logger.debug(f"[拖动后] 按钮ID顺序: {button_ids_after}")
-
         # 发送排序变更信号
         ordered_ids = self._current_button_ids()
-        logger.debug(f"[拖动] 发送排序变更信号，ID顺序: {ordered_ids}")
+        logger.debug(f"[拖动排序] Tab '{self.tab_name}', Card '{self.card_name}' 按钮顺序已更新")
         self.order_changed.emit(self.tab_name, self.card_name, ordered_ids)
 
     def _ordered_buttons(self):
@@ -296,13 +269,10 @@ class CustomButtonContainer(QWidget):
             int: 目标索引位置（插入位置，在指定索引的按钮之前）
         """
         if not buttons:
-            logger.debug(f"[目标索引] 按钮列表为空，返回 0")
             return 0
         
         # 默认插入到末尾
         target_index = len(buttons)
-        logger.debug(f"[目标索引] 初始目标索引: {target_index} (末尾)")
-        logger.debug(f"[目标索引] 鼠标位置: x={pos.x()}, y={pos.y()}")
         
         # 遍历所有按钮，找到鼠标应该在的位置
         # 使用按钮的左边界作为判断标准，更直观
@@ -311,29 +281,22 @@ class CustomButtonContainer(QWidget):
             btn_left = btn_rect.left()
             btn_right = btn_rect.right()
             btn_center_x = btn_rect.center().x()
-            btn_name = btn.button_data.get('name', '')
-            
-            logger.debug(f"[目标索引] 按钮[{index}] {btn_name}: left={btn_left}, right={btn_right}, center={btn_center_x}, 宽度={btn_rect.width()}")
             
             # 如果鼠标在按钮的左侧一半区域内，插入到该按钮之前
             # 这样可以更准确地判断用户想要插入的位置
             if pos.x() < btn_left:
                 target_index = index
-                logger.debug(f"[目标索引] 鼠标在按钮[{index}]左侧，目标索引设为: {target_index}")
                 break
             # 如果鼠标在按钮上，根据位置判断是插入到之前还是之后
             elif btn_left <= pos.x() <= btn_right:
                 if pos.x() < btn_center_x:
                     # 在按钮左侧一半，插入到该按钮之前
                     target_index = index
-                    logger.debug(f"[目标索引] 鼠标在按钮[{index}]左侧一半，目标索引设为: {target_index}")
                 else:
                     # 在按钮右侧一半，插入到该按钮之后
                     target_index = index + 1
-                    logger.debug(f"[目标索引] 鼠标在按钮[{index}]右侧一半，目标索引设为: {target_index}")
                 break
         
-        logger.debug(f"[目标索引] 最终确定的目标索引: {target_index}")
         return target_index
 
     def _accepts_event(self, mime_data):
@@ -1344,29 +1307,18 @@ class MainWindow(QMainWindow):
         self.background_data_tab.analyze_logs.connect(self._on_analyze_logs)
         
         # 连接 APP操作 Tab 信号
-        logger.debug("开始连接 AppOperationsTab 信号槽")
         try:
-            logger.debug("连接信号: query_package -> _on_query_package")
             self.app_operations_tab.query_package.connect(self._on_query_package)
-            logger.debug("连接信号: query_package_name -> _on_query_package_name")
             self.app_operations_tab.query_package_name.connect(self._on_query_package_name)
-            logger.debug("连接信号: query_install_path -> _on_query_install_path")
             self.app_operations_tab.query_install_path.connect(self._on_query_install_path)
-            logger.debug("连接信号: pull_apk -> _on_pull_apk")
             self.app_operations_tab.pull_apk.connect(self._on_pull_apk)
-            logger.debug("连接信号: push_apk -> _on_push_apk")
             self.app_operations_tab.push_apk.connect(self._on_push_apk)
-            logger.debug("连接信号: install_apk -> _on_install_apk")
             self.app_operations_tab.install_apk.connect(self._on_install_apk)
-            logger.debug("连接信号: view_processes -> _on_view_processes")
             self.app_operations_tab.view_processes.connect(self._on_view_processes)
-            logger.debug("连接信号: dump_app -> _on_dump_app")
             self.app_operations_tab.dump_app.connect(self._on_dump_app)
-            logger.debug("连接信号: enable_app -> _on_enable_app")
             self.app_operations_tab.enable_app.connect(self._on_enable_app)
-            logger.debug("连接信号: disable_app -> _on_disable_app")
             self.app_operations_tab.disable_app.connect(self._on_disable_app)
-            logger.debug("AppOperationsTab 所有信号槽连接成功")
+            logger.debug("AppOperationsTab 信号槽连接完成")
         except Exception as e:
             logger.error(f"连接 AppOperationsTab 信号槽失败:\n  错误类型: {type(e).__name__}\n  错误信息: {str(e)}")
             logger.exception("异常详情")
@@ -1380,55 +1332,33 @@ class MainWindow(QMainWindow):
         self.log_control_tab.mtk_sip_decode.connect(self._on_mtk_sip_decode)
         
         # 连接 其他 Tab 信号
-        logger.debug("=" * 60)
-        logger.debug("开始连接 OtherTab 信号槽")
         try:
-            logger.debug("连接信号: show_device_info_dialog -> _on_show_device_info_dialog")
             self.other_tab.show_device_info_dialog.connect(self._on_show_device_info_dialog)
-            logger.debug("连接信号: set_screen_timeout -> _on_set_screen_timeout")
             self.other_tab.set_screen_timeout.connect(self._on_set_screen_timeout)
-            logger.debug("连接信号: configure_hera -> _on_configure_hera")
             self.other_tab.configure_hera.connect(self._on_configure_hera)
-            logger.debug("连接信号: configure_collect_data -> _on_configure_collect_data")
             self.other_tab.configure_collect_data.connect(self._on_configure_collect_data)
-            logger.debug("连接信号: show_input_text_dialog -> _on_show_input_text_dialog")
             self.other_tab.show_input_text_dialog.connect(self._on_show_input_text_dialog)
-            logger.debug("连接信号: show_tools_config_dialog -> _on_show_tools_config_dialog")
             self.other_tab.show_tools_config_dialog.connect(self._on_show_tools_config_dialog)
-            logger.debug("连接信号: show_display_lines_dialog -> _on_show_display_lines_dialog")
             self.other_tab.show_display_lines_dialog.connect(self._on_show_display_lines_dialog)
-            logger.debug("连接信号: show_at_tool_dialog -> _on_show_at_tool_dialog")
             self.other_tab.show_at_tool_dialog.connect(self._on_show_at_tool_dialog)
-            logger.debug("连接信号: show_config_backup_dialog -> show_config_backup_dialog")
             self.other_tab.show_config_backup_dialog.connect(self.show_config_backup_dialog)
-            logger.debug("连接信号: show_unified_manager -> show_unified_manager_dialog")
             self.other_tab.show_unified_manager.connect(self.show_unified_manager_dialog)
-            logger.debug("连接信号: show_secret_code_dialog -> show_secret_code_dialog")
             self.other_tab.show_secret_code_dialog.connect(self.show_secret_code_dialog)
-            logger.debug("连接信号: show_lock_cell_dialog -> show_lock_cell_dialog")
             self.other_tab.show_lock_cell_dialog.connect(self.show_lock_cell_dialog)
-            logger.debug("连接信号: show_qc_nv_dialog -> show_qc_nv_dialog")
             self.other_tab.show_qc_nv_dialog.connect(self.show_qc_nv_dialog)
-            logger.debug("连接信号: show_pr_translation_dialog -> _on_show_pr_translation_dialog")
             self.other_tab.show_pr_translation_dialog.connect(self._on_show_pr_translation_dialog)
-            # 验证信号连接是否成功
+            # 验证关键信号连接是否成功
             try:
                 receivers = QObject.receivers(self.other_tab, self.other_tab.show_pr_translation_dialog)
-                logger.debug(f"show_pr_translation_dialog 信号接收器数量: {receivers}")
-                if receivers > 0:
-                    logger.debug("✓ show_pr_translation_dialog 信号连接成功")
-                else:
+                if receivers == 0:
                     logger.error("✗ show_pr_translation_dialog 信号连接失败！")
             except Exception as check_error:
                 logger.warning(f"无法检查信号 show_pr_translation_dialog 的接收器数量: {check_error}")
-            logger.debug("连接信号: show_encoding_tool_dialog -> _on_show_encoding_tool_dialog")
             self.other_tab.show_encoding_tool_dialog.connect(self._on_show_encoding_tool_dialog)
-            logger.debug("OtherTab 所有信号槽连接成功")
+            logger.debug("OtherTab 信号槽连接完成")
         except Exception as e:
             logger.error(f"连接 OtherTab 信号槽失败:\n  错误类型: {type(e).__name__}\n  错误信息: {str(e)}")
             logger.exception("异常详情")
-        finally:
-            logger.debug("=" * 60)
         
         # 连接Tab配置管理器信号
         self.tab_config_manager.tab_config_updated.connect(self._on_tab_config_updated)
@@ -1452,40 +1382,51 @@ class MainWindow(QMainWindow):
             tab_instances = {}
             
             # 初始化所有默认Tab
+            # 注意：不传递 parent 参数，避免与 QTabWidget.addTab() 时的 parent 设置冲突
+            # 在创建后手动设置 lang_manager
             
             self.log_control_tab = LogControlTab()
+            self.log_control_tab.lang_manager = self.lang_manager
             self.log_control_tab.tab_id = 'log_control'  # 添加tab_id属性
             tab_instances['log_control'] = self.log_control_tab
             
             self.log_filter_tab = LogFilterTab()
+            self.log_filter_tab.lang_manager = self.lang_manager
             self.log_filter_tab.tab_id = 'log_filter'  # 添加tab_id属性
             tab_instances['log_filter'] = self.log_filter_tab
             
-            self.network_info_tab = NetworkInfoTab(self)
+            self.network_info_tab = NetworkInfoTab()
+            self.network_info_tab.lang_manager = self.lang_manager
             self.network_info_tab.tab_id = 'network_info'  # 添加tab_id属性
             tab_instances['network_info'] = self.network_info_tab
             
             self.tmo_cc_tab = TMOCCTab()
+            self.tmo_cc_tab.lang_manager = self.lang_manager
             self.tmo_cc_tab.tab_id = 'tmo_cc'  # 添加tab_id属性
             tab_instances['tmo_cc'] = self.tmo_cc_tab
             
             self.tmo_echolocate_tab = TMOEcholocateTab()
+            self.tmo_echolocate_tab.lang_manager = self.lang_manager
             self.tmo_echolocate_tab.tab_id = 'tmo_echolocate'  # 添加tab_id属性
             tab_instances['tmo_echolocate'] = self.tmo_echolocate_tab
             
             self.background_data_tab = BackgroundDataTab()
+            self.background_data_tab.lang_manager = self.lang_manager
             self.background_data_tab.tab_id = 'background_data'  # 添加tab_id属性
             tab_instances['background_data'] = self.background_data_tab
             
             self.app_operations_tab = AppOperationsTab()
+            self.app_operations_tab.lang_manager = self.lang_manager
             self.app_operations_tab.tab_id = 'app_operations'  # 添加tab_id属性
             tab_instances['app_operations'] = self.app_operations_tab
             
             self.other_tab = OtherTab()
+            self.other_tab.lang_manager = self.lang_manager
             self.other_tab.tab_id = 'other'  # 添加tab_id属性
             tab_instances['other'] = self.other_tab
             
-            self.sim_tab = SimTab(self)
+            self.sim_tab = SimTab()
+            self.sim_tab.lang_manager = self.lang_manager
             self.sim_tab.tab_id = 'sim'  # 添加tab_id属性
             tab_instances['sim'] = self.sim_tab
             
@@ -1505,6 +1446,7 @@ class MainWindow(QMainWindow):
                     tab_instance = tab_instances[tab_id]
                     tab_name = self._get_tab_name(tab_id, all_tabs)
                     
+                    # 添加Tab到QTabWidget（QTabWidget会自动设置parent并管理布局）
                     self.tab_widget.addTab(tab_instance, tab_name)
             
             logger.info(self.lang_manager.tr("所有Tab页面初始化完成"))
@@ -1635,7 +1577,6 @@ class MainWindow(QMainWindow):
             
             v.addWidget(card_frame)
             
-            logger.debug(f"{self.tr('创建自定义Card组:')} '{card['name']}' {self.tr('（按钮稍后添加）')}")
             
             return container
         except Exception as e:
@@ -2222,7 +2163,6 @@ class MainWindow(QMainWindow):
                         all_tabs = self.tab_config_manager.get_all_tabs()
                         correct_title = self._get_tab_name(tab_id, all_tabs)
                         self.tab_widget.setTabText(i, correct_title)
-                        logger.debug(f"刷新Tab标题: 索引={i}, ID={tab_id}, 标题={correct_title}")
                     
                     # 更新Tab内容
                     if hasattr(tab_widget, 'refresh_texts'):
@@ -3820,27 +3760,15 @@ class MainWindow(QMainWindow):
     def load_custom_buttons_for_custom_tab(self, custom_tab, tab_widget):
         """为自定义Tab加载自定义按钮"""
         try:
-            logger.debug(f"{self.lang_manager.tr('为自定义Tab加载按钮:')} {custom_tab['name']}")
-            
             # 获取该自定义Tab的所有自定义Card
             custom_cards = self.tab_config_manager.get_custom_cards_for_tab(custom_tab['id'])
-            logger.debug(f"{self.lang_manager.tr('找到')} {len(custom_cards)} {self.lang_manager.tr('个自定义Card')}")
             
             for card in custom_cards:
-                logger.debug(f"{self.lang_manager.tr('处理Card:')} {card['name']}")
-                
                 # 获取该Card的自定义按钮
                 tab_name = custom_tab['name']
-                logger.debug(f"{self.lang_manager.tr('查找按钮: Tab=')} '{tab_name}', {self.lang_manager.tr('Card=')} '{card['name']}'")
-                
-                # 先检查所有按钮配置
-                all_buttons = self.custom_button_manager.get_all_buttons()
-                logger.debug(f"{self.lang_manager.tr('所有按钮配置:')} {len(all_buttons)} {self.lang_manager.tr('个')}")
-                for btn in all_buttons:
-                    logger.debug(f"  - {btn.get('name', '')} -> Tab: '{btn.get('tab', '')}', Card: '{btn.get('card', '')}'")
-                
                 buttons = self.custom_button_manager.get_buttons_by_location(tab_name, card['name'])
-                logger.debug(f"{self.lang_manager.tr('Card')} '{card['name']}' {self.lang_manager.tr('有')} {len(buttons)} {self.lang_manager.tr('个按钮')}")
+                if buttons:
+                    logger.debug(f"[自定义Tab] Tab '{tab_name}', Card '{card['name']}' 有 {len(buttons)} 个按钮")
                 
                 if buttons:
                     # 查找对应的Card GroupBox并添加按钮
@@ -3858,12 +3786,9 @@ class MainWindow(QMainWindow):
         try:
             from PyQt5.QtWidgets import QFrame, QHBoxLayout, QLabel
             
-            logger.debug(f"{self.lang_manager.tr('尝试向自定义Card添加按钮:')} '{card_name}'")
-            
             # 现在自定义Card使用QFrame+QLabel结构，与预置tab一致
             # 查找对应的Frame（标记为custom_card）
             frames = tab_widget.findChildren(QFrame)
-            logger.debug(f"{self.lang_manager.tr('找到')} {len(frames)} {self.lang_manager.tr('个QFrame')}")
             
             for frame in frames:
                 # 仅处理自定义Card的Frame
@@ -3877,10 +3802,7 @@ class MainWindow(QMainWindow):
                             label_class = label.property("class")
                             
                             if label_text == card_name and label_class == "section-title":
-                                logger.debug(f"{self.lang_manager.tr('找到匹配的自定义Card:')} '{card_name}'")
-                                
                                 button_layouts = frame.findChildren(QHBoxLayout)
-                                logger.debug(f"{self.lang_manager.tr('找到')} {len(button_layouts)} {self.lang_manager.tr('个QHBoxLayout')}")
                                 
                                 if button_layouts:
                                     button_layout = button_layouts[0]
@@ -4226,18 +4148,13 @@ class MainWindow(QMainWindow):
                                 break
             
             if button_layout:
-                logger.debug(f"{self.lang_manager.tr('找到按钮布局，准备填充')} {len(buttons)} {self.lang_manager.tr('个按钮')}")
                 container = self._get_or_create_button_container(tab_instance, button_layout, tab_name, card_name)
                 if container is None:
                     return
                 container.clear_buttons()
-                logger.debug(f"[按钮加载] 准备加载 {len(buttons)} 个按钮到 '{card_name}'，顺序: {[btn.get('name', '') for btn in buttons]}")
-                for idx, btn_data in enumerate(buttons):
+                for btn_data in buttons:
                     container.add_custom_button(btn_data)
-                    logger.debug(f"[按钮加载] [{idx}] 添加按钮: '{btn_data.get('name', '')}' (ID: {btn_data.get('id', '')})")
-                # 验证最终顺序
-                final_order = [btn.button_data.get('name', '') for btn in container._ordered_buttons()]
-                logger.debug(f"[按钮加载] 加载完成后，容器中的按钮顺序: {final_order}")
+                logger.debug(f"[按钮加载] 已加载 {len(buttons)} 个按钮到 '{card_name}'")
             else:
                 logger.warning(f"{self.lang_manager.tr('未找到合适的按钮布局')}")
             

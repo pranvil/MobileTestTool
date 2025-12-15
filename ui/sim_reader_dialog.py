@@ -44,9 +44,12 @@ class SimReaderDialog(QDialog):
         if cls._instance is None or not cls._instance.isVisible():
             # 如果实例不存在或已被关闭，创建新实例
             if cls._instance is not None:
-                # 清理旧实例
+                # 清理旧实例，确保状态恢复
                 try:
-                    cls._instance.close()
+                    # 手动触发关闭事件，确保状态恢复
+                    from PyQt5.QtCore import QEvent, QCloseEvent
+                    close_event = QCloseEvent()
+                    cls._instance._on_close_event(close_event)
                     cls._instance.deleteLater()
                 except:
                     pass
@@ -94,6 +97,7 @@ class SimReaderDialog(QDialog):
             
             # 保存原始的 sys.path 用于恢复
             original_sys_path = sys.path.copy()
+            logging.debug(f"[SimReaderDialog] 保存原始 sys.path，长度: {len(original_sys_path)}")
             
             # 关键：需要清理所有可能包含项目根目录的路径
             # 包括项目根目录本身，以及任何指向项目根目录的路径
@@ -317,6 +321,8 @@ class SimReaderDialog(QDialog):
     
     def _on_close_event(self, event):
         """处理关闭事件"""
+        import logging
+        logging.info("[SimReaderDialog] ========== 开始关闭对话框，准备恢复状态 ==========")
         try:
             # 如果有 sim_editor，尝试清理资源
             if hasattr(self, 'sim_editor') and self.sim_editor:
@@ -354,27 +360,137 @@ class SimReaderDialog(QDialog):
                     except:
                         pass
             
-            # 恢复被覆盖的模块（如果有）
-            if hasattr(self, '_saved_modules'):
-                import sys
-                for mod_name, mod in self._saved_modules.items():
-                    sys.modules[mod_name] = mod
-            
-            # 恢复 sys.path
+            # 恢复 sys.path（必须在恢复模块之前）
             if hasattr(self, '_original_sys_path'):
                 try:
-                    import logging
-                    logging.debug(f"[SimReaderDialog] 关闭时恢复 sys.path")
+                    logging.info(f"[SimReaderDialog] 关闭时恢复 sys.path")
                     sys.path = self._original_sys_path.copy()
-                except:
-                    pass
+                    
+                    # 关键：确保 sys._MEIPASS 在 sys.path 中（PyInstaller 环境）
+                    if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
+                        base_path = sys._MEIPASS
+                        if base_path not in sys.path:
+                            sys.path.insert(0, base_path)
+                            logging.debug(f"[SimReaderDialog] 已添加 sys._MEIPASS 到 sys.path: {base_path}")
+                    else:
+                        # 开发环境：确保项目根目录在 sys.path 中
+                        current_file = os.path.abspath(__file__)
+                        project_root = os.path.dirname(os.path.dirname(current_file))
+                        if project_root not in sys.path:
+                            sys.path.insert(0, project_root)
+                            logging.debug(f"[SimReaderDialog] 已添加项目根目录到 sys.path: {project_root}")
+                except Exception as e:
+                    logging.error(f"[SimReaderDialog] 恢复 sys.path 时出错: {e}", exc_info=True)
+            
+            # 恢复被覆盖的模块（如果有）
+            if hasattr(self, '_saved_modules'):
+                import importlib
+                for mod_name, mod in self._saved_modules.items():
+                    sys.modules[mod_name] = mod
+                    logging.debug(f"[SimReaderDialog] 恢复模块: {mod_name}")
+            
+            # 关键：重新导入所有被删除的 core.* 模块（即使它们不在 _saved_modules 中）
+            # 这样可以确保所有 core 模块都能正常工作
+            try:
+                import importlib
+                
+                logging.info(f"[SimReaderDialog] 开始重新导入 core 模块...")
+                
+                # 计算项目根目录和 sim_reader 路径，用于验证模块路径
+                current_file = os.path.abspath(__file__)
+                project_root = os.path.dirname(os.path.dirname(current_file))
+                sim_reader_path = os.path.join(project_root, "sim_reader")
+                normalized_project_root = os.path.normpath(os.path.abspath(project_root))
+                normalized_sim_reader_path = os.path.normpath(os.path.abspath(sim_reader_path))
+                
+                # 需要重新导入的 core 模块列表
+                core_modules_to_reload = [
+                    'core',
+                    'core.debug_logger',
+                    'core.language_manager',
+                    'core.device_manager',
+                    'core.mtklog_manager',
+                    'core.adblog_manager',
+                    'core.log_processor',
+                    'core.network_info_manager',
+                    'core.screenshot_manager',
+                    'core.video_manager',
+                    'core.tcpdump_manager',
+                    'core.log_utilities',
+                    'core.aee_log_manager',
+                    'core.google_log_manager',
+                    'core.enable_telephony_manager',
+                    'core.resource_utils',
+                    'core.tab_config_manager',
+                    'core.custom_button_manager',
+                    'core.update_manager',
+                    'core.update_manifest',
+                    'core.version',
+                ]
+                
+                reloaded_count = 0
+                failed_count = 0
+                
+                for mod_name in core_modules_to_reload:
+                    try:
+                        # 检查模块当前状态
+                        need_reload = False
+                        if mod_name in sys.modules:
+                            mod = sys.modules[mod_name]
+                            mod_file = getattr(mod, '__file__', None)
+                            if mod_file:
+                                # 规范化路径以便比较
+                                normalized_mod_file = os.path.normpath(os.path.abspath(mod_file))
+                                # 检查是否是 sim_reader 的模块，或者不是项目根目录的模块
+                                if normalized_sim_reader_path in normalized_mod_file:
+                                    # 是 sim_reader 的模块，需要删除并重新导入
+                                    logging.info(f"[SimReaderDialog] 发现 sim_reader 模块 {mod_name}，准备重新导入")
+                                    del sys.modules[mod_name]
+                                    need_reload = True
+                                elif normalized_project_root not in normalized_mod_file:
+                                    # 模块不在项目根目录中，可能是错误的模块，需要重新导入
+                                    logging.info(f"[SimReaderDialog] 模块 {mod_name} 不在项目根目录中，准备重新导入")
+                                    del sys.modules[mod_name]
+                                    need_reload = True
+                                else:
+                                    # 模块在项目根目录中，且不是 sim_reader 的，应该是正确的
+                                    logging.debug(f"[SimReaderDialog] 模块 {mod_name} 路径正确，跳过: {normalized_mod_file}")
+                                    continue
+                            else:
+                                # 模块没有 __file__ 属性，可能是内置模块或命名空间包，跳过
+                                logging.debug(f"[SimReaderDialog] 模块 {mod_name} 没有 __file__ 属性，跳过")
+                                continue
+                        else:
+                            # 模块不存在，需要导入
+                            logging.info(f"[SimReaderDialog] 模块 {mod_name} 不存在，准备导入")
+                            need_reload = True
+                        
+                        if need_reload:
+                            # 重新导入
+                            importlib.import_module(mod_name)
+                            reloaded_count += 1
+                            logging.info(f"[SimReaderDialog] ✓ 成功重新导入模块: {mod_name}")
+                    except (ImportError, ModuleNotFoundError) as e:
+                        failed_count += 1
+                        logging.warning(f"[SimReaderDialog] ✗ 无法重新导入模块 {mod_name}: {e}")
+                        # 如果导入失败，记录详细的错误信息以便调试
+                        logging.debug(f"[SimReaderDialog] 当前 sys.path: {sys.path[:5]}")
+                    except Exception as e:
+                        failed_count += 1
+                        logging.error(f"[SimReaderDialog] ✗ 重新导入模块 {mod_name} 时发生异常: {e}", exc_info=True)
+                
+                logging.info(f"[SimReaderDialog] 模块重新导入完成: 成功 {reloaded_count} 个，失败 {failed_count} 个")
+            except Exception as e:
+                logging.error(f"[SimReaderDialog] 重新导入 core 模块时出错: {e}", exc_info=True)
             
             # 重置单例实例
             SimReaderDialog._instance = None
             
+            logging.info("[SimReaderDialog] ========== 状态恢复完成 ==========")
+            
         except Exception as e:
-            # 忽略清理时的错误
-            pass
+            # 记录清理时的错误，但不阻止关闭
+            logging.error(f"[SimReaderDialog] 关闭时发生错误: {e}", exc_info=True)
         
         # 调用父类的关闭事件
         event.accept()

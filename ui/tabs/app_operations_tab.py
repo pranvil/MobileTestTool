@@ -40,8 +40,29 @@ class AppOperationsTab(QWidget):
             self.lang_manager = parent.lang_manager
         else:
             # 如果没有父窗口或语言管理器，使用单例
-            from core.language_manager import LanguageManager
-            self.lang_manager = LanguageManager.get_instance()
+            import sys
+            import os
+            try:
+                from core.language_manager import LanguageManager
+                self.lang_manager = LanguageManager.get_instance()
+            except ModuleNotFoundError:
+                # 如果导入失败，确保正确的路径在 sys.path 中
+                # 支持 PyInstaller 打包环境
+                if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
+                    # PyInstaller 环境：使用 sys._MEIPASS
+                    base_path = sys._MEIPASS
+                    if base_path not in sys.path:
+                        sys.path.insert(0, base_path)
+                else:
+                    # 开发环境：使用 __file__ 计算项目根目录
+                    current_file = os.path.abspath(__file__)
+                    # ui/tabs/app_operations_tab.py -> ui/tabs -> ui -> 项目根目录
+                    project_root = os.path.dirname(os.path.dirname(os.path.dirname(current_file)))
+                    if project_root not in sys.path:
+                        sys.path.insert(0, project_root)
+                # 重试导入
+                from core.language_manager import LanguageManager
+                self.lang_manager = LanguageManager.get_instance()
         self.setup_ui()
         
     def setup_ui(self):
