@@ -1363,11 +1363,79 @@ class MainWindow(QMainWindow):
         # 连接Tab配置管理器信号
         self.tab_config_manager.tab_config_updated.connect(self._on_tab_config_updated)
         
+    def _ensure_app_core_importable(self):
+        """
+        确保导入到的是主工程的 core 包，而不是 sim_reader/core 或其它子工程中的同名 core。
+        这在某些功能（例如 SIM Reader）动态修改 sys.path/sys.modules 后，可能导致概率性导入失败。
+        """
+        try:
+            import sys
+            import os
+            import importlib
+
+            # 计算项目根目录（开发环境）或 PyInstaller base_path（打包环境）
+            if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
+                project_root = sys._MEIPASS
+            else:
+                # ui/main_window.py -> ui -> 项目根目录
+                current_file = os.path.abspath(__file__)
+                project_root = os.path.dirname(os.path.dirname(current_file))
+
+            normalized_project_root = os.path.normpath(os.path.abspath(project_root))
+            expected_core_init = os.path.normpath(os.path.join(project_root, "core", "__init__.py"))
+            normalized_sim_reader_root = os.path.normpath(os.path.abspath(os.path.join(project_root, "sim_reader")))
+
+            # 置顶 project_root，避免同名包被更前的路径抢占
+            try:
+                if project_root in sys.path:
+                    sys.path.remove(project_root)
+            except ValueError:
+                pass
+            sys.path.insert(0, project_root)
+
+            def _module_file(mod):
+                return getattr(mod, "__file__", None) or ""
+
+            def _looks_like_wrong_core(mod) -> bool:
+                mod_file = _module_file(mod)
+                if not mod_file:
+                    return True
+                normalized_mod_file = os.path.normpath(os.path.abspath(mod_file))
+                # sim_reader 的 core 一律视为冲突
+                if normalized_sim_reader_root in normalized_mod_file:
+                    return True
+                # core 包不在预期位置，也视为冲突（例如 SIM_APDU_Parser/core）
+                if expected_core_init and normalized_mod_file != expected_core_init:
+                    return True
+                # 文件不存在也视为脏缓存
+                if not os.path.exists(mod_file):
+                    return True
+                # 兜底：确保来自项目根目录
+                if normalized_project_root not in normalized_mod_file:
+                    return True
+                return False
+
+            core_pkg = sys.modules.get("core")
+            if core_pkg is not None and _looks_like_wrong_core(core_pkg):
+                for name in list(sys.modules.keys()):
+                    if name == "core" or name.startswith("core."):
+                        sys.modules.pop(name, None)
+                importlib.invalidate_caches()
+        except Exception as e:
+            # 兜底：不影响主流程，只记录 debug
+            try:
+                logger.debug(f"[MainWindow] ensure_app_core_importable failed: {e}")
+            except Exception:
+                pass
+
     def setup_tabs(self):
         """设置Tab页面"""
         logger.info(self.lang_manager.tr("开始初始化所有Tab页面..."))
         
         try:
+            # 关键：某些功能可能修改 sys.path / sys.modules 导致同名 core 包污染，先恢复到主工程 core
+            self._ensure_app_core_importable()
+
             # 修复tab_order，确保包含所有默认tab和自定义tab
             # 这样可以避免因为配置不完整导致tab无法显示的问题
             self.tab_config_manager._fix_tab_order()
@@ -4666,6 +4734,9 @@ class MainWindow(QMainWindow):
     def reload_tabs(self):
         """重新加载Tab"""
         try:
+            # 关键：重新加载Tab时先恢复主工程 core 包，避免概率性导入失败
+            self._ensure_app_core_importable()
+
             # 保存当前选中的tab
             current_index = self.tab_widget.currentIndex()
             current_widget = self.tab_widget.currentWidget() if current_index >= 0 else None

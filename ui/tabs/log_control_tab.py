@@ -62,6 +62,7 @@ class LogControlTab(QWidget):
             # 如果没有父窗口或语言管理器，使用单例
             import sys
             import os
+            import importlib
             try:
                 from core.language_manager import LanguageManager
                 self.lang_manager = LanguageManager.get_instance()
@@ -71,15 +72,54 @@ class LogControlTab(QWidget):
                 if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
                     # PyInstaller 环境：使用 sys._MEIPASS
                     base_path = sys._MEIPASS
-                    if base_path not in sys.path:
-                        sys.path.insert(0, base_path)
+                    # 置顶 base_path，避免同名包被更前的路径抢占
+                    try:
+                        if base_path in sys.path:
+                            sys.path.remove(base_path)
+                    except ValueError:
+                        pass
+                    sys.path.insert(0, base_path)
                 else:
                     # 开发环境：使用 __file__ 计算项目根目录
                     current_file = os.path.abspath(__file__)
                     # ui/tabs/log_control_tab.py -> ui/tabs -> ui -> 项目根目录
                     project_root = os.path.dirname(os.path.dirname(os.path.dirname(current_file)))
-                    if project_root not in sys.path:
-                        sys.path.insert(0, project_root)
+                    # 置顶 project_root，避免同名包被更前的路径抢占
+                    try:
+                        if project_root in sys.path:
+                            sys.path.remove(project_root)
+                    except ValueError:
+                        pass
+                    sys.path.insert(0, project_root)
+
+                # 关键：如果 core 已被其它同名包污染（例如 sim_reader/core），需要清掉缓存后再导入
+                try:
+                    if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
+                        root = sys._MEIPASS
+                    else:
+                        root = project_root
+                    expected_core_init = os.path.normpath(os.path.join(root, "core", "__init__.py"))
+                    sim_reader_root = os.path.normpath(os.path.join(root, "sim_reader"))
+
+                    core_pkg = sys.modules.get("core")
+                    if core_pkg is not None:
+                        core_file = getattr(core_pkg, "__file__", None) or ""
+                        normalized_core_file = os.path.normpath(os.path.abspath(core_file)) if core_file else ""
+                        is_wrong = (
+                            (not core_file) or
+                            (sim_reader_root in normalized_core_file) or
+                            (expected_core_init and normalized_core_file != expected_core_init) or
+                            (core_file and not os.path.exists(core_file))
+                        )
+                        if is_wrong:
+                            for name in list(sys.modules.keys()):
+                                if name == "core" or name.startswith("core."):
+                                    sys.modules.pop(name, None)
+                            importlib.invalidate_caches()
+                except Exception:
+                    # 兜底：不阻止后续重试导入
+                    pass
+
                 # 重试导入
                 from core.language_manager import LanguageManager
                 self.lang_manager = LanguageManager.get_instance()
