@@ -1,28 +1,28 @@
 {
-    "version":  "0.9.6.4.8",
-    "download_url":  "https://github.com/pranvil/MobileTestTool/releases/download/v0.9.6.4.8/MobileTestTool_0.9.6.4.8.zip",
-    "sha256":  "ce0d524489da8d4d87fcfebcc236ac4314a0381d3c68d0f7fe3763361e6ccaf5",
-    "file_name":  "MobileTestTool_0.9.6.4.8.zip",
-    "file_size":  89332017,
+    "version":  "0.9.6.4.9",
+    "download_url":  "https://github.com/pranvil/MobileTestTool/releases/download/v0.9.6.4.9/MobileTestTool_0.9.6.4.9.zip",
+    "sha256":  "7378a20d133d79b0db7308794aed3fd7e7a2a1ff677e46bac45f37747db6805c",
+    "file_name":  "MobileTestTool_0.9.6.4.9.zip",
+    "file_size":  101444961,
     "release_notes":  "## Release Note\n- 修复概率性功能失效问题\n- 修2F00,6FD9的解析\n## Known issue",
-    "published_at":  "2025-12-15T07:17:55Z",
+    "published_at":  "2025-12-16T01:13:24Z",
     "mandatory":  false,
     "download_urls":  [
                           {
                               "region":  "us",
-                              "url":  "https://github.com/pranvil/MobileTestTool/releases/download/v0.9.6.4.8/MobileTestTool_0.9.6.4.8.zip",
+                              "url":  "https://github.com/pranvil/MobileTestTool/releases/download/v0.9.6.4.9/MobileTestTool_0.9.6.4.9.zip",
                               "priority":  10,
                               "platform":  "windows"
                           },
                           {
                               "region":  "cn",
-                              "url":  "https://gitee.com/pranvil/MobileTestTool/releases/download/v0.9.6.4.8/MobileTestTool_0.9.6.4.8.zip",
+                              "url":  "https://gitee.com/pranvil/MobileTestTool/releases/download/v0.9.6.4.9/MobileTestTool_0.9.6.4.9.zip",
                               "priority":  20,
                               "platform":  "windows"
                           },
                           {
                               "region":  "default",
-                              "url":  "https://github.com/pranvil/MobileTestTool/releases/download/v0.9.6.4.8/MobileTestTool_0.9.6.4.8.zip",
+                              "url":  "https://github.com/pranvil/MobileTestTool/releases/download/v0.9.6.4.9/MobileTestTool_0.9.6.4.9.zip",
                               "priority":  5,
                               "platform":  "all"
                           }
