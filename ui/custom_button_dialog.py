@@ -17,11 +17,13 @@ from ui.widgets.shadow_utils import add_card_shadow
 class ButtonEditDialog(QDialog):
     """按钮编辑对话框"""
     
-    def __init__(self, button_manager, button_data=None, parent=None):
+    def __init__(self, button_manager, button_data=None, preset_tab_name=None, preset_card_name=None, parent=None):
         super().__init__(parent)
         self.button_manager = button_manager
         self.button_data = button_data or {}
         self.is_edit = button_data is not None
+        self.preset_tab_name = preset_tab_name
+        self.preset_card_name = preset_card_name
         
         # 从父窗口获取语言管理器
         self.lang_manager = parent.lang_manager if parent and hasattr(parent, 'lang_manager') else None
@@ -37,6 +39,9 @@ class ButtonEditDialog(QDialog):
         
         if self.is_edit:
             self.load_data()
+        elif self.preset_tab_name or self.preset_card_name:
+            # 如果有预设值，在UI设置完成后设置
+            self._apply_preset_values()
     
     def tr(self, text):
         """安全地获取翻译文本"""
@@ -485,6 +490,26 @@ class ButtonEditDialog(QDialog):
         # 初始化类型相关的UI（默认不选择类型，所以高级设置区域应该是隐藏的）
         self.on_type_changed(self.type_combo.currentText())
     
+    def _apply_preset_values(self):
+        """应用预设的tab和card值"""
+        try:
+            if self.preset_tab_name:
+                # 设置tab
+                index = self.tab_combo.findText(self.preset_tab_name)
+                if index >= 0:
+                    self.tab_combo.setCurrentIndex(index)
+                    # 触发tab改变事件，更新card列表
+                    self.on_tab_changed(self.preset_tab_name)
+                    
+                    # 设置card（需要在tab改变后）
+                    if self.preset_card_name:
+                        index = self.card_combo.findText(self.preset_card_name)
+                        if index >= 0:
+                            self.card_combo.setCurrentIndex(index)
+        except Exception as e:
+            from core.debug_logger import logger
+            logger.exception(f"{self.tr('应用预设值失败:')} {e}")
+    
     def refresh_tab_list(self):
         """刷新Tab列表"""
         self.tab_combo.clear()
@@ -638,6 +663,8 @@ class ButtonEditDialog(QDialog):
             index = self.tab_combo.findText(tab)
             if index >= 0:
                 self.tab_combo.setCurrentIndex(index)
+                # 触发tab改变事件，更新card列表
+                self.on_tab_changed(tab)
         
         card = self.button_data.get('card', '')
         if card:

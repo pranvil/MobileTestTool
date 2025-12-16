@@ -520,10 +520,11 @@ class CustomTabDialog(QDialog):
 class CustomCardDialog(QDialog):
     """自定义Card对话框"""
     
-    def __init__(self, tab_config_manager, card_id=None, parent=None):
+    def __init__(self, tab_config_manager, card_id=None, preset_tab_id=None, parent=None):
         super().__init__(parent)
         self.tab_config_manager = tab_config_manager
         self.card_id = card_id
+        self.preset_tab_id = preset_tab_id
         self.lang_manager = parent.lang_manager if parent and hasattr(parent, 'lang_manager') else None
         
         self.setWindowTitle(self.tr("自定义Card") if not card_id else self.tr("编辑Card"))
@@ -533,6 +534,9 @@ class CustomCardDialog(QDialog):
         self.setup_ui()
         if card_id:
             self.load_card_data()
+        elif preset_tab_id:
+            # 如果有预设tab_id，在UI设置完成后设置
+            self._apply_preset_tab_id()
     
     def tr(self, text):
         """安全地获取翻译文本"""
@@ -620,6 +624,19 @@ class CustomCardDialog(QDialog):
             self.tab_combo.addItem(tab['name'], tab['id'])
         
         self.tab_combo.setEnabled(True)
+    
+    def _apply_preset_tab_id(self):
+        """应用预设的tab_id"""
+        try:
+            if self.preset_tab_id:
+                # 在tab_combo中查找对应的tab_id
+                for i in range(self.tab_combo.count()):
+                    if self.tab_combo.itemData(i) == self.preset_tab_id:
+                        self.tab_combo.setCurrentIndex(i)
+                        break
+        except Exception as e:
+            from core.debug_logger import logger
+            logger.exception(f"{self.tr('应用预设tab_id失败:')} {e}")
     
     def load_card_data(self):
         """加载Card数据"""

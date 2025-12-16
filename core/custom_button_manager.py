@@ -171,6 +171,7 @@ class CustomButtonManager(QObject):
             'TMO Echolocate',
             self.lang_manager.tr('24小时背景数据'),
             self.lang_manager.tr('APP操作'),
+            self.lang_manager.tr('SIM'),
             self.lang_manager.tr('其他')
         ]
         

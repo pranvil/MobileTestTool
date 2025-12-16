@@ -111,6 +111,41 @@ class DraggableCustomButton(QPushButton):
         super().mouseReleaseEvent(event)
         self._drag_start_pos = None
 
+    def contextMenuEvent(self, event):
+        """右键：编辑该自定义按钮（不显示卡片右键菜单）"""
+        try:
+            from PyQt5.QtWidgets import QDialog
+            from ui.custom_button_dialog import ButtonEditDialog
+
+            main_window = getattr(self.container, "main_window", None)
+            if not main_window or not getattr(main_window, "custom_button_manager", None):
+                return
+
+            current_data = dict(self.button_data or {})
+            button_id = current_data.get("id")
+            if not button_id:
+                return
+
+            dialog = ButtonEditDialog(
+                main_window.custom_button_manager,
+                button_data=current_data,
+                parent=main_window,
+            )
+            if dialog.exec_() == QDialog.Accepted:
+                new_data = dialog.get_button_data()
+                main_window.custom_button_manager.update_button(button_id, new_data)
+        except Exception as e:
+            try:
+                logger.exception(f"{getattr(self.container, 'main_window', None).tr('编辑自定义按钮失败:') if getattr(self.container, 'main_window', None) else '编辑自定义按钮失败:'} {e}")
+            except Exception:
+                logger.exception(f"编辑自定义按钮失败: {e}")
+        finally:
+            # 一定要吞掉事件，避免冒泡到 card_frame 触发卡片右键菜单
+            try:
+                event.accept()
+            except Exception:
+                pass
+
     def _start_drag(self):
         button_id = self.button_data.get('id')
         if not button_id:
@@ -1519,6 +1554,9 @@ class MainWindow(QMainWindow):
             
             logger.info(self.lang_manager.tr("所有Tab页面初始化完成"))
             
+            # 为所有预置Tab的card添加右键菜单
+            self._setup_preset_tab_card_context_menus()
+            
         except Exception as e:
             logger.exception(self.lang_manager.tr("Tab页面初始化失败"))
             raise
@@ -1576,7 +1614,7 @@ class MainWindow(QMainWindow):
             # 添加自定义Card
             custom_cards = self.tab_config_manager.get_custom_cards_for_tab(custom_tab['id'])
             for card in custom_cards:
-                card_group = self._create_custom_card_group(card)
+                card_group = self._create_custom_card_group(card, widget)
                 if card_group:
                     scroll_layout.addWidget(card_group)
             
@@ -1595,7 +1633,7 @@ class MainWindow(QMainWindow):
             logger.exception(f"{self.tr('创建自定义Tab实例失败:')} {e}")
             return None
     
-    def _create_custom_card_group(self, card):
+    def _create_custom_card_group(self, card, tab_widget):
         """创建自定义Card组（仅创建结构，按钮由统一方法添加）"""
         try:
             from PyQt5.QtWidgets import QWidget, QFrame, QVBoxLayout, QHBoxLayout, QLabel
@@ -1619,6 +1657,8 @@ class MainWindow(QMainWindow):
             card_frame.setObjectName("card")
             add_card_shadow(card_frame)
             card_frame.setProperty('custom_card', True)  # 标记为自定义Card
+            # 直接存储 card_name，避免后续通过布局回溯推断失败导致右键菜单无法弹出
+            card_frame.setProperty('card_name', card.get('name', ''))
             
             # 如果有描述，使用垂直布局；否则使用水平布局（与预置tab一致）
             if card.get('description'):
@@ -1645,6 +1685,11 @@ class MainWindow(QMainWindow):
             
             v.addWidget(card_frame)
             
+            # 为自定义card的QFrame添加右键菜单
+            card_frame.setContextMenuPolicy(Qt.CustomContextMenu)
+            card_frame.customContextMenuRequested.connect(
+                lambda pos: self._show_card_context_menu(pos, card_frame, tab_widget)
+            )
             
             return container
         except Exception as e:
@@ -1669,6 +1714,307 @@ class MainWindow(QMainWindow):
         except Exception as e:
             logger.exception(f"{self.tr('查找自定义Card失败:')} {e}")
             return None
+    
+    def _get_card_name_from_frame_simple(self, card_frame, tab_widget):
+        """简单方法：从card frame获取card名称（用于初始化时存储）"""
+        try:
+            from PyQt5.QtWidgets import QLabel
+            
+            # 获取card frame的父widget（通常是container）
+            parent_widget = card_frame.parent()
+            if not parent_widget:
+                return None
+            
+            parent_layout = parent_widget.layout()
+            if not parent_layout:
+                return None
+            
+            # 遍历parent_layout，找到card_frame的位置
+            frame_index = -1
+            for i in range(parent_layout.count()):
+                item = parent_layout.itemAt(i)
+                if item:
+                    widget = item.widget()
+                    if widget == card_frame:
+                        frame_index = i
+                        break
+                    elif widget:
+                        # 检查widget是否包含card_frame
+                        widget_layout = widget.layout()
+                        if widget_layout:
+                            for j in range(widget_layout.count()):
+                                layout_item = widget_layout.itemAt(j)
+                                if layout_item:
+                                    child_widget = layout_item.widget()
+                                    if child_widget == card_frame:
+                                        frame_index = i
+                                        break
+                            if frame_index >= 0:
+                                break
+            
+            # 如果找到了frame的位置，查找它前面最近的section-title label
+            if frame_index >= 0:
+                # 从frame_index-1开始向前查找
+                for i in range(frame_index - 1, -1, -1):
+                    item = parent_layout.itemAt(i)
+                    if item:
+                        widget = item.widget()
+                        if widget:
+                            # 情况1：标题本身就是一个 QLabel（常见：QLabel + card QFrame 的结构）
+                            if isinstance(widget, QLabel):
+                                label_class = widget.property("class")
+                                if label_class == "section-title":
+                                    return widget.text()
+
+                            # 情况2：标题在某个容器 widget 的 layout 中
+                            widget_layout = widget.layout()
+                            if widget_layout:
+                                # 遍历widget_layout查找label
+                                for j in range(widget_layout.count()):
+                                    layout_item = widget_layout.itemAt(j)
+                                    if layout_item:
+                                        child_widget = layout_item.widget()
+                                        if isinstance(child_widget, QLabel):
+                                            label_class = child_widget.property("class")
+                                            if label_class == "section-title":
+                                                return child_widget.text()
+            
+            return None
+        except Exception as e:
+            logger.exception(f"{self.tr('获取Card名称失败:')} {e}")
+            return None
+    
+    def _get_card_name_from_frame(self, card_frame, tab_widget=None):
+        """从card frame获取card名称"""
+        try:
+            # 首先尝试从frame的属性中获取（如果已设置）
+            card_name = card_frame.property('card_name')
+            if card_name:
+                return card_name
+            
+            # 如果没有存储，使用查找方法
+            from PyQt5.QtWidgets import QLabel
+            
+            # 如果没有传入tab_widget，尝试查找
+            if not tab_widget:
+                tab_widget = self._find_tab_widget_for_frame(card_frame)
+            
+            # 获取当前tab的可用card列表用于验证
+            tab_name = None
+            available_cards = []
+            if tab_widget:
+                tab_info = self._get_tab_info_from_widget(tab_widget)
+                if tab_info:
+                    tab_name = tab_info['name']
+                    available_cards = self.custom_button_manager.get_available_cards(tab_name)
+            
+            # 使用简单方法查找card名称
+            card_name = self._get_card_name_from_frame_simple(card_frame, tab_widget)
+            if card_name:
+                # 验证card_name是否在当前tab的可用card列表中
+                if not available_cards or card_name in available_cards:
+                    # 存储到frame属性中，下次直接使用
+                    card_frame.setProperty('card_name', card_name)
+                    return card_name
+                else:
+                    logger.debug(f"{self.tr('Card名称验证失败')}: {card_name} 不在 {available_cards} 中, tab_name={tab_name}")
+            
+            return None
+        except Exception as e:
+            logger.exception(f"{self.tr('获取Card名称失败:')} {e}")
+            return None
+    
+    def _find_tab_widget_for_frame(self, card_frame):
+        """查找card_frame所在的tab_widget"""
+        try:
+            widget = card_frame
+            # 向上遍历parent，找到tab_widget（有tab_id属性的widget）
+            while widget:
+                if hasattr(widget, 'tab_id'):
+                    return widget
+                widget = widget.parent()
+            return None
+        except Exception as e:
+            logger.exception(f"{self.tr('查找Tab Widget失败:')} {e}")
+            return None
+    
+    def _get_tab_info_from_widget(self, tab_widget):
+        """从tab widget获取tab信息（id、名称、是否自定义）"""
+        try:
+            # 从tab widget的tab_id属性获取tab id
+            tab_id = None
+            if hasattr(tab_widget, 'tab_id'):
+                tab_id = tab_widget.tab_id
+            
+            if not tab_id:
+                return None
+            
+            # 查询tab_config_manager获取tab信息
+            all_tabs = self.tab_config_manager.get_all_tabs()
+            for tab in all_tabs:
+                if tab['id'] == tab_id:
+                    tab_name = tab.get('name', '')
+                    is_custom = tab.get('custom', False)
+                    return {
+                        'id': tab_id,
+                        'name': tab_name,
+                        'is_custom': is_custom
+                    }
+            
+            return None
+        except Exception as e:
+            logger.exception(f"{self.tr('获取Tab信息失败:')} {e}")
+            return None
+    
+    def _show_card_context_menu(self, position, card_frame, tab_widget):
+        """显示card的右键菜单"""
+        try:
+            from PyQt5.QtWidgets import QMenu, QAction, QPushButton
+
+            # 只在 card 的“空白处”显示卡片菜单：
+            # - 右键点在任意 QPushButton（含预置/自定义）上：不弹卡片菜单
+            # - 右键点在其它子控件（如 QLabel 等）上：也不弹（避免误触）
+            # - 右键点在按钮容器(CustomButtonContainer)的空白区域：允许弹出（视为 card 空白）
+            clicked = card_frame.childAt(position)
+            if clicked is not None:
+                w = clicked
+                while w is not None and w != card_frame:
+                    if isinstance(w, QPushButton):
+                        return
+                    if w.property("custom_button_container"):
+                        break
+                    w = w.parent()
+                else:
+                    # 点在非空白子控件上
+                    return
+            
+            # 获取tab信息（先获取，用于验证card名称）
+            tab_info = self._get_tab_info_from_widget(tab_widget)
+            if not tab_info:
+                logger.debug(f"{self.tr('无法获取Tab信息')}")
+                return
+            
+            tab_id = tab_info['id']
+            tab_name = tab_info['name']
+            is_custom_tab = tab_info['is_custom']
+            
+            # 获取card名称（传入tab_widget用于验证）
+            card_name = self._get_card_name_from_frame(card_frame, tab_widget)
+            if not card_name:
+                logger.debug(f"{self.tr('无法获取Card名称')}, tab_id={tab_id}, tab_name={tab_name}")
+                return
+            
+            logger.debug(f"{self.tr('右键菜单')}: tab_id={tab_id}, tab_name={tab_name}, card_name={card_name}")
+            
+            # 创建右键菜单
+            menu = QMenu(self)
+            
+            # 添加Button选项（所有tab都支持）
+            add_button_action = QAction(self.tr("添加Button"), self)
+            add_button_action.triggered.connect(
+                lambda: self._add_button_from_card_context(tab_id, tab_name, card_name)
+            )
+            menu.addAction(add_button_action)
+            
+            # 添加Card选项（只有自定义tab支持）
+            if is_custom_tab:
+                menu.addSeparator()
+                add_card_action = QAction(self.tr("添加Card"), self)
+                add_card_action.triggered.connect(
+                    lambda: self._add_card_from_context(tab_id)
+                )
+                menu.addAction(add_card_action)
+            
+            # 显示菜单
+            menu.exec_(card_frame.mapToGlobal(position))
+            
+        except Exception as e:
+            logger.exception(f"{self.tr('显示Card右键菜单失败:')} {e}")
+    
+    def _add_button_from_card_context(self, tab_id, tab_name, card_name):
+        """从右键菜单添加button"""
+        try:
+            from ui.custom_button_dialog import ButtonEditDialog
+            from PyQt5.QtWidgets import QDialog
+            
+            # 打开按钮对话框，预设tab和card
+            dialog = ButtonEditDialog(
+                self.custom_button_manager,
+                preset_tab_name=tab_name,
+                preset_card_name=card_name,
+                parent=self
+            )
+            if dialog.exec_() == QDialog.Accepted:
+                # 刷新按钮显示
+                self.custom_button_manager.buttons_updated.emit()
+        except Exception as e:
+            logger.exception(f"{self.tr('从右键菜单添加Button失败:')} {e}")
+    
+    def _add_card_from_context(self, tab_id):
+        """从右键菜单添加card"""
+        try:
+            from ui.tab_manager_dialog import CustomCardDialog
+            from PyQt5.QtWidgets import QDialog
+            
+            # 打开Card对话框，预设tab
+            dialog = CustomCardDialog(
+                self.tab_config_manager,
+                preset_tab_id=tab_id,
+                parent=self
+            )
+            if dialog.exec_() == QDialog.Accepted:
+                # 刷新tab显示
+                self.tab_config_manager.tab_config_updated.emit()
+        except Exception as e:
+            logger.exception(f"{self.tr('从右键菜单添加Card失败:')} {e}")
+    
+    def _setup_preset_tab_card_context_menus(self):
+        """为所有预置Tab的card统一添加右键菜单"""
+        try:
+            from PyQt5.QtWidgets import QFrame
+            from PyQt5.QtCore import Qt
+            
+            # 获取所有tab widget
+            for i in range(self.tab_widget.count()):
+                tab_widget = self.tab_widget.widget(i)
+                if not tab_widget:
+                    continue
+                
+                # 获取tab_id
+                tab_id = None
+                if hasattr(tab_widget, 'tab_id'):
+                    tab_id = tab_widget.tab_id
+                
+                if not tab_id:
+                    continue
+                
+                # 检查是否为预置tab（不是自定义tab）
+                all_tabs = self.tab_config_manager.get_all_tabs()
+                is_custom = False
+                for tab in all_tabs:
+                    if tab['id'] == tab_id:
+                        is_custom = tab.get('custom', False)
+                        break
+                
+                # 只为预置tab添加右键菜单（自定义tab的card在_create_custom_card_group中已处理）
+                if not is_custom:
+                    # 查找所有card frame
+                    frames = tab_widget.findChildren(QFrame)
+                    for frame in frames:
+                        if frame.objectName() == "card":
+                            # 获取card名称并存储在frame的属性中
+                            card_name = self._get_card_name_from_frame_simple(frame, tab_widget)
+                            if card_name:
+                                frame.setProperty('card_name', card_name)
+                            
+                            # 检查是否已经有右键菜单（避免重复设置）
+                            if frame.contextMenuPolicy() != Qt.CustomContextMenu:
+                                frame.setContextMenuPolicy(Qt.CustomContextMenu)
+                                frame.customContextMenuRequested.connect(
+                                    lambda pos, f=frame, tw=tab_widget: self._show_card_context_menu(pos, f, tw)
+                                )
+        except Exception as e:
+            logger.exception(f"{self.tr('为预置Tab添加右键菜单失败:')} {e}")
     
         
     def _append_log_handler(self, text, color=None):

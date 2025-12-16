@@ -1561,8 +1561,13 @@ class UnifiedManagerDialog(QDialog):
             )
             return
         
+        # 获取预设的tab_id（如果选中了自定义tab）
+        preset_tab_id = None
+        if self.current_selected_tab_id and self.is_selected_custom_tab:
+            preset_tab_id = self.current_selected_tab_id
+        
         from ui.tab_manager_dialog import CustomCardDialog
-        dialog = CustomCardDialog(self.tab_config_manager, parent=self)
+        dialog = CustomCardDialog(self.tab_config_manager, preset_tab_id=preset_tab_id, parent=self)
         if dialog.exec_() == QDialog.Accepted:
             self.load_custom_cards()
     
@@ -1669,8 +1674,32 @@ class UnifiedManagerDialog(QDialog):
     # 按钮管理相关方法
     def add_button(self):
         """添加按钮"""
+        # 获取预设的tab和card名称
+        preset_tab_name = None
+        preset_card_name = None
+        
+        if self.current_selected_card_name:
+            # 如果选中了card，使用card的tab和card名称
+            preset_card_name = self.current_selected_card_name
+            preset_tab_name = self._get_selected_card_tab_name()
+        elif self.current_selected_tab_id:
+            # 如果只选了tab，没有选card，使用tab名称，card选择第一个
+            all_tabs = self.tab_config_manager.get_all_tabs()
+            selected_tab = next((tab for tab in all_tabs if tab['id'] == self.current_selected_tab_id), None)
+            if selected_tab:
+                preset_tab_name = selected_tab['name']
+                # 获取该tab下的第一个card
+                available_cards = self.custom_button_manager.get_available_cards(preset_tab_name)
+                if available_cards:
+                    preset_card_name = available_cards[0]
+        
         from ui.custom_button_dialog import ButtonEditDialog
-        dialog = ButtonEditDialog(self.custom_button_manager, parent=self)
+        dialog = ButtonEditDialog(
+            self.custom_button_manager,
+            preset_tab_name=preset_tab_name,
+            preset_card_name=preset_card_name,
+            parent=self
+        )
         if dialog.exec_() == QDialog.Accepted:
             button_data = dialog.get_button_data()
             if self.custom_button_manager.add_button(button_data):
@@ -1750,6 +1779,38 @@ class UnifiedManagerDialog(QDialog):
             # 重新应用当前过滤条件
             self.apply_filters()
 
+    def _get_selected_card_tab_name(self):
+        """获取选中card所属的tab名称"""
+        if not self.current_selected_card_name:
+            return None
+        
+        # 如果是预置card，使用current_selected_tab_id
+        if self.current_selected_card_is_preset:
+            if self.current_selected_tab_id:
+                all_tabs = self.tab_config_manager.get_all_tabs()
+                selected_tab = next((tab for tab in all_tabs if tab['id'] == self.current_selected_tab_id), None)
+                return selected_tab['name'] if selected_tab else None
+            return None
+        
+        # 如果是自定义card，从custom_cards中查找
+        card = next(
+            (c for c in self.tab_config_manager.custom_cards 
+             if c.get('name') == self.current_selected_card_name), 
+            None
+        )
+        if card:
+            tab_id = card.get('tab_id')
+            if tab_id:
+                # 从custom_tabs中查找
+                custom_tab = next(
+                    (tab for tab in self.tab_config_manager.custom_tabs 
+                     if tab['id'] == tab_id), 
+                    None
+                )
+                return custom_tab['name'] if custom_tab else None
+        
+        return None
+    
     def closeEvent(self, event):
         """关闭事件"""
         try:
