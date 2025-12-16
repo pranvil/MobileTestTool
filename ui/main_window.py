@@ -112,9 +112,9 @@ class DraggableCustomButton(QPushButton):
         self._drag_start_pos = None
 
     def contextMenuEvent(self, event):
-        """右键：编辑该自定义按钮（不显示卡片右键菜单）"""
+        """右键：显示自定义按钮菜单（不显示卡片右键菜单）"""
         try:
-            from PyQt5.QtWidgets import QDialog
+            from PyQt5.QtWidgets import QDialog, QMenu
             from ui.custom_button_dialog import ButtonEditDialog
 
             main_window = getattr(self.container, "main_window", None)
@@ -126,14 +126,18 @@ class DraggableCustomButton(QPushButton):
             if not button_id:
                 return
 
-            dialog = ButtonEditDialog(
-                main_window.custom_button_manager,
-                button_data=current_data,
-                parent=main_window,
-            )
-            if dialog.exec_() == QDialog.Accepted:
-                new_data = dialog.get_button_data()
-                main_window.custom_button_manager.update_button(button_id, new_data)
+            menu = QMenu(self)
+            edit_action = menu.addAction(main_window.tr("编辑"))
+            chosen = menu.exec_(event.globalPos())
+            if chosen == edit_action:
+                dialog = ButtonEditDialog(
+                    main_window.custom_button_manager,
+                    button_data=current_data,
+                    parent=main_window,
+                )
+                if dialog.exec_() == QDialog.Accepted:
+                    new_data = dialog.get_button_data()
+                    main_window.custom_button_manager.update_button(button_id, new_data)
         except Exception as e:
             try:
                 logger.exception(f"{getattr(self.container, 'main_window', None).tr('编辑自定义按钮失败:') if getattr(self.container, 'main_window', None) else '编辑自定义按钮失败:'} {e}")

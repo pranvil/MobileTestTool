@@ -299,6 +299,8 @@ class ButtonEditDialog(QDialog):
         scroll_content = QWidget()
         scroll_layout = QVBoxLayout(scroll_content)
         scroll_layout.setContentsMargins(5, 5, 5, 5)
+        # 避免内容不足时把“基本信息”区域拉伸得过高：整体顶对齐，剩余空间留在底部
+        scroll_layout.setAlignment(Qt.AlignTop)
         
         # 基本信息组（使用与Tab界面一致的样式：QLabel + QFrame）
         basic_container = QWidget()
@@ -462,6 +464,8 @@ class ButtonEditDialog(QDialog):
         advanced_card_layout.addLayout(path_layout)
         advanced_layout.addWidget(self.advanced_card)
         scroll_layout.addWidget(advanced_container)
+        # 让多余高度留在底部，保持各类型界面高度风格一致
+        scroll_layout.addStretch(1)
         
         # 保存advanced_card引用，用于控制可见性
         self.advanced_group = advanced_container
@@ -556,28 +560,36 @@ class ButtonEditDialog(QDialog):
             self.advanced_group.setVisible(False)
             return
         
-        # 显示/隐藏高级设置 - 统一使用脚本/命令输入区域（多行文本输入框）
-        if button_type in ["adb", "system", "python", "file", "program", "url"]:
-            # 所有类型都使用脚本/命令输入区域（多行文本输入框）
+        # file/program：使用“路径 + 浏览”，不再让用户手动输入多行路径
+        if button_type in ["file", "program"]:
+            self.script_edit.setVisible(False)
+            self.path_edit.setVisible(True)
+            self.file_browse_btn.setVisible(True)
+            self.folder_browse_btn.setVisible(button_type == "file")
+            self.advanced_title.setText(self.tr("路径"))
+            self.advanced_group.setVisible(True)
+            if button_type == "file":
+                self.path_edit.setPlaceholderText(self.tr("点击右侧按钮选择文件或文件夹..."))
+            else:
+                self.path_edit.setPlaceholderText(self.tr("点击右侧按钮选择要运行的程序（支持 .exe / .py / .bat / .cmd）..."))
+            return
+
+        # 其它类型仍使用脚本/命令输入区域
+        if button_type in ["adb", "system", "python", "url"]:
             self.script_edit.setVisible(True)
             self.script_edit.setMaximumHeight(300)
             self.path_edit.setVisible(False)
             self.file_browse_btn.setVisible(False)
             self.folder_browse_btn.setVisible(False)
-            self.advanced_title.setText(self.tr("脚本\\命令"))  # 统一使用"脚本\命令"标题
+            self.advanced_title.setText(self.tr("脚本\\命令"))
             self.advanced_group.setVisible(True)
-            
-            # 设置占位符
+
             if button_type == "adb":
                 self.script_edit.setPlaceholderText(self.tr("输入ADB命令（多行支持，不需要加 'adb -s {device}'）...\n例如：reboot\n例如：shell dumpsys battery"))
             elif button_type == "system":
                 self.script_edit.setPlaceholderText(self.tr("输入系统命令（多行支持）...\n例如：dir\n例如：ipconfig /all"))
             elif button_type == "python":
                 self.script_edit.setPlaceholderText(self.tr("输入Python脚本代码..."))
-            elif button_type == "file":
-                self.script_edit.setPlaceholderText(self.tr("输入文件或文件夹路径（多行支持）...\n例如：C:\\Users\\用户名\\Desktop\\文件.txt\n例如：C:\\Users\\用户名\\Documents\\项目文件夹"))
-            elif button_type == "program":
-                self.script_edit.setPlaceholderText(self.tr("输入程序路径（多行支持）...\n例如：C:\\Program Files\\Notepad++\\notepad++.exe\n例如：D:\\Tools\\script.py"))
             elif button_type == "url":
                 self.script_edit.setPlaceholderText(self.tr("输入网页地址（多行支持）...\n例如：https://www.example.com\n例如：www.google.com"))
         else:
@@ -602,10 +614,9 @@ class ButtonEditDialog(QDialog):
             if file_path:
                 self.path_edit.setText(file_path)
         elif type_text == self.tr("运行程序"):
-            # Windows平台：支持.exe、.py、.bat、.cmd等
             file_path, _ = QFileDialog.getOpenFileName(
                 self, self.tr("选择要运行的程序"), "",
-                self.tr("可执行文件和脚本 (*.exe *.py *.bat *.cmd);;所有文件 (*.*)")
+                self.tr("可执行文件/脚本 (*.exe *.py *.bat *.cmd);;可执行文件 (*.exe);;脚本 (*.py *.bat *.cmd)")
             )
             if file_path:
                 self.path_edit.setText(file_path)
@@ -648,10 +659,13 @@ class ButtonEditDialog(QDialog):
         if index >= 0:
             self.type_combo.setCurrentIndex(index)
         
-        # 根据类型加载内容 - 统一加载到script_edit
+        # 根据类型加载内容
         command = self.button_data.get('command', '')
-        if button_type in ['adb', 'system', 'file', 'program', 'url']:
-            # ADB命令、系统命令、打开文件、运行程序、打开网页：加载到script_edit
+        if button_type in ['file', 'program']:
+            # 文件/程序：加载到路径输入框
+            self.path_edit.setText(command)
+        elif button_type in ['adb', 'system', 'url']:
+            # ADB命令、系统命令、打开网页：加载到script_edit
             self.script_edit.setPlainText(command)
         elif button_type == 'python':
             # Python脚本：加载script字段到script_edit
@@ -714,23 +728,28 @@ class ButtonEditDialog(QDialog):
             if not command:
                 QMessageBox.warning(self, self.tr("验证失败"), "请输入系统命令")
                 return
-        elif button_type in [self.tr("打开文件"), self.tr("运行程序")]:
-            # 验证文件路径
-            command = self.script_edit.toPlainText().strip()
-            if not command:
-                QMessageBox.warning(self, self.tr("验证失败"), "请输入文件或程序路径")
+        elif button_type == self.tr("打开文件"):
+            path = self.path_edit.text().strip()
+            if not path:
+                QMessageBox.warning(self, self.tr("验证失败"), self.tr("请选择要打开的文件或文件夹"))
                 return
             import os
-            # 验证每行路径（支持多行）
-            lines = command.split('\n')
-            for line in lines:
-                line = line.strip()
-                if line and not os.path.exists(line):
-                    QMessageBox.warning(
-                        self, self.tr("验证失败"), 
-                        f"{self.tr('文件/程序不存在:')}\n{line}\n\n{self.tr('请检查路径是否正确')}"
-                    )
-                    return
+            if not os.path.exists(path):
+                QMessageBox.warning(self, self.tr("验证失败"), f"{self.tr('文件/文件夹不存在:')}\n{path}")
+                return
+        elif button_type == self.tr("运行程序"):
+            path = self.path_edit.text().strip()
+            if not path:
+                QMessageBox.warning(self, self.tr("验证失败"), self.tr("请选择要运行的程序"))
+                return
+            import os
+            if not os.path.exists(path):
+                QMessageBox.warning(self, self.tr("验证失败"), f"{self.tr('程序不存在:')}\n{path}")
+                return
+            lower = path.lower()
+            if not (lower.endswith('.exe') or lower.endswith('.py') or lower.endswith('.bat') or lower.endswith('.cmd')):
+                QMessageBox.warning(self, self.tr("验证失败"), self.tr("仅支持选择 .exe / .py / .bat / .cmd 文件"))
+                return
         elif button_type == self.tr("打开网页"):
             # 验证网页地址
             url = self.script_edit.toPlainText().strip()
@@ -754,9 +773,10 @@ class ButtonEditDialog(QDialog):
         }
         button_type = type_map.get(current_text, "adb")
         
-        # 根据类型获取command字段 - 统一从script_edit获取
-        if button_type in ['adb', 'system', 'file', 'program', 'url']:
-            # ADB命令、系统命令、打开文件、运行程序、打开网页：从script_edit获取
+        # 根据类型获取command字段
+        if button_type in ['file', 'program']:
+            command = self.path_edit.text().strip()
+        elif button_type in ['adb', 'system', 'url']:
             command = self.script_edit.toPlainText().strip()
         elif button_type == 'python':
             # Python脚本：command可以为空，使用script字段

@@ -1252,6 +1252,11 @@ except ImportError:
                 # 传递设备ID作为命令行参数
                 if device_id:
                     cmd.append(device_id)
+            elif program_path.lower().endswith('.bat') or program_path.lower().endswith('.cmd'):
+                # Windows 批处理脚本：通过 cmd.exe 启动，才能稳定执行并捕获 stdout/stderr
+                cmd = ['cmd.exe', '/c', program_path]
+                if device_id:
+                    cmd.append(device_id)
             
             # 启动程序
             process = subprocess.Popen(
