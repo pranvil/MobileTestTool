@@ -28,6 +28,33 @@ def setup_logging():
     log_level = logging.INFO
     show_console = True
 
+    # ------------------------------------------------------------------
+    # 优先尝试读取主程序的 debug 日志配置（用于“同步受控”的日志等级）
+    # 说明：
+    # - 主程序配置文件：<project_root>/logs/debug_log_config.json
+    # - sim_reader 自己的配置文件：<sim_reader_base>/log_config.json
+    # - 为避免 core 包名冲突（主程序 core vs sim_reader/core），这里用文件路径读取，不做 import。
+    # ------------------------------------------------------------------
+    try:
+        # utils.py 位于 sim_reader/core/utils.py
+        # 两级上跳到项目根目录（MobileTestTool）
+        project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+        debug_cfg_path = os.path.join(project_root, "logs", "debug_log_config.json")
+        if os.path.exists(debug_cfg_path):
+            with open(debug_cfg_path, "r", encoding="utf-8") as f:
+                debug_cfg = json.load(f) or {}
+            # 主程序字段：enabled / log_level
+            enable_log = bool(debug_cfg.get("enabled", True))
+            level_str = str(debug_cfg.get("log_level", "INFO")).upper()
+            log_level = getattr(logging, level_str, logging.INFO)
+            # show_console：主程序配置里没有该字段，沿用 sim_reader 的默认/自有配置
+    except Exception as e:
+        # 读不到主程序配置就回退到 sim_reader 自己的配置，不影响使用
+        try:
+            print(f"[Logging] Failed to read debug_log_config.json. Reason: {e}")
+        except Exception:
+            pass
+
     config_path = os.path.join(base_path, "log_config.json")
     if os.path.exists(config_path):
         try:

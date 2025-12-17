@@ -1,0 +1,13 @@
+{
+    "EF_list": [
+        {
+            "ef_id": "6F02",
+            "adf_type": "ISIM",
+            "records": [
+                {
+                    "IMPI": "310260012345678@ims.mnc260.mcc310.3gppnetwork.org"
+                }
+            ]
+        }
+    ]
+}
