@@ -97,6 +97,7 @@ class DeviceToolBar(QToolBar):
         
         # 设备下拉框
         self.device_combo = QComboBox()
+        self.device_combo.setSizeAdjustPolicy(QComboBox.AdjustToContents)
         self.device_combo.setMinimumWidth(250)
         self.device_combo.setEditable(False)
         self.device_combo.currentTextChanged.connect(self.device_changed.emit)
