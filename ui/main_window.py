@@ -1939,7 +1939,7 @@ class MainWindow(QMainWindow):
         """从右键菜单添加button"""
         try:
             from ui.custom_button_dialog import ButtonEditDialog
-            from PyQt5.QtWidgets import QDialog
+            from PyQt5.QtWidgets import QDialog, QMessageBox
             
             # 打开按钮对话框，预设tab和card
             dialog = ButtonEditDialog(
@@ -1949,8 +1949,14 @@ class MainWindow(QMainWindow):
                 parent=self
             )
             if dialog.exec_() == QDialog.Accepted:
-                # 刷新按钮显示
-                self.custom_button_manager.buttons_updated.emit()
+                # 获取按钮数据并添加到管理器
+                button_data = dialog.get_button_data()
+                if self.custom_button_manager.add_button(button_data):
+                    # 刷新按钮显示
+                    self.custom_button_manager.buttons_updated.emit()
+                    QMessageBox.information(self, self.tr("成功"), self.tr("按钮添加成功！"))
+                else:
+                    QMessageBox.warning(self, self.tr("失败"), self.tr("按钮添加失败，请检查日志"))
         except Exception as e:
             logger.exception(f"{self.tr('从右键菜单添加Button失败:')} {e}")
     
