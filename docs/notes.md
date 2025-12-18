@@ -1,9 +1,12 @@
 
 ## Release Note
-- 优化自定义按钮用户体验，在tab界面可以添加按钮和卡片
-- 自定义按钮打开文件和运行程序改为选择文件，而不是手动输入路径。
+- Fix SIM reader raw data update fail bug
+- Fix log debug level configuration
+- Make top left device list auto-adjust width
+- add -p --port parameter for CLI mode
+- New feature: SIM reader CLI update raw date, detail refer MobileTestTool.exe --help
 
-## Known issue
+
 
 
 

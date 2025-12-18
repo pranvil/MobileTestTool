@@ -142,9 +142,12 @@ class DebugLogger:
             current_date = datetime.now().date()
             date_str = current_date.strftime('%Y%m%d')
             
+            # 检查是否启用日志轮转
+            enable_rotation = config.get('enable_rotation', True)
+            
             # 检查是否需要按日期轮转
             needs_date_rotation = False
-            if config.get('rotation_by_date', True) and self._current_date and self._current_date != current_date:
+            if enable_rotation and config.get('rotation_by_date', True) and self._current_date and self._current_date != current_date:
                 # 日期已变化，需要轮转
                 needs_date_rotation = True
             
@@ -164,7 +167,7 @@ class DebugLogger:
                 max_size = config.get('max_file_size_mb', 10) * 1024 * 1024
                 
                 # 如果文件超过大小限制，需要轮转
-                if config.get('rotation_by_size', True) and file_size >= max_size:
+                if enable_rotation and config.get('rotation_by_size', True) and file_size >= max_size:
                     log_file_path = self._rotate_log_file(log_dir, date_str)
             else:
                 # 文件不存在，创建新文件
@@ -493,9 +496,12 @@ class DebugLogger:
         
         try:
             with self._lock:
+                # 检查是否启用日志轮转
+                enable_rotation = config.get('enable_rotation', True)
+                
                 # 检查是否需要按日期轮转
                 current_date = datetime.now().date()
-                if config.get('rotation_by_date', True) and self._current_date and self._current_date != current_date:
+                if enable_rotation and config.get('rotation_by_date', True) and self._current_date and self._current_date != current_date:
                     log_dir = os.path.dirname(self._log_file)
                     # 获取新日期的日志文件路径
                     self._log_file = self._get_log_file_path(log_dir)
@@ -509,7 +515,7 @@ class DebugLogger:
                     file_size = os.path.getsize(self._log_file)
                     max_size = config.get('max_file_size_mb', 10) * 1024 * 1024
                     
-                    if config.get('rotation_by_size', True) and file_size >= max_size:
+                    if enable_rotation and config.get('rotation_by_size', True) and file_size >= max_size:
                         log_dir = os.path.dirname(self._log_file)
                         date_str = datetime.now().date().strftime('%Y%m%d')
                         self._log_file = self._rotate_log_file(log_dir, date_str)

@@ -21,6 +21,29 @@ def is_pyinstaller():
     """检测是否在PyInstaller打包环境中运行"""
     return getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS')
 
+# 在Windows上动态分配控制台窗口（用于CLI模式）
+def allocate_console():
+    """在Windows上为打包的exe分配控制台窗口"""
+    if sys.platform == 'win32' and is_pyinstaller():
+        try:
+            import ctypes
+            kernel32 = ctypes.windll.kernel32
+            
+            # 总是创建新控制台窗口，避免输入问题和闪烁
+            kernel32.AllocConsole()
+            # 重新打开标准输出流
+            sys.stdout = open('CONOUT$', 'w', encoding='utf-8')
+            sys.stderr = open('CONOUT$', 'w', encoding='utf-8')
+            sys.stdin = open('CONIN$', 'r', encoding='utf-8')
+            
+            # 设置控制台代码页为UTF-8
+            try:
+                kernel32.SetConsoleOutputCP(65001)
+            except:
+                pass
+        except Exception:
+            pass  # 如果分配失败，静默处理
+
 # 设置控制台编码（解决Windows下中文乱码问题）
 if sys.platform == 'win32':
     import io
@@ -61,7 +84,7 @@ def redirect_stdout_to_log():
     """将标准输出重定向到日志文件"""
     # 检测是否是 CLI 模式，CLI 模式下不重定向输出
     if len(sys.argv) > 1:
-        cli_flags = ['-w', '-p', '--help', '-h']
+        cli_flags = ['-w', '-p', '--help', '-h', '--raw', '-r', '--skip-confirm', '--port', '-P']
         if any(arg in cli_flags for arg in sys.argv):
             # CLI 模式下不重定向输出，保持控制台输出
             return
@@ -99,6 +122,14 @@ def redirect_stdout_to_log():
         # 静默处理重定向错误
         pass
 
+# 检测是否有 CLI 参数，如果是 CLI 模式且是打包环境，提前分配控制台
+# 这样确保所有后续的输出（包括日志）都能正确显示
+if len(sys.argv) > 1:
+    cli_flags = ['-w', '-p', '--help', '-h', '--raw', '-r', '--skip-confirm', '--port', '-P']
+    if any(arg in cli_flags for arg in sys.argv):
+        # CLI 模式下，为打包的exe分配控制台窗口（在日志系统使用之前）
+        allocate_console()
+
 # 执行输出重定向
 redirect_stdout_to_log()
 
@@ -106,18 +137,21 @@ redirect_stdout_to_log()
 def main():
     """主入口 - 根据参数路由到 GUI 或 CLI"""
     try:
-        logger.info("=" * 60)
-        logger.info("程序启动")
-        logger.info("=" * 60)
-        
         # 检测是否有 CLI 参数
         if len(sys.argv) > 1:
-            cli_flags = ['-w', '-p', '--help', '-h']
+            cli_flags = ['-w', '-p', '--help', '-h', '--raw', '-r', '--skip-confirm', '--port', '-P']
             if any(arg in cli_flags for arg in sys.argv):
+                logger.info("=" * 60)
+                logger.info("程序启动（CLI模式）")
+                logger.info("=" * 60)
                 logger.info("检测到 CLI 参数，进入 CLI 模式")
                 from cli_main import main as cli_main
                 cli_main()
                 return
+        
+        logger.info("=" * 60)
+        logger.info("程序启动")
+        logger.info("=" * 60)
         
         # 默认启动 GUI
         logger.info("进入 GUI 模式")

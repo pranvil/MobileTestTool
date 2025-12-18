@@ -65,8 +65,14 @@ def main():
                 sys.modules[mod_name] = mod
             sys.path = original_path
             
-    except SystemExit:
+    except SystemExit as e:
         # argparse 在显示帮助信息后会抛出 SystemExit(0)，这是正常行为
+        # 在打包的 exe 中，等待用户按键以避免控制台窗口立即关闭
+        if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
+            try:
+                input("\n按 Enter 键退出...")
+            except (EOFError, OSError):
+                pass  # 如果无法读取输入，直接退出
         raise
     except Exception as e:
         # 如果有日志记录器，记录错误
@@ -78,6 +84,14 @@ def main():
         
         # 输出错误信息到控制台
         print(f"错误: {str(e)}", file=sys.stderr)
+        
+        # 在打包的 exe 中，等待用户按键
+        if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
+            try:
+                input("\n按 Enter 键退出...")
+            except (EOFError, OSError):
+                pass
+        
         sys.exit(1)
 
 

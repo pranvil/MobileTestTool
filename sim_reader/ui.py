@@ -232,13 +232,13 @@ class SimEditorUI(QMainWindow):
         self.port_timer.timeout.connect(self.update_port_list)
         self.port_timer.start()
         # === 启动时检测是否有串口 ===
-        if not self.comm.get_all_ports():
-            QMessageBox.warning(
-                self,
-                "No Ports Found",
-                "未检测到任何可用串口设备，请确在使用前认设备已经连接并且AT端口已经打开。",
-                QMessageBox.Ok
-            )
+        # if not self.comm.get_all_ports():
+        #     QMessageBox.warning(
+        #         self,
+        #         "No Ports Found",
+        #         "未检测到任何可用串口设备，请确在使用前认设备已经连接并且AT端口已经打开。",
+        #         QMessageBox.Ok
+        #     )
 
 
 
@@ -763,9 +763,20 @@ class SimEditorUI(QMainWindow):
         读取完成后通过信号将结果传递给主线程
         """
         try:
-            file_path = self.file_path_input.text()
-            adf_type = self.adf_type_input.text()
+            file_path = self.file_path_input.text().strip()
+            adf_type = self.adf_type_input.text().strip()
             logging.info("开始异步读取数据: adf=%s, file=%s", adf_type, file_path)
+            
+            # 验证 ADF 和 EF ID 是否为空
+            if not adf_type:
+                logging.warning("[read_data_async] ADF 类型为空")
+                self.show_message.emit("error", "请先选择或输入 ADF 类型（如 USIM、ISIM 等）")
+                return
+            
+            if not file_path:
+                logging.warning("[read_data_async] EF ID 为空")
+                self.show_message.emit("error", "请先选择或输入 EF ID（如 6F07、6F06 等）")
+                return
             
             # 检查连接状态
             is_connected, msg = self.check_connection_before_operation()
@@ -867,11 +878,6 @@ class SimEditorUI(QMainWindow):
     def on_update_button_clicked(self):
         force_raw = self.raw_checkbox.isChecked()
         """点击 'Update' 按钮（后台执行），显示进度对话框"""
-        if self.selected_row is None:
-            logging.warning("[on_update_button_clicked] 未选择记录")
-            QMessageBox.information(self, "Info", "请先选择一条记录")
-            return
-
         file_path = self.file_path_input.text().strip()
         adf_type = self.adf_type_input.text().strip()
         
@@ -889,6 +895,72 @@ class SimEditorUI(QMainWindow):
             QMessageBox.warning(self, "error", "无效的文件路径或 ADF 类型")
             return
 
+        # 在 raw 模式下，不要求必须选中行（因为 raw 模式只有一行）
+        if force_raw:
+            # 如果没有选择行，设置为 0（对于 transparent EF，row_index 实际上不会被使用）
+            if self.selected_row is None:
+                self.selected_row = 0
+            
+            # 如果没有输入框，自动创建一个 raw_data 输入框
+            if self.write_data_layout.rowCount() == 0:
+                label = QLabel("raw_data")
+                input_field = QLineEdit()
+                input_field.setObjectName("raw_data")
+                self.write_data_layout.addRow(label, input_field)
+                logging.info("[on_update_button_clicked] raw 模式下自动创建输入框")
+        else:
+            # 非 raw 模式下，需要选中行
+            if self.selected_row is None:
+                logging.warning("[on_update_button_clicked] 未选择记录")
+                QMessageBox.information(self, "Info", "请先选择一条记录")
+                return
+
+        # 获取写入值
+        input_values = self.get_input_values()
+        logging.info("[on_update_button_clicked] 用户输入值: %s", input_values)
+        
+        # 在 raw 模式下，检查是否有输入值
+        if force_raw:
+            # 在 raw 模式下，无论输入框的 label 是什么，都应该将所有输入框的值合并或使用第一个非空值
+            # 因为 raw 模式下只有一个输入框，且 label 可能是解析后的字段名（如 "IMSI"）
+            if 'raw_data' not in input_values:
+                # 检查写入区域是否有任何输入框
+                if self.write_data_layout.rowCount() > 0:
+                    # 遍历所有输入框，找到第一个有值的输入框
+                    found_value = False
+                    for i in range(self.write_data_layout.rowCount()):
+                        label_item = self.write_data_layout.itemAt(i, QFormLayout.LabelRole)
+                        input_item = self.write_data_layout.itemAt(i, QFormLayout.FieldRole)
+                        if label_item and input_item:
+                            input_widget = input_item.widget()
+                            if isinstance(input_widget, QLineEdit):
+                                input_value = input_widget.text().strip()
+                                if input_value:
+                                    input_values['raw_data'] = input_value
+                                    logging.info("[on_update_button_clicked] raw 模式下使用第 %d 个输入框的值 (label: %s): %s", 
+                                                i+1, label_item.widget().text() if label_item.widget() else "unknown", input_value)
+                                    found_value = True
+                                    break
+                    
+                    # 如果所有输入框都没有值，但 input_values 中有其他键的值，也尝试使用
+                    if not found_value and input_values:
+                        # 使用第一个非空值
+                        for key, value in input_values.items():
+                            if value and str(value).strip():
+                                input_values['raw_data'] = str(value).strip()
+                                logging.info("[on_update_button_clicked] raw 模式下使用 input_values 中的值 (key: %s): %s", key, input_values['raw_data'])
+                                found_value = True
+                                break
+            
+            # 验证 raw_data 是否有值
+            raw_data_value = input_values.get('raw_data', '').strip()
+            if not raw_data_value:
+                logging.warning("[on_update_button_clicked] raw 模式下 raw_data 为空，input_values: %s", input_values)
+                QMessageBox.warning(self, "Warning", 
+                    "Raw 模式下输入数据为空。\n\n"
+                    "请直接在输入框中输入十六进制数据，或先点击 'Read' 按钮读取数据。")
+                return
+
         # 显示进度对话框（无限滚动）
         self.progress_dialog = QProgressDialog("Writing to SIM...", None, 0, 0, self)
         self.progress_dialog.setWindowTitle("Please Wait")
@@ -896,10 +968,6 @@ class SimEditorUI(QMainWindow):
         self.progress_dialog.setCancelButton(None)
         self.progress_dialog.show()
         QApplication.processEvents()
-
-        # 获取写入值
-        input_values = self.get_input_values()
-        logging.info("[on_update_button_clicked] 用户输入值: %s", input_values)
 
         # 后台执行更新
         self.executor.submit(self.update_data_async, adf_type, file_path, input_values, force_raw)

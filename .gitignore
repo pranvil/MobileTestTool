@@ -118,6 +118,7 @@ Thumbs.db
 
 # Project specific
 *.log
+json_data/
 temp/
 logs/
 c:\log\*
