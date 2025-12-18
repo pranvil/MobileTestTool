@@ -217,7 +217,7 @@ class SimEditorUI(QMainWindow):
         self.tree_manager.populate_tree()
 
         # 设置窗口属性
-        self.setWindowTitle("SIM Tool v1.8")
+        self.setWindowTitle("SIM Tool")
         self.setGeometry(500, 300, 800, 600)
 
         # 连接信号和槽

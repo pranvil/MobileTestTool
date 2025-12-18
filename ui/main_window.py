@@ -1640,8 +1640,8 @@ class MainWindow(QMainWindow):
     def _create_custom_card_group(self, card, tab_widget):
         """创建自定义Card组（仅创建结构，按钮由统一方法添加）"""
         try:
-            from PyQt5.QtWidgets import QWidget, QFrame, QVBoxLayout, QHBoxLayout, QLabel
-            from PyQt5.QtCore import Qt
+            from PyQt5.QtWidgets import QWidget, QFrame, QVBoxLayout, QHBoxLayout, QLabel, QToolTip, QSizePolicy
+            from PyQt5.QtCore import Qt, QEvent, QObject
             from ui.widgets.shadow_utils import add_card_shadow
             
             # 使用与预置tab一致的现代结构：QLabel + QFrame
@@ -1654,7 +1654,41 @@ class MainWindow(QMainWindow):
             # 标题
             title = QLabel(card['name'])
             title.setProperty("class", "section-title")
-            v.addWidget(title)
+            # 方案A：标题不占满整行，只占文字宽度，避免“标题行空白处也触发 tooltip”
+            title.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+            # 描述不直接占用界面空间：鼠标悬停通过 tooltip 查看完整描述
+            # 仅在标题处显示 tooltip（不在 card 其它区域显示，避免干扰）
+            card_desc = (card.get('description') or '').strip()
+            if card_desc:
+                try:
+                    # 某些场景下 QLabel 的默认 tooltip 触发不稳定：用事件过滤器强制只在标题悬停时显示
+                    class _TitleTooltipFilter(QObject):
+                        def __init__(self, text, parent=None):
+                            super().__init__(parent)
+                            self._text = text
+
+                        def eventFilter(self, obj, event):
+                            if event.type() == QEvent.ToolTip:
+                                QToolTip.showText(event.globalPos(), self._text, obj)
+                                return True
+                            return False
+
+                    tooltip_filter = _TitleTooltipFilter(card_desc, title)
+                    if not hasattr(self, "_custom_card_title_tooltip_filters"):
+                        self._custom_card_title_tooltip_filters = []
+                    self._custom_card_title_tooltip_filters.append(tooltip_filter)  # 防止被GC回收
+                    title.installEventFilter(tooltip_filter)
+                    title.setAttribute(Qt.WA_AlwaysShowToolTips, True)
+                except Exception:
+                    pass
+            # 用一行容器包住标题：左侧标题 + 右侧 stretch
+            title_row = QWidget()
+            title_row_layout = QHBoxLayout(title_row)
+            title_row_layout.setContentsMargins(0, 0, 0, 0)
+            title_row_layout.setSpacing(0)
+            title_row_layout.addWidget(title, 0, Qt.AlignLeft)
+            title_row_layout.addStretch(1)
+            v.addWidget(title_row)
             
             # 卡片
             card_frame = QFrame()
@@ -1664,28 +1698,11 @@ class MainWindow(QMainWindow):
             # 直接存储 card_name，避免后续通过布局回溯推断失败导致右键菜单无法弹出
             card_frame.setProperty('card_name', card.get('name', ''))
             
-            # 如果有描述，使用垂直布局；否则使用水平布局（与预置tab一致）
-            if card.get('description'):
-                card_layout = QVBoxLayout(card_frame)
-                card_layout.setContentsMargins(10, 1, 10, 1)
-                card_layout.setSpacing(8)
-                
-                # 添加Card描述
-                desc_label = QLabel(card['description'])
-                desc_label.setWordWrap(True)
-                desc_label.setStyleSheet("color: #666; margin-bottom: 10px;")
-                card_layout.addWidget(desc_label)
-                
-                # 添加空的按钮布局（按钮由load_custom_buttons_for_all_tabs统一添加）
-                button_layout = QHBoxLayout()
-                button_layout.addStretch()  # 添加stretch，按钮会插入到stretch之前
-                card_layout.addLayout(button_layout)
-            else:
-                # 没有描述时，使用水平布局（与预置tab一致）
-                card_layout = QHBoxLayout(card_frame)
-                card_layout.setContentsMargins(10, 1, 10, 1)
-                card_layout.setSpacing(8)
-                card_layout.addStretch()  # 添加stretch，按钮会插入到stretch之前
+            # 统一使用水平布局（与预置tab一致），描述通过标题 tooltip 展示，避免占用卡片空间
+            card_layout = QHBoxLayout(card_frame)
+            card_layout.setContentsMargins(10, 1, 10, 1)
+            card_layout.setSpacing(8)
+            card_layout.addStretch()  # 添加stretch，按钮会插入到stretch之前
             
             v.addWidget(card_frame)
             
