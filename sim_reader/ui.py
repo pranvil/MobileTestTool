@@ -3,9 +3,9 @@ from PyQt5.QtWidgets import (
     QLineEdit, QPushButton, QLabel, QDialog, QTableWidget, QMessageBox,QGridLayout,
     QTableWidgetItem, QSizePolicy, QAbstractItemView, QFormLayout,
     QProgressDialog, QApplication, QFileDialog, QInputDialog, QComboBox,
-    QScrollArea, QCheckBox, QHeaderView
+    QScrollArea, QCheckBox, QHeaderView, QSpinBox
 )   
-from PyQt5.QtCore import QThread, pyqtSignal, Qt, QEvent, QTimer, pyqtSlot
+from PyQt5.QtCore import QThread, pyqtSignal, Qt, QEvent, QTimer, pyqtSlot, QSettings
 from threading import Lock
 from concurrent.futures import ThreadPoolExecutor
 from collections import OrderedDict
@@ -196,6 +196,8 @@ class SimEditorUI(QMainWindow):
     json_load_done = pyqtSignal(bool, str)  # JSON加载完成信号
     error_occurred = pyqtSignal(str)  # 错误发生信号
     show_message = pyqtSignal(str, str)  # 通用消息显示信号
+    progress_update = pyqtSignal(int)  # worker -> 主线程：更新进度条
+    progress_close = pyqtSignal()      # worker -> 主线程：关闭进度对话框
 
     def __init__(self):
         super().__init__()
@@ -208,6 +210,7 @@ class SimEditorUI(QMainWindow):
         self.comm = SerialComm()
         self.comm_lock = Lock()
         self.port_disconnect_warned = False  # 添加标志变量，用于控制端口断开警告的显示
+        self._settings = QSettings("MobileTestTool", "SIMReader")
 
         # 初始化UI组件
         self.init_ui()
@@ -225,6 +228,8 @@ class SimEditorUI(QMainWindow):
         self.json_load_done.connect(self.on_json_load_done)
         self.error_occurred.connect(self.show_error_dialog)
         self.show_message.connect(self.display_message)
+        self.progress_update.connect(self._on_progress_update)
+        self.progress_close.connect(self.close_progress_dialog)
         logging.debug("SIM编辑器主界面初始化完成")
         # --- 端口刷新定时器（简化版，仅检测端口变化） ---
         self.port_timer = QTimer(self)
@@ -505,19 +510,47 @@ class SimEditorUI(QMainWindow):
         self.port_combo.setCurrentIndex(0)  # 默认选中占位项
         self.update_port_list()  # 初始化端口列表
         self.port_combo.currentTextChanged.connect(self.on_port_changed)
-        grid.addWidget(raw_lbl, 1, 4)
-        grid.addWidget(self.raw_checkbox, 1, 5)
+
+        # AT 命令最小间隔配置（ms）
+        gap_lbl = QLabel("AT Gap(ms):")
+        self.at_gap_spin = QSpinBox()
+        self.at_gap_spin.setRange(0, 2000)
+        self.at_gap_spin.setSingleStep(10)
+        self.at_gap_spin.setSuffix(" ms")
+        self.at_gap_spin.setToolTip(
+            "AT 指令最小间隔（从上一条 RX 完成到下一条 TX 开始）。\n"
+            "用于降低部分模组/卡在高频 APDU 下的无响应概率。\n"
+            "经验建议：100~300ms；0 表示不限制。"
+        )
+        # 默认值 0：不节流（保留功能，用户按需开启）
+        saved_gap = int(self._settings.value("at_min_gap_ms", 0))
+        self.at_gap_spin.setValue(max(0, min(2000, saved_gap)))
+        # 立即应用到串口层
+        self.comm.set_min_command_gap_ms(self.at_gap_spin.value())
+        self.at_gap_spin.valueChanged.connect(self._on_at_gap_changed)
+        # 第 1 行左侧：AT 间隔 + Raw（固定位置，窗口缩放不漂移）
+        grid.addWidget(gap_lbl, 1, 0, alignment=Qt.AlignLeft | Qt.AlignVCenter)
+        grid.addWidget(self.at_gap_spin, 1, 1, alignment=Qt.AlignLeft | Qt.AlignVCenter)
+        grid.addWidget(raw_lbl, 1, 2, alignment=Qt.AlignLeft | Qt.AlignVCenter)
+        grid.addWidget(self.raw_checkbox, 1, 3, alignment=Qt.AlignLeft | Qt.AlignVCenter)
+
+        # 第 1 行右侧：pSIM / eSIM / 端口选择
         grid.addWidget(psim_btn, 1, 6)
         grid.addWidget(esim_btn, 1, 7)
         grid.addWidget(self.port_combo, 1, 8)
 
-        # -------- 网格弹性列，避免挤压 --------
-        grid.setColumnStretch(5, 1)   # 第 5 列吸收多余空间
+        # -------- 网格弹性列：把弹性空间放在 Raw 右侧、右侧按钮左侧 --------
+        grid.setColumnStretch(4, 1)   # 让第 4 列吸收多余空间，避免 Raw/AT Gap 随窗口变化漂移
         grid.setHorizontalSpacing(10)
         grid.setVerticalSpacing(6)
 
         outer.addStretch()            # 其余空间给表格 / 滚动区
         self.tabs.addTab(tab, "SIM Data")
+
+    def _on_at_gap_changed(self, value: int):
+        """用户修改 AT 命令最小间隔（主线程）"""
+        self._settings.setValue("at_min_gap_ms", int(value))
+        self.comm.set_min_command_gap_ms(int(value))
 
     def update_port_list(self):
         """简化的端口列表更新 - 仅检测端口变化，不自动重连"""
@@ -739,8 +772,13 @@ class SimEditorUI(QMainWindow):
         self.progress_dialog.show()
         QApplication.processEvents()
 
-        # 后台线程执行
-        self.executor.submit(self.read_data_async)
+        # 主线程中读取 UI 状态，避免 worker 线程触碰 Qt 控件
+        file_path = self.file_path_input.text().strip()
+        adf_type = self.adf_type_input.text().strip()
+        force_raw = self.raw_checkbox.isChecked()
+
+        # 后台线程执行（只做业务/串口，不操作 UI）
+        self.executor.submit(self.read_data_async, file_path, adf_type, force_raw)
 
 
 
@@ -749,6 +787,9 @@ class SimEditorUI(QMainWindow):
         try:
             # 简单的连接测试
             response = self.comm.send_command('AT')
+            if not response or isinstance(response, str) and response.startswith("error"):
+                logging.warning("连接检查失败，响应: %s", response)
+                return False, f"串口连接异常，响应: {response}"
             if 'OK' not in response:
                 logging.warning("连接检查失败，响应: %s", response)
                 return False, f"串口连接异常，响应: {response}"
@@ -757,14 +798,12 @@ class SimEditorUI(QMainWindow):
             logging.error("连接检查异常: %s", e)
             return False, f"串口连接失败: {e}"
 
-    def read_data_async(self):
+    def read_data_async(self, file_path: str, adf_type: str, force_raw: bool):
         """异步读取SIM卡数据
         在后台线程中执行数据读取操作，避免阻塞UI
         读取完成后通过信号将结果传递给主线程
         """
         try:
-            file_path = self.file_path_input.text().strip()
-            adf_type = self.adf_type_input.text().strip()
             logging.info("开始异步读取数据: adf=%s, file=%s", adf_type, file_path)
             
             # 验证 ADF 和 EF ID 是否为空
@@ -786,7 +825,6 @@ class SimEditorUI(QMainWindow):
                 return
             
             with self.comm_lock:
-                force_raw = self.raw_checkbox.isChecked()
                 data = self.sim_service.read_data(adf_type, file_path, save_single=True, force_raw=force_raw)
 
                 if isinstance(data, str) and data.startswith("error"):
@@ -810,7 +848,14 @@ class SimEditorUI(QMainWindow):
             logging.error(error_msg)
             self.show_message.emit("error", error_msg)
         finally:
-            QTimer.singleShot(0, self.close_progress_dialog)
+            # worker 线程不直接操作 UI
+            self.progress_close.emit()
+
+    @pyqtSlot(int)
+    def _on_progress_update(self, value: int):
+        """主线程更新进度对话框"""
+        if hasattr(self, 'progress_dialog') and self.progress_dialog:
+            self.progress_dialog.setValue(value)
 
     def display_read_data(self, data):
         """将读取到的数据展示到表格"""
@@ -1034,7 +1079,8 @@ class SimEditorUI(QMainWindow):
             logging.error(error_msg)
             self.show_message.emit("error", str(e))
         finally:
-            QTimer.singleShot(0, self.close_progress_dialog)
+            # worker 线程不直接操作 UI
+            self.progress_close.emit()
 
     def get_input_values(self):
         """获取写入区域里的所有输入值"""
@@ -1179,6 +1225,66 @@ class SimEditorUI(QMainWindow):
             QMessageBox.warning(self, "Error", f"Failed to load JSON: {str(e)}")
             return
 
+        # ===== JSON raw_data / Raw模式一致性校验（仅 UI 模式；CLI 不受影响）=====
+        force_raw = self.raw_checkbox.isChecked()
+
+        def _scan_raw_keys(data: dict):
+            """返回 (has_raw_data, has_non_raw_data)"""
+            has_raw = False
+            has_non_raw = False
+            try:
+                ef_list_local = data.get("EF_list", [])
+                for ef_obj in ef_list_local if isinstance(ef_list_local, list) else []:
+                    records = ef_obj.get("records", [])
+                    if not isinstance(records, list):
+                        continue
+                    for rec in records:
+                        if not isinstance(rec, dict):
+                            continue
+                        if "raw_data" in rec:
+                            has_raw = True
+                        # 只要存在任意非 raw_data 字段，就算“非 raw”
+                        for k in rec.keys():
+                            if k != "raw_data":
+                                has_non_raw = True
+                                break
+                        if has_raw and has_non_raw:
+                            return True, True
+            except Exception:
+                pass
+            return has_raw, has_non_raw
+
+        has_raw_data, has_non_raw_data = _scan_raw_keys(json_data)
+
+        # 1) 未勾选 raw，但 JSON 包含 raw_data：提示用户是否继续
+        if (not force_raw) and has_raw_data:
+            ret = QMessageBox.question(
+                self,
+                "Raw 模式提示",
+                "检测到 JSON 中包含字段：raw_data\n"
+                "但当前未勾选 Raw 模式。\n\n"
+                "继续将按“字段解析”方式写入，raw_data 可能无法按预期生效。\n"
+                "是否继续？",
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.No
+            )
+            if ret != QMessageBox.Yes:
+                return
+
+        # 2) 勾选 raw，但 JSON 存在非 raw_data 字段：提示用户是否继续
+        if force_raw and has_non_raw_data:
+            ret = QMessageBox.question(
+                self,
+                "Raw 模式提示",
+                "当前已勾选 Raw 模式，但检测到 JSON records 中存在非 raw_data 字段。\n\n"
+                "继续将按 Raw 模式写入（只认 raw_data），其他字段将不会按解析字段写入。\n"
+                "是否继续？",
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.No
+            )
+            if ret != QMessageBox.Yes:
+                return
+
         # 创建进度对话框，显示具体进度
         self.progress_dialog = QProgressDialog("Writing JSON to SIM...", None, 0, total_files, self)
         self.progress_dialog.setWindowTitle("Please Wait")
@@ -1189,11 +1295,10 @@ class SimEditorUI(QMainWindow):
         QApplication.processEvents()
 
         # 后台线程加载 JSON
-        self.executor.submit(self.load_json_async, json_file)
+        self.executor.submit(self.load_json_async, json_file, force_raw, total_files)
 
-    def load_json_async(self, json_file):
+    def load_json_async(self, json_file: str, force_raw: bool, total_files: int):
         """后台解析并写入 JSON"""
-        force_raw = self.raw_checkbox.isChecked()
         try:
             # 检查连接状态
             is_connected, msg = self.check_connection_before_operation()
@@ -1206,12 +1311,16 @@ class SimEditorUI(QMainWindow):
                 # 读取 JSON 文件获取总文件数
                 with open(json_file, "r", encoding="utf-8") as f:
                     json_data = json.load(f)
-                total_files = len(json_data["EF_list"])
+                try:
+                    total_files = len(json_data["EF_list"])
+                except Exception:
+                    # 回退使用主线程的 total_files
+                    pass
                 
                 # 定义进度回调函数
                 def update_progress(current):
-                    self.progress_dialog.setValue(current)
-                    QApplication.processEvents()
+                    # worker 线程仅发信号，由主线程更新 UI
+                    self.progress_update.emit(current)
                 
                 # 执行写入操作，传入进度回调
                 result = self.sim_service.load_and_write_from_json(json_file, progress_callback=update_progress, force_raw=force_raw)
@@ -1219,7 +1328,7 @@ class SimEditorUI(QMainWindow):
 
             if result == "success":
                 # 更新进度到100%
-                self.progress_dialog.setValue(total_files)
+                self.progress_update.emit(total_files)
                 # 发射成功信号
                 self.json_load_done.emit(True, "JSON data written successfully.")
             else:
@@ -1227,8 +1336,8 @@ class SimEditorUI(QMainWindow):
         except Exception as e:
             self.json_load_done.emit(False, str(e))
         finally:
-            # 关闭进度对话框
-            QTimer.singleShot(0, self.close_progress_dialog)
+            # worker 线程不直接操作 UI
+            self.progress_close.emit()
 
     # 4) 主线程中处理信号，弹出框
     def on_json_load_done(self, is_success, message):

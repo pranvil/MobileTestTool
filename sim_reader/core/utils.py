@@ -192,7 +192,9 @@ def handle_exception(func):
             error_message = f"Error in {func.__name__}: {e}"
             logging.error(error_message)
             logging.error(traceback.format_exc())  # 记录完整的异常堆栈信息
-            return None
+            # 避免返回 None 导致上层出现 'in' / '.startswith' 等二次异常，
+            # 统一返回可识别的 error 字符串，便于业务层判断与重试。
+            return f"error: {func.__name__} exception => {e}"
     return wrapper
 
 

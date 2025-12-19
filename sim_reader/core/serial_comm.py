@@ -6,6 +6,7 @@ import logging
 from PyQt5.QtWidgets import QMessageBox
 from core.utils import handle_exception
 from threading import Lock
+from typing import Tuple
   
 
 class SerialComm:
@@ -29,7 +30,28 @@ class SerialComm:
             self._io_lock = Lock()
             self.busy = False
             self._last_tx = 0
+            self._consecutive_timeouts = 0
+            # AT 命令最小间隔（RX -> 下一次 TX），用于缓解部分模组/SIM在 OK 后的“收尾时间”
+            self._min_command_gap_ms = 0
+            self._last_rx_mono = 0.0
             self.initialized = False
+
+    def set_min_command_gap_ms(self, ms: int):
+        """设置 AT 命令最小间隔（毫秒）。0 表示不做节流。"""
+        try:
+            ms_int = int(ms)
+        except Exception:
+            ms_int = 0
+        if ms_int < 0:
+            ms_int = 0
+        # 上限做个保护，避免误配导致“看起来卡死”
+        if ms_int > 10_000:
+            ms_int = 10_000
+        self._min_command_gap_ms = ms_int
+        logging.info("[AT][CFG] min_command_gap_ms=%d", self._min_command_gap_ms)
+
+    def get_min_command_gap_ms(self) -> int:
+        return int(getattr(self, "_min_command_gap_ms", 0) or 0)
 
     def initialize(self, show_popup=True) -> bool:
         """
@@ -154,10 +176,23 @@ class SerialComm:
             return False
 
     @handle_exception
-    def send_command(self, command: str):
+    def send_command(
+        self,
+        command: str,
+        *,
+        wait_timeout_s: float = 2.2,
+        max_retries: int = 1,
+        retry_backoff_s: float = 0.2,
+        reconnect_on_fail: bool = True
+    ):
         """
         发送 AT 命令并返回响应。
         内部使用互斥锁 + busy 标志，确保与健康探测不冲突。
+
+        可靠性策略：
+        - 若在 wait_timeout_s 内未收到 OK/ERROR：返回明确的 error: timeout
+        - 对“读类/查询类”指令允许重发（max_retries）
+        - 对“写类 APDU”默认不重发，避免非幂等导致的不确定写入；只尝试重连后返回错误
         """
         with self._io_lock:          # ***** 串口访问全程互斥 *****
             self.busy = True
@@ -166,80 +201,211 @@ class SerialComm:
                     logging.error("串口未打开，无法发送命令")
                     return "error: serial port not opened"
 
-                # 清空残留数据并发送
-                # self.ser.reset_input_buffer()
-                self.ser.write((command + '\r\n').encode())
-                time.sleep(0.1)
+                is_write_like = self._is_write_like_command(command)
+                retries_allowed = (not is_write_like)
 
-                # === 读取响应（保留你原来的 max_attempts 逻辑） ===
-                max_attempts = 20
                 attempt = 0
-                raw_response = ""
-
-                while attempt < max_attempts:
-                    time.sleep(0.1)
-                    chunk = self.ser.read_all().decode('utf-8', errors='ignore')
-                    if chunk:
-                        raw_response += chunk
-                        # 一旦看到 OK/ERROR 就结束
-                        if "OK" in chunk or "ERROR" in chunk:
-                            break
+                while True:
                     attempt += 1
-                    logging.debug("等待响应，尝试次数: %d/%d", attempt, max_attempts)
 
-                logging.debug("发送命令: %s", command)
-                logging.debug("原始响应: %s", raw_response)
+                    # 轻量恢复：清掉残留数据，避免上一次的回包污染本次解析
+                    self._reset_buffers_safely()
 
-                # === 提取有效数据（沿用旧正则） ===
-                pattern = r'\+(?:CGLA|CSIM): \d+,"([0-9A-Fa-f]+)"'
-                match = re.search(pattern, raw_response)
-                if match:
-                    response = match.group(1)
-                    # 处理 61xx 继续读取的场景
-                    if response.startswith("61") and len(response) == 4:
-                        add_len_hex = response[2:]  # 两位 16 进制长度
+                    try:
+                        # === 命令节流：保证 RX -> 下一次 TX 至少间隔 N ms ===
+                        gap_ms = self.get_min_command_gap_ms()
+                        if gap_ms > 0 and self._last_rx_mono:
+                            now = time.monotonic()
+                            delta_ms = int((now - self._last_rx_mono) * 1000)
+                            sleep_ms = gap_ms - delta_ms
+                            if sleep_ms > 0:
+                                time.sleep(sleep_ms / 1000.0)
+                                logging.debug("[AT][GAP] sleep_ms=%d", sleep_ms)
 
-                        # 判断主命令 payload 前缀是 01 还是 00
-                        # match_cgla_data = re.search(r'AT\+CGLA=\d+,\d+,"([0-9A-Fa-f]+)"', command)
-                        match_cgla_data = re.search(r'AT\+CSIM=\d+,"([0-9A-Fa-f]+)"', command)
-                        if match_cgla_data:
-                            payload = match_cgla_data.group(1)
-                            if payload.startswith("01"):
-                                add_cmd = f'AT+CSIM=10,"01C00000{add_len_hex}"'
+                        tx_t0 = time.monotonic()
+                        # TX 日志必须在 write 之前/附近打印，保证时间戳代表“真实发送时刻”
+                        logging.debug("[AT][TX] %s", command)
+                        self.ser.write((command + "\r\n").encode())
+                    except Exception as e:
+                        logging.error("串口写入失败: %s", e)
+                        if reconnect_on_fail:
+                            self._reconnect_locked(reason=f"serial write failed: {e}")
+                        if attempt <= max_retries and retries_allowed:
+                            time.sleep(retry_backoff_s * attempt)
+                            continue
+                        return f"error: serial write failed => {e}"
+
+                    # 读取响应直到 OK/ERROR 或超时
+                    raw_response, complete, polls = self._read_until_ok_error(wait_timeout_s)
+                    rx_t1 = time.monotonic()
+                    elapsed_ms = int((rx_t1 - tx_t0) * 1000)
+                    # 记录“最后一次 RX 完成时刻”，用于下一条命令节流
+                    self._last_rx_mono = rx_t1
+                    # RX 日志：时间戳代表“真实接收完成时刻”；内容尽量单行，避免多行造成“重复打印”的错觉
+                    logging.debug(
+                        "[AT][RX] ok=%s elapsed_ms=%d polls=%d resp=%r",
+                        complete, elapsed_ms, polls, raw_response
+                    )
+
+                    if not complete:
+                        self._consecutive_timeouts += 1
+                        logging.warning(
+                            "等待响应超时: attempt=%d/%d, write_like=%s, consecutive_timeouts=%d",
+                            attempt, max_retries + 1, is_write_like, self._consecutive_timeouts
+                        )
+
+                        # 对写类指令：不重发，最多重连一次然后返回错误（让上层做 read-back/校验）
+                        if reconnect_on_fail and (is_write_like or self._consecutive_timeouts >= 2):
+                            self._reconnect_locked(reason="timeout waiting OK/ERROR")
+
+                        if attempt <= max_retries and retries_allowed:
+                            time.sleep(retry_backoff_s * attempt)
+                            continue
+
+                        return f"error: timeout waiting response ({attempt}/{max_retries + 1})"
+
+                    # 收到了 OK/ERROR，认为链路恢复
+                    self._consecutive_timeouts = 0
+
+                    # === 提取有效数据（沿用旧正则） ===
+                    pattern = r'\+(?:CGLA|CSIM): \d+,"([0-9A-Fa-f]+)"'
+                    match = re.search(pattern, raw_response)
+                    if match:
+                        response = match.group(1)
+                        # 处理 61xx 继续读取的场景（GET RESPONSE，本质是读类）
+                        if response.startswith("61") and len(response) == 4:
+                            add_len_hex = response[2:]  # 两位 16 进制长度
+
+                            match_cgla_data = re.search(r'AT\+CSIM=\d+,"([0-9A-Fa-f]+)"', command)
+                            if match_cgla_data:
+                                payload = match_cgla_data.group(1)
+                                if payload.startswith("01"):
+                                    add_cmd = f'AT+CSIM=10,"01C00000{add_len_hex}"'
+                                else:
+                                    add_cmd = f'AT+CSIM=10,"00C00000{add_len_hex}"'
                             else:
+                                logging.warning("未能提取 CSIM payload，GET RESPONSE 默认使用00开头")
                                 add_cmd = f'AT+CSIM=10,"00C00000{add_len_hex}"'
-                        else:
-                            # 回退默认使用00（保底处理）
-                            logging.warning("未能提取 CGLA payload，默认使用00开头")
-                            add_cmd = f'AT+CSIM=10,"00C00000{add_len_hex}"'
-                        logging.debug("二次发送命令: %s, %s", command, add_cmd)
-                        self.ser.write((add_cmd + '\r\n').encode())
 
-                        # 3) 循环读取，直到收齐 “OK/ERROR” 为止（最久 2 s）
-                        add_raw = ""
-                        for _ in range(20):                 # 20 × 0.1 s = 2 s
-                            time.sleep(0.1)
-                            chunk = self.ser.read_all().decode('utf-8', errors='ignore')
-                            if chunk:
-                                add_raw += chunk
-                                if "OK" in chunk or "ERROR" in chunk:
-                                    break
+                            logging.debug("二次发送 GET RESPONSE: %s", add_cmd)
 
-                        logging.debug("二次 GET RESPONSE 原始: %s", add_raw)
+                            self._reset_buffers_safely()
+                            tx2_t0 = time.monotonic()
+                            logging.debug("[AT][TX] %s", add_cmd)
+                            self.ser.write((add_cmd + "\r\n").encode())
+                            add_raw, add_complete, add_polls = self._read_until_ok_error(wait_timeout_s)
+                            tx2_t1 = time.monotonic()
+                            add_elapsed_ms = int((tx2_t1 - tx2_t0) * 1000)
+                            logging.debug(
+                                "[AT][RX] ok=%s elapsed_ms=%d polls=%d resp=%r",
+                                add_complete, add_elapsed_ms, add_polls, add_raw
+                            )
 
-                        # 4) 提取真正数据
-                        add_match = re.search(pattern, add_raw)
-                        if add_match:
-                            response = add_match.group(1)
-                        else:
-                            logging.error("[61xx] GET RESPONSE 未匹配到数据，收到: %s", add_raw)
-                            response = f"error: GET RESPONSE failed ({add_raw.strip()})"
-                else:
-                    response = raw_response.strip()
-                return response
+                            if not add_complete:
+                                if reconnect_on_fail:
+                                    self._reconnect_locked(reason="timeout waiting GET RESPONSE")
+                                return "error: timeout waiting GET RESPONSE"
+
+                            add_match = re.search(pattern, add_raw)
+                            if add_match:
+                                response = add_match.group(1)
+                            else:
+                                logging.error("[61xx] GET RESPONSE 未匹配到数据，收到: %s", add_raw)
+                                response = f"error: GET RESPONSE failed ({add_raw.strip()})"
+                        return response
+
+                    # 非 +CSIM/+CGLA 场景（例如 AT），原样返回
+                    return raw_response.strip()
             finally:
                 self._last_tx = time.time()   # ★ 先记录业务完成时刻
                 self.busy = False     # ***** 无论成功失败都要复位 *****
+
+    def _reset_buffers_safely(self):
+        """尽力清空串口缓冲，避免旧回包污染；失败也不影响主流程。"""
+        try:
+            if self.ser:
+                self.ser.reset_input_buffer()
+                self.ser.reset_output_buffer()
+        except Exception:
+            pass
+
+    def _read_until_ok_error(self, wait_timeout_s: float) -> Tuple[str, bool, int]:
+        """
+        在 wait_timeout_s 内读取串口，直到回包中出现 OK 或 ERROR。
+        Returns:
+            (raw_response, complete, polls)
+        """
+        raw_response = ""
+        deadline = time.monotonic() + max(0.1, float(wait_timeout_s))
+        attempt = 0
+        while time.monotonic() < deadline:
+            attempt += 1
+            time.sleep(0.1)
+            try:
+                chunk = self.ser.read_all().decode("utf-8", errors="ignore")
+            except Exception:
+                chunk = ""
+            if chunk:
+                raw_response += chunk
+                if "OK" in chunk or "ERROR" in chunk or "OK\r" in raw_response or "ERROR\r" in raw_response:
+                    return raw_response, True, attempt
+            # 注意：这里不再每轮打印“等待响应”，避免日志刷屏/重复感
+        return raw_response, False, attempt
+
+    def _is_write_like_command(self, command: str) -> bool:
+        """
+        粗略判断是否为“写类/非幂等”指令：
+        - AT+CSIM/AT+CGLA 内的 APDU INS 属于 UPDATE/WRITE 类
+        """
+        try:
+            m = re.search(r'AT\+(?:CSIM|CGLA)=[^"]*"([0-9A-Fa-f]+)"', command)
+            if not m:
+                return False
+            apdu_hex = m.group(1)
+            if len(apdu_hex) < 4:
+                return False
+            ins = apdu_hex[2:4].upper()
+            # 常见写类 INS：D6(UPDATE BINARY), DC(UPDATE RECORD), E2(ERASE BINARY, 少见), D0/DA(WRITE)
+            return ins in {"D6", "DC", "E2", "D0", "DA"}
+        except Exception:
+            return False
+
+    def _reconnect_locked(self, reason: str = "") -> bool:
+        """
+        在已持有 _io_lock 的前提下重连。
+        策略：优先重开当前 port；失败再扫描 _find_port()。
+        """
+        logging.warning("触发串口重连: %s", reason)
+        try:
+            if self.ser and self.ser.is_open:
+                try:
+                    self.ser.close()
+                except Exception:
+                    pass
+            time.sleep(0.2)
+            # 重连后重置节流参考点
+            self._last_rx_mono = 0.0
+
+            # 优先重开当前端口
+            if self.port:
+                try:
+                    self.ser = serial.Serial(port=self.port, baudrate=self.baudrate, timeout=self.timeout)
+                    logging.info("串口重开成功: %s", self.port)
+                    return True
+                except Exception as e:
+                    logging.warning("串口重开失败(%s)，将尝试重新扫描: %s", self.port, e)
+
+            new_port = self._find_port()
+            if "error" in new_port:
+                logging.error("重连失败：未找到可用AT端口")
+                return False
+            self.port = new_port
+            self.ser = serial.Serial(port=self.port, baudrate=self.baudrate, timeout=self.timeout)
+            logging.info("串口重连成功: %s", self.port)
+            return True
+        except Exception as e:
+            logging.error("串口重连异常: %s", e)
+            return False
         
 
             
@@ -249,18 +415,11 @@ class SerialComm:
         Raises:
             Exception: 当未找到可用AT端口时抛出异常
         """
-        logging.info("正在尝试重新建立串口连接...")
-        if self.ser and self.ser.is_open:
-            self.ser.close()
-            logging.info("已关闭当前串口连接")
-
-        new_port = self._find_port()
-        if "error" in new_port:
-            raise Exception("未找到可用的AT串口设备")
-        
-        self.port = new_port
-        self.ser = serial.Serial(port=self.port, baudrate=115200, timeout=1)
-        logging.info("串口重连成功: %s", self.port)
+        # 注意：对外接口需要自己持锁，避免与 send_command 并发
+        with self._io_lock:
+            ok = self._reconnect_locked(reason="manual reconnect() called")
+            if not ok:
+                raise Exception("未找到可用的AT串口设备")
     
     def close(self):
         """关闭串口连接"""
