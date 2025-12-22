@@ -114,7 +114,7 @@ class DraggableCustomButton(QPushButton):
     def contextMenuEvent(self, event):
         """右键：显示自定义按钮菜单（不显示卡片右键菜单）"""
         try:
-            from PyQt5.QtWidgets import QDialog, QMenu
+            from PyQt5.QtWidgets import QDialog, QMenu, QMessageBox
             from ui.custom_button_dialog import ButtonEditDialog
 
             main_window = getattr(self.container, "main_window", None)
@@ -128,6 +128,7 @@ class DraggableCustomButton(QPushButton):
 
             menu = QMenu(self)
             edit_action = menu.addAction(main_window.tr("编辑"))
+            delete_action = menu.addAction(main_window.tr("删除"))
             chosen = menu.exec_(event.globalPos())
             if chosen == edit_action:
                 dialog = ButtonEditDialog(
@@ -138,11 +139,25 @@ class DraggableCustomButton(QPushButton):
                 if dialog.exec_() == QDialog.Accepted:
                     new_data = dialog.get_button_data()
                     main_window.custom_button_manager.update_button(button_id, new_data)
+            elif chosen == delete_action:
+                button_name = current_data.get('name', '')
+                reply = QMessageBox.question(
+                    main_window,
+                    main_window.tr("确认删除"),
+                    f"{main_window.tr('确定要删除按钮')} '{button_name}' {main_window.tr('吗？')}",
+                    QMessageBox.Yes | QMessageBox.No,
+                    QMessageBox.No
+                )
+                if reply == QMessageBox.Yes:
+                    if main_window.custom_button_manager.delete_button(button_id):
+                        QMessageBox.information(main_window, main_window.tr("成功"), main_window.tr("按钮删除成功！"))
+                    else:
+                        QMessageBox.warning(main_window, main_window.tr("失败"), main_window.tr("按钮删除失败，请检查日志"))
         except Exception as e:
             try:
-                logger.exception(f"{getattr(self.container, 'main_window', None).tr('编辑自定义按钮失败:') if getattr(self.container, 'main_window', None) else '编辑自定义按钮失败:'} {e}")
+                logger.exception(f"{getattr(self.container, 'main_window', None).tr('操作自定义按钮失败:') if getattr(self.container, 'main_window', None) else '操作自定义按钮失败:'} {e}")
             except Exception:
-                logger.exception(f"编辑自定义按钮失败: {e}")
+                logger.exception(f"操作自定义按钮失败: {e}")
         finally:
             # 一定要吞掉事件，避免冒泡到 card_frame 触发卡片右键菜单
             try:
@@ -1736,6 +1751,17 @@ class MainWindow(QMainWindow):
             logger.exception(f"{self.tr('查找自定义Card失败:')} {e}")
             return None
     
+    def _find_custom_card_id_by_name_and_tab(self, card_name, tab_id):
+        """根据Card名称和Tab ID查找自定义Card的ID"""
+        try:
+            for card in self.tab_config_manager.custom_cards:
+                if card['name'] == card_name and card.get('tab_id') == tab_id:
+                    return card.get('id')
+            return None
+        except Exception as e:
+            logger.exception(f"{self.tr('查找自定义Card ID失败:')} {e}")
+            return None
+    
     def _get_card_name_from_frame_simple(self, card_frame, tab_widget):
         """简单方法：从card frame获取card名称（用于初始化时存储）"""
         try:
@@ -1945,6 +1971,22 @@ class MainWindow(QMainWindow):
                     lambda: self._add_card_from_context(tab_id)
                 )
                 menu.addAction(add_card_action)
+                
+                # 检查是否为自定义Card，如果是则添加编辑和删除选项
+                card_id = self._find_custom_card_id_by_name_and_tab(card_name, tab_id)
+                if card_id:
+                    menu.addSeparator()
+                    edit_card_action = QAction(self.tr("编辑Card"), self)
+                    edit_card_action.triggered.connect(
+                        lambda: self._edit_card_from_context(card_id)
+                    )
+                    menu.addAction(edit_card_action)
+                    
+                    delete_card_action = QAction(self.tr("删除Card"), self)
+                    delete_card_action.triggered.connect(
+                        lambda: self._delete_card_from_context(card_id, card_name)
+                    )
+                    menu.addAction(delete_card_action)
             
             # 显示菜单
             menu.exec_(card_frame.mapToGlobal(position))
@@ -1994,6 +2036,48 @@ class MainWindow(QMainWindow):
                 self.tab_config_manager.tab_config_updated.emit()
         except Exception as e:
             logger.exception(f"{self.tr('从右键菜单添加Card失败:')} {e}")
+    
+    def _edit_card_from_context(self, card_id):
+        """从右键菜单编辑card"""
+        try:
+            from ui.tab_manager_dialog import CustomCardDialog
+            from PyQt5.QtWidgets import QDialog, QMessageBox
+            
+            # 打开Card对话框，编辑现有card
+            dialog = CustomCardDialog(
+                self.tab_config_manager,
+                card_id=card_id,
+                parent=self
+            )
+            if dialog.exec_() == QDialog.Accepted:
+                # 刷新tab显示
+                self.tab_config_manager.tab_config_updated.emit()
+                QMessageBox.information(self, self.tr("成功"), self.tr("Card已更新"))
+        except Exception as e:
+            logger.exception(f"{self.tr('从右键菜单编辑Card失败:')} {e}")
+    
+    def _delete_card_from_context(self, card_id, card_name):
+        """从右键菜单删除card"""
+        try:
+            from PyQt5.QtWidgets import QMessageBox
+            
+            reply = QMessageBox.question(
+                self,
+                self.tr("确认删除"),
+                f"{self.tr('确定要删除Card')} '{card_name}' {self.tr('吗？')}",
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.No
+            )
+            
+            if reply == QMessageBox.Yes:
+                if self.tab_config_manager.delete_custom_card(card_id):
+                    # 刷新tab显示
+                    self.tab_config_manager.tab_config_updated.emit()
+                    QMessageBox.information(self, self.tr("成功"), self.tr("Card已删除"))
+                else:
+                    QMessageBox.warning(self, self.tr("失败"), self.tr("Card删除失败，请检查日志"))
+        except Exception as e:
+            logger.exception(f"{self.tr('从右键菜单删除Card失败:')} {e}")
     
     def _setup_preset_tab_card_context_menus(self):
         """为所有预置Tab的card统一添加右键菜单"""

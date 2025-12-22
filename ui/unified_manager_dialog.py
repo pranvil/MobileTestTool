@@ -895,7 +895,8 @@ class UnifiedManagerDialog(QDialog):
                             'python': self.tr('Python脚本'),
                             'file': self.tr('打开文件'),
                             'program': self.tr('运行程序'),
-                            'system': self.tr('系统命令')
+                            'system': self.tr('系统命令'),
+                            'url': self.tr('打开网页')
                         }
                         value = type_map.get(button_type, self.tr('ADB命令'))
                     elif col_idx == 3:  # Tab
@@ -962,7 +963,8 @@ class UnifiedManagerDialog(QDialog):
                             'python': self.tr('Python脚本'),
                             'file': self.tr('打开文件'),
                             'program': self.tr('运行程序'),
-                            'system': self.tr('系统命令')
+                            'system': self.tr('系统命令'),
+                            'url': self.tr('打开网页')
                         }
                         value = type_map.get(button_type, self.tr('ADB命令'))
                     elif col_idx == 3:  # Tab
@@ -1025,7 +1027,8 @@ class UnifiedManagerDialog(QDialog):
                             'python': self.tr('Python脚本'),
                             'file': self.tr('打开文件'),
                             'program': self.tr('运行程序'),
-                            'system': self.tr('系统命令')
+                            'system': self.tr('系统命令'),
+                            'url': self.tr('打开网页')
                         }
                         search_texts.append(type_map.get(button_type, ''))
                         
@@ -1044,7 +1047,8 @@ class UnifiedManagerDialog(QDialog):
                                 'python': self.tr('Python脚本'),
                                 'file': self.tr('打开文件'),
                                 'program': self.tr('运行程序'),
-                                'system': self.tr('系统命令')
+                                'system': self.tr('系统命令'),
+                                'url': self.tr('打开网页')
                             }
                             search_text = type_map.get(button_type, '')
                         elif scope_index == 3:  # 命令
