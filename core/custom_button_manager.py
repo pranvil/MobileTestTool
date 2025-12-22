@@ -982,6 +982,8 @@ class CustomButtonManager(QObject):
             import sys
             import os
             import threading
+            import time
+            from collections import deque
             
             # 在脚本开头注入设备ID和u2.connect包装（如果提供）
             # 这样脚本可以使用 DEVICE_ID 变量，并且 u2.connect() 会自动使用设备ID
@@ -1012,16 +1014,107 @@ except ImportError:
             
             try:
                 # 获取Python解释器路径
-                python_exe = sys.executable
+                # 注意：在 PyInstaller 打包后的 EXE（frozen）中，sys.executable 指向本 EXE，
+                # 若直接用它执行临时 .py，会导致“再启动一个主程序”的错误行为。
+                def _is_frozen():
+                    return bool(getattr(sys, 'frozen', False)) and hasattr(sys, '_MEIPASS')
+                
+                def _check_python_cmd(cmd):
+                    """快速检查命令是否可用（只验证能输出版本即可）"""
+                    try:
+                        r = subprocess.run(
+                            [cmd, '--version'],
+                            capture_output=True,
+                            text=True,
+                            timeout=2,
+                            creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0
+                        )
+                        return r.returncode == 0
+                    except Exception:
+                        return False
+                
+                def _pick_system_python():
+                    # 1) 环境变量 PYTHON
+                    env_py = os.environ.get('PYTHON')
+                    if env_py and os.path.exists(env_py):
+                        return env_py
+                    
+                    # 2) PATH 中 python / pythonw / python3
+                    for candidate in ('python', 'pythonw', 'python3'):
+                        if _check_python_cmd(candidate):
+                            return candidate
+                    
+                    # 3) 常见安装路径（Windows）
+                    common_paths = [
+                        r'C:\Python39\python.exe',
+                        r'C:\Python310\python.exe',
+                        r'C:\Python311\python.exe',
+                        r'C:\Python312\python.exe',
+                        r'C:\Program Files\Python39\python.exe',
+                        r'C:\Program Files\Python310\python.exe',
+                        r'C:\Program Files\Python311\python.exe',
+                        r'C:\Program Files\Python312\python.exe',
+                    ]
+                    username = os.getenv('USERNAME', '')
+                    if username:
+                        common_paths.extend([
+                            rf'C:\Users\{username}\AppData\Local\Programs\Python\Python39\python.exe',
+                            rf'C:\Users\{username}\AppData\Local\Programs\Python\Python310\python.exe',
+                            rf'C:\Users\{username}\AppData\Local\Programs\Python\Python311\python.exe',
+                            rf'C:\Users\{username}\AppData\Local\Programs\Python\Python312\python.exe',
+                        ])
+                    for p in common_paths:
+                        if os.path.exists(p):
+                            return p
+                    
+                    return None
+                
+                if _is_frozen():
+                    python_exe = _pick_system_python()
+                    if not python_exe:
+                        return False, self.lang_manager.tr(
+                            "在打包环境中无法找到Python解释器。请确保系统已安装Python，并确保 `python --version` 可用，"
+                            "或设置 PYTHON 环境变量指向 python.exe。"
+                        )
+                else:
+                    python_exe = sys.executable
                 
                 # 在独立进程中运行脚本
                 # 使用CREATE_NO_WINDOW标志（Windows）避免显示控制台窗口
                 creation_flags = 0
                 if hasattr(subprocess, 'CREATE_NO_WINDOW'):
                     creation_flags = subprocess.CREATE_NO_WINDOW
+
+                # 捕获子进程输出（为避免缓冲区塞满导致阻塞，启动守护线程持续读取，并保留最近一段内容用于报错展示）
+                stdout_buf = deque(maxlen=200)
+                stderr_buf = deque(maxlen=200)
                 
+                def _drain_stream(stream, buf_deque, level='debug'):
+                    try:
+                        for line in iter(stream.readline, ''):
+                            if line is None:
+                                break
+                            s = line.rstrip('\r\n')
+                            if s:
+                                buf_deque.append(s)
+                                try:
+                                    if level == 'error':
+                                        logger.error(f"[GUI子进程] {s}")
+                                    else:
+                                        logger.debug(f"[GUI子进程] {s}")
+                                except Exception:
+                                    pass
+                    except Exception:
+                        # 不影响主流程
+                        pass
+                    finally:
+                        try:
+                            stream.close()
+                        except Exception:
+                            pass
+
                 process = subprocess.Popen(
-                    [python_exe, script_path],
+                    [python_exe, '-u', script_path],
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE,
                     text=True,
@@ -1029,6 +1122,14 @@ except ImportError:
                     errors='replace',
                     creationflags=creation_flags
                 )
+
+                # 启动输出读取线程，避免 PIPE 缓冲区塞满
+                if process.stdout:
+                    t_out = threading.Thread(target=_drain_stream, args=(process.stdout, stdout_buf, 'debug'), daemon=True)
+                    t_out.start()
+                if process.stderr:
+                    t_err = threading.Thread(target=_drain_stream, args=(process.stderr, stderr_buf, 'error'), daemon=True)
+                    t_err.start()
                 
                 # ✅ 新增：保存进程引用
                 if not hasattr(self, '_gui_processes'):
@@ -1059,6 +1160,31 @@ except ImportError:
                 monitor_thread.start()
                 
                 logger.debug(f"GUI进程已启动，PID: {process.pid}，当前跟踪的GUI进程数: {len(self._gui_processes)}")
+
+                # 若子进程很快退出（常见于解释器/依赖/语法错误），立刻回显 stderr，避免只显示“已启动”
+                try:
+                    time.sleep(0.3)
+                    rc = process.poll()
+                    if rc is not None:
+                        stdout_text = "\n".join(list(stdout_buf)[-50:])
+                        stderr_text = "\n".join(list(stderr_buf)[-50:])
+                        detail = []
+                        if stdout_text.strip():
+                            detail.append(f"{self.lang_manager.tr('输出:')}\n{stdout_text}")
+                        if stderr_text.strip():
+                            detail.append(f"{self.lang_manager.tr('错误:')}\n{stderr_text}")
+                        detail_text = "\n\n".join(detail).strip()
+                        if not detail_text:
+                            detail_text = self.lang_manager.tr("无可用输出（可能被安全策略拦截或进程在初始化前退出）")
+                        return False, (
+                            f"{self.lang_manager.tr('GUI脚本启动后立即退出')} (exit={rc})\n"
+                            f"{self.lang_manager.tr('解释器:')} {python_exe}\n"
+                            f"{self.lang_manager.tr('临时脚本:')} {script_path}\n\n"
+                            f"{detail_text}"
+                        )
+                except Exception:
+                    # 不影响正常返回
+                    pass
                 
                 # 不等待进程结束（GUI应用会持续运行）
                 # 返回成功信息

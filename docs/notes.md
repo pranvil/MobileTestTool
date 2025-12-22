@@ -1,8 +1,7 @@
 
 ## Release Note
-- fix crash issue when batch write EF file
-- add feature to set interval between AT command
-- Before batch write file validate the json file
+- fix customize button run python script issue
+- add delete button option from right click menu
 
 
 
