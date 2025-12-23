@@ -302,6 +302,7 @@ class ATCommandDialog(QDialog):
         self.commands_table.setSelectionBehavior(QTableWidget.SelectRows)
         self.commands_table.setContextMenuPolicy(Qt.CustomContextMenu)
         self.commands_table.customContextMenuRequested.connect(self.show_context_menu)
+        self.commands_table.cellClicked.connect(self.on_command_clicked)
         self.commands_table.cellDoubleClicked.connect(self.on_command_double_clicked)
         self.commands_table.verticalHeader().setVisible(False)
         commands_container.addWidget(self.commands_table)
@@ -420,6 +421,18 @@ class ATCommandDialog(QDialog):
         worker = ATCommandWorker(port, command, parent=self)
         worker.output.connect(self.append_output)
         worker.start()
+    
+    def on_command_clicked(self, row, column):
+        """单击命令时将其填入输入框"""
+        if row < 0 or row >= len(self.at_commands):
+            return
+        
+        command = self.at_commands[row]["command"]
+        self.command_input.setText(command)
+        # 将焦点设置到输入框，方便用户直接修改
+        self.command_input.setFocus()
+        # 选中所有文本，方便用户直接输入替换
+        self.command_input.selectAll()
     
     def on_command_double_clicked(self, row, column):
         """双击命令时直接发送"""
