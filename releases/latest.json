@@ -1,28 +1,28 @@
 {
-    "version":  "0.9.6.5.3",
-    "download_url":  "https://github.com/pranvil/MobileTestTool/releases/download/v0.9.6.5.3/MobileTestTool_0.9.6.5.3.zip",
-    "sha256":  "5fbaf344061f16a5435b00b110f2e4663665babd25786a45e9b5013bf5d64108",
-    "file_name":  "MobileTestTool_0.9.6.5.3.zip",
-    "file_size":  101705330,
-    "release_notes":  "## Release Note\n- fix crash issue when batch write EF file\n- add feature to set interval between AT command\n- Before batch write file validate the json file",
-    "published_at":  "2025-12-19T07:58:59Z",
+    "version":  "0.9.6.5.4",
+    "download_url":  "https://github.com/pranvil/MobileTestTool/releases/download/v0.9.6.5.4/MobileTestTool_0.9.6.5.4.zip",
+    "sha256":  "ff943f2b6e7e59c7565e596f9b116aeb323a6ce5bb17153da21517fd44f72319",
+    "file_name":  "MobileTestTool_0.9.6.5.4.zip",
+    "file_size":  101709537,
+    "release_notes":  "## Release Note\n- fix customize button run python script issue\n- add delete button option from right click menu\n- fix button filter issue\n- Optimize AT command tool user experience",
+    "published_at":  "2025-12-23T00:34:39Z",
     "mandatory":  false,
     "download_urls":  [
                           {
                               "region":  "us",
-                              "url":  "https://github.com/pranvil/MobileTestTool/releases/download/v0.9.6.5.3/MobileTestTool_0.9.6.5.3.zip",
+                              "url":  "https://github.com/pranvil/MobileTestTool/releases/download/v0.9.6.5.4/MobileTestTool_0.9.6.5.4.zip",
                               "priority":  10,
                               "platform":  "windows"
                           },
                           {
                               "region":  "cn",
-                              "url":  "https://gitee.com/pranvil/MobileTestTool/releases/download/v0.9.6.5.3/MobileTestTool_0.9.6.5.3.zip",
+                              "url":  "https://gitee.com/pranvil/MobileTestTool/releases/download/v0.9.6.5.4/MobileTestTool_0.9.6.5.4.zip",
                               "priority":  20,
                               "platform":  "windows"
                           },
                           {
                               "region":  "default",
-                              "url":  "https://github.com/pranvil/MobileTestTool/releases/download/v0.9.6.5.3/MobileTestTool_0.9.6.5.3.zip",
+                              "url":  "https://github.com/pranvil/MobileTestTool/releases/download/v0.9.6.5.4/MobileTestTool_0.9.6.5.4.zip",
                               "priority":  5,
                               "platform":  "all"
                           }
