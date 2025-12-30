@@ -510,9 +510,27 @@ function Invoke-GitLabReleaseCreate {
         
         $bodyBytes = [System.Text.Encoding]::UTF8.GetBytes($bodyJson)
         $resp = Invoke-RestMethod -Uri $releasesUrl -Method Post -Headers $headers -Body $bodyBytes -ContentType "application/json; charset=utf-8" -ErrorAction Stop
+        
+        # 调试：打印完整响应
+        Write-Host "GitLab API Response:" -ForegroundColor Gray
+        $resp | ConvertTo-Json -Depth 5 | Write-Host -ForegroundColor Gray
+        Write-Host ""
+        
         Write-Host "GitLab release created successfully!" -ForegroundColor Green
-        Write-Host "Release ID: $($resp.id)" -ForegroundColor Cyan
-        Write-Host "Release URL: $($resp.web_url)" -ForegroundColor Cyan
+        
+        # 尝试多种可能的属性名
+        $releaseId = $resp.id
+        $releaseUrl = $resp.web_url
+        if (-not $releaseUrl) {
+            $releaseUrl = $resp.url
+        }
+        if (-not $releaseUrl) {
+            # 构建 URL
+            $releaseUrl = "$Url/$Owner/$Repo/-/releases/v$Version"
+        }
+        
+        Write-Host "Release ID: $releaseId" -ForegroundColor Cyan
+        Write-Host "Release URL: $releaseUrl" -ForegroundColor Cyan
         
         # 上传文件到 GitLab
         Write-Host "Uploading package file to GitLab..." -ForegroundColor Cyan
@@ -550,6 +568,7 @@ function Invoke-GitLabReleaseCreate {
                         
                         if ($response.IsSuccessStatusCode) {
                             $responseContent = $response.Content.ReadAsStringAsync().Result
+                            Write-Host "Upload API Response: $responseContent" -ForegroundColor Gray
                             $uploadResp = $responseContent | ConvertFrom-Json
                             
                             $uploadedUrl = $uploadResp.url
@@ -557,24 +576,37 @@ function Invoke-GitLabReleaseCreate {
                                 $uploadedUrl = $uploadResp.markdown -replace '\[.*?\]\((.*?)\)', '$1'
                             }
                             
-                            if ($uploadedUrl) {
+                                if ($uploadedUrl) {
                                 if (-not $uploadedUrl.StartsWith("http")) {
                                     $uploadedUrl = "$Url$uploadedUrl"
                                 }
                                 
-                                $assetUrl = "$releasesUrl/v$Version/assets/links"
+                                # 使用正确的 API 端点添加 asset link
+                                # GitLab API: POST /projects/:id/releases/:tag_name/assets/links
+                                $assetUrl = "$apiBaseUrl/releases/v$Version/assets/links"
                                 $assetBody = @{
                                     name = $fileName
                                     url = $uploadedUrl
-                                } | ConvertTo-Json -Depth 3
+                                    link_type = "package"
+                                } | ConvertTo-Json -Depth 3 -Compress
                                 
                                 Write-Host "Adding file to release assets..." -ForegroundColor Cyan
-                                $assetResp = Invoke-RestMethod -Uri $assetUrl -Method Post -Headers $headers -Body $assetBody -ErrorAction Stop
+                                Write-Host "Asset URL: $assetUrl" -ForegroundColor Gray
+                                Write-Host "Asset Body: $assetBody" -ForegroundColor Gray
                                 
-                                Write-Host "File uploaded successfully!" -ForegroundColor Green
-                                Write-Host "Download URL: $uploadedUrl" -ForegroundColor Cyan
+                                try {
+                                    $assetBodyBytes = [System.Text.Encoding]::UTF8.GetBytes($assetBody)
+                                    $assetResp = Invoke-RestMethod -Uri $assetUrl -Method Post -Headers $headers -Body $assetBodyBytes -ContentType "application/json; charset=utf-8" -ErrorAction Stop
+                                    
+                                    Write-Host "File uploaded and added to release successfully!" -ForegroundColor Green
+                                    Write-Host "Download URL: $uploadedUrl" -ForegroundColor Cyan
+                                } catch {
+                                    Write-Host "Warning: Failed to add file link to release: $_" -ForegroundColor Yellow
+                                    Write-Host "File uploaded to: $uploadedUrl" -ForegroundColor Cyan
+                                    Write-Host "You may need to manually add the file link to the release." -ForegroundColor Yellow
+                                }
                             } else {
-                                throw "Upload succeeded but could not parse response URL"
+                                throw "Upload succeeded but could not parse response URL. Response: $responseContent"
                             }
                         } else {
                             $errorContent = $response.Content.ReadAsStringAsync().Result
@@ -589,7 +621,11 @@ function Invoke-GitLabReleaseCreate {
             } catch {
                 Write-Host "Warning: File upload failed: $_" -ForegroundColor Yellow
                 Write-Host "Release created but file upload failed. You may need to upload manually." -ForegroundColor Yellow
-                Write-Host "You can upload the file manually at: $($resp.web_url)" -ForegroundColor Yellow
+                if ($releaseUrl) {
+                    Write-Host "You can upload the file manually at: $releaseUrl" -ForegroundColor Yellow
+                } else {
+                    Write-Host "Release URL: $Url/$Owner/$Repo/-/releases/v$Version" -ForegroundColor Yellow
+                }
             }
         }
         
@@ -598,7 +634,11 @@ function Invoke-GitLabReleaseCreate {
         Write-Host "GitLab Release 创建成功！" -ForegroundColor Green
         Write-Host "==========================================" -ForegroundColor Yellow
         Write-Host ""
-        Write-Host "Release 地址: $($resp.web_url)" -ForegroundColor Cyan
+        if ($releaseUrl) {
+            Write-Host "Release 地址: $releaseUrl" -ForegroundColor Cyan
+        } else {
+            Write-Host "Release 地址: $Url/$Owner/$Repo/-/releases/v$Version" -ForegroundColor Cyan
+        }
         Write-Host ""
         Write-Host "==========================================" -ForegroundColor Yellow
         Write-Host ""
