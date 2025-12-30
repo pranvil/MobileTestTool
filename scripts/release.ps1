@@ -546,7 +546,9 @@ function Invoke-GitLabReleaseCreate {
                 $fileSizeMB = [math]::Round($fileSize / 1MB, 2)
                 
                 Write-Host "Uploading file: $fileName ($fileSizeMB MB)..." -ForegroundColor Cyan
+                Write-Host "This may take a while for large files..." -ForegroundColor Yellow
                 
+                # 使用 System.Net.Http.HttpClient 但改用更简单的方法
                 try {
                     Add-Type -AssemblyName System.Net.Http -ErrorAction Stop
                 } catch {
@@ -554,66 +556,39 @@ function Invoke-GitLabReleaseCreate {
                 }
                 
                 $httpClient = New-Object System.Net.Http.HttpClient
+                $httpClient.Timeout = [System.TimeSpan]::FromMinutes(30)
+                
                 try {
                     $httpClient.DefaultRequestHeaders.Add("PRIVATE-TOKEN", $Token)
                     
+                    # 使用 MultipartFormDataContent
                     $multipartContent = New-Object System.Net.Http.MultipartFormDataContent
-                    $fileStream = [System.IO.File]::OpenRead($Package)
+                    $fileContent = New-Object System.Net.Http.ByteArrayContent([System.IO.File]::ReadAllBytes($Package))
+                    $fileContent.Headers.ContentType = New-Object System.Net.Http.Headers.MediaTypeHeaderValue("application/zip")
+                    $multipartContent.Add($fileContent, "file", $fileName)
+                    
+                    Write-Host "Sending POST request to: $uploadsUrl" -ForegroundColor Gray
+                    
                     try {
-                        $streamContent = New-Object System.Net.Http.StreamContent($fileStream)
-                        $streamContent.Headers.ContentType = New-Object System.Net.Http.Headers.MediaTypeHeaderValue("application/zip")
-                        $multipartContent.Add($streamContent, "file", $fileName)
-                        
-                        Write-Host "Sending POST request to: $uploadsUrl" -ForegroundColor Gray
-                        $response = $null
-                        try {
-                            $response = $httpClient.PostAsync($uploadsUrl, $multipartContent).Result
-                        } catch {
-                            Write-Host "Error during POST request: $_" -ForegroundColor Red
-                            Write-Host "Exception type: $($_.Exception.GetType().FullName)" -ForegroundColor Red
-                            if ($_.Exception.InnerException) {
-                                Write-Host "Inner exception: $($_.Exception.InnerException.Message)" -ForegroundColor Red
-                            }
-                            throw
-                        }
+                        # 使用异步方法但同步等待
+                        $task = $httpClient.PostAsync($uploadsUrl, $multipartContent)
+                        $response = $task.GetAwaiter().GetResult()
                         
                         if ($null -eq $response) {
+                            if ($task.IsFaulted) {
+                                throw $task.Exception.InnerException
+                            }
                             throw "Response is null"
                         }
                         
                         Write-Host "Response status: $($response.StatusCode)" -ForegroundColor Gray
-                        Write-Host "IsSuccessStatusCode: $($response.IsSuccessStatusCode)" -ForegroundColor Gray
                         
                         if ($response.IsSuccessStatusCode) {
-                            if ($null -eq $response.Content) {
-                                throw "Response.Content is null"
-                            }
+                            $responseContent = $response.Content.ReadAsStringAsync().GetAwaiter().GetResult()
+                            Write-Host "Upload API Response:" -ForegroundColor Gray
+                            Write-Host $responseContent -ForegroundColor Gray
                             
-                            $responseContent = $null
-                            try {
-                                $responseContent = $response.Content.ReadAsStringAsync().Result
-                            } catch {
-                                Write-Host "Error reading response content: $_" -ForegroundColor Red
-                                throw
-                            }
-                            
-                            if ([string]::IsNullOrWhiteSpace($responseContent)) {
-                                throw "Response content is empty"
-                            }
-                            
-                            Write-Host "Upload API Response: $responseContent" -ForegroundColor Gray
-                            
-                            $uploadResp = $null
-                            try {
-                                $uploadResp = $responseContent | ConvertFrom-Json
-                            } catch {
-                                Write-Host "Error parsing JSON response: $_" -ForegroundColor Red
-                                throw "Failed to parse upload response as JSON: $responseContent"
-                            }
-                            
-                            if ($null -eq $uploadResp) {
-                                throw "Parsed response is null"
-                            }
+                            $uploadResp = $responseContent | ConvertFrom-Json
                             
                             $uploadedUrl = $null
                             if ($uploadResp.PSObject.Properties.Name -contains "url") {
@@ -630,7 +605,7 @@ function Invoke-GitLabReleaseCreate {
                             if ([string]::IsNullOrWhiteSpace($uploadedUrl)) {
                                 Write-Host "Upload response object:" -ForegroundColor Yellow
                                 $uploadResp | ConvertTo-Json -Depth 5 | Write-Host -ForegroundColor Yellow
-                                throw "Could not extract URL from upload response. Response: $responseContent"
+                                throw "Could not extract URL from upload response"
                             }
                             
                             if (-not $uploadedUrl.StartsWith("http")) {
@@ -638,7 +613,6 @@ function Invoke-GitLabReleaseCreate {
                             }
                             
                             # 使用正确的 API 端点添加 asset link
-                            # GitLab API: POST /projects/:id/releases/:tag_name/assets/links
                             $assetUrl = "$apiBaseUrl/releases/v$Version/assets/links"
                             $assetBody = @{
                                 name = $fileName
@@ -648,7 +622,6 @@ function Invoke-GitLabReleaseCreate {
                             
                             Write-Host "Adding file to release assets..." -ForegroundColor Cyan
                             Write-Host "Asset URL: $assetUrl" -ForegroundColor Gray
-                            Write-Host "Asset Body: $assetBody" -ForegroundColor Gray
                             
                             try {
                                 $assetBodyBytes = [System.Text.Encoding]::UTF8.GetBytes($assetBody)
@@ -662,18 +635,19 @@ function Invoke-GitLabReleaseCreate {
                                 Write-Host "You may need to manually add the file link to the release." -ForegroundColor Yellow
                             }
                         } else {
-                            $errorContent = ""
-                            if ($null -ne $response.Content) {
-                                try {
-                                    $errorContent = $response.Content.ReadAsStringAsync().Result
-                                } catch {
-                                    $errorContent = "Could not read error content: $_"
-                                }
-                            }
+                            $errorContent = $response.Content.ReadAsStringAsync().GetAwaiter().GetResult()
                             throw "Upload failed with status $($response.StatusCode): $errorContent"
                         }
+                    } catch {
+                        Write-Host "Error during file upload: $_" -ForegroundColor Red
+                        Write-Host "Exception type: $($_.Exception.GetType().FullName)" -ForegroundColor Red
+                        if ($_.Exception.InnerException) {
+                            Write-Host "Inner exception: $($_.Exception.InnerException.Message)" -ForegroundColor Red
+                        }
+                        throw
                     } finally {
-                        $fileStream.Close()
+                        $fileContent.Dispose()
+                        $multipartContent.Dispose()
                     }
                 } finally {
                     $httpClient.Dispose()
@@ -1140,3 +1114,4 @@ if ($platformsToPublish -contains "gitlab") {
 Write-Host ""
 Write-Host "Code and tags have been pushed to configured remotes."
 Write-Host "=== all done ==="
+
