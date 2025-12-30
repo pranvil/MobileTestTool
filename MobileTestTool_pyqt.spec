@@ -158,8 +158,15 @@ a = Analysis(
         'matplotlib.pyplot',
         'contourpy',
         'kiwisolver',
-        # 注意：numpy 可能是某些依赖的间接依赖，如果排除后运行出错，需要移除这行
-        # 'numpy',  # 暂时注释，如果确认不需要再取消注释
+        # 排除科学计算库（代码中未直接使用，可能是间接依赖）
+        'numpy',
+        'numpy.core',
+        'numpy.libs',
+        'scipy',
+        'scipy.libs',
+        'pandas',
+        'pandas.libs',
+        # 如果排除后运行出错，说明某个功能需要这些库，需要找出并处理
         # 排除不需要的 PIL 格式支持（如果不需要 AVIF 等新格式）
         'PIL._avif',  # AVIF 格式支持，约 7.5MB，如果不需要可以排除
         # 排除不需要的测试和开发工具

@@ -129,6 +129,9 @@ missing_translations.txt
 # Gitee configuration (contains sensitive tokens)
 .gitee-config.ps1
 
+# GitLab configuration (contains sensitive tokens)
+.gitlab-config.ps1
+
 # Build artifacts
 build/
 dist/
