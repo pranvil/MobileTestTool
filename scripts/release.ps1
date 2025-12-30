@@ -539,14 +539,84 @@ function Invoke-GitLabReleaseCreate {
             Write-Host "Warning: Package file not found: $Package" -ForegroundColor Yellow
             Write-Host "Release created but file upload skipped." -ForegroundColor Yellow
         } else {
-            try {
-                $uploadsUrl = "$apiBaseUrl/uploads"
-                $fileName = Split-Path -Leaf $Package
-                $fileSize = (Get-Item $Package).Length
-                $fileSizeMB = [math]::Round($fileSize / 1MB, 2)
+            $fileName = Split-Path -Leaf $Package
+            $fileSize = (Get-Item $Package).Length
+            $fileSizeMB = [math]::Round($fileSize / 1MB, 2)
+            $maxUploadSizeMB = 50  # GitLab uploads API 限制为 50MB
+            
+            Write-Host "File size: $fileSizeMB MB" -ForegroundColor Cyan
+            
+            # 检查文件大小是否超过 GitLab uploads API 限制
+            if ($fileSizeMB -gt $maxUploadSizeMB) {
+                Write-Host ""
+                Write-Host "========================================" -ForegroundColor Yellow
+                Write-Host "Warning: File exceeds GitLab upload limit" -ForegroundColor Yellow
+                Write-Host "========================================" -ForegroundColor Yellow
+                Write-Host ""
+                Write-Host "File size ($fileSizeMB MB) exceeds GitLab uploads API limit ($maxUploadSizeMB MB)." -ForegroundColor Yellow
+                Write-Host "GitLab uploads API cannot handle files larger than $maxUploadSizeMB MB." -ForegroundColor Yellow
+                Write-Host ""
+                Write-Host "Alternative solutions:" -ForegroundColor Cyan
+                Write-Host "  1. Use external storage (GitHub/Gitee) and add as external link" -ForegroundColor White
+                Write-Host "  2. Contact GitLab admin to increase upload limit" -ForegroundColor White
+                Write-Host "  3. Use GitLab Package Registry (if available)" -ForegroundColor White
+                Write-Host "  4. Manually upload via GitLab Web UI" -ForegroundColor White
+                Write-Host ""
                 
-                Write-Host "Uploading file: $fileName ($fileSizeMB MB)..." -ForegroundColor Cyan
-                Write-Host "This may take a while for large files..." -ForegroundColor Yellow
+                # 尝试从其他平台获取下载链接并添加为外部 asset link
+                $externalUrl = $null
+                
+                # 检查是否有 GitHub release（如果发布了）
+                if ($platformsToPublish -contains "github" -or $Platform -eq "all") {
+                    $githubUrl = "https://github.com/pranvil/MobileTestTool/releases/download/v$Version/$fileName"
+                    Write-Host "Attempting to add GitHub download link as external asset..." -ForegroundColor Cyan
+                    $externalUrl = $githubUrl
+                }
+                # 检查是否有 Gitee release
+                elseif ($platformsToPublish -contains "gitee" -or $Platform -eq "all") {
+                    if ($config.GiteeOwner -and $config.GiteeRepo) {
+                        $giteeUrl = "https://gitee.com/$($config.GiteeOwner)/$($config.GiteeRepo)/releases/download/v$Version/$fileName"
+                        Write-Host "Attempting to add Gitee download link as external asset..." -ForegroundColor Cyan
+                        $externalUrl = $giteeUrl
+                    }
+                }
+                
+                if ($externalUrl) {
+                    try {
+                        $assetUrl = "$apiBaseUrl/releases/v$Version/assets/links"
+                        $assetBody = @{
+                            name = $fileName
+                            url = $externalUrl
+                            link_type = "package"
+                        } | ConvertTo-Json -Depth 3 -Compress
+                        
+                        Write-Host "Adding external download link to release assets..." -ForegroundColor Cyan
+                        $assetBodyBytes = [System.Text.Encoding]::UTF8.GetBytes($assetBody)
+                        $assetResp = Invoke-RestMethod -Uri $assetUrl -Method Post -Headers $headers -Body $assetBodyBytes -ContentType "application/json; charset=utf-8" -ErrorAction Stop
+                        
+                        Write-Host "External download link added successfully!" -ForegroundColor Green
+                        Write-Host "Download URL: $externalUrl" -ForegroundColor Cyan
+                    } catch {
+                        Write-Host "Warning: Failed to add external link: $_" -ForegroundColor Yellow
+                        Write-Host "Please manually add the download link in GitLab Web UI" -ForegroundColor Yellow
+                    }
+                } else {
+                    Write-Host "No external download URL available. Please manually upload the file." -ForegroundColor Yellow
+                }
+                
+                Write-Host ""
+                Write-Host "Manual upload instructions:" -ForegroundColor Cyan
+                Write-Host "  1. Go to: $releaseUrl" -ForegroundColor White
+                Write-Host "  2. Click 'Edit' button" -ForegroundColor White
+                Write-Host "  3. Upload the file manually or add external download link" -ForegroundColor White
+                Write-Host ""
+            } else {
+                # 文件小于 50MB，可以正常上传
+                try {
+                    $uploadsUrl = "$apiBaseUrl/uploads"
+                    
+                    Write-Host "Uploading file: $fileName ($fileSizeMB MB)..." -ForegroundColor Cyan
+                    Write-Host "This may take a while for large files..." -ForegroundColor Yellow
                 
                 # 使用 System.Net.Http.HttpClient 但改用更简单的方法
                 try {
@@ -563,7 +633,11 @@ function Invoke-GitLabReleaseCreate {
                     
                     # 使用 MultipartFormDataContent
                     $multipartContent = New-Object System.Net.Http.MultipartFormDataContent
-                    $fileContent = New-Object System.Net.Http.ByteArrayContent([System.IO.File]::ReadAllBytes($Package))
+                    
+                    # 读取文件内容为字节数组
+                    Write-Host "Reading file into memory..." -ForegroundColor Gray
+                    $fileBytes = [System.IO.File]::ReadAllBytes($Package)
+                    $fileContent = New-Object System.Net.Http.ByteArrayContent($fileBytes)
                     $fileContent.Headers.ContentType = New-Object System.Net.Http.Headers.MediaTypeHeaderValue("application/zip")
                     $multipartContent.Add($fileContent, "file", $fileName)
                     
@@ -652,13 +726,14 @@ function Invoke-GitLabReleaseCreate {
                 } finally {
                     $httpClient.Dispose()
                 }
-            } catch {
-                Write-Host "Warning: File upload failed: $_" -ForegroundColor Yellow
-                Write-Host "Release created but file upload failed. You may need to upload manually." -ForegroundColor Yellow
-                if ($releaseUrl) {
-                    Write-Host "You can upload the file manually at: $releaseUrl" -ForegroundColor Yellow
-                } else {
-                    Write-Host "Release URL: $Url/$Owner/$Repo/-/releases/v$Version" -ForegroundColor Yellow
+                } catch {
+                    Write-Host "Warning: File upload failed: $_" -ForegroundColor Yellow
+                    Write-Host "Release created but file upload failed. You may need to upload manually." -ForegroundColor Yellow
+                    if ($releaseUrl) {
+                        Write-Host "You can upload the file manually at: $releaseUrl" -ForegroundColor Yellow
+                    } else {
+                        Write-Host "Release URL: $Url/$Owner/$Repo/-/releases/v$Version" -ForegroundColor Yellow
+                    }
                 }
             }
         }
