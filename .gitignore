@@ -23,7 +23,10 @@ MANIFEST
 
 # PyInstaller
 *.manifest
-*.spec
+# Note: *.spec files are tracked (they are configuration files)
+# If you want to ignore new .spec files, uncomment the line below:
+# *.spec
+# But keep MobileTestTool_pyqt.spec and updater.spec tracked
 
 # Installer logs
 pip-log.txt
@@ -126,6 +129,18 @@ c:\log\*
 *.temp
 missing_translations.txt
 .cursor/
+
+# System and temporary files
+syslog.txt
+syslog*.txt
+
+# Configuration backups
+MobileTestTool_All_Config_*.json
+
+# Cursor temporary assets (keep assets/ directory but ignore cursor-generated files)
+assets/c__Users_*
+assets/*cursor*
+assets/*image-*.png
 
 # Release configuration (contains sensitive tokens)
 .release-config.ps1
