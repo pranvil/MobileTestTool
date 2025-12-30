@@ -4,14 +4,26 @@
     "sha256":  "e0c73028608a3c1e7e3997f33e1affae005f726b4d073913caa2a2c98eb398b6",
     "file_name":  "MobileTestTool_0.9.6.5.5.zip",
     "file_size":  91222108,
-    "release_notes":  "## Release Note\n- New feature: search file",
-    "published_at":  "2025-12-30T05:28:29Z",
+    "release_notes":  "- Add release notes here",
+    "published_at":  "2025-12-30T05:49:43Z",
     "mandatory":  false,
     "download_urls":  [
                           {
                               "region":  "us",
                               "url":  "https://github.com/pranvil/MobileTestTool/releases/download/v0.9.6.5.5/MobileTestTool_0.9.6.5.5.zip",
                               "priority":  10,
+                              "platform":  "windows"
+                          },
+                          {
+                              "region":  "cn",
+                              "url":  "https://gitee.com/pranvil/MobileTestTool/releases/download/v0.9.6.5.5/MobileTestTool_0.9.6.5.5.zip",
+                              "priority":  20,
+                              "platform":  "windows"
+                          },
+                          {
+                              "region":  "internal",
+                              "url":  "http://10.129.93.67/hao.lin/MobileTestTool/-/releases/v0.9.6.5.5/downloads/MobileTestTool_0.9.6.5.5.zip",
+                              "priority":  15,
                               "platform":  "windows"
                           },
                           {
