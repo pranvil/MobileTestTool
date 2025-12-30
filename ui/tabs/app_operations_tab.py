@@ -19,6 +19,7 @@ class AppOperationsTab(QWidget):
     query_package = pyqtSignal()
     query_package_name = pyqtSignal()
     query_install_path = pyqtSignal()
+    query_find_file = pyqtSignal()
     
     # APK操作
     pull_apk = pyqtSignal()
@@ -150,6 +151,10 @@ class AppOperationsTab(QWidget):
         self.query_install_path_btn = QPushButton(self.lang_manager.tr("查询安装路径"))
         self.query_install_path_btn.clicked.connect(lambda: self._on_button_clicked("query_install_path_btn", self.query_install_path.emit))
         card_layout.addWidget(self.query_install_path_btn)
+        
+        self.query_find_file_btn = QPushButton(self.lang_manager.tr("查找文件"))
+        self.query_find_file_btn.clicked.connect(lambda: self._on_button_clicked("query_find_file_btn", self.query_find_file.emit))
+        card_layout.addWidget(self.query_find_file_btn)
         
         card_layout.addStretch()
         
@@ -333,6 +338,8 @@ class AppOperationsTab(QWidget):
             self.query_package_name_btn.setText(self.lang_manager.tr("查询包名"))
         if hasattr(self, 'query_install_path_btn'):
             self.query_install_path_btn.setText(self.lang_manager.tr("查询安装路径"))
+        if hasattr(self, 'query_find_file_btn'):
+            self.query_find_file_btn.setText(self.lang_manager.tr("查找文件"))
         
         # 刷新APK操作组按钮
         if hasattr(self, 'push_apk_btn'):

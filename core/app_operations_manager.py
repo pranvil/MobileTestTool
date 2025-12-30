@@ -15,7 +15,7 @@ from PyQt5.QtCore import QObject, pyqtSignal, QThread, Qt
 from PyQt5.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QPushButton, 
                              QLabel, QCheckBox, QLineEdit,
                              QRadioButton, QFileDialog, QMessageBox, QTextEdit,
-                             QWidget, QFrame)
+                             QWidget, QFrame, QProgressDialog)
 
 from ui.widgets.shadow_utils import add_card_shadow
 
@@ -75,6 +75,15 @@ class AppOperationsManager(QObject):
         
         # 显示包名输入对话框
         self.show_package_name_input_dialog(device)
+    
+    def query_find_file(self):
+        """查找文件"""
+        device = self.device_manager.validate_device_selection()
+        if not device:
+            return
+        
+        # 显示查找文件对话框
+        self.show_find_file_dialog(device)
     
     def pull_apk(self):
         """拉取APK文件"""
@@ -187,6 +196,11 @@ class AppOperationsManager(QObject):
     def show_push_apk_dialog(self, device):
         """显示推送文件对话框"""
         dialog = PushApkDialog(device, self, self.parent().parent())
+        dialog.exec_()
+    
+    def show_find_file_dialog(self, device):
+        """显示查找文件对话框"""
+        dialog = FindFileDialog(device, self, self.parent().parent())
         dialog.exec_()
     
     def execute_package_query(self, device, selected_params, filter_text):
@@ -756,6 +770,157 @@ class AppOperationsManager(QObject):
         thread = threading.Thread(target=run_command, daemon=True)
         thread.start()
     
+    def execute_find_file(self, device, search_path, file_name, file_type=None, ignore_case=False, fuzzy=False):
+        """执行查找文件命令"""
+        # 模糊搜索：若用户未输入通配符，则自动补全为 *xxx*
+        if fuzzy:
+            wildcard_chars = ("*", "?", "[", "]")
+            if file_name and not any(ch in file_name for ch in wildcard_chars):
+                file_name = f"*{file_name}*"
+        
+        # 构建find命令
+        cmd_parts = ["adb", "-s", device, "shell", "find", search_path]
+        
+        # 添加-type参数
+        if file_type:
+            cmd_parts.extend(["-type", file_type])
+        
+        # 添加-name/-iname参数
+        if file_name:
+            cmd_parts.extend(["-iname" if ignore_case else "-name", file_name])
+        
+        # 构建显示的命令字符串
+        cmd = f"adb -s {device} shell \"find {search_path}"
+        if file_type:
+            cmd += f" -type {file_type}"
+        if file_name:
+            name_flag = "-iname" if ignore_case else "-name"
+            # 终端示例里建议给通配符加引号，避免被本地 shell 提前解析
+            wildcard_chars = ("*", "?", "[", "]")
+            display_name = f"\\\"{file_name}\\\"" if any(ch in file_name for ch in wildcard_chars) else file_name
+            cmd += f" {name_flag} {display_name}"
+        cmd += "\""
+        
+        self._log_message(f" {self.lang_manager.tr('执行命令:')} {cmd}")
+        if search_path:
+            self._log_message(f" {self.lang_manager.tr('搜索路径:')} {search_path}")
+        if file_name:
+            self._log_message(f" {self.lang_manager.tr('文件名:')} {file_name}")
+        if file_type:
+            type_name = {"f": "普通文件", "d": "目录", "l": "符号链接"}.get(file_type, file_type)
+            self._log_message(f" {self.lang_manager.tr('文件类型:')} {type_name} ({file_type})")
+        self._log_message(f" {self.lang_manager.tr('忽略大小写:')} {self.lang_manager.tr('是') if ignore_case else self.lang_manager.tr('否')}")
+        self._log_message(f" {self.lang_manager.tr('查询模式:')} {self.lang_manager.tr('模糊') if fuzzy else self.lang_manager.tr('精确')}")
+        
+        # 弹框提示：正在搜索（可取消/可关闭）
+        progress_parent = None
+        try:
+            p = self.parent()
+            while p is not None:
+                if isinstance(p, QWidget):
+                    progress_parent = p
+                    break
+                p = p.parent()
+        except Exception:
+            progress_parent = None
+
+        progress = QProgressDialog(
+            self.lang_manager.tr("正在搜索，请稍候..."),
+            self.lang_manager.tr("取消"),
+            0,
+            0,
+            progress_parent
+        )
+        progress.setWindowTitle(self.lang_manager.tr("正在搜索"))
+        progress.setWindowModality(Qt.WindowModal)
+        progress.setMinimumDuration(0)
+        progress.setAutoClose(False)
+        progress.setAutoReset(False)
+
+        cancelled = threading.Event()
+        closing_normally = threading.Event()
+        proc_lock = threading.Lock()
+        proc_holder = {"proc": None}
+
+        def cancel_search():
+            # 注意：QProgressDialog 在被代码 close() 时也可能触发 canceled 信号
+            # 这里用 closing_normally 区分“正常结束关闭” vs “用户主动取消/关闭”
+            if closing_normally.is_set():
+                return
+            if cancelled.is_set():
+                return
+            cancelled.set()
+            self._log_message(f" {self.lang_manager.tr('已取消搜索，正在终止任务...')}")
+            try:
+                progress.close()
+            except Exception:
+                pass
+            with proc_lock:
+                proc = proc_holder.get("proc")
+            if proc is not None:
+                try:
+                    proc.terminate()
+                except Exception:
+                    pass
+                try:
+                    # 兜底：terminate 不生效时强制 kill
+                    proc.kill()
+                except Exception:
+                    pass
+
+        # 用户点击取消/关闭窗口 -> 取消搜索
+        progress.canceled.connect(cancel_search)
+        progress.show()
+
+        # 在后台线程中执行命令
+        def run_command():
+            try:
+                # 执行命令
+                process = subprocess.Popen(
+                    cmd_parts,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True,
+                    encoding='utf-8',
+                    errors='replace',
+                    creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0
+                )
+                with proc_lock:
+                    proc_holder["proc"] = process
+                
+                stdout, stderr = process.communicate()
+                
+                # 取消场景：不再打印结果（可按需保留部分输出）
+                if cancelled.is_set():
+                    return
+
+                # 在主线程中更新UI（log_message 是 signal，线程安全）
+                self._handle_find_file_result(stdout, stderr, cmd)
+                
+            except Exception as e:
+                if cancelled.is_set():
+                    return
+                error_msg = f"{self.lang_manager.tr('执行命令失败:')} {str(e)}"
+                self._handle_query_error(error_msg)
+            finally:
+                # 关闭“正在搜索”弹框（必须在主线程）
+                closing_normally.set()
+                try:
+                    # 注意：从后台线程直接 close 可能无效（UI 线程才有事件循环）
+                    # 这里用 QueuedConnection 投递到 progress 所在线程（UI线程）执行 close()
+                    from PyQt5.QtCore import QMetaObject
+                    QMetaObject.invokeMethod(progress, "close", Qt.QueuedConnection)
+                except Exception:
+                    # 兜底：如果投递失败，就尽力直接关（不保证一定生效）
+                    try:
+                        progress.close()
+                    except Exception:
+                        pass
+        
+        # 启动后台线程
+        thread = threading.Thread(target=run_command, daemon=True)
+        thread.start()
+    
     # ========== 结果处理方法 ==========
     
     def _handle_query_result(self, stdout, stderr, cmd):
@@ -1036,6 +1201,31 @@ class AppOperationsManager(QObject):
         else:
             # 没有输出通常表示成功
             self._log_message(f" {self.lang_manager.tr('文件推送成功!')}")
+    
+    def _handle_find_file_result(self, stdout, stderr, cmd):
+        """处理查找文件结果"""
+        if stderr:
+            self._log_message(f" {self.lang_manager.tr('错误信息:')} {stderr}")
+        
+        if stdout:
+            # 显示结果
+            self._log_message(f" {self.lang_manager.tr('查找结果:')}")
+            lines = stdout.strip().split('\n')
+            result_count = 0
+            for line in lines:
+                if line.strip():
+                    self._log_message(f"  {line}")
+                    result_count += 1
+            
+            # 显示结果统计
+            if result_count > 0:
+                self._log_message(f"{self.lang_manager.tr(' 共找到 ')}{result_count}{self.lang_manager.tr(' 个匹配项')}")
+            else:
+                self._log_message(f" {self.lang_manager.tr('未找到匹配的文件或目录')}")
+        else:
+            self._log_message(f" {self.lang_manager.tr('未找到匹配的文件或目录')}")
+            if stderr and stderr.strip():
+                self._log_message(f" {self.lang_manager.tr('错误信息:')} {stderr.strip()}")
     
     def _log_message(self, message):
         """在日志区域显示消息"""
@@ -1924,6 +2114,191 @@ class PushApkDialog(QDialog):
         # 启动后台线程
         thread = threading.Thread(target=run_command, daemon=True)
         thread.start()
+
+
+class FindFileDialog(QDialog):
+    """查找文件对话框"""
+    
+    def __init__(self, device, manager, parent=None):
+        super().__init__(parent)
+        self.device = device
+        self.manager = manager
+        # 从父窗口获取语言管理器
+        self.lang_manager = parent.lang_manager if parent and hasattr(parent, 'lang_manager') else None
+        self.setWindowTitle(self.lang_manager.tr("查找文件") if self.lang_manager else "查找文件")
+        self.setMinimumSize(500, 400)
+        self.init_ui()
+    
+    def tr(self, text):
+        """安全地获取翻译文本"""
+        return self.lang_manager.tr(text) if self.lang_manager else text
+    
+    def init_ui(self):
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(20, 20, 20, 20)
+        layout.setSpacing(15)
+        
+        # 标题
+        title = QLabel(self.tr("查找文件"))
+        title.setStyleSheet("font-size: 14pt; font-weight: bold; margin-bottom: 10px;")
+        layout.addWidget(title)
+        
+        # 搜索路径组（使用与Tab界面一致的样式：QLabel + QFrame）
+        path_container = QWidget()
+        path_container_layout = QVBoxLayout(path_container)
+        path_container_layout.setContentsMargins(0, 0, 0, 0)
+        path_container_layout.setSpacing(4)
+        
+        path_title = QLabel(self.tr("搜索路径"))
+        path_title.setProperty("class", "section-title")
+        path_container_layout.addWidget(path_title)
+        
+        path_card = QFrame()
+        path_card.setObjectName("card")
+        add_card_shadow(path_card)
+        path_layout = QVBoxLayout(path_card)
+        path_layout.setContentsMargins(10, 1, 10, 1)
+        path_layout.setSpacing(8)
+        
+        self.search_path_entry = QLineEdit()
+        self.search_path_entry.setText("/")
+        self.search_path_entry.setPlaceholderText(self.tr("例如: / 或 /system 或 /data"))
+        path_layout.addWidget(self.search_path_entry)
+        
+        path_container_layout.addWidget(path_card)
+        layout.addWidget(path_container)
+        
+        # 文件名组
+        name_container = QWidget()
+        name_container_layout = QVBoxLayout(name_container)
+        name_container_layout.setContentsMargins(0, 0, 0, 0)
+        name_container_layout.setSpacing(4)
+        
+        name_title = QLabel(self.tr("文件名（-name）"))
+        name_title.setProperty("class", "section-title")
+        name_container_layout.addWidget(name_title)
+        
+        name_card = QFrame()
+        name_card.setObjectName("card")
+        add_card_shadow(name_card)
+        name_layout = QVBoxLayout(name_card)
+        name_layout.setContentsMargins(10, 1, 10, 1)
+        name_layout.setSpacing(8)
+        
+        self.file_name_entry = QLineEdit()
+        self.file_name_entry.setPlaceholderText(self.tr("例如: gps.conf"))
+        name_layout.addWidget(self.file_name_entry)
+        
+        name_container_layout.addWidget(name_card)
+        layout.addWidget(name_container)
+        
+        # 查询选项组
+        options_container = QWidget()
+        options_container_layout = QVBoxLayout(options_container)
+        options_container_layout.setContentsMargins(0, 0, 0, 0)
+        options_container_layout.setSpacing(4)
+        
+        options_title = QLabel(self.tr("查询选项"))
+        options_title.setProperty("class", "section-title")
+        options_container_layout.addWidget(options_title)
+        
+        options_card = QFrame()
+        options_card.setObjectName("card")
+        add_card_shadow(options_card)
+        options_layout = QVBoxLayout(options_card)
+        options_layout.setContentsMargins(10, 1, 10, 1)
+        options_layout.setSpacing(8)
+        
+        # 忽略大小写选项
+        self.ignore_case_cb = QCheckBox(self.tr("忽略大小写"))
+        options_layout.addWidget(self.ignore_case_cb)
+        
+        # 模糊查询选项
+        self.fuzzy_cb = QCheckBox(self.tr("模糊查询（使用通配符）"))
+        options_layout.addWidget(self.fuzzy_cb)
+        
+        # 提示信息
+        hint = QLabel(self.tr(" "))
+        hint.setStyleSheet("color: gray; font-size: 9pt;")
+        hint.setWordWrap(True)
+        options_layout.addWidget(hint)
+        
+        options_container_layout.addWidget(options_card)
+        layout.addWidget(options_container)
+        
+        # 文件类型组
+        type_container = QWidget()
+        type_container_layout = QVBoxLayout(type_container)
+        type_container_layout.setContentsMargins(0, 0, 0, 0)
+        type_container_layout.setSpacing(4)
+        
+        type_title = QLabel(self.tr("文件类型:"))
+        type_title.setProperty("class", "section-title")
+        type_container_layout.addWidget(type_title)
+        
+        type_card = QFrame()
+        type_card.setObjectName("card")
+        add_card_shadow(type_card)
+        type_layout = QVBoxLayout(type_card)
+        type_layout.setContentsMargins(10, 1, 10, 1)
+        type_layout.setSpacing(8)
+        
+        self.type_none_rb = QRadioButton(self.tr("不限"))
+        self.type_none_rb.setChecked(True)
+        type_layout.addWidget(self.type_none_rb)
+        
+        self.type_dir_rb = QRadioButton(self.tr("目录"))
+        self.type_dir_rb.setProperty("value", "d")
+        type_layout.addWidget(self.type_dir_rb)
+        
+        self.type_file_rb = QRadioButton(self.tr("文件"))
+        self.type_file_rb.setProperty("value", "f")
+        type_layout.addWidget(self.type_file_rb)
+        
+        type_container_layout.addWidget(type_card)
+        layout.addWidget(type_container)
+        
+        # 添加弹性空间
+        layout.addStretch()
+        
+        # 按钮
+        button_layout = QHBoxLayout()
+        button_layout.addStretch()
+        self.confirm_btn = QPushButton(self.tr("开始查找"))
+        self.confirm_btn.clicked.connect(self.on_confirm)
+        self.cancel_btn = QPushButton(self.tr("取消"))
+        self.cancel_btn.clicked.connect(self.reject)
+        
+        button_layout.addWidget(self.confirm_btn)
+        button_layout.addWidget(self.cancel_btn)
+        layout.addLayout(button_layout)
+    
+    def on_confirm(self):
+        search_path = self.search_path_entry.text().strip()
+        if not search_path:
+            QMessageBox.warning(self, self.tr("输入错误"), "请输入搜索路径")
+            return
+        
+        file_name = self.file_name_entry.text().strip()
+        if not file_name:
+            QMessageBox.warning(self, self.tr("输入错误"), "请输入文件名")
+            return
+        
+        # 获取文件类型
+        file_type = None
+        if self.type_file_rb.isChecked():
+            file_type = self.type_file_rb.property("value")
+        elif self.type_dir_rb.isChecked():
+            file_type = self.type_dir_rb.property("value")
+        
+        # 获取查询选项
+        ignore_case = self.ignore_case_cb.isChecked()
+        fuzzy = self.fuzzy_cb.isChecked()
+        
+        self.accept()
+        
+        # 执行查找
+        self.manager.execute_find_file(self.device, search_path, file_name, file_type, ignore_case=ignore_case, fuzzy=fuzzy)
 
 
 # 添加缺少的方法到AppOperationsManager

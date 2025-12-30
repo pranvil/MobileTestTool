@@ -210,6 +210,10 @@ class PyQtAppOperationsManager(QObject):
         """查询安装路径"""
         self.app_ops_manager.query_install_path()
     
+    def query_find_file(self):
+        """查找文件"""
+        self.app_ops_manager.query_find_file()
+    
     def pull_apk(self):
         """pull apk"""
         self.app_ops_manager.pull_apk()

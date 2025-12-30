@@ -1365,6 +1365,7 @@ class MainWindow(QMainWindow):
             self.app_operations_tab.query_package.connect(self._on_query_package)
             self.app_operations_tab.query_package_name.connect(self._on_query_package_name)
             self.app_operations_tab.query_install_path.connect(self._on_query_install_path)
+            self.app_operations_tab.query_find_file.connect(self._on_query_find_file)
             self.app_operations_tab.pull_apk.connect(self._on_pull_apk)
             self.app_operations_tab.push_apk.connect(self._on_push_apk)
             self.app_operations_tab.install_apk.connect(self._on_install_apk)
@@ -3431,6 +3432,34 @@ class MainWindow(QMainWindow):
             QMessageBox.critical(self, self.tr("错误"), self.tr(f"查询安装路径失败: {str(e)}"))
         finally:
             logger.debug("=" * 60)
+    
+    def _on_query_find_file(self):
+        """查找文件"""
+        logger.debug("=" * 60)
+        logger.debug("按钮点击: 查找文件")
+        logger.debug(f"函数: _on_query_find_file")
+        logger.debug(f"APP操作管理器对象: {self.app_operations_manager}")
+        try:
+            if not hasattr(self, 'app_operations_manager') or self.app_operations_manager is None:
+                logger.error("app_operations_manager 未初始化或为None")
+                from PyQt5.QtWidgets import QMessageBox
+                QMessageBox.warning(self, self.tr("错误"), self.tr("APP操作管理器未初始化"))
+                return
+            logger.debug("调用 app_operations_manager.query_find_file()")
+            self.app_operations_manager.query_find_file()
+            logger.debug("查找文件成功")
+        except ImportError as e:
+            logger.error(f"模块导入失败:\n  错误类型: ImportError\n  错误信息: {str(e)}")
+            logger.exception("模块导入异常详情")
+            from PyQt5.QtWidgets import QMessageBox
+            QMessageBox.critical(self, self.tr("错误"), self.tr(f"模块导入失败: {str(e)}"))
+        except Exception as e:
+            logger.error(f"查找文件失败:\n  错误类型: {type(e).__name__}\n  错误信息: {str(e)}")
+            logger.exception("异常详情")
+            from PyQt5.QtWidgets import QMessageBox
+            QMessageBox.critical(self, self.tr("错误"), self.tr(f"查找文件失败: {str(e)}"))
+        finally:
+            logger.debug("=" * 60)
         
     def _on_pull_apk(self):
         """pull apk"""
@@ -5296,6 +5325,7 @@ class MainWindow(QMainWindow):
                 self.app_operations_tab.query_package.connect(self._on_query_package)
                 self.app_operations_tab.query_package_name.connect(self._on_query_package_name)
                 self.app_operations_tab.query_install_path.connect(self._on_query_install_path)
+                self.app_operations_tab.query_find_file.connect(self._on_query_find_file)
                 self.app_operations_tab.pull_apk.connect(self._on_pull_apk)
                 self.app_operations_tab.push_apk.connect(self._on_push_apk)
                 self.app_operations_tab.install_apk.connect(self._on_install_apk)
