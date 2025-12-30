@@ -566,19 +566,18 @@ function Invoke-GitLabReleaseCreate {
                 # 尝试从其他平台获取下载链接并添加为外部 asset link
                 $externalUrl = $null
                 
-                # 检查是否有 GitHub release（如果发布了）
-                if ($platformsToPublish -contains "github" -or $Platform -eq "all") {
-                    $githubUrl = "https://github.com/pranvil/MobileTestTool/releases/download/v$Version/$fileName"
-                    Write-Host "Attempting to add GitHub download link as external asset..." -ForegroundColor Cyan
-                    $externalUrl = $githubUrl
-                }
-                # 检查是否有 Gitee release
-                elseif ($platformsToPublish -contains "gitee" -or $Platform -eq "all") {
-                    if ($config.GiteeOwner -and $config.GiteeRepo) {
-                        $giteeUrl = "https://gitee.com/$($config.GiteeOwner)/$($config.GiteeRepo)/releases/download/v$Version/$fileName"
-                        Write-Host "Attempting to add Gitee download link as external asset..." -ForegroundColor Cyan
-                        $externalUrl = $giteeUrl
-                    }
+                # 优先使用 GitHub 下载链接（通常最可靠）
+                $githubUrl = "https://github.com/pranvil/MobileTestTool/releases/download/v$Version/$fileName"
+                Write-Host "Attempting to add GitHub download link as external asset..." -ForegroundColor Cyan
+                Write-Host "GitHub URL: $githubUrl" -ForegroundColor Gray
+                $externalUrl = $githubUrl
+                
+                # 如果没有 GitHub，尝试 Gitee
+                if (-not $externalUrl -and $config.GiteeOwner -and $config.GiteeRepo) {
+                    $giteeUrl = "https://gitee.com/$($config.GiteeOwner)/$($config.GiteeRepo)/releases/download/v$Version/$fileName"
+                    Write-Host "Attempting to add Gitee download link as external asset..." -ForegroundColor Cyan
+                    Write-Host "Gitee URL: $giteeUrl" -ForegroundColor Gray
+                    $externalUrl = $giteeUrl
                 }
                 
                 if ($externalUrl) {
