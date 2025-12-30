@@ -564,52 +564,112 @@ function Invoke-GitLabReleaseCreate {
                         $streamContent.Headers.ContentType = New-Object System.Net.Http.Headers.MediaTypeHeaderValue("application/zip")
                         $multipartContent.Add($streamContent, "file", $fileName)
                         
-                        $response = $httpClient.PostAsync($uploadsUrl, $multipartContent).Result
+                        Write-Host "Sending POST request to: $uploadsUrl" -ForegroundColor Gray
+                        $response = $null
+                        try {
+                            $response = $httpClient.PostAsync($uploadsUrl, $multipartContent).Result
+                        } catch {
+                            Write-Host "Error during POST request: $_" -ForegroundColor Red
+                            Write-Host "Exception type: $($_.Exception.GetType().FullName)" -ForegroundColor Red
+                            if ($_.Exception.InnerException) {
+                                Write-Host "Inner exception: $($_.Exception.InnerException.Message)" -ForegroundColor Red
+                            }
+                            throw
+                        }
+                        
+                        if ($null -eq $response) {
+                            throw "Response is null"
+                        }
+                        
+                        Write-Host "Response status: $($response.StatusCode)" -ForegroundColor Gray
+                        Write-Host "IsSuccessStatusCode: $($response.IsSuccessStatusCode)" -ForegroundColor Gray
                         
                         if ($response.IsSuccessStatusCode) {
-                            $responseContent = $response.Content.ReadAsStringAsync().Result
-                            Write-Host "Upload API Response: $responseContent" -ForegroundColor Gray
-                            $uploadResp = $responseContent | ConvertFrom-Json
-                            
-                            $uploadedUrl = $uploadResp.url
-                            if (-not $uploadedUrl) {
-                                $uploadedUrl = $uploadResp.markdown -replace '\[.*?\]\((.*?)\)', '$1'
+                            if ($null -eq $response.Content) {
+                                throw "Response.Content is null"
                             }
                             
-                                if ($uploadedUrl) {
-                                if (-not $uploadedUrl.StartsWith("http")) {
-                                    $uploadedUrl = "$Url$uploadedUrl"
+                            $responseContent = $null
+                            try {
+                                $responseContent = $response.Content.ReadAsStringAsync().Result
+                            } catch {
+                                Write-Host "Error reading response content: $_" -ForegroundColor Red
+                                throw
+                            }
+                            
+                            if ([string]::IsNullOrWhiteSpace($responseContent)) {
+                                throw "Response content is empty"
+                            }
+                            
+                            Write-Host "Upload API Response: $responseContent" -ForegroundColor Gray
+                            
+                            $uploadResp = $null
+                            try {
+                                $uploadResp = $responseContent | ConvertFrom-Json
+                            } catch {
+                                Write-Host "Error parsing JSON response: $_" -ForegroundColor Red
+                                throw "Failed to parse upload response as JSON: $responseContent"
+                            }
+                            
+                            if ($null -eq $uploadResp) {
+                                throw "Parsed response is null"
+                            }
+                            
+                            $uploadedUrl = $null
+                            if ($uploadResp.PSObject.Properties.Name -contains "url") {
+                                $uploadedUrl = $uploadResp.url
+                            }
+                            
+                            if ([string]::IsNullOrWhiteSpace($uploadedUrl) -and ($uploadResp.PSObject.Properties.Name -contains "markdown")) {
+                                $markdown = $uploadResp.markdown
+                                if (-not [string]::IsNullOrWhiteSpace($markdown)) {
+                                    $uploadedUrl = $markdown -replace '\[.*?\]\((.*?)\)', '$1'
                                 }
+                            }
+                            
+                            if ([string]::IsNullOrWhiteSpace($uploadedUrl)) {
+                                Write-Host "Upload response object:" -ForegroundColor Yellow
+                                $uploadResp | ConvertTo-Json -Depth 5 | Write-Host -ForegroundColor Yellow
+                                throw "Could not extract URL from upload response. Response: $responseContent"
+                            }
+                            
+                            if (-not $uploadedUrl.StartsWith("http")) {
+                                $uploadedUrl = "$Url$uploadedUrl"
+                            }
+                            
+                            # 使用正确的 API 端点添加 asset link
+                            # GitLab API: POST /projects/:id/releases/:tag_name/assets/links
+                            $assetUrl = "$apiBaseUrl/releases/v$Version/assets/links"
+                            $assetBody = @{
+                                name = $fileName
+                                url = $uploadedUrl
+                                link_type = "package"
+                            } | ConvertTo-Json -Depth 3 -Compress
+                            
+                            Write-Host "Adding file to release assets..." -ForegroundColor Cyan
+                            Write-Host "Asset URL: $assetUrl" -ForegroundColor Gray
+                            Write-Host "Asset Body: $assetBody" -ForegroundColor Gray
+                            
+                            try {
+                                $assetBodyBytes = [System.Text.Encoding]::UTF8.GetBytes($assetBody)
+                                $assetResp = Invoke-RestMethod -Uri $assetUrl -Method Post -Headers $headers -Body $assetBodyBytes -ContentType "application/json; charset=utf-8" -ErrorAction Stop
                                 
-                                # 使用正确的 API 端点添加 asset link
-                                # GitLab API: POST /projects/:id/releases/:tag_name/assets/links
-                                $assetUrl = "$apiBaseUrl/releases/v$Version/assets/links"
-                                $assetBody = @{
-                                    name = $fileName
-                                    url = $uploadedUrl
-                                    link_type = "package"
-                                } | ConvertTo-Json -Depth 3 -Compress
-                                
-                                Write-Host "Adding file to release assets..." -ForegroundColor Cyan
-                                Write-Host "Asset URL: $assetUrl" -ForegroundColor Gray
-                                Write-Host "Asset Body: $assetBody" -ForegroundColor Gray
-                                
-                                try {
-                                    $assetBodyBytes = [System.Text.Encoding]::UTF8.GetBytes($assetBody)
-                                    $assetResp = Invoke-RestMethod -Uri $assetUrl -Method Post -Headers $headers -Body $assetBodyBytes -ContentType "application/json; charset=utf-8" -ErrorAction Stop
-                                    
-                                    Write-Host "File uploaded and added to release successfully!" -ForegroundColor Green
-                                    Write-Host "Download URL: $uploadedUrl" -ForegroundColor Cyan
-                                } catch {
-                                    Write-Host "Warning: Failed to add file link to release: $_" -ForegroundColor Yellow
-                                    Write-Host "File uploaded to: $uploadedUrl" -ForegroundColor Cyan
-                                    Write-Host "You may need to manually add the file link to the release." -ForegroundColor Yellow
-                                }
-                            } else {
-                                throw "Upload succeeded but could not parse response URL. Response: $responseContent"
+                                Write-Host "File uploaded and added to release successfully!" -ForegroundColor Green
+                                Write-Host "Download URL: $uploadedUrl" -ForegroundColor Cyan
+                            } catch {
+                                Write-Host "Warning: Failed to add file link to release: $_" -ForegroundColor Yellow
+                                Write-Host "File uploaded to: $uploadedUrl" -ForegroundColor Cyan
+                                Write-Host "You may need to manually add the file link to the release." -ForegroundColor Yellow
                             }
                         } else {
-                            $errorContent = $response.Content.ReadAsStringAsync().Result
+                            $errorContent = ""
+                            if ($null -ne $response.Content) {
+                                try {
+                                    $errorContent = $response.Content.ReadAsStringAsync().Result
+                                } catch {
+                                    $errorContent = "Could not read error content: $_"
+                                }
+                            }
                             throw "Upload failed with status $($response.StatusCode): $errorContent"
                         }
                     } finally {
