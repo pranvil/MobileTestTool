@@ -1,0 +1,21 @@
+# Release Configuration Template
+# Copy this file to .release-config.ps1 and fill in your actual values
+# This file contains sensitive tokens and should NOT be committed to git
+
+# GitHub Configuration
+# GitHub uses gh CLI for authentication, usually no token needed
+# But you can specify owner/repo if needed (optional)
+# $GitHubOwner = "pranvil"
+# $GitHubRepo = "MobileTestTool"
+
+# Gitee Configuration
+$GiteeOwner = "your_gitee_username"
+$GiteeRepo = "MobileTestTool"
+$GiteeToken = "your_gitee_token_here"
+
+# GitLab Configuration
+$GitLabUrl = "http://10.129.93.67"
+$GitLabOwner = "your_gitlab_username"
+$GitLabRepo = "mobiletesttool"
+$GitLabToken = "your_gitlab_token_here"
+

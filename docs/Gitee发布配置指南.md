@@ -77,55 +77,53 @@ $env:GITEE_TOKEN = "your_token_here"
 [System.Environment]::SetEnvironmentVariable("GITEE_TOKEN", "your_token_here", "User")
 ```
 
-**或者创建配置文件：**
+**或者使用统一配置文件（推荐）：**
 
-在项目根目录创建 `.gitee-config.ps1`（已添加到 .gitignore）：
+在项目根目录创建 `.release-config.ps1`（可参考 `.release-config.ps1.example`）：
 ```powershell
+# Gitee 配置
 $GiteeOwner = "您的用户名"
 $GiteeRepo = "MobileTestTool"
 $GiteeToken = "您的Token"
+
+# 也可以同时配置 GitLab
+$GitLabUrl = "http://10.129.93.67"
+$GitLabOwner = "hao.lin"
+$GitLabRepo = "mobiletesttool"
+$GitLabToken = "your_gitlab_token"
 ```
 
-然后在 `release.ps1` 中加载：
-```powershell
-if (Test-Path ".\.gitee-config.ps1") {
-    . .\.gitee-config.ps1
-}
-```
+**注意**：`.release-config.ps1` 已添加到 `.gitignore`，不会被提交到仓库。
 
 ---
 
-## 📝 第三步：修改发布脚本
+## 📝 第三步：使用发布脚本
 
-脚本已经更新，支持 Gitee 发布。您只需要在运行时提供参数即可。
+### 3.1 使用统一发布脚本（推荐）
 
-### 3.1 基本用法
-
-```powershell
-.\scripts\release.ps1 -Version "0.9.6.4.4" `
-    -GiteeOwner "您的用户名" `
-    -GiteeRepo "MobileTestTool" `
-    -GiteeToken "您的Token"
-```
-
-### 3.2 使用环境变量
-
-如果设置了环境变量，可以简化命令：
+现在所有平台使用统一的 `scripts/release.ps1` 脚本，通过 `-Platform` 参数选择发布平台：
 
 ```powershell
-# 设置环境变量（只需设置一次）
-$env:GITEE_OWNER = "您的用户名"
-$env:GITEE_REPO = "MobileTestTool"
-$env:GITEE_TOKEN = "您的Token"
+# 发布到所有已配置的平台（包括 Gitee）
+.\scripts\release.ps1 -Version "0.9.6.5.5" -NotesFile "docs\notes.md"
 
-# 运行时使用环境变量
-.\scripts\release.ps1 -Version "0.9.6.4.4" `
-    -GiteeOwner $env:GITEE_OWNER `
-    -GiteeRepo $env:GITEE_REPO `
-    -GiteeToken $env:GITEE_TOKEN
+# 仅发布到 Gitee
+.\scripts\release.ps1 -Version "0.9.6.5.5" -Platform gitee -NotesFile "docs\notes.md"
+
+# 仅发布到 GitHub
+.\scripts\release.ps1 -Version "0.9.6.5.5" -Platform github
+
+# 仅发布到 GitLab
+.\scripts\release.ps1 -Version "0.9.6.5.5" -Platform gitlab
 ```
 
-### 3.3 创建便捷脚本
+### 3.2 配置说明
+
+脚本会自动从以下位置加载配置（按优先级）：
+1. **环境变量**（最高优先级）
+2. **`.release-config.ps1` 配置文件**（项目根目录）
+
+如果使用配置文件，脚本会自动加载，无需手动指定参数。
 
 创建 `scripts\release-with-gitee.ps1`：
 
@@ -173,12 +171,11 @@ if (-not $giteeOwner -or -not $giteeRepo -or -not $giteeToken) {
 # 1. 确保代码已提交到 GitHub
 git status
 
-# 2. 执行发布（会自动发布到 GitHub 和 Gitee）
-.\scripts\release.ps1 -Version "0.9.6.4.4" `
-    -GiteeOwner "您的用户名" `
-    -GiteeRepo "MobileTestTool" `
-    -GiteeToken "您的Token" `
-    -NotesFile "docs\notes.md"
+# 2. 执行发布（会自动发布到所有已配置的平台）
+.\scripts\release.ps1 -Version "0.9.6.5.5" -NotesFile "docs\notes.md"
+
+# 或者仅发布到 Gitee
+.\scripts\release.ps1 -Version "0.9.6.5.5" -Platform gitee -NotesFile "docs\notes.md"
 ```
 
 ### 4.2 发布流程说明

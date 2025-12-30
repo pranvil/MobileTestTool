@@ -364,23 +364,60 @@ pyinstaller --clean MobileTestTool_pyqt.spec
 - 如需灰度或版本存档，可在静态目录中同时保留历史版本的 JSON 与安装包。
 
 #### 版本打包与发布脚本
-为减少人工操作，可使用项目根目录的 PowerShell 脚本：
+为减少人工操作，可使用统一的 PowerShell 发布脚本：
 
-##### `scripts/release.ps1`
-```powershell
-.\scripts\release.ps1 -Version "0.9.4"              # 打包 + 生成 latest.json + 提交并发布
-.\scripts\release.ps1 -Version "0.9.4" -SkipPublish # 仅生成包与 manifest
-.\scripts\release.ps1 -Version "0.9.4" -NotesFile "docs\notes.md" # 指定发布说明
-```
-- 自动执行 `scripts\build_pyqt.bat`、压缩 onedir 目录、计算 SHA256 并生成 `releases/latest.json`。
-- 默认会 `git add/commit/push`、创建 `v<版本>` 标签并调用 GitHub CLI 发布 Release。
-- 需预先安装并登录 GitHub CLI；`-SkipPublish` 可跳过推送与发布，`-NotesFile` 可读取外部 Markdown 作为 release notes。
+##### 配置发布平台
+首先，在项目根目录创建 `.release-config.ps1` 配置文件（可参考 `.release-config.ps1.example`）：
 
-##### `scripts/publish-release.ps1`
-兼容旧流程的入口，内部会转调 `release.ps1`：
 ```powershell
-.\scripts\publish-release.ps1 -Version "0.9.4"
+# Gitee 配置
+$GiteeOwner = "your_gitee_username"
+$GiteeRepo = "MobileTestTool"
+$GiteeToken = "your_gitee_token"
+
+# GitLab 配置
+$GitLabUrl = "http://10.129.93.67"
+$GitLabOwner = "your_gitlab_username"
+$GitLabRepo = "mobiletesttool"
+$GitLabToken = "your_gitlab_token"
 ```
+
+**注意**：`.release-config.ps1` 文件包含敏感信息，已添加到 `.gitignore`，不会被提交到仓库。
+
+##### `scripts/release.ps1` - 统一发布脚本
+支持发布到 GitHub、Gitee、GitLab 三个平台，可通过 `-Platform` 参数选择发布平台：
+
+```powershell
+# 发布到所有已配置的平台（默认）
+.\scripts\release.ps1 -Version "0.9.6.5.5"
+
+# 仅发布到 GitHub
+.\scripts\release.ps1 -Version "0.9.6.5.5" -Platform github
+
+# 仅发布到 Gitee
+.\scripts\release.ps1 -Version "0.9.6.5.5" -Platform gitee
+
+# 仅发布到 GitLab
+.\scripts\release.ps1 -Version "0.9.6.5.5" -Platform gitlab
+
+# 指定发布说明文件
+.\scripts\release.ps1 -Version "0.9.6.5.5" -NotesFile "docs\notes.md"
+
+# 跳过发布步骤（仅打包）
+.\scripts\release.ps1 -Version "0.9.6.5.5" -SkipPublish
+
+# 跳过打包步骤（使用已有包）
+.\scripts\release.ps1 -Version "0.9.6.5.5" -SkipPackage
+```
+
+**功能说明**：
+- 自动执行 `scripts\build_pyqt.bat`、压缩 onedir 目录、计算 SHA256 并生成 `releases/latest.json`
+- 自动 `git add/commit/push`、创建 `v<版本>` 标签并推送到所有配置的远程仓库
+- 根据 `-Platform` 参数创建对应平台的 Release
+- GitHub 使用 `gh` CLI（需预先安装并登录）
+- Gitee 和 GitLab 使用 API（需在配置文件中提供 Token）
+- GitLab 支持自动上传 ZIP 文件到 Release Assets
+- `-SkipPublish` 可跳过推送与发布，`-SkipPackage` 可使用已有包
 
 ### 🆕 SIM APDU解析器
 1. 在"SIM"标签页点击"启动 APDU 解析器"按钮

@@ -91,7 +91,7 @@ GitLab API 需要 Access Token 来创建 Release。
 
 ### 2.2 保存 Token（推荐方式）
 
-为了安全，建议将 Token 保存为环境变量或配置文件：
+为了安全，建议将 Token 保存为环境变量或统一配置文件：
 
 #### 方式 A：使用环境变量（推荐）
 
@@ -110,55 +110,54 @@ $env:GITLAB_TOKEN = "your_token_here"
 [System.Environment]::SetEnvironmentVariable("GITLAB_TOKEN", "your_token_here", "User")
 ```
 
-#### 方式 B：创建配置文件
+#### 方式 B：使用统一配置文件（推荐，支持多平台）
 
-在项目根目录创建 `.gitlab-config.ps1`（已添加到 .gitignore）：
+在项目根目录创建 `.release-config.ps1`（可参考 `.release-config.ps1.example`）：
 
 ```powershell
+# GitLab 配置
 $GitLabUrl = "http://10.129.93.67"
 $GitLabOwner = "hao.lin"
 $GitLabRepo = "mobiletesttool"
 $GitLabToken = "your_token_here"
+
+# 也可以同时配置 Gitee
+$GiteeOwner = "your_gitee_username"
+$GiteeRepo = "MobileTestTool"
+$GiteeToken = "your_gitee_token"
 ```
+
+**注意**：`.release-config.ps1` 已添加到 `.gitignore`，不会被提交到仓库。
 
 ---
 
 ## 📝 第三步：使用发布脚本
 
-### 3.1 使用便捷脚本（推荐）
+### 3.1 使用统一发布脚本（推荐）
+
+现在所有平台使用统一的 `scripts/release.ps1` 脚本，通过 `-Platform` 参数选择发布平台：
 
 ```powershell
-# 使用便捷脚本（自动加载配置）
-.\scripts\release-with-gitlab.ps1 -Version "0.9.6.5.5" -NotesFile "docs\notes.md"
+# 发布到所有已配置的平台（包括 GitLab）
+.\scripts\release.ps1 -Version "0.9.6.5.5" -NotesFile "docs\notes.md"
+
+# 仅发布到 GitLab
+.\scripts\release.ps1 -Version "0.9.6.5.5" -Platform gitlab -NotesFile "docs\notes.md"
+
+# 仅发布到 GitHub
+.\scripts\release.ps1 -Version "0.9.6.5.5" -Platform github
+
+# 仅发布到 Gitee
+.\scripts\release.ps1 -Version "0.9.6.5.5" -Platform gitee
 ```
 
-### 3.2 直接使用主脚本
+### 3.2 配置说明
 
-```powershell
-# 使用环境变量
-.\scripts\release.ps1 -Version "0.9.6.5.5" `
-    -GitLabUrl "http://10.129.93.67" `
-    -GitLabOwner "hao.lin" `
-    -GitLabRepo "mobiletesttool" `
-    -GitLabToken "your_token" `
-    -NotesFile "docs\notes.md"
-```
+脚本会自动从以下位置加载配置（按优先级）：
+1. **环境变量**（最高优先级）
+2. **`.release-config.ps1` 配置文件**（项目根目录）
 
-### 3.3 同时发布到多个平台
-
-脚本支持同时发布到 GitHub、Gitee 和 GitLab：
-
-```powershell
-.\scripts\release.ps1 -Version "0.9.6.5.5" `
-    -GitLabUrl "http://10.129.93.67" `
-    -GitLabOwner "hao.lin" `
-    -GitLabRepo "mobiletesttool" `
-    -GitLabToken "your_gitlab_token" `
-    -GiteeOwner "your_gitee_username" `
-    -GiteeRepo "MobileTestTool" `
-    -GiteeToken "your_gitee_token" `
-    -NotesFile "docs\notes.md"
-```
+如果使用配置文件，脚本会自动加载，无需手动指定参数。
 
 ---
 
@@ -170,8 +169,11 @@ $GitLabToken = "your_token_here"
 # 1. 确保代码已提交
 git status
 
-# 2. 执行发布（会自动发布到 GitLab）
-.\scripts\release-with-gitlab.ps1 -Version "0.9.6.5.5" -NotesFile "docs\notes.md"
+# 2. 执行发布（会自动发布到所有已配置的平台）
+.\scripts\release.ps1 -Version "0.9.6.5.5" -NotesFile "docs\notes.md"
+
+# 或者仅发布到 GitLab
+.\scripts\release.ps1 -Version "0.9.6.5.5" -Platform gitlab -NotesFile "docs\notes.md"
 ```
 
 ### 4.2 发布流程说明

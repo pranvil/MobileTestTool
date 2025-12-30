@@ -125,11 +125,13 @@ c:\log\*
 *.tmp
 *.temp
 missing_translations.txt
+.cursor/
 
-# Gitee configuration (contains sensitive tokens)
+# Release configuration (contains sensitive tokens)
+.release-config.ps1
+
+# Legacy configuration files (deprecated, use .release-config.ps1 instead)
 .gitee-config.ps1
-
-# GitLab configuration (contains sensitive tokens)
 .gitlab-config.ps1
 
 # Build artifacts
