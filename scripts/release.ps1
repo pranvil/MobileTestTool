@@ -968,7 +968,7 @@ Invoke-Git "tag" "-a" $tagName "-m" ("Release {0}" -f $Version)
 
 # Push tags to remotes
 Write-Host "Pushing tag $tagName to 'origin' (GitHub)..."
-Invoke-Git "push" "origin" $tagName
+Invoke-Git "push" "origin" $tagName "--force"
 
 if ($remotes -contains "gitee" -and ($platformsToPublish -contains "gitee" -or $Platform -eq "all")) {
     Write-Host "Pushing tag $tagName to 'gitee'..."
