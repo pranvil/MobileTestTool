@@ -1,19 +1,57 @@
+<#
+.SYNOPSIS
+    统一的发布脚本，支持发布到 GitHub、Gitee、GitLab
+
+.DESCRIPTION
+    自动从配置文件加载平台配置，支持选择发布到单个或多个平台
+
+.PARAMETER Version
+    版本号（必需），例如 "0.9.6.5.5"
+
+.PARAMETER Platform
+    发布平台（可选），可选值：all|github|gitee|gitlab，默认 "all"
+
+.PARAMETER NotesFile
+    发布说明文件路径（可选），例如 "docs\notes.md"
+
+.PARAMETER SkipPublish
+    跳过发布步骤（仅打包）
+
+.PARAMETER SkipPackage
+    跳过打包步骤（使用已有包）
+
+.EXAMPLE
+    .\scripts\release.ps1 -Version "0.9.6.5.5"
+    发布到所有已配置的平台
+
+.EXAMPLE
+    .\scripts\release.ps1 -Version "0.9.6.5.5" -Platform github
+    仅发布到 GitHub
+
+.EXAMPLE
+    .\scripts\release.ps1 -Version "0.9.6.5.5" -Platform gitee
+    仅发布到 Gitee
+
+.EXAMPLE
+    .\scripts\release.ps1 -Version "0.9.6.5.5" -Platform gitlab
+    仅发布到 GitLab
+#>
+
 param(
     [Parameter(Mandatory = $true)]
     [string]$Version,
+    [ValidateSet("all", "github", "gitee", "gitlab")]
+    [string]$Platform = "all",
     [string]$NotesFile = "",
     [switch]$SkipPublish,
-    [switch]$SkipPackage,
-    [string]$GiteeOwner = "",
-    [string]$GiteeRepo = "",
-    [string]$GiteeToken = "",
-    [string]$GitLabUrl = "",
-    [string]$GitLabOwner = "",
-    [string]$GitLabRepo = "",
-    [string]$GitLabToken = ""
+    [switch]$SkipPackage
 )
 
 $ErrorActionPreference = "Stop"
+
+# ============================================================================
+# Helper Functions
+# ============================================================================
 
 function Invoke-Git {
     param(
@@ -27,6 +65,101 @@ function Invoke-Git {
         throw "git command failed: git $joined"
     }
 }
+
+function Load-ReleaseConfig {
+    <#
+    .SYNOPSIS
+        加载发布配置，优先从环境变量读取，然后从配置文件读取
+    #>
+    
+    $config = @{
+        GiteeOwner = $null
+        GiteeRepo = $null
+        GiteeToken = $null
+        GitLabUrl = $null
+        GitLabOwner = $null
+        GitLabRepo = $null
+        GitLabToken = $null
+    }
+    
+    # 1. 优先从环境变量读取
+    $config.GiteeOwner = $env:GITEE_OWNER
+    $config.GiteeRepo = $env:GITEE_REPO
+    $config.GiteeToken = $env:GITEE_TOKEN
+    $config.GitLabUrl = $env:GITLAB_URL
+    $config.GitLabOwner = $env:GITLAB_OWNER
+    $config.GitLabRepo = $env:GITLAB_REPO
+    $config.GitLabToken = $env:GITLAB_TOKEN
+    
+    # 2. 如果环境变量未设置，从配置文件读取
+    $configFile = Join-Path $PSScriptRoot "..\.release-config.ps1"
+    if (Test-Path $configFile) {
+        Write-Host "Loading configuration from .release-config.ps1..." -ForegroundColor Cyan
+        . $configFile
+        
+        if (-not $config.GiteeOwner) { $config.GiteeOwner = $GiteeOwner }
+        if (-not $config.GiteeRepo) { $config.GiteeRepo = $GiteeRepo }
+        if (-not $config.GiteeToken) { $config.GiteeToken = $GiteeToken }
+        if (-not $config.GitLabUrl) { $config.GitLabUrl = $GitLabUrl }
+        if (-not $config.GitLabOwner) { $config.GitLabOwner = $GitLabOwner }
+        if (-not $config.GitLabRepo) { $config.GitLabRepo = $GitLabRepo }
+        if (-not $config.GitLabToken) { $config.GitLabToken = $GitLabToken }
+    }
+    
+    return $config
+}
+
+function Get-PlatformsToPublish {
+    <#
+    .SYNOPSIS
+        根据 Platform 参数和配置情况，确定要发布的平台列表
+    #>
+    param(
+        [string]$Platform,
+        [hashtable]$Config
+    )
+    
+    $platforms = @()
+    
+    switch ($Platform.ToLower()) {
+        "all" {
+            # 检查所有平台的配置
+            # GitHub 总是可用（使用 gh CLI）
+            $platforms += "github"
+            
+            # 检查 Gitee 配置
+            if ($Config.GiteeOwner -and $Config.GiteeRepo -and $Config.GiteeToken) {
+                $platforms += "gitee"
+            }
+            
+            # 检查 GitLab 配置
+            if ($Config.GitLabUrl -and $Config.GitLabOwner -and $Config.GitLabRepo -and $Config.GitLabToken) {
+                $platforms += "gitlab"
+            }
+        }
+        "github" {
+            $platforms = @("github")
+        }
+        "gitee" {
+            if (-not ($Config.GiteeOwner -and $Config.GiteeRepo -and $Config.GiteeToken)) {
+                throw "Gitee configuration not found! Please configure Gitee in .release-config.ps1 or environment variables."
+            }
+            $platforms = @("gitee")
+        }
+        "gitlab" {
+            if (-not ($Config.GitLabUrl -and $Config.GitLabOwner -and $Config.GitLabRepo -and $Config.GitLabToken)) {
+                throw "GitLab configuration not found! Please configure GitLab in .release-config.ps1 or environment variables."
+            }
+            $platforms = @("gitlab")
+        }
+    }
+    
+    return $platforms
+}
+
+# ============================================================================
+# Release Creation Functions
+# ============================================================================
 
 function Invoke-GhReleaseCreate {
     param(
@@ -207,12 +340,12 @@ function Invoke-GitLabReleaseCreate {
     }
 
     # GitLab API URL - 使用项目路径编码
-    # 注意：GitLab API 需要 URL 编码的项目路径，格式为 owner%2Frepo
     $projectPath = "$Owner/$Repo"
-    # 使用 PowerShell 内置方法进行 URL 编码
-    $encodedPath = [System.Uri]::EscapeDataString($projectPath)
+    $encodedPath = $projectPath -replace '/', '%2F'
     $apiBaseUrl = "$Url/api/v4/projects/$encodedPath"
     $releasesUrl = "$apiBaseUrl/releases"
+    
+    Write-Host "GitLab API URL: $apiBaseUrl" -ForegroundColor Cyan
 
     $headers = @{
         "PRIVATE-TOKEN" = $Token
@@ -221,7 +354,6 @@ function Invoke-GitLabReleaseCreate {
 
     # 检查是否已存在该 tag 的 Release
     try {
-        # GitLab API 需要获取所有 releases 然后查找匹配的 tag
         $allReleases = Invoke-RestMethod -Uri $releasesUrl -Method Get -Headers $headers -ErrorAction SilentlyContinue
         if ($allReleases) {
             $existingRelease = $allReleases | Where-Object { $_.tag_name -eq "v$Version" } | Select-Object -First 1
@@ -236,22 +368,153 @@ function Invoke-GitLabReleaseCreate {
         Write-Host "No existing GitLab release for tag v$Version, continue to create."
     }
 
-    # 创建 Release 的请求体
-    $bodyObj = @{
-        name = "MobileTestTool v$Version"
-        tag_name = "v$Version"
-        description = $Notes
-        ref = $targetCommitish
+    # 验证 tag 是否存在，如果不存在则自动创建并推送
+    Write-Host "Checking if tag exists in GitLab..." -ForegroundColor Cyan
+    $tagsUrl = "$apiBaseUrl/repository/tags/v$Version"
+    $tagExists = $false
+    $maxRetries = 5
+    $retryDelay = 2
+    
+    for ($i = 1; $i -le $maxRetries; $i++) {
+        try {
+            $tagInfo = Invoke-RestMethod -Uri $tagsUrl -Method Get -Headers $headers -ErrorAction Stop
+            if ($tagInfo -and $tagInfo.name) {
+                Write-Host "Tag found: $($tagInfo.name) (commit: $($tagInfo.commit.id))" -ForegroundColor Green
+                $tagExists = $true
+                break
+            }
+        } catch {
+            $errorResponse = $_.Exception.Response
+            if ($errorResponse -and $errorResponse.StatusCode -eq 404) {
+                $tagExists = $false
+                break
+            } else {
+                if ($i -lt $maxRetries) {
+                    Write-Host "Error checking tag, retrying in $retryDelay seconds... (attempt $i/$maxRetries)" -ForegroundColor Yellow
+                    Start-Sleep -Seconds $retryDelay
+                } else {
+                    Write-Host "Warning: Could not verify tag status. Will attempt to create tag anyway." -ForegroundColor Yellow
+                    $tagExists = $false
+                }
+            }
+        }
+    }
+    
+    # 如果 tag 不存在，自动创建并推送
+    if (-not $tagExists) {
+        Write-Host "Tag 'v$Version' does not exist in GitLab. Creating and pushing tag..." -ForegroundColor Yellow
+        
+        $remotes = (git remote) -split "`n" | ForEach-Object { $_.Trim() } | Where-Object { $_ }
+        if (-not ($remotes -contains "gitlab")) {
+            Write-Host ""
+            Write-Host "========================================" -ForegroundColor Red
+            Write-Host "ERROR: Cannot create tag automatically!" -ForegroundColor Red
+            Write-Host "========================================" -ForegroundColor Red
+            Write-Host ""
+            Write-Host "Tag 'v$Version' does not exist in GitLab, and 'gitlab' remote is not configured." -ForegroundColor Yellow
+            Write-Host "Please configure the gitlab remote first:" -ForegroundColor Cyan
+            Write-Host "  git remote add gitlab $Url/$Owner/$Repo.git" -ForegroundColor White
+            Write-Host ""
+            Write-Host "Or manually push the tag:" -ForegroundColor Cyan
+            Write-Host "  git tag -a v$Version -m 'Release $Version'" -ForegroundColor White
+            Write-Host "  git push gitlab v$Version --force" -ForegroundColor White
+            Write-Host ""
+            throw "Tag 'v$Version' not found in GitLab and cannot create automatically (no gitlab remote)."
+        }
+        
+        $localTag = git tag --list "v$Version" 2>$null
+        if ($localTag) {
+            Write-Host "Local tag 'v$Version' exists. Using existing tag." -ForegroundColor Cyan
+        } else {
+            Write-Host "Creating local tag 'v$Version'..." -ForegroundColor Cyan
+            try {
+                Invoke-Git "tag" "-a" "v$Version" "-m" ("Release {0}" -f $Version)
+                Write-Host "Local tag created successfully." -ForegroundColor Green
+            } catch {
+                Write-Host "Warning: Failed to create local tag: $_" -ForegroundColor Yellow
+                throw "Failed to create tag: $_"
+            }
+        }
+        
+        Write-Host "Pushing tag 'v$Version' to GitLab..." -ForegroundColor Cyan
+        try {
+            $gitlabRemoteUrl = (git remote get-url gitlab)
+            if ($gitlabRemoteUrl -match "^http://") {
+                Write-Host "GitLab remote uses HTTP. Configuring Git to allow insecure connections..." -ForegroundColor Yellow
+                $gitlabHost = ([System.Uri]$gitlabRemoteUrl).Host
+                git config --local "http.$gitlabRemoteUrl.sslVerify" false 2>$null
+                if ($LASTEXITCODE -ne 0) {
+                    git config --global "http.$gitlabHost.sslVerify" false 2>$null
+                }
+            }
+            
+            Invoke-Git "push" "gitlab" "v$Version" "--force"
+            Write-Host "Tag pushed to GitLab successfully." -ForegroundColor Green
+            
+            Write-Host "Waiting for GitLab API to sync the tag..." -ForegroundColor Cyan
+            $syncRetries = 5
+            $syncDelay = 2
+            $tagSynced = $false
+            
+            for ($j = 1; $j -le $syncRetries; $j++) {
+                Start-Sleep -Seconds $syncDelay
+                try {
+                    $tagInfo = Invoke-RestMethod -Uri $tagsUrl -Method Get -Headers $headers -ErrorAction Stop
+                    if ($tagInfo -and $tagInfo.name) {
+                        Write-Host "Tag synced to GitLab API: $($tagInfo.name)" -ForegroundColor Green
+                        $tagSynced = $true
+                        break
+                    }
+                } catch {
+                    if ($j -lt $syncRetries) {
+                        Write-Host "Tag not synced yet, waiting... (attempt $j/$syncRetries)" -ForegroundColor Yellow
+                    }
+                }
+            }
+            
+            if (-not $tagSynced) {
+                Write-Host "Warning: Tag pushed but GitLab API hasn't synced yet. Continuing anyway..." -ForegroundColor Yellow
+            }
+        } catch {
+            Write-Host ""
+            Write-Host "========================================" -ForegroundColor Red
+            Write-Host "ERROR: Failed to push tag to GitLab!" -ForegroundColor Red
+            Write-Host "========================================" -ForegroundColor Red
+            Write-Host ""
+            Write-Host "Error: $_" -ForegroundColor Red
+            Write-Host ""
+            Write-Host "Please push the tag manually:" -ForegroundColor Cyan
+            Write-Host "  git push gitlab v$Version --force" -ForegroundColor White
+            Write-Host ""
+            throw "Failed to push tag to GitLab: $_"
+        }
     }
 
-    $bodyJson = $bodyObj | ConvertTo-Json -Depth 3
+    # 创建 Release 的请求体
+    $bodyObj = @{
+        tag_name = "v$Version"
+        name = "MobileTestTool v$Version"
+        description = $Notes
+    }
+    
+    if ($targetCommitish -and $targetCommitish -ne "main" -and $targetCommitish -ne "master") {
+        $bodyObj.ref = $targetCommitish
+    }
+
+    $bodyJson = $bodyObj | ConvertTo-Json -Depth 3 -Compress
 
     try {
-        # 1. 创建 Release
-        $resp = Invoke-RestMethod -Uri $releasesUrl -Method Post -Headers $headers -Body $bodyJson -ErrorAction Stop
-        Write-Host "GitLab release created successfully!" -ForegroundColor Green
+        Write-Host "Calling GitLab API: POST $releasesUrl" -ForegroundColor Cyan
+        Write-Host "Request body: $bodyJson" -ForegroundColor Gray
+        Write-Host ""
         
-        # 2. 上传文件到 GitLab
+        $bodyBytes = [System.Text.Encoding]::UTF8.GetBytes($bodyJson)
+        $resp = Invoke-RestMethod -Uri $releasesUrl -Method Post -Headers $headers -Body $bodyBytes -ContentType "application/json; charset=utf-8" -ErrorAction Stop
+        Write-Host "GitLab release created successfully!" -ForegroundColor Green
+        Write-Host "Release ID: $($resp.id)" -ForegroundColor Cyan
+        Write-Host "Release URL: $($resp.web_url)" -ForegroundColor Cyan
+        
+        # 上传文件到 GitLab
         Write-Host "Uploading package file to GitLab..." -ForegroundColor Cyan
         
         if (-not (Test-Path $Package)) {
@@ -259,7 +522,6 @@ function Invoke-GitLabReleaseCreate {
             Write-Host "Release created but file upload skipped." -ForegroundColor Yellow
         } else {
             try {
-                # 使用 GitLab Uploads API 上传文件
                 $uploadsUrl = "$apiBaseUrl/uploads"
                 $fileName = Split-Path -Leaf $Package
                 $fileSize = (Get-Item $Package).Length
@@ -267,7 +529,6 @@ function Invoke-GitLabReleaseCreate {
                 
                 Write-Host "Uploading file: $fileName ($fileSizeMB MB)..." -ForegroundColor Cyan
                 
-                # 使用 .NET HttpClient 进行 multipart/form-data 上传
                 try {
                     Add-Type -AssemblyName System.Net.Http -ErrorAction Stop
                 } catch {
@@ -291,20 +552,16 @@ function Invoke-GitLabReleaseCreate {
                             $responseContent = $response.Content.ReadAsStringAsync().Result
                             $uploadResp = $responseContent | ConvertFrom-Json
                             
-                            # GitLab Uploads API 返回的格式可能是 { "alt": "...", "url": "...", "markdown": "..." }
                             $uploadedUrl = $uploadResp.url
                             if (-not $uploadedUrl) {
-                                # 尝试其他可能的字段名
                                 $uploadedUrl = $uploadResp.markdown -replace '\[.*?\]\((.*?)\)', '$1'
                             }
                             
                             if ($uploadedUrl) {
-                                # 确保 URL 是完整的
                                 if (-not $uploadedUrl.StartsWith("http")) {
                                     $uploadedUrl = "$Url$uploadedUrl"
                                 }
                                 
-                                # 3. 将上传的文件添加到 Release 的 assets
                                 $assetUrl = "$releasesUrl/v$Version/assets/links"
                                 $assetBody = @{
                                     name = $fileName
@@ -351,7 +608,6 @@ function Invoke-GitLabReleaseCreate {
     }
 }
 
-
 function Get-ReleaseNotes {
     param(
         [string]$NotesFile,
@@ -364,7 +620,6 @@ function Get-ReleaseNotes {
         return $DefaultNotes
     }
 
-    # Try as absolute path, if not then relative to project root
     $notesPath = if ([System.IO.Path]::IsPathRooted($NotesFile)) {
         $NotesFile
     } else {
@@ -390,6 +645,45 @@ function Get-ReleaseNotes {
     }
 }
 
+# ============================================================================
+# Main Script
+# ============================================================================
+
+Write-Host ""
+Write-Host "========================================" -ForegroundColor Cyan
+Write-Host "MobileTestTool Release Script" -ForegroundColor Cyan
+Write-Host "========================================" -ForegroundColor Cyan
+Write-Host ""
+Write-Host "Version: $Version" -ForegroundColor Green
+Write-Host "Platform: $Platform" -ForegroundColor Green
+Write-Host ""
+
+# Load configuration
+$config = Load-ReleaseConfig
+
+# Determine platforms to publish
+$platformsToPublish = Get-PlatformsToPublish -Platform $Platform -Config $config
+
+Write-Host "Platforms to publish:" -ForegroundColor Cyan
+foreach ($p in $platformsToPublish) {
+    Write-Host "  - $p" -ForegroundColor Yellow
+}
+Write-Host ""
+
+# Validate configurations for selected platforms
+if ($platformsToPublish -contains "gitee") {
+    if (-not ($config.GiteeOwner -and $config.GiteeRepo -and $config.GiteeToken)) {
+        throw "Gitee configuration incomplete. Please check .release-config.ps1 or environment variables."
+    }
+}
+
+if ($platformsToPublish -contains "gitlab") {
+    if (-not ($config.GitLabUrl -and $config.GitLabOwner -and $config.GitLabRepo -and $config.GitLabToken)) {
+        throw "GitLab configuration incomplete. Please check .release-config.ps1 or environment variables."
+    }
+}
+
+# Set up paths
 $repoRoot    = (Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path))
 $buildDir    = Join-Path $repoRoot "dist/MobileTestTool"
 $packageDir  = Join-Path $repoRoot "dist"
@@ -407,7 +701,6 @@ if (-not (Test-Path $versionFile)) {
 
 $versionContent = Get-Content $versionFile -Raw -Encoding UTF8
 
-# Use single quotes for regex to avoid escaping issues
 $oldVersion = $null
 if ($versionContent -match 'APP_VERSION = "([^"]+)"') {
     $oldVersion = $matches[1]
@@ -415,10 +708,8 @@ if ($versionContent -match 'APP_VERSION = "([^"]+)"') {
 
 if ($oldVersion -and $oldVersion -ne $Version) {
     Write-Host "Updating version from $oldVersion to $Version"
-
     $versionPattern     = 'APP_VERSION = "[^"]+"'
     $versionReplacement = 'APP_VERSION = "' + $Version + '"'
-
     $versionContent = $versionContent -replace $versionPattern, $versionReplacement
     [System.IO.File]::WriteAllText(
         $versionFile,
@@ -432,6 +723,7 @@ if ($oldVersion -and $oldVersion -ne $Version) {
     Write-Host "Warning: Could not find APP_VERSION in version.py, skipping update"
 }
 
+# Build package
 if (-not $SkipPackage) {
     Write-Host "=== step 1: run build_pyqt.bat ==="
     $buildScript = Join-Path $repoRoot "scripts\build_pyqt.bat"
@@ -467,7 +759,7 @@ Write-Host ("SHA256: {0}" -f $sha256)
 if ($SkipPublish) {
     Write-Host "=== step 4: SKIPPED (SkipPublish enabled) ==="
     Write-Host "Warning: latest.json will not be generated because -SkipPublish is used"
-    Write-Host "Reason: latest.json download links require corresponding GitHub Release to work properly"
+    Write-Host "Reason: latest.json download links require corresponding Release to work properly"
     Write-Host "If you need to publish this version later, run the full release process without -SkipPublish"
     Write-Host ""
     Write-Host "SkipPublish enabled. Packaging complete."
@@ -482,7 +774,6 @@ if (-not (Test-Path $manifestDir)) {
 }
 
 $githubDownloadUrl = "https://github.com/pranvil/MobileTestTool/releases/download/v$Version/$packageName"
-# Read release notes once to ensure latest.json and releases use the same content
 $releaseNotes = Get-ReleaseNotes -NotesFile $NotesFile -RepoRoot $repoRoot -DefaultNotes "- Add release notes here" -Trim
 
 # Build download_urls array
@@ -497,8 +788,8 @@ $downloadUrls += @{
 }
 
 # Gitee source (CN) - if configured
-if ($GiteeOwner -and $GiteeRepo) {
-    $giteeDownloadUrl = "https://gitee.com/$GiteeOwner/$GiteeRepo/releases/download/v$Version/$packageName"
+if ($config.GiteeOwner -and $config.GiteeRepo) {
+    $giteeDownloadUrl = "https://gitee.com/$($config.GiteeOwner)/$($config.GiteeRepo)/releases/download/v$Version/$packageName"
     $downloadUrls += @{
         url = $giteeDownloadUrl
         region = "cn"
@@ -508,8 +799,8 @@ if ($GiteeOwner -and $GiteeRepo) {
 }
 
 # GitLab source (Internal) - if configured
-if ($GitLabUrl -and $GitLabOwner -and $GitLabRepo) {
-    $gitlabDownloadUrl = "$GitLabUrl/$GitLabOwner/$GitLabRepo/-/releases/v$Version/downloads/$packageName"
+if ($config.GitLabUrl -and $config.GitLabOwner -and $config.GitLabRepo) {
+    $gitlabDownloadUrl = "$($config.GitLabUrl)/$($config.GitLabOwner)/$($config.GitLabRepo)/-/releases/v$Version/downloads/$packageName"
     $downloadUrls += @{
         url = $gitlabDownloadUrl
         region = "internal"
@@ -528,7 +819,7 @@ $downloadUrls += @{
 
 $manifest = [ordered]@{
     version       = $Version
-    download_url  = $githubDownloadUrl  # Default fallback
+    download_url  = $githubDownloadUrl
     sha256        = $sha256
     file_name     = $packageName
     file_size     = (Get-Item $packagePath).Length
@@ -548,7 +839,6 @@ Write-Host ""
 
 Write-Host "=== step 6: git commit and push ==="
 
-# 需要一起提交到 Git 的文件（按你原来的习惯保留）
 $filesToStage = @(
     "scripts/release.ps1",
     "config/latest.json.example",
@@ -567,7 +857,6 @@ foreach ($file in $filesToStage) {
     }
 }
 
-# 如果有暂存修改，就提交一次版本
 git diff --cached --quiet
 if ($LASTEXITCODE -ne 0) {
     $commitMessage = "chore: release v$Version"
@@ -578,23 +867,21 @@ else {
     Write-Host "No staged changes detected. Skipping commit."
 }
 
-# 推送主分支到 GitHub（origin）
+# Push to remotes based on platforms to publish
+$remotes = (git remote) -split "`n" | ForEach-Object { $_.Trim() } | Where-Object { $_ }
+
+# Always push to GitHub (origin)
 Write-Host "Pushing 'main' to 'origin' (GitHub)..."
 Invoke-Git "push" "origin" "main"
 
-# 检查是否配置了 gitee 这个 remote，如果有就同步过去
-$remotes = (git remote) -split "`n" | ForEach-Object { $_.Trim() } | Where-Object { $_ }
-if ($remotes -contains "gitee") {
+# Push to Gitee if configured and selected
+if ($remotes -contains "gitee" -and ($platformsToPublish -contains "gitee" -or $Platform -eq "all")) {
     Write-Host "Pushing 'main' to 'gitee'..."
-    
-    # 先 fetch gitee 的最新状态
     Write-Host "Fetching latest from 'gitee'..."
     Invoke-Git "fetch" "gitee"
     
-    # 检查是否可以快进推送
     $canFastForward = $true
     try {
-        # 检查 gitee/main 是否在本地 main 的历史中
         $mergeBase = git merge-base main gitee/main 2>$null
         $giteeMainCommit = git rev-parse gitee/main 2>$null
         if ($LASTEXITCODE -eq 0 -and $mergeBase -and $giteeMainCommit) {
@@ -611,41 +898,35 @@ if ($remotes -contains "gitee") {
     if ($canFastForward) {
         Invoke-Git "push" "gitee" "main"
     } else {
-        # 使用 --force-with-lease 进行安全强制推送
-        # 这比 --force 更安全，只有在远程没有被其他人更新时才会推送
         Write-Host "Using '--force-with-lease' to push to 'gitee'..." -ForegroundColor Yellow
         Invoke-Git "push" "gitee" "main" "--force-with-lease"
     }
 }
 else {
-    Write-Host "No 'gitee' remote configured. Skipping push of 'main' to Gitee."
+    if ($platformsToPublish -contains "gitee") {
+        Write-Host "Warning: Gitee remote not configured, but Gitee release is requested." -ForegroundColor Yellow
+    }
 }
 
-# 检查是否配置了 gitlab 这个 remote，如果有就同步过去
-if ($remotes -contains "gitlab") {
+# Push to GitLab if configured and selected
+if ($remotes -contains "gitlab" -and ($platformsToPublish -contains "gitlab" -or $Platform -eq "all")) {
     Write-Host "Pushing 'main' to 'gitlab'..."
     
-    # 检查 GitLab remote URL 是否为 HTTP，如果是则配置允许不安全连接（内网环境）
     $gitlabUrl = (git remote get-url gitlab)
     if ($gitlabUrl -match "^http://") {
         Write-Host "GitLab remote uses HTTP. Configuring Git to allow insecure connections..." -ForegroundColor Yellow
-        # 针对特定 URL 配置允许 HTTP（仅针对 GitLab 服务器）
         $gitlabHost = ([System.Uri]$gitlabUrl).Host
         git config --global "http.https://$gitlabHost/.sslVerify" false 2>$null
         git config --global "http.$gitlabHost.sslVerify" false 2>$null
-        # 如果上面的配置不生效，使用更宽松的配置（仅针对这个仓库）
         git config "http.sslVerify" false 2>$null
         Write-Host "Git configured to allow HTTP connections to GitLab." -ForegroundColor Green
     }
     
-    # 先 fetch gitlab 的最新状态
     Write-Host "Fetching latest from 'gitlab'..."
     Invoke-Git "fetch" "gitlab"
     
-    # 检查是否可以快进推送
     $canFastForward = $true
     try {
-        # 检查 gitlab/main 是否在本地 main 的历史中
         $mergeBase = git merge-base main gitlab/main 2>$null
         $gitlabMainCommit = git rev-parse gitlab/main 2>$null
         if ($LASTEXITCODE -eq 0 -and $mergeBase -and $gitlabMainCommit) {
@@ -662,21 +943,20 @@ if ($remotes -contains "gitlab") {
     if ($canFastForward) {
         Invoke-Git "push" "gitlab" "main"
     } else {
-        # 使用 --force-with-lease 进行安全强制推送
         Write-Host "Using '--force-with-lease' to push to 'gitlab'..." -ForegroundColor Yellow
         Invoke-Git "push" "gitlab" "main" "--force-with-lease"
     }
 }
 else {
-    Write-Host "No 'gitlab' remote configured. Skipping push of 'main' to GitLab."
+    if ($platformsToPublish -contains "gitlab") {
+        Write-Host "Warning: GitLab remote not configured, but GitLab release is requested." -ForegroundColor Yellow
+    }
 }
 
-Write-Host "=== step 7: tags and GitHub release ==="
+Write-Host "=== step 7: tags and releases ==="
 
-# 版本号对应的 tag 名
 $tagName = "v$Version"
 
-# 如果本地已有同名 tag，先删掉再重建，避免冲突
 $existingTag = git tag --list $tagName
 if ($existingTag) {
     Write-Host "Tag $tagName already exists locally. Deleting and recreating..."
@@ -686,83 +966,77 @@ if ($existingTag) {
 Write-Host "Creating tag $tagName..."
 Invoke-Git "tag" "-a" $tagName "-m" ("Release {0}" -f $Version)
 
-# 把 tag 推到 GitHub（origin）
+# Push tags to remotes
 Write-Host "Pushing tag $tagName to 'origin' (GitHub)..."
 Invoke-Git "push" "origin" $tagName
 
-# 如果有 gitee 远程，把 tag 同步到 Gitee
-if ($remotes -contains "gitee") {
+if ($remotes -contains "gitee" -and ($platformsToPublish -contains "gitee" -or $Platform -eq "all")) {
     Write-Host "Pushing tag $tagName to 'gitee'..."
-    # Tag 推送使用 --force，因为同一个 tag 可能在不同提交上
     Invoke-Git "push" "gitee" $tagName "--force"
 }
-else {
-    Write-Host "No 'gitee' remote configured. Skipping push of tag to Gitee."
-}
 
-# 如果有 gitlab 远程，把 tag 同步到 GitLab
-if ($remotes -contains "gitlab") {
+if ($remotes -contains "gitlab" -and ($platformsToPublish -contains "gitlab" -or $Platform -eq "all")) {
     Write-Host "Pushing tag $tagName to 'gitlab'..."
-    # Tag 推送使用 --force，因为同一个 tag 可能在不同提交上
     Invoke-Git "push" "gitlab" $tagName "--force"
 }
-else {
-    Write-Host "No 'gitlab' remote configured. Skipping push of tag to GitLab."
+
+# Create releases
+if ($platformsToPublish -contains "github") {
+    Write-Host "=== step 7a: GitHub release ==="
+    try {
+        Invoke-GhReleaseCreate -Version $Version -Package $packagePath -Notes $releaseNotes
+    }
+    catch {
+        Write-Error "Failed to create GitHub release: $_"
+        throw
+    }
 }
 
-Write-Host "=== step 7a: GitHub release ==="
-
-try {
-    # 这里沿用你原来的 GitHub Release 函数和变量
-    Invoke-GhReleaseCreate -Version $Version -Package $packagePath -Notes $releaseNotes
-}
-catch {
-    Write-Error "Failed to create GitHub release: $_"
-    throw
-}
-
-Write-Host "=== step 7b: Gitee release ==="
-
-if ($GiteeOwner -and $GiteeRepo -and $GiteeToken) {
+if ($platformsToPublish -contains "gitee") {
+    Write-Host "=== step 7b: Gitee release ==="
     try {
         Invoke-GiteeReleaseCreate `
             -Version $Version `
             -Package $packagePath `
             -Notes $releaseNotes `
-            -Owner $GiteeOwner `
-            -Repo $GiteeRepo `
-            -Token $GiteeToken
+            -Owner $config.GiteeOwner `
+            -Repo $config.GiteeRepo `
+            -Token $config.GiteeToken
     }
     catch {
         Write-Host "Gitee release creation failed. Please check the error message above." -ForegroundColor Red
-        # 不抛出异常，允许脚本继续执行完成
     }
 }
-else {
-    Write-Host "Gitee config not set. Skipping Gitee release creation."
-}
 
-Write-Host "=== step 7c: GitLab release ==="
-
-if ($GitLabUrl -and $GitLabOwner -and $GitLabRepo -and $GitLabToken) {
+if ($platformsToPublish -contains "gitlab") {
+    Write-Host "=== step 7c: GitLab release ==="
     try {
         Invoke-GitLabReleaseCreate `
             -Version $Version `
             -Package $packagePath `
             -Notes $releaseNotes `
-            -Url $GitLabUrl `
-            -Owner $GitLabOwner `
-            -Repo $GitLabRepo `
-            -Token $GitLabToken
+            -Url $config.GitLabUrl `
+            -Owner $config.GitLabOwner `
+            -Repo $config.GitLabRepo `
+            -Token $config.GitLabToken
     }
     catch {
-        Write-Host "GitLab release creation failed. Please check the error message above." -ForegroundColor Red
-        # 不抛出异常，允许脚本继续执行完成
+        $errorMsg = $_.Exception.Message
+        if ($_.Exception.Response) {
+            $reader = New-Object System.IO.StreamReader($_.Exception.Response.GetResponseStream())
+            $responseBody = $reader.ReadToEnd()
+            $reader.Close()
+            Write-Host "GitLab API Error Response: $responseBody" -ForegroundColor Red
+        }
+        Write-Host "GitLab release creation failed: $errorMsg" -ForegroundColor Red
+        Write-Host "Please check:" -ForegroundColor Yellow
+        Write-Host "  1. GitLab URL is correct: $($config.GitLabUrl)" -ForegroundColor Yellow
+        Write-Host "  2. Owner and Repo are correct: $($config.GitLabOwner)/$($config.GitLabRepo)" -ForegroundColor Yellow
+        Write-Host "  3. Token has 'api' and 'write_repository' permissions" -ForegroundColor Yellow
+        Write-Host "  4. Tag 'v$Version' exists in GitLab" -ForegroundColor Yellow
     }
 }
-else {
-    Write-Host "GitLab config not set. Skipping GitLab release creation."
-}
 
-Write-Host "Code and tags have been pushed to the 'gitee' and 'gitlab' remotes (if configured)."
+Write-Host ""
+Write-Host "Code and tags have been pushed to configured remotes."
 Write-Host "=== all done ==="
