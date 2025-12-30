@@ -6,7 +6,11 @@ param(
     [switch]$SkipPackage,
     [string]$GiteeOwner = "",
     [string]$GiteeRepo = "",
-    [string]$GiteeToken = ""
+    [string]$GiteeToken = "",
+    [string]$GitLabUrl = "",
+    [string]$GitLabOwner = "",
+    [string]$GitLabRepo = "",
+    [string]$GitLabToken = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -91,7 +95,7 @@ function Invoke-GiteeReleaseCreate {
 
     Write-Host "Creating Gitee release for v$Version..."
 
-    # 确保描述不为空，否则 Gitee 会报 “发行版的描述不能为空”
+    # 确保描述不为空，否则 Gitee 会报 "发行版的描述不能为空"
     if ([string]::IsNullOrWhiteSpace($Notes)) {
         $Notes = "MobileTestTool v$Version"
     }
@@ -164,6 +168,185 @@ function Invoke-GiteeReleaseCreate {
         Write-Host ""
     } catch {
         Write-Error "Failed to create Gitee release: $_"
+        throw
+    }
+}
+
+function Invoke-GitLabReleaseCreate {
+    param(
+        [string]$Version,
+        [string]$Package,
+        [string]$Notes,
+        [string]$Url,
+        [string]$Owner,
+        [string]$Repo,
+        [string]$Token
+    )
+
+    Write-Host "Creating GitLab release for v$Version..."
+
+    # 确保描述不为空
+    if ([string]::IsNullOrWhiteSpace($Notes)) {
+        $Notes = "MobileTestTool v$Version"
+    }
+
+    # 确定 target_commitish
+    $targetCommitish = "main"
+    try {
+        $currentBranch = git rev-parse --abbrev-ref HEAD 2>$null
+        if ($LASTEXITCODE -eq 0 -and $currentBranch) {
+            $targetCommitish = $currentBranch.Trim()
+        }
+
+        $commitSha = git rev-parse HEAD 2>$null
+        if ($LASTEXITCODE -eq 0 -and $commitSha) {
+            $targetCommitish = $commitSha.Trim()
+        }
+    } catch {
+        Write-Host "Warning: could not determine target commit, using '$targetCommitish'"
+    }
+
+    # GitLab API URL - 使用项目路径编码
+    # 注意：GitLab API 需要 URL 编码的项目路径，格式为 owner%2Frepo
+    $projectPath = "$Owner/$Repo"
+    # 使用 PowerShell 内置方法进行 URL 编码
+    $encodedPath = [System.Uri]::EscapeDataString($projectPath)
+    $apiBaseUrl = "$Url/api/v4/projects/$encodedPath"
+    $releasesUrl = "$apiBaseUrl/releases"
+
+    $headers = @{
+        "PRIVATE-TOKEN" = $Token
+        "Content-Type" = "application/json"
+    }
+
+    # 检查是否已存在该 tag 的 Release
+    try {
+        # GitLab API 需要获取所有 releases 然后查找匹配的 tag
+        $allReleases = Invoke-RestMethod -Uri $releasesUrl -Method Get -Headers $headers -ErrorAction SilentlyContinue
+        if ($allReleases) {
+            $existingRelease = $allReleases | Where-Object { $_.tag_name -eq "v$Version" } | Select-Object -First 1
+            if ($existingRelease) {
+                Write-Host "GitLab release v$Version already exists. Deleting..."
+                $releaseId = $existingRelease.id
+                $deleteUrl = "$releasesUrl/$releaseId"
+                Invoke-RestMethod -Uri $deleteUrl -Method Delete -Headers $headers -ErrorAction Stop | Out-Null
+            }
+        }
+    } catch {
+        Write-Host "No existing GitLab release for tag v$Version, continue to create."
+    }
+
+    # 创建 Release 的请求体
+    $bodyObj = @{
+        name = "MobileTestTool v$Version"
+        tag_name = "v$Version"
+        description = $Notes
+        ref = $targetCommitish
+    }
+
+    $bodyJson = $bodyObj | ConvertTo-Json -Depth 3
+
+    try {
+        # 1. 创建 Release
+        $resp = Invoke-RestMethod -Uri $releasesUrl -Method Post -Headers $headers -Body $bodyJson -ErrorAction Stop
+        Write-Host "GitLab release created successfully!" -ForegroundColor Green
+        
+        # 2. 上传文件到 GitLab
+        Write-Host "Uploading package file to GitLab..." -ForegroundColor Cyan
+        
+        if (-not (Test-Path $Package)) {
+            Write-Host "Warning: Package file not found: $Package" -ForegroundColor Yellow
+            Write-Host "Release created but file upload skipped." -ForegroundColor Yellow
+        } else {
+            try {
+                # 使用 GitLab Uploads API 上传文件
+                $uploadsUrl = "$apiBaseUrl/uploads"
+                $fileName = Split-Path -Leaf $Package
+                $fileSize = (Get-Item $Package).Length
+                $fileSizeMB = [math]::Round($fileSize / 1MB, 2)
+                
+                Write-Host "Uploading file: $fileName ($fileSizeMB MB)..." -ForegroundColor Cyan
+                
+                # 使用 .NET HttpClient 进行 multipart/form-data 上传
+                try {
+                    Add-Type -AssemblyName System.Net.Http -ErrorAction Stop
+                } catch {
+                    throw "Failed to load System.Net.Http assembly. Please ensure .NET Framework 4.5+ is installed."
+                }
+                
+                $httpClient = New-Object System.Net.Http.HttpClient
+                try {
+                    $httpClient.DefaultRequestHeaders.Add("PRIVATE-TOKEN", $Token)
+                    
+                    $multipartContent = New-Object System.Net.Http.MultipartFormDataContent
+                    $fileStream = [System.IO.File]::OpenRead($Package)
+                    try {
+                        $streamContent = New-Object System.Net.Http.StreamContent($fileStream)
+                        $streamContent.Headers.ContentType = New-Object System.Net.Http.Headers.MediaTypeHeaderValue("application/zip")
+                        $multipartContent.Add($streamContent, "file", $fileName)
+                        
+                        $response = $httpClient.PostAsync($uploadsUrl, $multipartContent).Result
+                        
+                        if ($response.IsSuccessStatusCode) {
+                            $responseContent = $response.Content.ReadAsStringAsync().Result
+                            $uploadResp = $responseContent | ConvertFrom-Json
+                            
+                            # GitLab Uploads API 返回的格式可能是 { "alt": "...", "url": "...", "markdown": "..." }
+                            $uploadedUrl = $uploadResp.url
+                            if (-not $uploadedUrl) {
+                                # 尝试其他可能的字段名
+                                $uploadedUrl = $uploadResp.markdown -replace '\[.*?\]\((.*?)\)', '$1'
+                            }
+                            
+                            if ($uploadedUrl) {
+                                # 确保 URL 是完整的
+                                if (-not $uploadedUrl.StartsWith("http")) {
+                                    $uploadedUrl = "$Url$uploadedUrl"
+                                }
+                                
+                                # 3. 将上传的文件添加到 Release 的 assets
+                                $assetUrl = "$releasesUrl/v$Version/assets/links"
+                                $assetBody = @{
+                                    name = $fileName
+                                    url = $uploadedUrl
+                                } | ConvertTo-Json -Depth 3
+                                
+                                Write-Host "Adding file to release assets..." -ForegroundColor Cyan
+                                $assetResp = Invoke-RestMethod -Uri $assetUrl -Method Post -Headers $headers -Body $assetBody -ErrorAction Stop
+                                
+                                Write-Host "File uploaded successfully!" -ForegroundColor Green
+                                Write-Host "Download URL: $uploadedUrl" -ForegroundColor Cyan
+                            } else {
+                                throw "Upload succeeded but could not parse response URL"
+                            }
+                        } else {
+                            $errorContent = $response.Content.ReadAsStringAsync().Result
+                            throw "Upload failed with status $($response.StatusCode): $errorContent"
+                        }
+                    } finally {
+                        $fileStream.Close()
+                    }
+                } finally {
+                    $httpClient.Dispose()
+                }
+            } catch {
+                Write-Host "Warning: File upload failed: $_" -ForegroundColor Yellow
+                Write-Host "Release created but file upload failed. You may need to upload manually." -ForegroundColor Yellow
+                Write-Host "You can upload the file manually at: $($resp.web_url)" -ForegroundColor Yellow
+            }
+        }
+        
+        Write-Host ""
+        Write-Host "==========================================" -ForegroundColor Yellow
+        Write-Host "GitLab Release 创建成功！" -ForegroundColor Green
+        Write-Host "==========================================" -ForegroundColor Yellow
+        Write-Host ""
+        Write-Host "Release 地址: $($resp.web_url)" -ForegroundColor Cyan
+        Write-Host ""
+        Write-Host "==========================================" -ForegroundColor Yellow
+        Write-Host ""
+    } catch {
+        Write-Error "Failed to create GitLab release: $_"
         throw
     }
 }
@@ -324,6 +507,17 @@ if ($GiteeOwner -and $GiteeRepo) {
     }
 }
 
+# GitLab source (Internal) - if configured
+if ($GitLabUrl -and $GitLabOwner -and $GitLabRepo) {
+    $gitlabDownloadUrl = "$GitLabUrl/$GitLabOwner/$GitLabRepo/-/releases/v$Version/downloads/$packageName"
+    $downloadUrls += @{
+        url = $gitlabDownloadUrl
+        region = "internal"
+        platform = "windows"
+        priority = 15
+    }
+}
+
 # Default source (for other countries)
 $downloadUrls += @{
     url = $githubDownloadUrl
@@ -427,6 +621,43 @@ else {
     Write-Host "No 'gitee' remote configured. Skipping push of 'main' to Gitee."
 }
 
+# 检查是否配置了 gitlab 这个 remote，如果有就同步过去
+if ($remotes -contains "gitlab") {
+    Write-Host "Pushing 'main' to 'gitlab'..."
+    
+    # 先 fetch gitlab 的最新状态
+    Write-Host "Fetching latest from 'gitlab'..."
+    Invoke-Git "fetch" "gitlab"
+    
+    # 检查是否可以快进推送
+    $canFastForward = $true
+    try {
+        # 检查 gitlab/main 是否在本地 main 的历史中
+        $mergeBase = git merge-base main gitlab/main 2>$null
+        $gitlabMainCommit = git rev-parse gitlab/main 2>$null
+        if ($LASTEXITCODE -eq 0 -and $mergeBase -and $gitlabMainCommit) {
+            if ($mergeBase -ne $gitlabMainCommit) {
+                $canFastForward = $false
+                Write-Host "Warning: 'gitlab/main' has diverged from local 'main'. Using force-with-lease to push." -ForegroundColor Yellow
+            }
+        }
+    } catch {
+        $canFastForward = $false
+        Write-Host "Warning: Could not determine merge base. Using force-with-lease to push." -ForegroundColor Yellow
+    }
+    
+    if ($canFastForward) {
+        Invoke-Git "push" "gitlab" "main"
+    } else {
+        # 使用 --force-with-lease 进行安全强制推送
+        Write-Host "Using '--force-with-lease' to push to 'gitlab'..." -ForegroundColor Yellow
+        Invoke-Git "push" "gitlab" "main" "--force-with-lease"
+    }
+}
+else {
+    Write-Host "No 'gitlab' remote configured. Skipping push of 'main' to GitLab."
+}
+
 Write-Host "=== step 7: tags and GitHub release ==="
 
 # 版本号对应的 tag 名
@@ -454,6 +685,16 @@ if ($remotes -contains "gitee") {
 }
 else {
     Write-Host "No 'gitee' remote configured. Skipping push of tag to Gitee."
+}
+
+# 如果有 gitlab 远程，把 tag 同步到 GitLab
+if ($remotes -contains "gitlab") {
+    Write-Host "Pushing tag $tagName to 'gitlab'..."
+    # Tag 推送使用 --force，因为同一个 tag 可能在不同提交上
+    Invoke-Git "push" "gitlab" $tagName "--force"
+}
+else {
+    Write-Host "No 'gitlab' remote configured. Skipping push of tag to GitLab."
 }
 
 Write-Host "=== step 7a: GitHub release ==="
@@ -488,5 +729,27 @@ else {
     Write-Host "Gitee config not set. Skipping Gitee release creation."
 }
 
-Write-Host "Code and tags have been pushed to the 'gitee' remote (if configured)."
+Write-Host "=== step 7c: GitLab release ==="
+
+if ($GitLabUrl -and $GitLabOwner -and $GitLabRepo -and $GitLabToken) {
+    try {
+        Invoke-GitLabReleaseCreate `
+            -Version $Version `
+            -Package $packagePath `
+            -Notes $releaseNotes `
+            -Url $GitLabUrl `
+            -Owner $GitLabOwner `
+            -Repo $GitLabRepo `
+            -Token $GitLabToken
+    }
+    catch {
+        Write-Host "GitLab release creation failed. Please check the error message above." -ForegroundColor Red
+        # 不抛出异常，允许脚本继续执行完成
+    }
+}
+else {
+    Write-Host "GitLab config not set. Skipping GitLab release creation."
+}
+
+Write-Host "Code and tags have been pushed to the 'gitee' and 'gitlab' remotes (if configured)."
 Write-Host "=== all done ==="
