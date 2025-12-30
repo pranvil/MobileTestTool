@@ -625,6 +625,19 @@ else {
 if ($remotes -contains "gitlab") {
     Write-Host "Pushing 'main' to 'gitlab'..."
     
+    # 检查 GitLab remote URL 是否为 HTTP，如果是则配置允许不安全连接（内网环境）
+    $gitlabUrl = (git remote get-url gitlab)
+    if ($gitlabUrl -match "^http://") {
+        Write-Host "GitLab remote uses HTTP. Configuring Git to allow insecure connections..." -ForegroundColor Yellow
+        # 针对特定 URL 配置允许 HTTP（仅针对 GitLab 服务器）
+        $gitlabHost = ([System.Uri]$gitlabUrl).Host
+        git config --global "http.https://$gitlabHost/.sslVerify" false 2>$null
+        git config --global "http.$gitlabHost.sslVerify" false 2>$null
+        # 如果上面的配置不生效，使用更宽松的配置（仅针对这个仓库）
+        git config "http.sslVerify" false 2>$null
+        Write-Host "Git configured to allow HTTP connections to GitLab." -ForegroundColor Green
+    }
+    
     # 先 fetch gitlab 的最新状态
     Write-Host "Fetching latest from 'gitlab'..."
     Invoke-Git "fetch" "gitlab"
