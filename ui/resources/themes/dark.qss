@@ -1,4 +1,4 @@
-/* PyQt5 Dark Theme */
+/* PySide6 Dark Theme */
 
 /* 全局容器底色：把所有未显式指定的 QWidget 都拉进暗色 */
 QWidget {

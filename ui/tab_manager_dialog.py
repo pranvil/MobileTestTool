@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
 Tab管理对话框
@@ -6,13 +6,13 @@ Tab管理对话框
 """
 
 import os
-from PyQt5.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel, 
+from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel, 
                              QPushButton, QListWidget, QListWidgetItem, 
                              QCheckBox, QTabWidget, QWidget,
                              QLineEdit, QTextEdit, QMessageBox, QComboBox,
                              QSpinBox, QFormLayout, QScrollArea, QFrame)
-from PyQt5.QtCore import Qt, pyqtSignal
-from PyQt5.QtGui import QFont
+from PySide6.QtCore import Qt, Signal
+from PySide6.QtGui import QFont
 from core.debug_logger import logger
 from ui.widgets.shadow_utils import add_card_shadow
 
@@ -324,11 +324,11 @@ class TabManagerDialog(QDialog):
             self,
             self.tr("确认重置"),
             self.tr("确定要重置为默认Tab配置吗？这将删除所有自定义Tab和Card。"),
-            QMessageBox.Yes | QMessageBox.No,
-            QMessageBox.No
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No
         )
         
-        if reply == QMessageBox.Yes:
+        if reply == QMessageBox.StandardButton.Yes:
             self.tab_config_manager.reset_to_default()
             self.load_tab_config()
             QMessageBox.information(self, self.tr("成功"), self.tr("已重置为默认配置"))
@@ -336,7 +336,7 @@ class TabManagerDialog(QDialog):
     def show_add_tab_dialog(self):
         """显示添加Tab对话框"""
         dialog = CustomTabDialog(self.tab_config_manager, parent=self)
-        if dialog.exec_() == QDialog.Accepted:
+        if dialog.exec() == QDialog.DialogCode.Accepted:
             self.load_custom_tabs()
     
     def edit_custom_tab(self):
@@ -348,7 +348,7 @@ class TabManagerDialog(QDialog):
         
         tab_id = current_item.data(Qt.UserRole)
         dialog = CustomTabDialog(self.tab_config_manager, tab_id=tab_id, parent=self)
-        if dialog.exec_() == QDialog.Accepted:
+        if dialog.exec() == QDialog.DialogCode.Accepted:
             self.load_custom_tabs()
     
     def delete_custom_tab(self):
@@ -365,11 +365,11 @@ class TabManagerDialog(QDialog):
             self,
             self.tr("确认删除"),
             f"{self.tr('确定要删除Tab')} '{tab_name}' {self.tr('吗？')}",
-            QMessageBox.Yes | QMessageBox.No,
-            QMessageBox.No
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No
         )
         
-        if reply == QMessageBox.Yes:
+        if reply == QMessageBox.StandardButton.Yes:
             if self.tab_config_manager.delete_custom_tab(tab_id):
                 self.load_custom_tabs()
                 QMessageBox.information(self, self.tr("成功"), self.tr("Tab已删除"))
@@ -377,7 +377,7 @@ class TabManagerDialog(QDialog):
     def show_add_card_dialog(self):
         """显示添加Card对话框"""
         dialog = CustomCardDialog(self.tab_config_manager, parent=self)
-        if dialog.exec_() == QDialog.Accepted:
+        if dialog.exec() == QDialog.DialogCode.Accepted:
             self.load_custom_cards()
     
     def edit_custom_card(self):
@@ -389,7 +389,7 @@ class TabManagerDialog(QDialog):
         
         card_id = current_item.data(Qt.UserRole)
         dialog = CustomCardDialog(self.tab_config_manager, card_id=card_id, parent=self)
-        if dialog.exec_() == QDialog.Accepted:
+        if dialog.exec() == QDialog.DialogCode.Accepted:
             self.load_custom_cards()
     
     def delete_custom_card(self):
@@ -406,11 +406,11 @@ class TabManagerDialog(QDialog):
             self,
             self.tr("确认删除"),
             f"{self.tr('确定要删除Card')} '{card_name}' {self.tr('吗？')}",
-            QMessageBox.Yes | QMessageBox.No,
-            QMessageBox.No
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No
         )
         
-        if reply == QMessageBox.Yes:
+        if reply == QMessageBox.StandardButton.Yes:
             if self.tab_config_manager.delete_custom_card(card_id):
                 self.load_custom_cards()
                 QMessageBox.information(self, self.tr("成功"), self.tr("Card已删除"))

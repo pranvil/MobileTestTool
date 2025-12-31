@@ -1,7 +1,7 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-PyQt5 Log过滤管理器
+PySide6 Log过滤管理器
 完整实现原Tkinter版本的Log过滤功能
 """
 
@@ -11,8 +11,9 @@ import re
 import os
 import queue
 from datetime import datetime
-from PyQt5.QtCore import QObject, pyqtSignal, QTimer, QMutex
-from PyQt5.QtWidgets import QMessageBox, QFileDialog
+from PySide6.QtCore import QObject, Signal, QTimer, QMutex
+from PySide6.QtWidgets import QMessageBox, QFileDialog
+from PySide6.QtGui import QTextCursor
 
 
 class LogFilterWorker(threading.Thread):
@@ -163,17 +164,17 @@ class LogFilterWorker(threading.Thread):
             self.process.terminate()
 
 
-class PyQtLogProcessor(QObject):
-    """PyQt5 Log过滤管理器 - 完整功能版本"""
+class PySide6LogProcessor(QObject):
+    """PySide6 Log过滤管理器 - 完整功能版本"""
     
     # 信号定义
-    filtering_started = pyqtSignal()
-    filtering_stopped = pyqtSignal()
-    log_received = pyqtSignal(str)  # log_line
-    status_message = pyqtSignal(str)
-    performance_update = pyqtSignal(str)  # 性能统计更新
-    keyword_loaded = pyqtSignal(str)  # 关键字已加载
-    filter_state_changed = pyqtSignal(bool, str)  # is_running, current_keyword - 用于更新按钮状态
+    filtering_started = Signal()
+    filtering_stopped = Signal()
+    log_received = Signal(str)  # log_line
+    status_message = Signal(str)
+    performance_update = Signal(str)  # 性能统计更新
+    keyword_loaded = Signal(str)  # 关键字已加载
+    filter_state_changed = Signal(bool, str)  # is_running, current_keyword - 用于更新按钮状态
     
     def __init__(self, device_manager, parent=None):
         super().__init__(parent)
@@ -368,11 +369,11 @@ class PyQtLogProcessor(QObject):
             None,
             self.lang_manager.tr("确认"),
             self.lang_manager.tr("确定要清空所有日志吗？"),
-            QMessageBox.Yes | QMessageBox.No,
-            QMessageBox.No
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No
         )
         
-        if reply == QMessageBox.Yes:
+        if reply == QMessageBox.StandardButton.Yes:
             self.log_viewer.text_edit.clear()
             self._line_count = 0
             self.status_message.emit(self.lang_manager.tr("日志已清空"))
@@ -386,7 +387,7 @@ class PyQtLogProcessor(QObject):
     
     def show_display_lines_dialog(self):
         """显示设置最大显示行数的对话框"""
-        from PyQt5.QtWidgets import QInputDialog
+        from PySide6.QtWidgets import QInputDialog
         
         current_lines = self.adaptive_params['max_display_lines']
         
@@ -561,7 +562,7 @@ class PyQtLogProcessor(QObject):
         
         # 移动到末尾
         cursor = text_edit.textCursor()
-        cursor.movePosition(cursor.End)
+        cursor.movePosition(QTextCursor.MoveOperation.End)
         
         # 批量处理所有行
         for line in lines:
@@ -652,10 +653,10 @@ class PyQtLogProcessor(QObject):
                     
                     # 使用文本光标一次性删除超出的行
                     cursor = text_edit.textCursor()
-                    cursor.movePosition(cursor.Start)
-                    cursor.movePosition(cursor.Down, cursor.MoveAnchor, lines_to_delete)
-                    cursor.movePosition(cursor.StartOfLine)
-                    cursor.movePosition(cursor.Start, cursor.KeepAnchor)
+                    cursor.movePosition(QTextCursor.MoveOperation.Start)
+                    cursor.movePosition(QTextCursor.MoveOperation.Down, QTextCursor.MoveMode.MoveAnchor, lines_to_delete)
+                    cursor.movePosition(QTextCursor.MoveOperation.StartOfLine)
+                    cursor.movePosition(QTextCursor.MoveOperation.Start, QTextCursor.MoveMode.KeepAnchor)
                     cursor.removeSelectedText()
                     
                     # 更新缓存

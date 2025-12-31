@@ -1,13 +1,13 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
 输入文本对话框
 """
 
 import subprocess
-from PyQt5.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel, 
+from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel, 
                              QTextEdit, QPushButton, QMessageBox)
-from PyQt5.QtCore import Qt
+from PySide6.QtCore import Qt
 
 
 class InputTextDialog(QDialog):

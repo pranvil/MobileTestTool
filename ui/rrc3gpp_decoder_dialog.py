@@ -1,15 +1,15 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
 3GPP RRC/NAS/SMS 消息解码对话框（支持多条消息）
 """
 
-from PyQt5.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel, 
+from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel, 
                               QComboBox, QLineEdit, QTextEdit, QPushButton, 
                               QDialogButtonBox, QMessageBox, QScrollArea, 
                               QWidget, QFrame)
-from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QFontMetrics
+from PySide6.QtCore import Qt
+from PySide6.QtGui import QFontMetrics
 
 
 # 协议列表（根据技术类型）
@@ -109,7 +109,7 @@ class RRC3GPPMessageWidget(QFrame):
             max_width = 0
             for i in range(self.protocol_combo.count()):
                 text = self.protocol_combo.itemText(i)
-                # 使用 horizontalAdvance 方法（PyQt5 推荐），如果不存在则使用 width
+                # 使用 horizontalAdvance 方法（PySide6 推荐），如果不存在则使用 width
                 if hasattr(font_metrics, 'horizontalAdvance'):
                     width = font_metrics.horizontalAdvance(text)
                 else:

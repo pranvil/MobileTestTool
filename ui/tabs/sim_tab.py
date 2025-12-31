@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
 SIM Tab - SIM APDU 解析器集成
@@ -7,9 +7,9 @@ SIM Tab - SIM APDU 解析器集成
 import sys
 import os
 import subprocess
-from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QPushButton, 
+from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QPushButton, 
                            QLabel, QMessageBox, QScrollArea, QFrame)
-from PyQt5.QtCore import pyqtSignal, Qt
+from PySide6.QtCore import Signal, Qt
 from ui.widgets.shadow_utils import add_card_shadow
 
 # 添加SIM_APDU_Parser到Python路径
@@ -38,7 +38,7 @@ class SimTab(QWidget):
     """SIM APDU 解析器 Tab"""
     
     # 信号定义
-    status_message = pyqtSignal(str)
+    status_message = Signal(str)
     
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -164,7 +164,7 @@ class SimTab(QWidget):
         try:
             # 打开APDU解析器对话框
             dialog = ApduParserDialog(self)
-            dialog.exec_()
+            dialog.exec()
             
             self.status_message.emit("APDU 解析器已启动")
                 

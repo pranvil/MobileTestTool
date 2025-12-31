@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
 APDU 解析器对话框 - 集成 SIM_APDU_Parser 核心功能
@@ -8,13 +8,13 @@ import os
 import sys
 import re
 from typing import List, Optional
-from PyQt5.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QPushButton, 
+from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QPushButton, 
                            QLabel, QTextEdit, QTreeWidget, QTreeWidgetItem,
                            QFileDialog, QMessageBox, QSplitter,
                            QProgressBar, QComboBox, QCheckBox, QLineEdit,
-                           QSizePolicy, QApplication, QWidget, QFrame, QShortcut)
-from PyQt5.QtCore import Qt, QThread, pyqtSignal, QTimer
-from PyQt5.QtGui import QFont, QColor, QPalette, QKeySequence
+                           QSizePolicy, QApplication, QWidget, QFrame)
+from PySide6.QtCore import Qt, QThread, Signal, QTimer
+from PySide6.QtGui import QFont, QColor, QPalette, QKeySequence, QShortcut
 from ui.widgets.shadow_utils import add_card_shadow
 
 # 延迟导入 SIM_APDU_Parser 核心模块
@@ -120,9 +120,9 @@ def _import_sim_parser_modules():
 
 class ApduParseWorker(QThread):
     """APDU解析工作线程"""
-    progress = pyqtSignal(int)
-    finished = pyqtSignal(list)
-    error = pyqtSignal(str)
+    progress = Signal(int)
+    finished = Signal(list)
+    error = Signal(str)
     
     def __init__(self, file_path: str, prefer_mtk: bool = True, use_qualcomm: bool = False):
         super().__init__()
@@ -427,7 +427,8 @@ class ApduParserDialog(QDialog):
         
     def setup_filter_combo(self):
         """设置可复选的下拉菜单"""
-        from PyQt5.QtWidgets import QMenu, QAction
+        from PySide6.QtWidgets import QMenu
+        from PySide6.QtGui import QAction
         
         # 创建菜单
         self.filter_menu = QMenu(self.filter_btn)
@@ -724,7 +725,7 @@ class ApduParserDialog(QDialog):
     
     def show_search_dialog(self):
         """显示搜索对话框"""
-        from PyQt5.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QCheckBox
+        from PySide6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QCheckBox
         
         # 创建搜索对话框
         search_dialog = QDialog(self)
@@ -978,7 +979,7 @@ class ApduParserDialog(QDialog):
     def parse_single_apdu(self):
         """解析单条APDU"""
         # 显示单条APDU解析对话框
-        from PyQt5.QtWidgets import QDialog, QVBoxLayout, QTextEdit, QPushButton, QLabel, QLineEdit, QHBoxLayout
+        from PySide6.QtWidgets import QDialog, QVBoxLayout, QTextEdit, QPushButton, QLabel, QLineEdit, QHBoxLayout
         
         dialog = QDialog(self)
         dialog.setWindowTitle("单条APDU解析")
@@ -1077,7 +1078,7 @@ class ApduParserDialog(QDialog):
         
         layout.addLayout(button_layout)
         
-        dialog.exec_()
+        dialog.exec()
     
     def format_parse_tree(self, node, level: int = 0) -> str:
         """格式化解析树为文本"""
@@ -1098,7 +1099,8 @@ class ApduParserDialog(QDialog):
         if not item:
             return
         
-        from PyQt5.QtWidgets import QMenu, QAction
+        from PySide6.QtWidgets import QMenu
+        from PySide6.QtGui import QAction
         
         menu = QMenu(self.apdu_tree)
         
@@ -1112,7 +1114,7 @@ class ApduParserDialog(QDialog):
         copy_all_action.triggered.connect(self.copy_all_apdu_items)
         menu.addAction(copy_all_action)
         
-        menu.exec_(self.apdu_tree.mapToGlobal(position))
+        menu.exec(self.apdu_tree.mapToGlobal(position))
     
     def show_parse_context_menu(self, position):
         """显示解析结果的上下文菜单"""
@@ -1120,7 +1122,8 @@ class ApduParserDialog(QDialog):
         if not item:
             return
         
-        from PyQt5.QtWidgets import QMenu, QAction
+        from PySide6.QtWidgets import QMenu
+        from PySide6.QtGui import QAction
         
         menu = QMenu(self.parse_tree)
         
@@ -1134,7 +1137,7 @@ class ApduParserDialog(QDialog):
         copy_all_action.triggered.connect(self.copy_all_parse_items)
         menu.addAction(copy_all_action)
         
-        menu.exec_(self.parse_tree.mapToGlobal(position))
+        menu.exec(self.parse_tree.mapToGlobal(position))
     
     def copy_apdu_item(self, item):
         """复制APDU事件列表的选中行"""

@@ -1,12 +1,12 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
 其他 Tab
 """
 
-from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QPushButton, 
+from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QPushButton, 
                              QScrollArea, QLabel, QFrame)
-from PyQt5.QtCore import pyqtSignal, Qt, QObject
+from PySide6.QtCore import Signal, Qt, QObject
 from ui.widgets.shadow_utils import add_card_shadow
 from core.debug_logger import logger
 
@@ -16,45 +16,45 @@ class OtherTab(QWidget):
     
     # 信号定义
     # 设备信息
-    show_device_info_dialog = pyqtSignal()
-    set_screen_timeout = pyqtSignal()
+    show_device_info_dialog = Signal()
+    set_screen_timeout = Signal()
     
     # 赫拉配置
-    configure_hera = pyqtSignal()
-    configure_collect_data = pyqtSignal()
+    configure_hera = Signal()
+    configure_collect_data = Signal()
     
     # 其他操作
-    show_input_text_dialog = pyqtSignal()
+    show_input_text_dialog = Signal()
     
     # 工具配置
-    show_tools_config_dialog = pyqtSignal()
+    show_tools_config_dialog = Signal()
     
     # 设置显示行数
-    show_display_lines_dialog = pyqtSignal()
+    show_display_lines_dialog = Signal()
     
     # AT工具
-    show_at_tool_dialog = pyqtSignal()
+    show_at_tool_dialog = Signal()
     
     # 配置备份恢复
-    show_config_backup_dialog = pyqtSignal()
+    show_config_backup_dialog = Signal()
     
     # 自定义界面管理
-    show_unified_manager = pyqtSignal()
+    show_unified_manager = Signal()
     
     # 暗码管理
-    show_secret_code_dialog = pyqtSignal()
+    show_secret_code_dialog = Signal()
     
     # 高通lock cell
-    show_lock_cell_dialog = pyqtSignal()
+    show_lock_cell_dialog = Signal()
     
     # 高通NV
-    show_qc_nv_dialog = pyqtSignal()
+    show_qc_nv_dialog = Signal()
     
     # PR翻译
-    show_pr_translation_dialog = pyqtSignal()
+    show_pr_translation_dialog = Signal()
     
     # 转码工具
-    show_encoding_tool_dialog = pyqtSignal()
+    show_encoding_tool_dialog = Signal()
     
     def __init__(self, parent=None):
         try:

@@ -1,7 +1,7 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-PyQt5 Echolocate管理器
+PySide6 Echolocate管理器
 适配原Tkinter版本的Echolocate功能 - 完整功能版本
 """
 
@@ -11,8 +11,8 @@ import glob
 import datetime
 import time
 import sys
-from PyQt5.QtCore import QObject, pyqtSignal, QThread
-from PyQt5.QtWidgets import (QMessageBox, QFileDialog, QInputDialog, QDialog, 
+from PySide6.QtCore import QObject, Signal, QThread
+from PySide6.QtWidgets import (QMessageBox, QFileDialog, QInputDialog, QDialog, 
                               QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, 
                               QPushButton, QListWidget, QProgressBar, QTextEdit,
                               QApplication)
@@ -97,9 +97,9 @@ class ProgressDialog(QDialog):
 class VoiceIntentWorker(QThread):
     """Voice Intent测试后台线程"""
     
-    progress_updated = pyqtSignal(int, str)  # progress, status
-    show_confirm = pyqtSignal(str)  # test_case_id
-    finished = pyqtSignal(dict)  # result
+    progress_updated = Signal(int, str)  # progress, status
+    show_confirm = Signal(str)  # test_case_id
+    finished = Signal(dict)  # result
     
     def __init__(self, device, test_case_id, progress_dialog):
         super().__init__()
@@ -212,16 +212,16 @@ class VoiceIntentWorker(QThread):
             })
 
 
-class PyQtEcholocateManager(QObject):
-    """PyQt5 Echolocate管理器 - 完整功能版本"""
+class PySide6EcholocateManager(QObject):
+    """PySide6 Echolocate管理器 - 完整功能版本"""
     
     # 信号定义
-    echolocate_installed = pyqtSignal()
-    echolocate_triggered = pyqtSignal()
-    file_pulled = pyqtSignal(str)  # folder
-    file_deleted = pyqtSignal()
-    status_message = pyqtSignal(str)
-    log_message = pyqtSignal(str, str)  # text, color
+    echolocate_installed = Signal()
+    echolocate_triggered = Signal()
+    file_pulled = Signal(str)  # folder
+    file_deleted = Signal()
+    status_message = Signal(str)
+    log_message = Signal(str, str)  # text, color
     
     def __init__(self, device_manager, parent=None):
         super().__init__(parent)
@@ -423,7 +423,7 @@ class PyQtEcholocateManager(QObject):
             layout.addLayout(button_layout)
             
             # 显示对话框
-            if dialog.exec_() != QDialog.Accepted:
+            if dialog.exec() != QDialog.DialogCode.Accepted:
                 return
             
             folder_name = name_input.text().strip()
@@ -678,7 +678,7 @@ class PyQtEcholocateManager(QObject):
             cancel_btn.clicked.connect(dialog.reject)
             layout.addWidget(cancel_btn)
             
-            dialog.exec_()
+            dialog.exec()
             
         except Exception as e:
             QMessageBox.critical(None, self.tr("错误"), f"创建voice_intent测试对话框失败: {str(e)}")
@@ -718,7 +718,7 @@ class PyQtEcholocateManager(QObject):
             self.worker.start()
             
             # 显示进度对话框
-            progress_dialog.exec_()
+            progress_dialog.exec()
             
             return True
             
@@ -823,7 +823,7 @@ class PyQtEcholocateManager(QObject):
             layout.addLayout(button_layout)
             
             # 显示对话框
-            if intent_dialog.exec_() != QDialog.Accepted:
+            if intent_dialog.exec() != QDialog.DialogCode.Accepted:
                 return False
             
             # 获取选中的intent

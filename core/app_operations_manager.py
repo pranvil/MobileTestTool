@@ -1,7 +1,7 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-APP操作管理器 - PyQt5版本
+APP操作管理器 - PySide6版本
 负责Android应用的安装、卸载、查询等操作
 完整迁移自App_Operations/app_operations_manager.py
 """
@@ -11,8 +11,8 @@ import os
 import re
 import threading
 from datetime import datetime
-from PyQt5.QtCore import QObject, pyqtSignal, QThread, Qt
-from PyQt5.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QPushButton, 
+from PySide6.QtCore import QObject, Signal, QThread, Qt
+from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QPushButton, 
                              QLabel, QCheckBox, QLineEdit,
                              QRadioButton, QFileDialog, QMessageBox, QTextEdit,
                              QWidget, QFrame, QProgressDialog)
@@ -21,10 +21,10 @@ from ui.widgets.shadow_utils import add_card_shadow
 
 
 class AppOperationsManager(QObject):
-    """APP操作管理器 - PyQt5版本"""
+    """APP操作管理器 - PySide6版本"""
     
     # 信号定义
-    log_message = pyqtSignal(str)  # 日志消息信号
+    log_message = Signal(str)  # 日志消息信号
     
     def __init__(self, device_manager, parent=None):
         """初始化APP操作管理器"""
@@ -151,57 +151,57 @@ class AppOperationsManager(QObject):
     def show_package_query_dialog(self, device):
         """显示package查询参数选择对话框"""
         dialog = PackageQueryDialog(device, self, self.parent().parent())
-        dialog.exec_()
+        dialog.exec()
     
     def show_package_name_query_dialog(self, device):
         """显示包名查询提示对话框"""
         dialog = PackageNameQueryDialog(device, self, self.parent().parent())
-        dialog.exec_()
+        dialog.exec()
     
     def show_package_name_input_dialog(self, device):
         """显示包名输入对话框"""
         dialog = PackageNameInputDialog(device, self, self.parent().parent())
-        dialog.exec_()
+        dialog.exec()
     
     def show_pull_apk_dialog(self, device):
         """显示pull APK包名输入对话框"""
         dialog = PullApkDialog(device, self, self.parent().parent())
-        dialog.exec_()
+        dialog.exec()
     
     def show_install_apk_dialog(self, device):
         """显示APK安装参数选择对话框"""
         dialog = InstallApkDialog(device, self, self.parent().parent())
-        dialog.exec_()
+        dialog.exec()
     
     def show_process_view_dialog(self, device):
         """显示进程查看参数选择对话框"""
         dialog = ProcessViewDialog(device, self, self.parent().parent())
-        dialog.exec_()
+        dialog.exec()
     
     def show_dump_app_dialog(self, device):
         """显示dump应用对话框"""
         dialog = DumpAppDialog(device, self, self.parent().parent())
-        dialog.exec_()
+        dialog.exec()
     
     def show_enable_app_dialog(self, device):
         """显示启用应用包名输入对话框"""
         dialog = EnableAppDialog(device, self, self.parent().parent())
-        dialog.exec_()
+        dialog.exec()
     
     def show_disable_app_dialog(self, device):
         """显示禁用应用包名输入对话框"""
         dialog = DisableAppDialog(device, self, self.parent().parent())
-        dialog.exec_()
+        dialog.exec()
     
     def show_push_apk_dialog(self, device):
         """显示推送文件对话框"""
         dialog = PushApkDialog(device, self, self.parent().parent())
-        dialog.exec_()
+        dialog.exec()
     
     def show_find_file_dialog(self, device):
         """显示查找文件对话框"""
         dialog = FindFileDialog(device, self, self.parent().parent())
-        dialog.exec_()
+        dialog.exec()
     
     def execute_package_query(self, device, selected_params, filter_text):
         """执行package查询命令"""
@@ -908,7 +908,7 @@ class AppOperationsManager(QObject):
                 try:
                     # 注意：从后台线程直接 close 可能无效（UI 线程才有事件循环）
                     # 这里用 QueuedConnection 投递到 progress 所在线程（UI线程）执行 close()
-                    from PyQt5.QtCore import QMetaObject
+                    from PySide6.QtCore import QMetaObject
                     QMetaObject.invokeMethod(progress, "close", Qt.QueuedConnection)
                 except Exception:
                     # 兜底：如果投递失败，就尽力直接关（不保证一定生效）

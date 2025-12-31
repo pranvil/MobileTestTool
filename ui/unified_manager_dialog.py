@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
 统一管理对话框
@@ -8,14 +8,14 @@
 import os
 import json
 import datetime
-from PyQt5.QtWidgets import (QDialog, QTabWidget, QVBoxLayout, QHBoxLayout, 
+from PySide6.QtWidgets import (QDialog, QTabWidget, QVBoxLayout, QHBoxLayout, 
                              QPushButton, QMessageBox, QFileDialog,
                              QListWidget, QListWidgetItem, QCheckBox, QScrollArea, QWidget,
                              QTableWidget, QTableWidgetItem, QHeaderView,
                              QFormLayout, QLineEdit, QTextEdit, QComboBox,
                              QLabel, QSplitter, QFrame, QAbstractItemView, QSizePolicy)
-from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QFont
+from PySide6.QtCore import Qt
+from PySide6.QtGui import QFont
 
 # 延迟导入，支持 PyInstaller 环境，以及 SIM Reader 对话框可能修改 sys.path/sys.modules 的情况
 #
@@ -1267,11 +1267,11 @@ class UnifiedManagerDialog(QDialog):
                      self.tr("• 所有自定义Button将被替换\n") +
                      self.tr("• 当前配置将永久丢失\n\n") +
                      self.tr("确定要继续导入吗？")),
-                    QMessageBox.Yes | QMessageBox.No,
-                    QMessageBox.No
+                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                    QMessageBox.StandardButton.No
                 )
                 
-                if reply == QMessageBox.Yes:
+                if reply == QMessageBox.StandardButton.Yes:
                     # 读取配置文件
                     with open(file_path, 'r', encoding='utf-8') as f:
                         config_data = json.load(f)
@@ -1322,11 +1322,11 @@ class UnifiedManagerDialog(QDialog):
                             (self.tr(f"发现 {invalid_count} 个无效按钮，将跳过这些按钮：\n\n") +
                              invalid_details +
                              f"\n\n{self.tr('是否继续导入其他有效按钮？')}"),
-                            QMessageBox.Yes | QMessageBox.No,
-                            QMessageBox.Yes
+                            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                            QMessageBox.StandardButton.Yes
                         )
                         
-                        if reply == QMessageBox.No:
+                        if reply == QMessageBox.StandardButton.No:
                             QMessageBox.information(self, self.tr("已取消"), self.tr("导入已取消"))
                             return
                         
@@ -1480,11 +1480,11 @@ class UnifiedManagerDialog(QDialog):
             self,
             self.tr("确认重置"),
             self.tr("确定要重置为默认配置吗？这将删除所有自定义Tab、Card和按钮。"),
-            QMessageBox.Yes | QMessageBox.No,
-            QMessageBox.No
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No
         )
         
-        if reply == QMessageBox.Yes:
+        if reply == QMessageBox.StandardButton.Yes:
             try:
                 # 重置Tab配置
                 self.tab_config_manager.reset_to_default()
@@ -1513,7 +1513,7 @@ class UnifiedManagerDialog(QDialog):
         """显示添加Tab对话框"""
         from ui.tab_manager_dialog import CustomTabDialog
         dialog = CustomTabDialog(self.tab_config_manager, parent=self)
-        if dialog.exec_() == QDialog.Accepted:
+        if dialog.exec() == QDialog.DialogCode.Accepted:
             self.load_tab_config()
             self.load_custom_cards()
     
@@ -1526,7 +1526,7 @@ class UnifiedManagerDialog(QDialog):
         tab_id = self.current_selected_tab_id
         from ui.tab_manager_dialog import CustomTabDialog
         dialog = CustomTabDialog(self.tab_config_manager, tab_id=tab_id, parent=self)
-        if dialog.exec_() == QDialog.Accepted:
+        if dialog.exec() == QDialog.DialogCode.Accepted:
             self.load_tab_config()
     
     def delete_custom_tab(self):
@@ -1541,11 +1541,11 @@ class UnifiedManagerDialog(QDialog):
         reply = QMessageBox.question(
             self, self.tr("确认删除"),
             f"{self.tr('确定要删除Tab')} '{tab_name}' {self.tr('吗？这将同时删除该Tab下的所有Card。')}",
-            QMessageBox.Yes | QMessageBox.No,
-            QMessageBox.No
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No
         )
         
-        if reply == QMessageBox.Yes:
+        if reply == QMessageBox.StandardButton.Yes:
             tab_id = self.current_selected_tab_id
             if self.tab_config_manager.delete_custom_tab(tab_id):
                 self.current_selected_tab_id = None
@@ -1572,7 +1572,7 @@ class UnifiedManagerDialog(QDialog):
         
         from ui.tab_manager_dialog import CustomCardDialog
         dialog = CustomCardDialog(self.tab_config_manager, preset_tab_id=preset_tab_id, parent=self)
-        if dialog.exec_() == QDialog.Accepted:
+        if dialog.exec() == QDialog.DialogCode.Accepted:
             self.load_custom_cards()
     
     def edit_custom_card(self):
@@ -1595,7 +1595,7 @@ class UnifiedManagerDialog(QDialog):
         
         from ui.tab_manager_dialog import CustomCardDialog
         dialog = CustomCardDialog(self.tab_config_manager, card_id=card_id, parent=self)
-        if dialog.exec_() == QDialog.Accepted:
+        if dialog.exec() == QDialog.DialogCode.Accepted:
             self.load_custom_cards()
     
     def delete_custom_card(self):
@@ -1620,11 +1620,11 @@ class UnifiedManagerDialog(QDialog):
         reply = QMessageBox.question(
             self, self.tr("确认删除"),
             f"{self.tr('确定要删除Card')} '{card_name}' {self.tr('吗？')}",
-            QMessageBox.Yes | QMessageBox.No,
-            QMessageBox.No
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No
         )
         
-        if reply == QMessageBox.Yes:
+        if reply == QMessageBox.StandardButton.Yes:
             if self.tab_config_manager.delete_custom_card(card_id):
                 self.load_custom_cards()
                 QMessageBox.information(self, self.tr("成功"), self.tr("Card已删除"))
@@ -1704,7 +1704,7 @@ class UnifiedManagerDialog(QDialog):
             preset_card_name=preset_card_name,
             parent=self
         )
-        if dialog.exec_() == QDialog.Accepted:
+        if dialog.exec() == QDialog.DialogCode.Accepted:
             button_data = dialog.get_button_data()
             if self.custom_button_manager.add_button(button_data):
                 # 重新加载数据，但保持当前的搜索和过滤条件
@@ -1734,7 +1734,7 @@ class UnifiedManagerDialog(QDialog):
         if button_data:
             from ui.custom_button_dialog import ButtonEditDialog
             dialog = ButtonEditDialog(self.custom_button_manager, button_data=button_data, parent=self)
-            if dialog.exec_() == QDialog.Accepted:
+            if dialog.exec() == QDialog.DialogCode.Accepted:
                 updated_data = dialog.get_button_data()
                 if self.custom_button_manager.update_button(button_id, updated_data):
                     # 重新加载数据，但保持当前的搜索和过滤条件
@@ -1756,10 +1756,10 @@ class UnifiedManagerDialog(QDialog):
         reply = QMessageBox.question(
             self, self.tr("确认删除"),
             f"{self.tr('确定要删除按钮')} '{button_name}' {self.tr('吗？')}",
-            QMessageBox.Yes | QMessageBox.No
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
         )
         
-        if reply == QMessageBox.Yes:
+        if reply == QMessageBox.StandardButton.Yes:
             button_id = self.button_table.item(current_row, 0).data(Qt.UserRole)
             if self.custom_button_manager.delete_button(button_id):
                 # 重新加载数据，但保持当前的搜索和过滤条件

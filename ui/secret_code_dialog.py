@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
 暗码管理对话框
@@ -11,11 +11,11 @@ import sys
 import time
 import subprocess
 import re
-from PyQt5.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QPushButton, 
+from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QPushButton, 
                              QTableWidget, QTableWidgetItem, QHeaderView,
                              QLineEdit, QMessageBox, QFileDialog, QSplitter,
                              QWidget, QLabel, QMenu, QFrame)
-from PyQt5.QtCore import Qt, QPoint, pyqtSignal, QTimer
+from PySide6.QtCore import Qt, QPoint, Signal, QTimer
 from core.debug_logger import logger
 from ui.widgets.shadow_utils import add_card_shadow
 
@@ -347,7 +347,7 @@ class SecretCodeDialog(QDialog):
             return
         
         dialog = SecretCodeEditDialog(self)
-        if dialog.exec_() == QDialog.Accepted:
+        if dialog.exec() == QDialog.DialogCode.Accepted:
             code = dialog.get_code()
             description = dialog.get_description()
             
@@ -381,7 +381,7 @@ class SecretCodeDialog(QDialog):
         current_description = self.code_table.item(row, 1).text()
         
         dialog = SecretCodeEditDialog(self, code=current_code, description=current_description)
-        if dialog.exec_() == QDialog.Accepted:
+        if dialog.exec() == QDialog.DialogCode.Accepted:
             new_code = dialog.get_code()
             new_description = dialog.get_description()
             
@@ -413,11 +413,11 @@ class SecretCodeDialog(QDialog):
             self, 
             self.tr("确认删除"),
             self.tr("确定要删除这个暗码吗？"),
-            QMessageBox.Yes | QMessageBox.No,
-            QMessageBox.No
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No
         )
         
-        if reply == QMessageBox.Yes:
+        if reply == QMessageBox.StandardButton.Yes:
             row = selected_items[0].row()
             code_to_delete = self.code_table.item(row, 0).text()
             
@@ -1005,7 +1005,7 @@ class SecretCodeDialog(QDialog):
     def add_category(self):
         """新增分类"""
         dialog = CategoryEditDialog(parent=self)
-        if dialog.exec_() == QDialog.Accepted:
+        if dialog.exec() == QDialog.DialogCode.Accepted:
             new_category = dialog.get_category_name()
             if new_category and new_category not in self.categories:
                 self.categories.append(new_category)
@@ -1025,7 +1025,7 @@ class SecretCodeDialog(QDialog):
         old_category = selected_items[0].text()
         
         dialog = CategoryEditDialog(parent=self, category_name=old_category)
-        if dialog.exec_() == QDialog.Accepted:
+        if dialog.exec() == QDialog.DialogCode.Accepted:
             new_category = dialog.get_category_name()
             if new_category and new_category != old_category:
                 if new_category not in self.categories:
@@ -1063,11 +1063,11 @@ class SecretCodeDialog(QDialog):
             self,
             self.tr("确认删除"),
             self.tr(f"确定要删除分类'{category_to_delete}'吗？\n删除分类会同时删除该分类下的所有暗码。"),
-            QMessageBox.Yes | QMessageBox.No,
-            QMessageBox.No
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No
         )
         
-        if reply == QMessageBox.Yes:
+        if reply == QMessageBox.StandardButton.Yes:
             # 从分类列表中删除
             self.categories.remove(category_to_delete)
             
@@ -1120,7 +1120,7 @@ class SecretCodeDialog(QDialog):
             delete_action.triggered.connect(self.delete_category)
         
         # 显示菜单
-        menu.exec_(self.category_table.viewport().mapToGlobal(position))
+        menu.exec(self.category_table.viewport().mapToGlobal(position))
     
     def move_category_up(self, row):
         """上移分类"""
@@ -1183,7 +1183,7 @@ class SecretCodeEditDialog(QDialog):
     
     def setup_ui(self):
         """设置UI"""
-        from PyQt5.QtWidgets import QFormLayout, QDialogButtonBox
+        from PySide6.QtWidgets import QFormLayout, QDialogButtonBox
         
         layout = QVBoxLayout(self)
         
@@ -1241,7 +1241,7 @@ class CategoryEditDialog(QDialog):
     
     def setup_ui(self):
         """设置UI"""
-        from PyQt5.QtWidgets import QFormLayout, QDialogButtonBox
+        from PySide6.QtWidgets import QFormLayout, QDialogButtonBox
         
         layout = QVBoxLayout(self)
         

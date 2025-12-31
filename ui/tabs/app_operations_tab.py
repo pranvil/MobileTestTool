@@ -1,12 +1,12 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
 APP操作 Tab
 """
 
-from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QPushButton, 
+from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QPushButton, 
                              QScrollArea, QLabel, QFrame)
-from PyQt5.QtCore import pyqtSignal, Qt, QObject
+from PySide6.QtCore import Signal, Qt, QObject
 from ui.widgets.shadow_utils import add_card_shadow
 from core.debug_logger import logger
 
@@ -16,23 +16,23 @@ class AppOperationsTab(QWidget):
     
     # 信号定义
     # 查询操作
-    query_package = pyqtSignal()
-    query_package_name = pyqtSignal()
-    query_install_path = pyqtSignal()
-    query_find_file = pyqtSignal()
+    query_package = Signal()
+    query_package_name = Signal()
+    query_install_path = Signal()
+    query_find_file = Signal()
     
     # APK操作
-    pull_apk = pyqtSignal()
-    push_apk = pyqtSignal()
-    install_apk = pyqtSignal()
+    pull_apk = Signal()
+    push_apk = Signal()
+    install_apk = Signal()
     
     # 进程操作
-    view_processes = pyqtSignal()
-    dump_app = pyqtSignal()
+    view_processes = Signal()
+    dump_app = Signal()
     
     # APP状态操作
-    enable_app = pyqtSignal()
-    disable_app = pyqtSignal()
+    enable_app = Signal()
+    disable_app = Signal()
     
     def __init__(self, parent=None):
         super().__init__(parent)

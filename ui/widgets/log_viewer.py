@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
 日志查看器
@@ -8,11 +8,11 @@ import os
 import json
 import re
 from datetime import datetime
-from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QTextEdit, QLabel,
+from PySide6.QtWidgets import (QWidget, QVBoxLayout, QTextEdit, QLabel,
                              QHBoxLayout, QPushButton, QLineEdit, QCheckBox,
-                             QSizePolicy, QFrame, QMenu, QAction)
-from PyQt5.QtCore import Qt, pyqtSignal
-from PyQt5.QtGui import QTextCharFormat, QColor, QTextCursor, QFont, QTextDocument, QKeyEvent
+                             QSizePolicy, QFrame, QMenu)
+from PySide6.QtCore import Qt, Signal
+from PySide6.QtGui import QTextCharFormat, QColor, QTextCursor, QFont, QTextDocument, QKeyEvent, QAction
 
 
 class FileDropLineEdit(QLineEdit):
@@ -123,8 +123,8 @@ class LogViewer(QWidget):
     """日志查看器控件"""
     
     # 信号定义
-    search_requested = pyqtSignal(str, bool)  # keyword, case_sensitive
-    adb_command_executed = pyqtSignal(str)  # 执行adb命令
+    search_requested = Signal(str, bool)  # keyword, case_sensitive
+    adb_command_executed = Signal(str)  # 执行adb命令
     
     # 行首 adb 时间戳匹配：MM-DD HH:mm:ss.SSS
     _ADB_TS_RE = re.compile(r'^\s*\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}\.\d{3}\b')
@@ -443,7 +443,7 @@ class LogViewer(QWidget):
         text = _ensure_ts(text)
         
         cursor = self.text_edit.textCursor()
-        cursor.movePosition(QTextCursor.End)
+        cursor.movePosition(QTextCursor.MoveOperation.End)
         
         # 设置文本格式
         if color:
@@ -463,7 +463,7 @@ class LogViewer(QWidget):
     def append_log_with_highlight(self, text, keyword, color="#FF4444"):
         """追加日志并高亮关键字"""
         cursor = self.text_edit.textCursor()
-        cursor.movePosition(QTextCursor.End)
+        cursor.movePosition(QTextCursor.MoveOperation.End)
         
         # 添加文本
         cursor.setCharFormat(self.default_format)
@@ -483,7 +483,7 @@ class LogViewer(QWidget):
         format.setForeground(QColor(color))
         
         cursor = self.text_edit.textCursor()
-        cursor.movePosition(QTextCursor.End)
+        cursor.movePosition(QTextCursor.MoveOperation.End)
         
         # 查找并高亮所有匹配项
         text = self.text_edit.toPlainText()
@@ -531,7 +531,7 @@ class LogViewer(QWidget):
         # 搜索所有匹配项的位置
         self.search_results = []
         cursor = self.text_edit.textCursor()
-        cursor.movePosition(QTextCursor.Start)
+        cursor.movePosition(QTextCursor.MoveOperation.Start)
         self.text_edit.setTextCursor(cursor)
         
         flags = QTextDocument.FindFlags()
@@ -642,9 +642,9 @@ class LogViewer(QWidget):
             return
         
         # 创建结果显示窗口
-        from PyQt5.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QTextEdit, QFrame
-        from PyQt5.QtGui import QTextCharFormat, QColor
-        from PyQt5.QtWidgets import QMessageBox
+        from PySide6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QTextEdit, QFrame
+        from PySide6.QtGui import QTextCharFormat, QColor
+        from PySide6.QtWidgets import QMessageBox
         
         results_window = QDialog(self)
         results_window.setWindowTitle(f"{self.tr('搜索结果 - 找到 ')}{len(matching_lines)}{self.tr(' 个匹配项')}")
@@ -716,7 +716,7 @@ class LogViewer(QWidget):
         for line_num, line in matching_lines:
             # 添加行号
             cursor = results_text.textCursor()
-            cursor.movePosition(cursor.End)
+            cursor.movePosition(QTextCursor.MoveOperation.End)
             cursor.setCharFormat(default_format)
             cursor.insertText(f"[{line_num:4d}] ")
             
@@ -747,7 +747,7 @@ class LogViewer(QWidget):
             cursor.insertText("\n")
         
         # 移动到顶部
-        results_text.moveCursor(QTextCursor.Start)
+        results_text.moveCursor(QTextCursor.MoveOperation.Start)
         
         # 连接按钮事件
         def select_all():
@@ -766,7 +766,7 @@ class LogViewer(QWidget):
         close_btn.clicked.connect(close_window)
         
         # 显示窗口
-        results_window.exec_()
+        results_window.exec()
         self.status_message.emit(f"{self.tr('显示 ')}{len(matching_lines)}{self.tr(' 个匹配项')}")
     
     def show_context_menu(self, position):
@@ -807,7 +807,7 @@ class LogViewer(QWidget):
         menu.addAction(clear_action)
         
         # 显示菜单
-        menu.exec_(self.text_edit.mapToGlobal(position))
+        menu.exec(self.text_edit.mapToGlobal(position))
     
     def toggle_auto_scroll(self):
         """切换自动滚动状态"""
@@ -820,5 +820,5 @@ class LogViewer(QWidget):
             self.text_edit.setTextCursor(cursor)
         
     # 信号定义（用于发送状态消息）
-    status_message = pyqtSignal(str)
+    status_message = Signal(str)
 

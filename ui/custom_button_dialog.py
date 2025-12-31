@@ -1,15 +1,15 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
 自定义按钮编辑对话框
 """
 
-from PyQt5.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QPushButton,
+from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QPushButton,
                              QMessageBox, QLabel, QLineEdit, QComboBox,
                              QTextEdit, QCheckBox, QFileDialog,
                              QFormLayout, QScrollArea, QWidget, QTextBrowser,
                              QSizePolicy, QFrame)
-from PyQt5.QtCore import Qt
+from PySide6.QtCore import Qt
 from core.debug_logger import logger
 from ui.widgets.shadow_utils import add_card_shadow
 
@@ -49,7 +49,8 @@ class ButtonEditDialog(QDialog):
     
     def event(self, event):
         """处理事件，包括帮助按钮点击"""
-        if event.type() == event.EnterWhatsThisMode:
+        from PySide6.QtCore import QEvent
+        if event.type() == QEvent.Type.EnterWhatsThisMode:
             # 点击帮助按钮时显示帮助对话框
             self.show_help_dialog()
             return True
@@ -283,7 +284,7 @@ class ButtonEditDialog(QDialog):
         close_btn.clicked.connect(help_dialog.accept)
         layout.addWidget(close_btn)
         
-        help_dialog.exec_()
+        help_dialog.exec()
     
     def setup_ui(self):
         """设置UI"""
@@ -601,7 +602,7 @@ class ButtonEditDialog(QDialog):
     
     def browse_file(self):
         """浏览文件"""
-        from PyQt5.QtWidgets import QFileDialog
+        from PySide6.QtWidgets import QFileDialog
         
         type_text = self.type_combo.currentText()
         
@@ -630,7 +631,7 @@ class ButtonEditDialog(QDialog):
     
     def browse_folder(self):
         """浏览文件夹"""
-        from PyQt5.QtWidgets import QFileDialog
+        from PySide6.QtWidgets import QFileDialog
         
         folder_path = QFileDialog.getExistingDirectory(
             self, self.tr("选择要打开的文件夹"), ""

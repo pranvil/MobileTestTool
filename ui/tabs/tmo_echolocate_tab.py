@@ -1,12 +1,12 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
 TMO Echolocate Tab
 """
 
-from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QPushButton, 
+from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QPushButton, 
                              QScrollArea, QLabel, QFrame)
-from PyQt5.QtCore import pyqtSignal, Qt
+from PySide6.QtCore import Signal, Qt
 from ui.widgets.shadow_utils import add_card_shadow
 
 
@@ -15,20 +15,20 @@ class TMOEcholocateTab(QWidget):
     
     # 信号定义
     # Echolocate 操作
-    install_echolocate = pyqtSignal()
-    trigger_echolocate = pyqtSignal()
-    pull_echolocate_file = pyqtSignal()
-    delete_echolocate_file = pyqtSignal()
-    get_echolocate_version = pyqtSignal()
+    install_echolocate = Signal()
+    trigger_echolocate = Signal()
+    pull_echolocate_file = Signal()
+    delete_echolocate_file = Signal()
+    get_echolocate_version = Signal()
     
     # 过滤操作
-    filter_callid = pyqtSignal()
-    filter_callstate = pyqtSignal()
-    filter_uicallstate = pyqtSignal()
-    filter_allcallstate = pyqtSignal()
-    filter_ims_signalling = pyqtSignal()
-    filter_allcallflow = pyqtSignal()
-    filter_voice_intent = pyqtSignal()
+    filter_callid = Signal()
+    filter_callstate = Signal()
+    filter_uicallstate = Signal()
+    filter_allcallstate = Signal()
+    filter_ims_signalling = Signal()
+    filter_allcallflow = Signal()
+    filter_voice_intent = Signal()
     
     def __init__(self, parent=None):
         super().__init__(parent)

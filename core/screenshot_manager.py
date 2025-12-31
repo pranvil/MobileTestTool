@@ -1,7 +1,7 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-PyQt5 截图管理器
+PySide6 截图管理器
 适配原Tkinter版本的截图功能
 """
 
@@ -9,15 +9,15 @@ import subprocess
 import os
 import time
 import datetime
-from PyQt5.QtCore import QObject, pyqtSignal, QThread, QMutex
-from PyQt5.QtWidgets import QMessageBox
+from PySide6.QtCore import QObject, Signal, QThread, QMutex
+from PySide6.QtWidgets import QMessageBox
 
 
 class ScreenshotWorker(QThread):
     """截图工作线程"""
     
-    finished = pyqtSignal(bool, str)  # success, message
-    progress = pyqtSignal(int, str)   # progress, status
+    finished = Signal(bool, str)  # success, message
+    progress = Signal(int, str)   # progress, status
     
     def __init__(self, device, lang_manager=None, parent=None, storage_path_func=None):
         super().__init__(parent)
@@ -122,13 +122,13 @@ class ScreenshotWorker(QThread):
             self.finished.emit(False, f"{self.tr('截图失败:')} {str(e)}")
 
 
-class PyQtScreenshotManager(QObject):
-    """PyQt5 截图管理器"""
+class PySide6ScreenshotManager(QObject):
+    """PySide6 截图管理器"""
     
     # 信号定义
-    screenshot_completed = pyqtSignal(str)  # filename
-    progress_updated = pyqtSignal(int, str)  # progress, status
-    status_message = pyqtSignal(str)
+    screenshot_completed = Signal(str)  # filename
+    progress_updated = Signal(int, str)  # progress, status
+    status_message = Signal(str)
     
     def __init__(self, device_manager, parent=None):
         super().__init__(parent)

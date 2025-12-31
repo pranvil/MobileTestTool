@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
 调试日志模块
@@ -773,14 +773,14 @@ def setup_exception_hook():
         
         # 显示错误对话框（如果可能）
         try:
-            from PyQt5.QtWidgets import QMessageBox
+            from PySide6.QtWidgets import QMessageBox
             msg = QMessageBox()
-            msg.setIcon(QMessageBox.Critical)
+            msg.setIcon(QMessageBox.Icon.Critical)
             msg.setWindowTitle("❌ " + logger._tr("程序错误"))
             msg.setText(logger._tr("程序遇到错误：") + str(exc_value))
             msg.setInformativeText(logger._tr("详细信息请查看日志文件：") + "\n" + (logger.get_log_file_path() or ""))
-            msg.setStandardButtons(QMessageBox.Ok)
-            msg.exec_()
+            msg.setStandardButtons(QMessageBox.StandardButton.Ok)
+            msg.exec()
         except:
             pass
         

@@ -1,7 +1,7 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-PyQt5 TCPDUMP管理器
+PySide6 TCPDUMP管理器
 适配原Tkinter版本的TCPDUMP管理功能
 """
 
@@ -10,8 +10,8 @@ import os
 import time
 import threading
 from datetime import datetime
-from PyQt5.QtCore import QObject, pyqtSignal, QThread
-from PyQt5.QtWidgets import QMessageBox, QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QTextEdit, QScrollBar, QWidget
+from PySide6.QtCore import QObject, Signal, QThread
+from PySide6.QtWidgets import QMessageBox, QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QTextEdit, QScrollBar, QWidget
 
 
 class TCPDumpDialog(QDialog):
@@ -386,7 +386,7 @@ class TCPDumpDialog(QDialog):
     
     def show_device_selection_dialog(self):
         """显示设备类型选择对话框"""
-        from PyQt5.QtWidgets import QRadioButton, QButtonGroup
+        from PySide6.QtWidgets import QRadioButton, QButtonGroup
         
         device_dialog = QDialog(self)
         device_dialog.setWindowTitle(self.lang_manager.tr("选择设备类型"))
@@ -438,7 +438,7 @@ class TCPDumpDialog(QDialog):
         
         layout.addLayout(button_layout)
         
-        if device_dialog.exec_() == QDialog.Accepted:
+        if device_dialog.exec() == QDialog.DialogCode.Accepted:
             pass
     
     def toggle_capture(self):
@@ -461,9 +461,9 @@ class TCPDumpDialog(QDialog):
                 self,
                 self.lang_manager.tr("确认关闭"),
                 self.lang_manager.tr("TCPDUMP正在运行中，关闭对话框将停止抓包。是否继续？"),
-                QMessageBox.Yes | QMessageBox.No
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
             )
-            if reply == QMessageBox.Yes:
+            if reply == QMessageBox.StandardButton.Yes:
                 self.stop_capture()
                 event.accept()
             else:
@@ -472,10 +472,10 @@ class TCPDumpDialog(QDialog):
             event.accept()
 
 
-class PyQtTCPDumpManager(QObject):
-    """PyQt5 TCPDUMP管理器"""
+class PySide6TCPDumpManager(QObject):
+    """PySide6 TCPDUMP管理器"""
     
-    status_message = pyqtSignal(str)
+    status_message = Signal(str)
     
     def __init__(self, device_manager, parent=None):
         super().__init__(parent)
@@ -495,7 +495,7 @@ class PyQtTCPDumpManager(QObject):
             # 创建并显示对话框
             self.dialog = TCPDumpDialog(parent=self.parent())
             self.dialog.check_initial_status()
-            self.dialog.exec_()
+            self.dialog.exec()
             
             return True
             

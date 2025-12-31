@@ -1,7 +1,7 @@
 @echo off
 chcp 65001 >nul
 echo ========================================
-echo PyQt5版本打包脚本 (onedir模式)
+echo PySide6版本打包脚本 (onedir模式)
 echo ========================================
 echo.
 
@@ -81,7 +81,7 @@ echo   2. 关闭可能占用文件的资源管理器窗口
 echo   3. 检查是否有杀毒软件正在扫描该目录
 echo.
 
-pyinstaller --clean --noconfirm MobileTestTool_pyqt.spec
+pyinstaller --clean --noconfirm MobileTestTool.spec
 
 if %errorlevel% neq 0 (
     echo.

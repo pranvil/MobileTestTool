@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
 阴影效果工具函数
@@ -6,8 +6,8 @@
 """
 
 from typing import Union, Tuple, Optional
-from PyQt5.QtWidgets import QGraphicsDropShadowEffect, QWidget
-from PyQt5.QtGui import QColor
+from PySide6.QtWidgets import QGraphicsDropShadowEffect, QWidget
+from PySide6.QtGui import QColor
 
 
 def add_shadow(

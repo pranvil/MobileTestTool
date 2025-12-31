@@ -1,21 +1,21 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-PyQt5 Telephony日志启用管理器
+PySide6 Telephony日志启用管理器
 适配原Tkinter版本的Telephony日志启用功能
 """
 
 import subprocess
 import time
-from PyQt5.QtCore import QObject, pyqtSignal, QThread
-from PyQt5.QtWidgets import QMessageBox
+from PySide6.QtCore import QObject, Signal, QThread
+from PySide6.QtWidgets import QMessageBox
 
 
 class TelephonyWorker(QThread):
     """Telephony日志启用工作线程"""
     
-    finished = pyqtSignal(bool, str)
-    progress = pyqtSignal(str)
+    finished = Signal(bool, str)
+    progress = Signal(str)
     
     def __init__(self, device, telephony_commands, lang_manager=None):
         super().__init__()
@@ -66,10 +66,10 @@ class TelephonyWorker(QThread):
             self.finished.emit(False, f"{self.lang_manager.tr('执行Telephony命令失败:')} {str(e)}")
 
 
-class PyQtTelephonyManager(QObject):
-    """PyQt5 Telephony日志启用管理器"""
+class PySide6TelephonyManager(QObject):
+    """PySide6 Telephony日志启用管理器"""
     
-    status_message = pyqtSignal(str)
+    status_message = Signal(str)
     
     def __init__(self, device_manager, parent=None):
         super().__init__(parent)
@@ -459,11 +459,11 @@ class PyQtTelephonyManager(QObject):
                 self.lang_manager.tr("Telephony日志设置完成！\n\n") +
                 self.lang_manager.tr("为了确保设置生效，建议立即重启设备。\n") +
                 self.lang_manager.tr("是否现在重启设备？"),
-                QMessageBox.Yes | QMessageBox.No,
-                QMessageBox.Yes
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.Yes
             )
             
-            if reply == QMessageBox.Yes:
+            if reply == QMessageBox.StandardButton.Yes:
                 self.reboot_device()
             else:
                 QMessageBox.information(None, self.lang_manager.tr("完成"), self.lang_manager.tr("Telephony日志设置完成！\n请手动重启设备以使设置生效。"))

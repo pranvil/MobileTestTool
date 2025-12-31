@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-设备信息管理器 - PyQt5版本
+设备信息管理器 - PySide6版本
 负责获取设备的IMEI、ICCID、IMSI、MSISDN等信息
 完整迁移自Device_Settings/device_info_manager.py
 """
@@ -12,7 +12,7 @@ from typing import Optional, List, Tuple, Dict, Any
 
 
 class DeviceInfoManager:
-    """设备信息管理器 - PyQt5版本"""
+    """设备信息管理器 - PySide6版本"""
     
     def __init__(self):
         """初始化设备信息管理器"""

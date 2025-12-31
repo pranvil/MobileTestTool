@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
 3GPP RRC/NAS/SMS 消息解码器
@@ -10,7 +10,7 @@ from pathlib import Path
 import subprocess
 import time
 from datetime import datetime
-from PyQt5.QtCore import QObject, pyqtSignal
+from PySide6.QtCore import QObject, Signal
 
 
 LOG_DIR = Path(r"c:\log")
@@ -55,7 +55,7 @@ class RRC3GPPDecoder(QObject):
     """3GPP RRC/NAS/SMS 解码管理器"""
     
     # 信号定义
-    status_message = pyqtSignal(str)
+    status_message = Signal(str)
     
     def __init__(self, parent=None):
         super().__init__(parent)

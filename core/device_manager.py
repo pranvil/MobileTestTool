@@ -1,21 +1,21 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-PyQt5设备管理器
+PySide6设备管理器
 适配原Tkinter版本的设备管理功能
 """
 
 import subprocess
-from PyQt5.QtCore import QObject, pyqtSignal
+from PySide6.QtCore import QObject, Signal
 
 
-class PyQtDeviceManager(QObject):
-    """PyQt5设备管理器"""
+class PySide6DeviceManager(QObject):
+    """PySide6设备管理器"""
     
     # 信号定义
-    devices_updated = pyqtSignal(list)  # 设备列表更新
-    device_selected = pyqtSignal(str)   # 设备选择变化
-    status_message = pyqtSignal(str)    # 状态消息
+    devices_updated = Signal(list)  # 设备列表更新
+    device_selected = Signal(str)   # 设备选择变化
+    status_message = Signal(str)    # 状态消息
     
     def __init__(self, parent=None):
         super().__init__(parent)

@@ -1,12 +1,12 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
 24小时背景数据 Tab
 """
 
-from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QPushButton, 
+from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QPushButton, 
                              QScrollArea, QLabel, QFrame)
-from PyQt5.QtCore import pyqtSignal, Qt
+from PySide6.QtCore import Signal, Qt
 from ui.widgets.shadow_utils import add_card_shadow
 
 
@@ -15,8 +15,8 @@ class BackgroundDataTab(QWidget):
     
     # 信号定义
     # 背景数据操作
-    configure_phone = pyqtSignal()
-    analyze_logs = pyqtSignal()
+    configure_phone = Signal()
+    analyze_logs = Signal()
     
     def __init__(self, parent=None):
         super().__init__(parent)

@@ -1,13 +1,13 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
 网络信息 Tab
 """
 
-from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, 
+from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, 
                              QPushButton, QTableWidget, 
                              QTableWidgetItem, QHeaderView, QFrame, QLineEdit, QScrollArea)
-from PyQt5.QtCore import pyqtSignal, Qt, QObject
+from PySide6.QtCore import Signal, Qt, QObject
 from ui.widgets.shadow_utils import add_card_shadow
 from core.debug_logger import logger
 
@@ -17,12 +17,12 @@ class NetworkInfoTab(QWidget):
     
     # 信号定义
     # 网络信息控制
-    start_network_info = pyqtSignal()
-    stop_network_info = pyqtSignal()
+    start_network_info = Signal()
+    stop_network_info = Signal()
     
     # Ping 控制
-    start_ping = pyqtSignal(str)  # 传递 ping_target 参数
-    stop_ping = pyqtSignal()
+    start_ping = Signal(str)  # 传递 ping_target 参数
+    stop_ping = Signal()
     
     def __init__(self, parent=None):
         super().__init__(parent)

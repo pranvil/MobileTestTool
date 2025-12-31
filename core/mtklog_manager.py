@@ -1,7 +1,7 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-PyQt5 MTKLOG管理器
+PySide6 MTKLOG管理器
 适配原Tkinter版本的MTKLOG管理功能
 """
 
@@ -13,8 +13,8 @@ import re
 import sys
 import shutil
 import shlex
-from PyQt5.QtCore import QObject, pyqtSignal, QThread, QMutex
-from PyQt5.QtWidgets import QMessageBox, QInputDialog, QFileDialog, QDialog, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton, QDialogButtonBox, QFrame
+from PySide6.QtCore import QObject, Signal, QThread, QMutex
+from PySide6.QtWidgets import QMessageBox, QInputDialog, QFileDialog, QDialog, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton, QDialogButtonBox, QFrame
 
 # 导入资源工具
 try:
@@ -420,8 +420,8 @@ class LogSizeDialog(QDialog):
 class MTKLogWorker(QThread):
     """MTKLOG工作线程"""
     
-    finished = pyqtSignal(bool, str)  # success, message
-    progress = pyqtSignal(int, str)   # progress, status
+    finished = Signal(bool, str)  # success, message
+    progress = Signal(int, str)   # progress, status
     
     def __init__(self, device, operation, device_manager, parent=None, log_name=None, export_media=False, storage_path_func=None, should_record=False):
         super().__init__(parent)
@@ -611,7 +611,7 @@ class MTKLogWorker(QThread):
             self.progress.emit(0, self.tr("检查并停止视频录制进程..."))
             try:
                 # 首先尝试通过video_manager停止录制
-                # MTKLogWorker的parent是PyQtMTKLogManager，PyQtMTKLogManager的parent是主窗口
+                # MTKLogWorker的parent是PySide6MTKLogManager，PySide6MTKLogManager的parent是主窗口
                 mtklog_manager = self.parent()
                 video_manager = None
                 if mtklog_manager and hasattr(mtklog_manager, 'get_video_manager'):
@@ -1000,16 +1000,16 @@ class MTKLogWorker(QThread):
         except Exception as e:
             self.finished.emit(False, f"{self.lang_manager.tr('删除MTKLOG失败:')} {str(e)}")
 
-class PyQtMTKLogManager(QObject):
-    """PyQt5 MTKLOG管理器"""
+class PySide6MTKLogManager(QObject):
+    """PySide6 MTKLOG管理器"""
     
     # 信号定义
-    mtklog_started = pyqtSignal()
-    mtklog_stopped = pyqtSignal()
-    mtklog_deleted = pyqtSignal()
-    mtklog_exported = pyqtSignal(str)  # export_path
-    progress_updated = pyqtSignal(int, str)  # progress, status
-    status_message = pyqtSignal(str)
+    mtklog_started = Signal()
+    mtklog_stopped = Signal()
+    mtklog_deleted = Signal()
+    mtklog_exported = Signal(str)  # export_path
+    progress_updated = Signal(int, str)  # progress, status
+    status_message = Signal(str)
     
     def __init__(self, device_manager, parent=None):
         super().__init__(parent)
@@ -1057,10 +1057,10 @@ class PyQtMTKLogManager(QObject):
                 self.lang_manager.tr("开始录制视频"),
                 (self.lang_manager.tr("是否在MTKLOG启动成功后开始录制视频？\n\n") +
                  self.lang_manager.tr("注意：录制视频过程中USB连接不能断开。")),
-                QMessageBox.Yes | QMessageBox.No,
-                QMessageBox.No
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No
             )
-            should_record = (reply == QMessageBox.Yes)
+            should_record = (reply == QMessageBox.StandardButton.Yes)
         
         # 创建工作线程
         self.worker = MTKLogWorker(device, 'start', self.device_manager, self, storage_path_func=self.get_storage_path, should_record=should_record)
@@ -1090,10 +1090,10 @@ class PyQtMTKLogManager(QObject):
             self.lang_manager.tr("导出媒体文件"),
             (self.lang_manager.tr("是否导出手机录制的视频和截图？\n\n") +
              self.lang_manager.tr("选择") + self.lang_manager.tr("是") + self.lang_manager.tr("将导出这些媒体文件。")),
-            QMessageBox.Yes | QMessageBox.No,
-            QMessageBox.No
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No
         )
-        export_media = (reply == QMessageBox.Yes)
+        export_media = (reply == QMessageBox.StandardButton.Yes)
         
         # 创建工作线程
         self.worker = MTKLogWorker(device, 'stop_export', self.device_manager, self, log_name=log_name, export_media=export_media, storage_path_func=self.get_storage_path)
@@ -1126,11 +1126,11 @@ class PyQtMTKLogManager(QObject):
             None,
             self.lang_manager.tr("确认删除"),
             self.lang_manager.tr("确定要删除设备上的MTKLOG吗？"),
-            QMessageBox.Yes | QMessageBox.No,
-            QMessageBox.No
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No
         )
         
-        if reply != QMessageBox.Yes:
+        if reply != QMessageBox.StandardButton.Yes:
             return
         
         # 创建工作线程
@@ -1152,7 +1152,7 @@ class PyQtMTKLogManager(QObject):
         
         # 显示对话框
         dialog = LogSizeDialog(device=device, parent=self.parent())
-        if dialog.exec_() != QDialog.Accepted:
+        if dialog.exec() != QDialog.DialogCode.Accepted:
             return
         
         # 获取输入的值
@@ -1311,10 +1311,10 @@ class PyQtMTKLogManager(QObject):
                             None,
                             self.lang_manager.tr("安装警告"),
                             warning_msg,
-                            QMessageBox.Yes | QMessageBox.No,
-                            QMessageBox.No
+                            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                            QMessageBox.StandardButton.No
                         )
-                        if reply != QMessageBox.Yes:
+                        if reply != QMessageBox.StandardButton.Yes:
                             self.status_message.emit(self.lang_manager.tr("用户取消安装"))
                             return
                     
@@ -1332,10 +1332,10 @@ class PyQtMTKLogManager(QObject):
                             None,
                             self.lang_manager.tr("安装警告"),
                             warning_msg,
-                            QMessageBox.Yes | QMessageBox.No,
-                            QMessageBox.No
+                            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                            QMessageBox.StandardButton.No
                         )
-                        if reply != QMessageBox.Yes:
+                        if reply != QMessageBox.StandardButton.Yes:
                             self.status_message.emit(self.lang_manager.tr("用户取消安装"))
                             return
                 else:
@@ -1361,10 +1361,10 @@ class PyQtMTKLogManager(QObject):
                             None,
                             self.lang_manager.tr("安装警告"),
                             warning_msg,
-                            QMessageBox.Yes | QMessageBox.No,
-                            QMessageBox.No
+                            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                            QMessageBox.StandardButton.No
                         )
-                        if reply != QMessageBox.Yes:
+                        if reply != QMessageBox.StandardButton.Yes:
                             self.status_message.emit(self.lang_manager.tr("用户取消安装"))
                             return
                     elif not APKUTILS_AVAILABLE:

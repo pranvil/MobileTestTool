@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
 通用工具函数
@@ -7,14 +7,14 @@
 
 import subprocess
 import time
-from PyQt5.QtCore import QObject, pyqtSignal, QThread
-from PyQt5.QtWidgets import QMessageBox
+from PySide6.QtCore import QObject, Signal, QThread
+from PySide6.QtWidgets import QMessageBox
 
 
 class RebootDeviceWorker(QThread):
     """异步重启设备Worker"""
     
-    finished = pyqtSignal(bool, str)  # success, message
+    finished = Signal(bool, str)  # success, message
     
     def __init__(self, device, lang_manager=None):
         super().__init__()
@@ -52,9 +52,9 @@ class DeviceUtilities(QObject):
     """设备通用工具类"""
     
     # 信号定义
-    status_message = pyqtSignal(str)
-    reboot_started = pyqtSignal(str)  # device
-    reboot_finished = pyqtSignal(bool, str)  # success, message
+    status_message = Signal(str)
+    reboot_started = Signal(str)  # device
+    reboot_finished = Signal(bool, str)  # success, message
     
     def __init__(self, device_manager, parent=None):
         super().__init__(parent)
@@ -81,11 +81,11 @@ class DeviceUtilities(QObject):
                 parent_widget,
                 self.tr("确认重启"),
                 f"{self.tr('确定要重启设备')} {device} {self.tr('吗？')}\n\n{self.tr('这将执行')} 'adb reboot' {self.tr('命令')}",
-                QMessageBox.Yes | QMessageBox.No,
-                QMessageBox.No
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No
             )
             
-            if reply != QMessageBox.Yes:
+            if reply != QMessageBox.StandardButton.Yes:
                 return False
         
         # 创建并启动异步Worker
@@ -124,11 +124,11 @@ class DeviceUtilities(QObject):
             parent_widget,
             self.tr("确认"),
             self.tr("确定要清除设备上的日志缓存吗？\n\n这将执行 'adb logcat -c' 命令"),
-            QMessageBox.Yes | QMessageBox.No,
-            QMessageBox.No
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No
         )
         
-        if reply != QMessageBox.Yes:
+        if reply != QMessageBox.StandardButton.Yes:
             return False
         
         try:

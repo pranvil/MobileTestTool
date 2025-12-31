@@ -1,7 +1,7 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-PyQt5 其他管理器集合
+PySide6 其他管理器集合
 包含TCPDUMP、Telephony、Google Log、AEE Log、Bugreport等管理器
 """
 
@@ -9,14 +9,14 @@ import subprocess
 import os
 import datetime
 import threading
-from PyQt5.QtCore import QObject, pyqtSignal
-from PyQt5.QtWidgets import QMessageBox, QInputDialog, QFileDialog
+from PySide6.QtCore import QObject, Signal
+from PySide6.QtWidgets import QMessageBox, QInputDialog, QFileDialog
 
 
-class PyQtTCPDumpManager(QObject):
+class PySide6TCPDumpManager(QObject):
     """TCPDUMP管理器"""
     
-    status_message = pyqtSignal(str)
+    status_message = Signal(str)
     
     def __init__(self, device_manager, parent=None):
         super().__init__(parent)
@@ -103,10 +103,10 @@ class PyQtTCPDumpManager(QObject):
             self.status_message.emit(f"{self.lang_manager.tr('保存TCPDUMP失败:')} {str(e)}")
 
 
-class PyQtGoogleLogManager(QObject):
+class PySide6GoogleLogManager(QObject):
     """Google Log管理器"""
     
-    status_message = pyqtSignal(str)
+    status_message = Signal(str)
     
     def __init__(self, device_manager, parent=None):
         super().__init__(parent)
@@ -144,10 +144,10 @@ class PyQtGoogleLogManager(QObject):
             self.status_message.emit(f"{self.lang_manager.tr('切换Google日志失败:')} {str(e)}")
 
 
-class PyQtAEELogManager(QObject):
+class PySide6AEELogManager(QObject):
     """AEE Log管理器"""
     
-    status_message = pyqtSignal(str)
+    status_message = Signal(str)
     
     def __init__(self, device_manager, parent=None):
         super().__init__(parent)
@@ -172,10 +172,10 @@ class PyQtAEELogManager(QObject):
             self.status_message.emit(f"{self.lang_manager.tr('启动AEE Log失败:')} {str(e)}")
 
 
-class PyQtBugreportManager(QObject):
+class PySide6BugreportManager(QObject):
     """Bugreport管理器"""
     
-    status_message = pyqtSignal(str)
+    status_message = Signal(str)
     
     def __init__(self, device_manager, parent=None):
         super().__init__(parent)
@@ -212,10 +212,10 @@ class PyQtBugreportManager(QObject):
                 os.makedirs(bugreport_folder)
             
             # 在后台线程中生成Bugreport
-            from PyQt5.QtCore import QThread, pyqtSignal
+            from PySide6.QtCore import QThread, Signal
             
             class BugreportWorker(QThread):
-                finished = pyqtSignal(bool, str)
+                finished = Signal(bool, str)
                 
                 def __init__(self, device, folder):
                     super().__init__()
@@ -270,14 +270,14 @@ class PyQtBugreportManager(QObject):
             # 检查是否返回错误信息
             if "No such file or directory" in check_result.stderr or check_result.returncode != 0:
                 self.status_message.emit(self.lang_manager.tr("设备上没有bugreport"))
-                from PyQt5.QtWidgets import QMessageBox
+                from PySide6.QtWidgets import QMessageBox
                 QMessageBox.information(None, self.lang_manager.tr("提示"), "设备上没有bugreport文件")
                 return
             
             # 如果目录存在但为空，也提示
             if not check_result.stdout.strip():
                 self.status_message.emit(self.lang_manager.tr("设备上的bugreport目录为空"))
-                from PyQt5.QtWidgets import QMessageBox
+                from PySide6.QtWidgets import QMessageBox
                 QMessageBox.information(None, self.lang_manager.tr("提示"), "设备上的bugreport目录为空")
                 return
             
@@ -312,16 +312,16 @@ class PyQtBugreportManager(QObject):
             return
         
         # 确认对话框
-        from PyQt5.QtWidgets import QMessageBox
+        from PySide6.QtWidgets import QMessageBox
         reply = QMessageBox.question(
             None,
             self.lang_manager.tr("确认删除"),
             self.lang_manager.tr("确定要删除设备上的bugreport吗？此操作不可恢复。"),
-            QMessageBox.Yes | QMessageBox.No,
-            QMessageBox.No
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No
         )
         
-        if reply != QMessageBox.Yes:
+        if reply != QMessageBox.StandardButton.Yes:
             return
         
         try:
@@ -339,10 +339,10 @@ class PyQtBugreportManager(QObject):
 
 # 导出所有管理器
 __all__ = [
-    'PyQtTCPDumpManager',
-    'PyQtTelephonyManager',
-    'PyQtGoogleLogManager',
-    'PyQtAEELogManager',
-    'PyQtBugreportManager'
+    'PySide6TCPDumpManager',
+    'PySide6TelephonyManager',
+    'PySide6GoogleLogManager',
+    'PySide6AEELogManager',
+    'PySide6BugreportManager'
 ]
 

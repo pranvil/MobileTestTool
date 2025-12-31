@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
 SIM卡读写工具对话框
@@ -9,8 +9,8 @@ import sys
 import os
 import logging
 import time
-from PyQt5.QtWidgets import QDialog, QVBoxLayout, QMessageBox
-from PyQt5.QtCore import Qt, pyqtSignal
+from PySide6.QtWidgets import QDialog, QVBoxLayout, QMessageBox
+from PySide6.QtCore import Qt, Signal
 
 # 注意：sim_reader 的导入路径将在对话框初始化时动态添加
 # 这样可以避免与当前的 ui 模块冲突
@@ -47,7 +47,7 @@ class SimReaderDialog(QDialog):
                 # 清理旧实例，确保状态恢复
                 try:
                     # 手动触发关闭事件，确保状态恢复
-                    from PyQt5.QtCore import QEvent, QCloseEvent
+                    from PySide6.QtCore import QEvent, QCloseEvent
                     close_event = QCloseEvent()
                     cls._instance._on_close_event(close_event)
                     cls._instance.deleteLater()
@@ -297,14 +297,6 @@ class SimReaderDialog(QDialog):
             
         except ImportError as e:
             # 如果导入失败，显示错误信息
-            error_label = QMessageBox(
-                QMessageBox.Critical,
-                "导入错误",
-                f"无法导入 sim_reader 模块：\n{str(e)}\n\n请确保 sim_reader 目录存在且包含所有必需的文件。",
-                QMessageBox.Ok,
-                self
-            )
-            layout.addWidget(error_label)
             QMessageBox.critical(
                 self,
                 "导入错误",

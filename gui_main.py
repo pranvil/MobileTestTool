@@ -8,15 +8,15 @@
 import sys
 import os
 
-from PyQt5.QtWidgets import QApplication
-from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QFont, QIcon
+from PySide6.QtWidgets import QApplication
+from PySide6.QtCore import Qt
+from PySide6.QtGui import QFont, QIcon
 
 from core.debug_logger import logger
 
 # 在打包环境中，预导入对话框模块以确保PyInstaller包含它们
 # 这样可以避免首次导入时的模块找不到问题
-# 必须在PyQt5导入之后、MainWindow导入之前进行预导入
+# 必须在PySide6导入之后、MainWindow导入之前进行预导入
 if hasattr(sys, 'frozen') and hasattr(sys, '_MEIPASS'):
     try:
         # 预导入所有对话框模块，确保它们在启动时就被PyInstaller识别
@@ -83,9 +83,8 @@ def main():
         logger.info("程序启动 (GUI 模式)")
         logger.info("=" * 60)
         
-        # 在创建QApplication之前启用高DPI缩放（Qt 5.6+）
-        QApplication.setAttribute(Qt.AA_EnableHighDpiScaling, True)
-        QApplication.setAttribute(Qt.AA_UseHighDpiPixmaps, True)
+        # PySide6/Qt6 默认启用高DPI缩放，无需手动设置
+        # Qt6 中已移除 AA_EnableHighDpiScaling 和 AA_UseHighDpiPixmaps 属性
         
         # 创建应用程序
         logger.info("创建QApplication实例...")
@@ -93,7 +92,7 @@ def main():
         
         # 设置应用程序属性
         app.setApplicationName("手机测试辅助工具")
-        app.setApplicationVersion("0.7-PyQt5")
+        app.setApplicationVersion("0.7-PySide6")
         app.setOrganizationName("MobileTestTool")
         
         # 设置应用程序图标
@@ -156,7 +155,7 @@ def main():
         logger.separator()
         
         # 运行应用程序
-        exit_code = app.exec_()
+        exit_code = app.exec()
         
         logger.info("=" * 60)
         logger.info(f"程序正常退出，退出码: {exit_code}")
@@ -172,13 +171,13 @@ def main():
         
         # 尝试显示错误对话框
         try:
-            from PyQt5.QtWidgets import QMessageBox
+            from PySide6.QtWidgets import QMessageBox
             msg = QMessageBox()
-            msg.setIcon(QMessageBox.Critical)
+            msg.setIcon(QMessageBox.Icon.Critical)
             msg.setWindowTitle("启动失败")
             msg.setText(f"程序启动失败: {str(e)}")
             msg.setInformativeText(f"详细信息请查看日志文件：\n{logger.get_log_file_path()}")
-            msg.exec_()
+            msg.exec()
         except:
             # 静默处理启动失败错误，避免控制台乱码
             pass

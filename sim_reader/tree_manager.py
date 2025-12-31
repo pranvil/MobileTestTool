@@ -1,5 +1,5 @@
-import logging
-from PyQt5.QtWidgets import QTreeWidgetItem
+﻿import logging
+from PySide6.QtWidgets import QTreeWidgetItem
 
 class TreeManager:
     """SIM卡文件树形结构管理器
@@ -10,7 +10,7 @@ class TreeManager:
         """初始化树形管理器
         
         Args:
-            tree_widget: PyQt5树形控件实例，用于显示文件结构
+            tree_widget: PySide6树形控件实例，用于显示文件结构
         """
         self.tree_widget = tree_widget
         logging.debug("初始化树形管理器")

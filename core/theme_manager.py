@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
 主题管理器
@@ -6,8 +6,8 @@
 """
 
 import os
-from PyQt5.QtCore import QFile, QTextStream
-from PyQt5.QtWidgets import QApplication
+from PySide6.QtCore import QFile, QTextStream
+from PySide6.QtWidgets import QApplication
 from core.resource_utils import get_resource_path
 
 

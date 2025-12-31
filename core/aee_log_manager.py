@@ -1,7 +1,7 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-PyQt5 AEE日志管理器
+PySide6 AEE日志管理器
 适配原Tkinter版本的AEE日志管理功能
 """
 
@@ -10,14 +10,14 @@ import os
 import datetime
 import time
 import threading
-from PyQt5.QtCore import QObject, pyqtSignal, QThread
-from PyQt5.QtWidgets import QMessageBox, QFileDialog
+from PySide6.QtCore import QObject, Signal, QThread
+from PySide6.QtWidgets import QMessageBox, QFileDialog
 
 
 class AEELogWorker(QThread):
     """AEE日志等待和拉取工作线程"""
     
-    finished = pyqtSignal(bool, str)
+    finished = Signal(bool, str)
     
     def __init__(self, device, lang_manager=None, storage_path_func=None):
         super().__init__()
@@ -113,10 +113,10 @@ class AEELogWorker(QThread):
             self.finished.emit(False, error_msg)
 
 
-class PyQtAEELogManager(QObject):
-    """PyQt5 AEE日志管理器"""
+class PySide6AEELogManager(QObject):
+    """PySide6 AEE日志管理器"""
     
-    status_message = pyqtSignal(str)
+    status_message = Signal(str)
     
     def __init__(self, device_manager, parent=None):
         super().__init__(parent)
@@ -213,10 +213,10 @@ class PyQtAEELogManager(QObject):
                     self.lang_manager.tr("安装提示"),
                     self.lang_manager.tr("com.tcl.logger未安装，是否选择APK文件进行安装？\n\n") +
                     self.lang_manager.tr("点击 '是' 选择APK文件进行安装\n点击 '否' 取消操作"),
-                    QMessageBox.Yes | QMessageBox.No
+                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
                 )
                 
-                if reply == QMessageBox.Yes:
+                if reply == QMessageBox.StandardButton.Yes:
                     # 选择APK文件
                     apk_file, _ = QFileDialog.getOpenFileName(
                         None,

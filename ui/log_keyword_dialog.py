@@ -1,14 +1,14 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
 Log关键字配置对话框
 """
 
-from PyQt5.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QPushButton,
+from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QPushButton,
                              QTableWidget, QTableWidgetItem, QHeaderView,
                              QMessageBox, QLabel, QLineEdit, QTextEdit,
                              QFileDialog, QFormLayout, QWidget, QFrame)
-from PyQt5.QtCore import Qt
+from PySide6.QtCore import Qt
 from core.debug_logger import logger
 from ui.widgets.shadow_utils import add_card_shadow
 
@@ -124,7 +124,7 @@ class LogKeywordDialog(QDialog):
     def add_keyword(self):
         """添加关键字"""
         dialog = KeywordEditDialog(parent=self)
-        if dialog.exec_() == QDialog.Accepted:
+        if dialog.exec() == QDialog.DialogCode.Accepted:
             keyword_data = dialog.get_keyword_data()
             if self.keyword_manager.add_keyword(keyword_data):
                 self.load_keywords()
@@ -144,7 +144,7 @@ class LogKeywordDialog(QDialog):
         
         if keyword_data:
             dialog = KeywordEditDialog(keyword_data=keyword_data, parent=self)
-            if dialog.exec_() == QDialog.Accepted:
+            if dialog.exec() == QDialog.DialogCode.Accepted:
                 updated_data = dialog.get_keyword_data()
                 if self.keyword_manager.update_keyword(keyword_id, updated_data):
                     self.load_keywords()
@@ -163,10 +163,10 @@ class LogKeywordDialog(QDialog):
         reply = QMessageBox.question(
             self, self.tr("确认删除"),
             f"{self.tr('确定要删除关键字')} '{keyword_name}' {self.tr('吗？')}",
-            QMessageBox.Yes | QMessageBox.No
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
         )
         
-        if reply == QMessageBox.Yes:
+        if reply == QMessageBox.StandardButton.Yes:
             keyword_id = self.table.item(current_row, 0).data(Qt.UserRole)
             if self.keyword_manager.delete_keyword(keyword_id):
                 self.load_keywords()

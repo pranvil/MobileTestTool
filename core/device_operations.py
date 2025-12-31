@@ -1,7 +1,7 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-PyQt5 剩余管理器集合
+PySide6 剩余管理器集合
 包含背景数据、APP操作、设备信息、赫拉配置、其他操作等管理器
 """
 
@@ -9,17 +9,17 @@ import subprocess
 import os
 import datetime
 import json
-from PyQt5.QtCore import QObject, pyqtSignal, QThread
-from PyQt5.QtWidgets import QMessageBox, QFileDialog, QInputDialog, QDialog
+from PySide6.QtCore import QObject, Signal, QThread
+from PySide6.QtWidgets import QMessageBox, QFileDialog, QInputDialog, QDialog
 
 from core.update_manager import DEFAULT_UPDATE_FEED_URL
 
 
-class PyQtBackgroundDataManager(QObject):
+class PySide6BackgroundDataManager(QObject):
     """背景数据管理器 - 使用完整实现"""
     
-    status_message = pyqtSignal(str)
-    log_message = pyqtSignal(str, str)  # text, color
+    status_message = Signal(str)
+    log_message = Signal(str, str)  # text, color
     
     def __init__(self, device_manager, parent=None):
         super().__init__(parent)
@@ -173,10 +173,10 @@ class PyQtBackgroundDataManager(QObject):
         # TODO: 实现日志分析逻辑
 
 
-class PyQtAppOperationsManager(QObject):
+class PySide6AppOperationsManager(QObject):
     """APP操作管理器 - 使用完整实现"""
     
-    status_message = pyqtSignal(str)
+    status_message = Signal(str)
     
     def __init__(self, device_manager, parent=None):
         super().__init__(parent)
@@ -246,9 +246,9 @@ class PyQtAppOperationsManager(QObject):
 class DeviceInfoWorker(QThread):
     """设备信息获取工作线程 - 避免阻塞UI"""
     
-    finished = pyqtSignal(dict)  # 完成信号，返回设备信息字典
-    error_occurred = pyqtSignal(str)  # 错误信号
-    status_updated = pyqtSignal(str)  # 状态更新信号
+    finished = Signal(dict)  # 完成信号，返回设备信息字典
+    error_occurred = Signal(str)  # 错误信号
+    status_updated = Signal(str)  # 状态更新信号
     
     def __init__(self, device, device_info_manager, lang_manager=None):
         super().__init__()
@@ -275,10 +275,10 @@ class DeviceInfoWorker(QThread):
             self.error_occurred.emit(str(e))
 
 
-class PyQtDeviceInfoManager(QObject):
+class PySide6DeviceInfoManager(QObject):
     """设备信息管理器"""
     
-    status_message = pyqtSignal(str)
+    status_message = Signal(str)
     
     def __init__(self, device_manager, parent=None):
         super().__init__(parent)
@@ -296,7 +296,7 @@ class PyQtDeviceInfoManager(QObject):
         
     def _init_device_info_manager(self):
         """初始化设备信息管理器"""
-        # 导入PyQt5版本的DeviceInfoManager
+        # 导入PySide6版本的DeviceInfoManager
         from core.device_info_manager import DeviceInfoManager
         self.device_info_manager = DeviceInfoManager()
         
@@ -431,18 +431,18 @@ class PyQtDeviceInfoManager(QObject):
             self.status_message.emit("❌ " + self.tr("设置灭屏时间失败: ") + str(e))
 
 
-class PyQtHeraConfigManager(QObject):
+class PySide6HeraConfigManager(QObject):
     """赫拉配置管理器"""
     
-    status_message = pyqtSignal(str)
+    status_message = Signal(str)
     
     def __init__(self, device_manager, parent=None):
         super().__init__(parent)
         self.device_manager = device_manager
         # 从父窗口获取语言管理器
         self.lang_manager = parent.lang_manager if parent and hasattr(parent, 'lang_manager') else None
-        # 导入独立的PyQt5赫拉配置管理器
-        from core.hera_config_manager import PyQtHeraConfigManager as HeraManager
+        # 导入独立的PySide6赫拉配置管理器
+        from core.hera_config_manager import PySide6HeraConfigManager as HeraManager
         self.hera_manager = HeraManager(device_manager, parent=self)
         # 连接信号
         self.hera_manager.status_message.connect(self.status_message.emit)
@@ -465,11 +465,11 @@ class PyQtHeraConfigManager(QObject):
 class VenvWorker(QThread):
     """虚拟环境处理工作线程"""
     
-    progress_updated = pyqtSignal(int)  # 进度 (0-100)
-    status_updated = pyqtSignal(str)  # 状态消息
-    finished = pyqtSignal(dict)  # 完成信号，返回结果字典
-    error_occurred = pyqtSignal(str)  # 错误信号
-    request_user_confirm = pyqtSignal(str, str)  # 请求用户确认 (title, message)
+    progress_updated = Signal(int)  # 进度 (0-100)
+    status_updated = Signal(str)  # 状态消息
+    finished = Signal(dict)  # 完成信号，返回结果字典
+    error_occurred = Signal(str)  # 错误信号
+    request_user_confirm = Signal(str, str)  # 请求用户确认 (title, message)
     
     def __init__(self, elt_path, venv_path, lang_manager=None, parent_manager=None):
         super().__init__()
@@ -479,7 +479,7 @@ class VenvWorker(QThread):
         self.parent_manager = parent_manager
         self.user_response = None
         self.user_response_mutex = None
-        from PyQt5.QtCore import QMutex
+        from PySide6.QtCore import QMutex
         self.user_response_mutex = QMutex()
     
     def tr(self, text):
@@ -555,9 +555,9 @@ class VenvWorker(QThread):
         )
         
         # 等待用户响应
-        from PyQt5.QtWidgets import QMessageBox
+        from PySide6.QtWidgets import QMessageBox
         user_response = self.wait_for_user_response()
-        if user_response != QMessageBox.Yes:
+        if user_response != QMessageBox.StandardButton.Yes:
             return {'success': False, 'error': self.tr('用户取消创建虚拟环境')}
         
         # 创建虚拟环境
@@ -719,10 +719,10 @@ class OtherOperationsWorker(QThread):
     """其他操作工作线程"""
     
     # 信号定义
-    progress_updated = pyqtSignal(int)  # 进度 (0-100)
-    status_updated = pyqtSignal(str)  # 状态消息
-    finished = pyqtSignal(dict)  # 完成信号，返回结果字典
-    error_occurred = pyqtSignal(str)  # 错误信号
+    progress_updated = Signal(int)  # 进度 (0-100)
+    status_updated = Signal(str)  # 状态消息
+    finished = Signal(dict)  # 完成信号，返回结果字典
+    error_occurred = Signal(str)  # 错误信号
     
     def __init__(self, operation_type, lang_manager=None, **kwargs):
         super().__init__()
@@ -2077,10 +2077,10 @@ print(f"Success count: {{success_count}}")
         self.stop_flag = True
 
 
-class PyQtOtherOperationsManager(QObject):
+class PySide6OtherOperationsManager(QObject):
     """其他操作管理器"""
     
-    status_message = pyqtSignal(str)
+    status_message = Signal(str)
     
     def __init__(self, device_manager, parent=None):
         super().__init__(parent)
@@ -2139,14 +2139,14 @@ class PyQtOtherOperationsManager(QObject):
     
     def _check_tool_config(self, check_mtk=True, check_qualcomm=False, check_wireshark=True):
         """检查工具配置"""
-        from PyQt5.QtWidgets import QMessageBox
+        from PySide6.QtWidgets import QMessageBox
         
         if check_mtk and not self.tool_config.get("mtk_tools"):
             reply = QMessageBox.question(
                 None, self.tr("配置缺失"), self.tr("未配置MTK工具，是否现在配置？"),
-                QMessageBox.Yes | QMessageBox.No
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
             )
-            if reply == QMessageBox.Yes:
+            if reply == QMessageBox.StandardButton.Yes:
                 self.configure_tools()
                 return bool(self.tool_config.get("mtk_tools"))
             return False
@@ -2154,9 +2154,9 @@ class PyQtOtherOperationsManager(QObject):
         if check_qualcomm and not self.tool_config.get("qualcomm_tools"):
             reply = QMessageBox.question(
                 None, self.tr("配置缺失"), self.tr("未配置高通工具，是否现在配置？"),
-                QMessageBox.Yes | QMessageBox.No
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
             )
-            if reply == QMessageBox.Yes:
+            if reply == QMessageBox.StandardButton.Yes:
                 self.configure_tools()
                 return bool(self.tool_config.get("qualcomm_tools"))
             return False
@@ -2164,9 +2164,9 @@ class PyQtOtherOperationsManager(QObject):
         if check_wireshark and not self.tool_config.get("wireshark_path"):
             reply = QMessageBox.question(
                 None, self.tr("配置缺失"), self.tr("未配置Wireshark路径，是否现在配置？"),
-                QMessageBox.Yes | QMessageBox.No
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
             )
-            if reply == QMessageBox.Yes:
+            if reply == QMessageBox.StandardButton.Yes:
                 self.configure_tools()
                 return bool(self.tool_config.get("wireshark_path"))
             return False
@@ -2209,7 +2209,7 @@ class PyQtOtherOperationsManager(QObject):
                 return self.tool_config["mtk_tools"][0]
             
             # 创建选择对话框
-            from PyQt5.QtWidgets import QDialog, QVBoxLayout, QListWidget, QPushButton, QHBoxLayout, QLabel, QMessageBox
+            from PySide6.QtWidgets import QDialog, QVBoxLayout, QListWidget, QPushButton, QHBoxLayout, QLabel, QMessageBox
             
             dialog = QDialog()
             dialog.setWindowTitle(self.tr("选择MTK工具"))
@@ -2252,7 +2252,7 @@ class PyQtOtherOperationsManager(QObject):
             button_layout.addWidget(cancel_btn)
             layout.addLayout(button_layout)
             
-            if dialog.exec_() == QDialog.Accepted:
+            if dialog.exec() == QDialog.DialogCode.Accepted:
                 return result[0]
             else:
                 return None
@@ -2271,7 +2271,7 @@ class PyQtOtherOperationsManager(QObject):
                 return self.tool_config["qualcomm_tools"][0]
             
             # 创建选择对话框
-            from PyQt5.QtWidgets import QDialog, QVBoxLayout, QListWidget, QPushButton, QHBoxLayout, QLabel, QMessageBox
+            from PySide6.QtWidgets import QDialog, QVBoxLayout, QListWidget, QPushButton, QHBoxLayout, QLabel, QMessageBox
             
             dialog = QDialog()
             dialog.setWindowTitle(self.tr("选择高通工具"))
@@ -2314,7 +2314,7 @@ class PyQtOtherOperationsManager(QObject):
             button_layout.addWidget(cancel_btn)
             layout.addLayout(button_layout)
             
-            if dialog.exec_() == QDialog.Accepted:
+            if dialog.exec() == QDialog.DialogCode.Accepted:
                 return result[0]
             else:
                 return None
@@ -2325,7 +2325,7 @@ class PyQtOtherOperationsManager(QObject):
     def merge_mtklog(self):
         """合并MTKlog文件"""
         try:
-            from PyQt5.QtWidgets import QMessageBox, QFileDialog
+            from PySide6.QtWidgets import QMessageBox, QFileDialog
             
             # 检查工具配置
             if not self._check_tool_config():
@@ -2359,7 +2359,7 @@ class PyQtOtherOperationsManager(QObject):
     def extract_pcap_from_mtklog(self):
         """从MTKlog中提取pcap文件"""
         try:
-            from PyQt5.QtWidgets import QMessageBox, QFileDialog
+            from PySide6.QtWidgets import QMessageBox, QFileDialog
             
             # 检查工具配置
             if not self._check_tool_config():
@@ -2398,7 +2398,7 @@ class PyQtOtherOperationsManager(QObject):
     def merge_pcap(self):
         """合并PCAP文件"""
         try:
-            from PyQt5.QtWidgets import QMessageBox, QFileDialog
+            from PySide6.QtWidgets import QMessageBox, QFileDialog
             
             # 检查Wireshark配置
             if not self.tool_config.get("wireshark_path"):
@@ -2410,9 +2410,9 @@ class PyQtOtherOperationsManager(QObject):
                 )
                 reply = QMessageBox.question(
                     None, self.tr("配置缺失"), message,
-                    QMessageBox.Yes | QMessageBox.No
+                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
                 )
-                if reply == QMessageBox.Yes:
+                if reply == QMessageBox.StandardButton.Yes:
                     self.configure_tools()
                     if not self.tool_config.get("wireshark_path"):
                         return
@@ -2435,7 +2435,7 @@ class PyQtOtherOperationsManager(QObject):
     def extract_pcap_from_qualcomm_log(self):
         """从高通log提取pcap文件"""
         try:
-            from PyQt5.QtWidgets import QMessageBox, QFileDialog
+            from PySide6.QtWidgets import QMessageBox, QFileDialog
             
             # 检查工具配置
             if not self._check_tool_config(check_mtk=False, check_qualcomm=True, check_wireshark=True):
@@ -2474,7 +2474,7 @@ class PyQtOtherOperationsManager(QObject):
     def _start_worker(self, operation_type, **kwargs):
         """启动工作线程"""
         try:
-            from PyQt5.QtWidgets import QDialog, QVBoxLayout, QLabel, QProgressBar, QPushButton, QMessageBox
+            from PySide6.QtWidgets import QDialog, QVBoxLayout, QLabel, QProgressBar, QPushButton, QMessageBox
             
             # 保存原始参数（用于重新启动）
             self._last_worker_kwargs = kwargs.copy()
@@ -2511,7 +2511,7 @@ class PyQtOtherOperationsManager(QObject):
             self.worker.start()
             
             # 显示对话框
-            self.progress_dialog.exec_()
+            self.progress_dialog.exec()
             
         except Exception as e:
             QMessageBox.critical(None, self.tr("错误"), f"启动工作线程失败: {str(e)}")
@@ -2572,7 +2572,7 @@ class PyQtOtherOperationsManager(QObject):
                     self.log_message.emit(error_display)
                 else:
                     self.status_message.emit(error_display)
-                from PyQt5.QtWidgets import QMessageBox
+                from PySide6.QtWidgets import QMessageBox
                 QMessageBox.critical(
                     None,
                     self.tr("操作失败"),
@@ -2669,7 +2669,7 @@ class PyQtOtherOperationsManager(QObject):
             from ui.tools_config_dialog import ToolsConfigDialog
             
             dialog = ToolsConfigDialog(self.tool_config, parent=None)
-            if dialog.exec_() == QDialog.Accepted:
+            if dialog.exec() == QDialog.DialogCode.Accepted:
                 # 保存配置
                 self._save_tool_config()
                 QMessageBox.information(None, self.tr("成功"), "工具配置已保存")
@@ -2688,7 +2688,7 @@ class PyQtOtherOperationsManager(QObject):
         try:
             # 创建并显示对话框
             dialog = InputTextDialog(device, parent=self.parent())
-            dialog.exec_()
+            dialog.exec()
             
         except Exception as e:
             self.status_message.emit("❌ " + self.tr("输入文本失败: ") + str(e))
@@ -2696,7 +2696,7 @@ class PyQtOtherOperationsManager(QObject):
     def mtk_sip_decode(self):
         """MTK SIP DECODE"""
         try:
-            from PyQt5.QtWidgets import QMessageBox, QFileDialog
+            from PySide6.QtWidgets import QMessageBox, QFileDialog
             
             # 检查工具配置
             if not self._check_tool_config():
@@ -2730,9 +2730,9 @@ class PyQtOtherOperationsManager(QObject):
                 None, 
                 self.tr("清空历史加密信息"), 
                 self.tr("是否要清空历史加密信息？\n\n选择\"是\"将清空现有的 esp_sa 文件\n选择\"否\"将追加到现有文件"),
-                QMessageBox.Yes | QMessageBox.No
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
             )
-            clear_history = (reply == QMessageBox.Yes)
+            clear_history = (reply == QMessageBox.StandardButton.Yes)
             
             # 启动工作线程
             self._start_worker('mtk_sip_decode',
@@ -2752,7 +2752,7 @@ class PyQtOtherOperationsManager(QObject):
     
     def _start_venv_worker(self, elt_path):
         """启动虚拟环境处理工作线程"""
-        from PyQt5.QtWidgets import QDialog, QVBoxLayout, QLabel, QProgressBar, QPushButton, QMessageBox
+        from PySide6.QtWidgets import QDialog, QVBoxLayout, QLabel, QProgressBar, QPushButton, QMessageBox
         
         venv_path = self._get_venv_path()
         
@@ -2788,7 +2788,7 @@ class PyQtOtherOperationsManager(QObject):
         self.venv_worker.start()
         
         # 显示对话框
-        self.venv_progress_dialog.exec_()
+        self.venv_progress_dialog.exec()
     
     def _on_venv_status_updated(self, status):
         """虚拟环境状态更新"""
@@ -2801,12 +2801,12 @@ class PyQtOtherOperationsManager(QObject):
     
     def _on_venv_request_confirm(self, title, message):
         """处理虚拟环境工作线程的用户确认请求"""
-        from PyQt5.QtWidgets import QMessageBox
+        from PySide6.QtWidgets import QMessageBox
         reply = QMessageBox.question(
             None,
             title,
             message,
-            QMessageBox.Yes | QMessageBox.No
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
         )
         self.venv_worker.set_user_response(reply)
     
@@ -2831,7 +2831,7 @@ class PyQtOtherOperationsManager(QObject):
             # 虚拟环境处理失败
             error_msg = result.get('error', self.tr('虚拟环境处理失败'))
             if error_msg == self.tr('Python 3.7 未安装'):
-                from PyQt5.QtWidgets import QMessageBox
+                from PySide6.QtWidgets import QMessageBox
                 QMessageBox.critical(
                     None,
                     self.tr("Python 3.7 未安装"),
@@ -2841,7 +2841,7 @@ class PyQtOtherOperationsManager(QObject):
                 # 用户取消，不需要显示错误
                 pass
             else:
-                from PyQt5.QtWidgets import QMessageBox
+                from PySide6.QtWidgets import QMessageBox
                 QMessageBox.critical(
                     None,
                     self.tr("虚拟环境处理失败"),
@@ -3048,10 +3048,10 @@ class PyQtOtherOperationsManager(QObject):
 
 # 导出所有管理器
 __all__ = [
-    'PyQtBackgroundDataManager',
-    'PyQtAppOperationsManager',
-    'PyQtDeviceInfoManager',
-    'PyQtHeraConfigManager',
-    'PyQtOtherOperationsManager'
+    'PySide6BackgroundDataManager',
+    'PySide6AppOperationsManager',
+    'PySide6DeviceInfoManager',
+    'PySide6HeraConfigManager',
+    'PySide6OtherOperationsManager'
 ]
 

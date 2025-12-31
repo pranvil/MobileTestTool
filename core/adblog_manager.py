@@ -1,22 +1,22 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-PyQt5 ADB Log管理器
+PySide6 ADB Log管理器
 适配原Tkinter版本的ADB Log管理功能
 """
 
 import subprocess
 import os
 import datetime
-from PyQt5.QtCore import QObject, pyqtSignal, QThread
+from PySide6.QtCore import QObject, Signal, QThread
 
 
 class OfflineADBLogWorker(QThread):
     """离线ADB Log工作线程"""
     
-    finished = pyqtSignal(dict)
-    error = pyqtSignal(str)
-    progress = pyqtSignal(str, int)
+    finished = Signal(dict)
+    error = Signal(str)
+    progress = Signal(str, int)
     
     def __init__(self, device, log_name, lang_manager=None):
         super().__init__()
@@ -70,11 +70,11 @@ class OfflineADBLogWorker(QThread):
 class OnlineADBLogWorker(QThread):
     """连线ADB Log工作线程"""
     
-    finished = pyqtSignal(dict)
-    error = pyqtSignal(str)
-    progress = pyqtSignal(str, int)
-    usb_disconnected = pyqtSignal(str)  # 设备ID
-    usb_reconnected = pyqtSignal(str)   # 设备ID
+    finished = Signal(dict)
+    error = Signal(str)
+    progress = Signal(str, int)
+    usb_disconnected = Signal(str)  # 设备ID
+    usb_reconnected = Signal(str)   # 设备ID
     
     def __init__(self, device, log_name, online_logcat_process_ref, online_log_file_path_ref, folder=None, lang_manager=None, storage_path_func=None):
         super().__init__()
@@ -246,9 +246,9 @@ class OnlineADBLogWorker(QThread):
 class ExportADBLogWorker(QThread):
     """导出ADB Log工作线程"""
     
-    finished = pyqtSignal(dict)
-    error = pyqtSignal(str)
-    progress = pyqtSignal(str, int)
+    finished = Signal(dict)
+    error = Signal(str)
+    progress = Signal(str, int)
     
     def __init__(self, device, lang_manager=None, storage_path_func=None):
         super().__init__()
@@ -386,20 +386,20 @@ class ExportADBLogWorker(QThread):
             self.error.emit(str(e))
 
 
-class PyQtADBLogManager(QObject):
-    """PyQt5 ADB Log管理器"""
+class PySide6ADBLogManager(QObject):
+    """PySide6 ADB Log管理器"""
     
     # 信号定义
-    mode_selection_required = pyqtSignal()  # 需要选择模式
-    adblog_started = pyqtSignal(str, str)  # device, log_filename
-    adblog_stopped = pyqtSignal()
-    adblog_exported = pyqtSignal(str)  # export_path
-    status_message = pyqtSignal(str)
-    clear_old_logs_required = pyqtSignal(str, int, list)  # device, file_count, txt_files
-    online_mode_started = pyqtSignal()  # 连线模式已启动
-    online_mode_stopped = pyqtSignal()  # 连线模式已停止
-    usb_disconnected = pyqtSignal(str)  # USB断开
-    usb_reconnected = pyqtSignal(str)   # USB重连
+    mode_selection_required = Signal()  # 需要选择模式
+    adblog_started = Signal(str, str)  # device, log_filename
+    adblog_stopped = Signal()
+    adblog_exported = Signal(str)  # export_path
+    status_message = Signal(str)
+    clear_old_logs_required = Signal(str, int, list)  # device, file_count, txt_files
+    online_mode_started = Signal()  # 连线模式已启动
+    online_mode_stopped = Signal()  # 连线模式已停止
+    usb_disconnected = Signal(str)  # USB断开
+    usb_reconnected = Signal(str)   # USB重连
     
     def __init__(self, device_manager, parent=None):
         super().__init__(parent)

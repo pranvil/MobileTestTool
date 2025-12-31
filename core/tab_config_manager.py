@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
 Tab配置管理器
@@ -8,7 +8,7 @@ Tab配置管理器
 import os
 import json
 import datetime
-from PyQt5.QtCore import QObject, pyqtSignal
+from PySide6.QtCore import QObject, Signal
 from core.debug_logger import logger
 
 
@@ -16,9 +16,9 @@ class TabConfigManager(QObject):
     """Tab配置管理器"""
     
     # 信号定义
-    tab_config_updated = pyqtSignal()  # Tab配置更新
-    custom_tab_created = pyqtSignal(dict)  # 自定义tab创建
-    custom_tab_deleted = pyqtSignal(str)  # 自定义tab删除
+    tab_config_updated = Signal()  # Tab配置更新
+    custom_tab_created = Signal(dict)  # 自定义tab创建
+    custom_tab_deleted = Signal(str)  # 自定义tab删除
     
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -101,7 +101,7 @@ class TabConfigManager(QObject):
             
             # 创建防抖定时器
             if self._save_timer is None:
-                from PyQt5.QtCore import QTimer
+                from PySide6.QtCore import QTimer
                 self._save_timer = QTimer()
                 self._save_timer.setSingleShot(True)
                 self._save_timer.timeout.connect(self._do_save_config)

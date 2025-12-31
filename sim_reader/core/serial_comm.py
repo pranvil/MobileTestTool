@@ -1,9 +1,9 @@
-import serial
+﻿import serial
 import re
 from serial.tools import list_ports
 import time
 import logging
-from PyQt5.QtWidgets import QMessageBox
+from PySide6.QtWidgets import QMessageBox
 from core.utils import handle_exception
 from threading import Lock
 from typing import Tuple
@@ -64,7 +64,7 @@ class SerialComm:
         if not self.port or self.port.startswith("error:"):
             logging.error("初始化失败：未找到支持AT命令的COM口")
             if show_popup:
-                QMessageBox.critical(None, "错误", "未找到支持AT命令的COM口", QMessageBox.Ok)
+                QMessageBox.critical(None, "错误", "未找到支持AT命令的COM口", QMessageBox.StandardButton.Ok)
             return False
 
         try:
@@ -75,7 +75,7 @@ class SerialComm:
         except Exception as e:
             logging.error("串口打开失败：%s", e)
             if show_popup:
-                QMessageBox.critical(None, "错误", f"串口打开失败: {e}", QMessageBox.Ok)
+                QMessageBox.critical(None, "错误", f"串口打开失败: {e}", QMessageBox.StandardButton.Ok)
             return False
 
 

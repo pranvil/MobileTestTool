@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-手机测试辅助工具 - PyQt5 版本
+手机测试辅助工具 - PySide6 版本
 主程序入口
 """
 
@@ -68,7 +68,7 @@ if sys.platform == 'win32':
         except (AttributeError, OSError):
             pass
 
-# 必须在导入PyQt5之前设置高DPI支持
+# 必须在导入PySide6之前设置高DPI支持
 os.environ['QT_ENABLE_HIGHDPI_SCALING'] = '1'
 os.environ['QT_SCALE_FACTOR_ROUNDING_POLICY'] = 'PassThrough'
 os.environ['QT_AUTO_SCREEN_SCALE_FACTOR'] = '1'

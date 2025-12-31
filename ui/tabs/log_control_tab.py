@@ -1,12 +1,12 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
 Log控制 Tab
 """
 
-from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout,
+from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout,
                               QPushButton, QLabel, QScrollArea, QFrame)
-from PyQt5.QtCore import pyqtSignal, Qt
+from PySide6.QtCore import Signal, Qt
 from ui.widgets.shadow_utils import add_card_shadow
 
 
@@ -15,43 +15,43 @@ class LogControlTab(QWidget):
     
     # 信号定义
     # MTKLOG 相关
-    mtklog_start = pyqtSignal()
-    mtklog_stop_export = pyqtSignal()
-    mtklog_delete = pyqtSignal()
-    mtklog_set_log_size = pyqtSignal()
-    mtklog_sd_mode = pyqtSignal()
-    mtklog_usb_mode = pyqtSignal()
-    mtklog_install = pyqtSignal()
+    mtklog_start = Signal()
+    mtklog_stop_export = Signal()
+    mtklog_delete = Signal()
+    mtklog_set_log_size = Signal()
+    mtklog_sd_mode = Signal()
+    mtklog_usb_mode = Signal()
+    mtklog_install = Signal()
     
     # ADB Log 相关
-    adblog_start = pyqtSignal()  # 保留原有信号，用于离线log
-    adblog_online_start = pyqtSignal()  # 新增连线log信号
-    adblog_export = pyqtSignal()
+    adblog_start = Signal()  # 保留原有信号，用于离线log
+    adblog_online_start = Signal()  # 新增连线log信号
+    adblog_export = Signal()
     
     # Telephony 相关
-    telephony_enable = pyqtSignal()
+    telephony_enable = Signal()
     
     # Google 日志相关
-    google_log_toggle = pyqtSignal()
+    google_log_toggle = Signal()
     
     # Bugreport 相关
-    bugreport_generate = pyqtSignal()
-    bugreport_pull = pyqtSignal()
-    bugreport_delete = pyqtSignal()
+    bugreport_generate = Signal()
+    bugreport_pull = Signal()
+    bugreport_delete = Signal()
     
     # AEE log 相关
-    aee_log_start = pyqtSignal()
+    aee_log_start = Signal()
     
     # TCPDUMP 相关
-    tcpdump_show_dialog = pyqtSignal()
+    tcpdump_show_dialog = Signal()
     
     # Log操作相关
-    merge_mtklog = pyqtSignal()
-    extract_pcap_from_mtklog = pyqtSignal()
-    merge_pcap = pyqtSignal()
-    extract_pcap_from_qualcomm_log = pyqtSignal()
-    parse_3gpp_message = pyqtSignal()
-    mtk_sip_decode = pyqtSignal()
+    merge_mtklog = Signal()
+    extract_pcap_from_mtklog = Signal()
+    merge_pcap = Signal()
+    extract_pcap_from_qualcomm_log = Signal()
+    parse_3gpp_message = Signal()
+    mtk_sip_decode = Signal()
     
     def __init__(self, parent=None):
         super().__init__(parent)

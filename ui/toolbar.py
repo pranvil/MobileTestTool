@@ -1,13 +1,13 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
 顶部工具栏
 """
 
-from PyQt5.QtWidgets import (QToolBar, QWidget, QHBoxLayout, QLabel, 
+from PySide6.QtWidgets import (QToolBar, QWidget, QHBoxLayout, QLabel, 
                               QComboBox, QPushButton, QFrame, QLineEdit, QSizePolicy)
-from PyQt5.QtCore import Qt, pyqtSignal
-from PyQt5.QtGui import QIcon
+from PySide6.QtCore import Qt, Signal
+from PySide6.QtGui import QIcon
 from core.resource_utils import get_icon_path
 import os
 import logging
@@ -19,16 +19,16 @@ class DeviceToolBar(QToolBar):
     """设备工具栏"""
     
     # 信号定义
-    device_changed = pyqtSignal(str)
-    refresh_clicked = pyqtSignal()
-    screenshot_clicked = pyqtSignal()
-    record_toggled = pyqtSignal(bool)
-    reboot_clicked = pyqtSignal()
-    root_remount_clicked = pyqtSignal()
-    theme_toggled = pyqtSignal()
-    adb_command_executed = pyqtSignal(str)  # 执行adb命令
-    language_changed = pyqtSignal(str)  # 语言切换信号
-    check_update_clicked = pyqtSignal()
+    device_changed = Signal(str)
+    refresh_clicked = Signal()
+    screenshot_clicked = Signal()
+    record_toggled = Signal(bool)
+    reboot_clicked = Signal()
+    root_remount_clicked = Signal()
+    theme_toggled = Signal()
+    adb_command_executed = Signal(str)  # 执行adb命令
+    language_changed = Signal(str)  # 语言切换信号
+    check_update_clicked = Signal()
     
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -130,7 +130,7 @@ class DeviceToolBar(QToolBar):
         self.record_btn = QPushButton(self.lang_manager.tr("开始录制"))
         self.record_btn.setIcon(self.record_icon)
         self.record_btn.setCheckable(True)
-        self.record_btn.clicked.connect(self.record_toggled.emit)
+        self.record_btn.toggled.connect(self.record_toggled.emit)
         quick_layout.addWidget(self.record_btn)
         
         # 重启手机按钮

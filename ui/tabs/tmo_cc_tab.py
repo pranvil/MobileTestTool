@@ -1,12 +1,12 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
 TMO CC Tab
 """
 
-from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QPushButton, 
+from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QPushButton, 
                              QScrollArea, QLabel, QFrame)
-from PyQt5.QtCore import pyqtSignal, Qt
+from PySide6.QtCore import Signal, Qt
 from ui.widgets.shadow_utils import add_card_shadow
 
 
@@ -15,20 +15,20 @@ class TMOCCTab(QWidget):
     
     # 信号定义
     # CC 文件操作
-    push_cc_file = pyqtSignal()
-    pull_cc_file = pyqtSignal()
+    push_cc_file = Signal()
+    pull_cc_file = Signal()
     
     # 过滤操作
-    simple_filter = pyqtSignal()
-    complete_filter = pyqtSignal()
+    simple_filter = Signal()
+    complete_filter = Signal()
     
     # 服务器选择
-    prod_server = pyqtSignal()
-    stg_server = pyqtSignal()
+    prod_server = Signal()
+    stg_server = Signal()
     
     # 其他操作
-    clear_logs = pyqtSignal()
-    clear_device_logs = pyqtSignal()
+    clear_logs = Signal()
+    clear_device_logs = Signal()
     
     def __init__(self, parent=None):
         super().__init__(parent)

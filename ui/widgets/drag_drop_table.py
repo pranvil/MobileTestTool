@@ -1,18 +1,18 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
 支持拖拽排序的表格组件
 """
 
-from PyQt5.QtWidgets import QTableWidget, QTableWidgetItem
-from PyQt5.QtCore import Qt, pyqtSignal
-from PyQt5.QtWidgets import QAbstractItemView
+from PySide6.QtWidgets import QTableWidget, QTableWidgetItem
+from PySide6.QtCore import Qt, Signal
+from PySide6.QtWidgets import QAbstractItemView
 
 
 class DragDropButtonTable(QTableWidget):
     """支持拖拽排序的按钮表格"""
 
-    rows_reordered = pyqtSignal(list)
+    rows_reordered = Signal(list)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -22,7 +22,7 @@ class DragDropButtonTable(QTableWidget):
         self.setDropIndicatorShown(True)
         self.setDragDropMode(QAbstractItemView.InternalMove)
         self.setDragDropOverwriteMode(False)
-        self.setDefaultDropAction(Qt.MoveAction)
+        self.setDefaultDropAction(Qt.DropAction.MoveAction)
         self.setSelectionBehavior(QAbstractItemView.SelectRows)
         self.setSelectionMode(QAbstractItemView.SingleSelection)
 

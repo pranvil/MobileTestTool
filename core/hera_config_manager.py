@@ -1,7 +1,7 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-PyQt5赫拉配置管理器
+PySide6赫拉配置管理器
 独立实现，不依赖Tkinter
 """
 
@@ -10,8 +10,8 @@ import time
 import subprocess
 import sys
 from datetime import datetime
-from PyQt5.QtCore import QObject, pyqtSignal, QThread
-from PyQt5.QtWidgets import QMessageBox
+from PySide6.QtCore import QObject, Signal, QThread
+from PySide6.QtWidgets import QMessageBox
 from core.resource_utils import get_apk_path
 
 # 检测是否在PyInstaller打包环境中运行
@@ -48,8 +48,8 @@ def run_adb_command(cmd, **kwargs):
 class HeraConfigWorker(QThread):
     """赫拉配置工作线程"""
     
-    progress = pyqtSignal(str)  # 进度信息
-    finished = pyqtSignal(bool, str)  # 完成信号
+    progress = Signal(str)  # 进度信息
+    finished = Signal(bool, str)  # 完成信号
     
     def __init__(self, device, config_options, parent=None):
         super().__init__(parent)
@@ -701,8 +701,8 @@ class HeraConfigWorker(QThread):
 class HeraDataCollectionWorker(QThread):
     """赫拉测试数据收集工作线程"""
     
-    progress = pyqtSignal(str)
-    finished = pyqtSignal(bool, str)
+    progress = Signal(str)
+    finished = Signal(bool, str)
     
     def __init__(self, device, parent=None):
         super().__init__(parent)
@@ -854,10 +854,10 @@ class HeraDataCollectionWorker(QThread):
             return None
 
 
-class PyQtHeraConfigManager(QObject):
-    """PyQt5赫拉配置管理器"""
+class PySide6HeraConfigManager(QObject):
+    """PySide6赫拉配置管理器"""
     
-    status_message = pyqtSignal(str)
+    status_message = Signal(str)
     
     def __init__(self, device_manager, parent=None):
         super().__init__(parent)
@@ -891,10 +891,10 @@ class PyQtHeraConfigManager(QObject):
                 self.tr("•") + self.tr("GDPR检查和设置\n") +
                 self.tr("•") + self.tr("检查系统状态\n\n") +
                 self.tr("是否继续？"),
-                QMessageBox.Yes | QMessageBox.No
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
             )
             
-            if reply != QMessageBox.Yes:
+            if reply != QMessageBox.StandardButton.Yes:
                 return
             
             # 配置选项
@@ -929,10 +929,10 @@ class PyQtHeraConfigManager(QObject):
                 None,
                 self.tr("赫拉测试数据收集"),
                 self.tr("\n\n 确定要开始赫拉测试数据收集吗？\n\n"),
-                QMessageBox.Yes | QMessageBox.No
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
             )
             
-            if reply != QMessageBox.Yes:
+            if reply != QMessageBox.StandardButton.Yes:
                 return
             
             # 启动数据收集线程

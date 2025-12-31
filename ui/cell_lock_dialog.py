@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
 高通 Lock Cell 管理对话框
@@ -7,10 +7,10 @@
 
 import os
 import sys
-from PyQt5.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QPushButton, 
+from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QPushButton, 
                              QLabel, QRadioButton, QButtonGroup, QLineEdit,
                              QFileDialog, QMessageBox, QFormLayout, QDialogButtonBox)
-from PyQt5.QtCore import Qt
+from PySide6.QtCore import Qt
 from core.debug_logger import logger
 # 在模块顶层导入资源路径工具，避免PyInstaller打包时的延迟导入问题
 from core.resource_utils import get_resource_path
@@ -87,12 +87,12 @@ class LockCellDialog(QDialog):
         if self.lte_radio.isChecked():
             self.cell_type = "LTE"
             dialog = LTEInputDialog(self)
-            if dialog.exec_() == QDialog.Accepted:
+            if dialog.exec() == QDialog.DialogCode.Accepted:
                 self.process_lte_config(dialog)
         else:
             self.cell_type = "5G"
             dialog = FiveGInputDialog(self)
-            if dialog.exec_() == QDialog.Accepted:
+            if dialog.exec() == QDialog.DialogCode.Accepted:
                 self.process_fg_config(dialog)
     
     def process_lte_config(self, dialog):

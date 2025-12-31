@@ -1,5 +1,5 @@
-import sys
-from PyQt5.QtWidgets import QApplication
+﻿import sys
+from PySide6.QtWidgets import QApplication
 from ui import SimEditorUI
 from core.utils import setup_logging, disable_logging
 
@@ -12,7 +12,7 @@ def main():
     app = QApplication(sys.argv)
     editor_ui = SimEditorUI()    
     editor_ui.show()
-    sys.exit(app.exec_())
+    sys.exit(app.exec())
 
 if __name__ == "__main__":
     main()

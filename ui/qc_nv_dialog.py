@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
 高通 NV 管理对话框
@@ -8,12 +8,12 @@
 import os
 import json
 import datetime
-from PyQt5.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QPushButton, 
+from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QPushButton, 
                              QTableWidget, QTableWidgetItem, QHeaderView,
                              QLineEdit, QMessageBox, QFileDialog, QLabel,
                              QDialogButtonBox, QTextEdit, QFormLayout,
                              QSplitter, QWidget)
-from PyQt5.QtCore import Qt
+from PySide6.QtCore import Qt
 from core.debug_logger import logger
 
 
@@ -206,7 +206,7 @@ class QCNVDialog(QDialog):
     def add_nv(self):
         """新增NV"""
         dialog = NVEditDialog(parent=self)
-        if dialog.exec_() == QDialog.Accepted:
+        if dialog.exec() == QDialog.DialogCode.Accepted:
             nv_value, description = dialog.get_data()
             if nv_value:
                 self.nv_data.append({
@@ -228,7 +228,7 @@ class QCNVDialog(QDialog):
         description = self.table.item(current_row, 1).text()
         
         dialog = NVEditDialog(nv_value=nv_value, description=description, parent=self)
-        if dialog.exec_() == QDialog.Accepted:
+        if dialog.exec() == QDialog.DialogCode.Accepted:
             new_nv_value, new_description = dialog.get_data()
             if new_nv_value:
                 # 更新数据
@@ -252,10 +252,10 @@ class QCNVDialog(QDialog):
         reply = QMessageBox.question(
             self, self.tr("确认删除"),
             f"{self.tr('确定要删除')} '{nv_value}' {self.tr('吗？')}",
-            QMessageBox.Yes | QMessageBox.No
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
         )
         
-        if reply == QMessageBox.Yes:
+        if reply == QMessageBox.StandardButton.Yes:
             del self.nv_data[current_row]
             self.save_data()
             self.refresh_table()
@@ -281,13 +281,13 @@ class QCNVDialog(QDialog):
                 reply = QMessageBox.question(
                     self, self.tr("导入方式"),
                     self.tr("请选择导入方式：\n是 = 追加到现有数据\n否 = 覆盖现有数据\n取消 = 取消操作"),
-                    QMessageBox.Yes | QMessageBox.No | QMessageBox.Cancel
+                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No | QMessageBox.StandardButton.Cancel
                 )
                 
-                if reply == QMessageBox.Yes:
+                if reply == QMessageBox.StandardButton.Yes:
                     # 追加
                     self.nv_data.extend(imported_data)
-                elif reply == QMessageBox.No:
+                elif reply == QMessageBox.StandardButton.No:
                     # 覆盖
                     self.nv_data = imported_data
                 else:
@@ -392,7 +392,7 @@ class QCNVDialog(QDialog):
         close_btn.clicked.connect(detail_dialog.close)
         layout.addWidget(close_btn)
         
-        detail_dialog.exec_()
+        detail_dialog.exec()
     
     def closeEvent(self, event):
         """关闭事件"""

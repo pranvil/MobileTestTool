@@ -1,7 +1,7 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-PyQt5 录制管理器
+PySide6 录制管理器
 适配原Tkinter版本的视频录制功能
 """
 
@@ -10,18 +10,18 @@ import os
 import datetime
 import threading
 import time
-from PyQt5.QtCore import QObject, pyqtSignal, QMutex, QMetaObject, Qt
-from PyQt5.QtWidgets import QMessageBox
+from PySide6.QtCore import QObject, Signal, QMutex, QMetaObject, Qt
+from PySide6.QtWidgets import QMessageBox
 
 
 class VideoManager(QObject):
     """录制管理器"""
     
     # 信号定义
-    recording_started = pyqtSignal()
-    recording_stopped = pyqtSignal()
-    video_saved = pyqtSignal(str, int)  # video_dir, count
-    status_message = pyqtSignal(str)
+    recording_started = Signal()
+    recording_stopped = Signal()
+    video_saved = Signal(str, int)  # video_dir, count
+    status_message = Signal(str)
     
     def __init__(self, device_manager, parent=None):
         super().__init__(parent)

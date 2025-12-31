@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
 转码工具对话框
@@ -6,9 +6,9 @@
 """
 
 import re
-from PyQt5.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QPushButton, 
+from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QPushButton, 
                              QTextEdit, QTabWidget, QWidget, QLabel, QMessageBox, QSizePolicy)
-from PyQt5.QtCore import Qt
+from PySide6.QtCore import Qt
 from core.debug_logger import logger
 
 # 导入GSM 7-bit编码函数

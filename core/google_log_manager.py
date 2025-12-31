@@ -1,22 +1,22 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-PyQt5 Google日志管理器
+PySide6 Google日志管理器
 适配原Tkinter版本的Google日志管理功能
 """
 
 import subprocess
 import os
 import datetime
-from PyQt5.QtCore import QObject, pyqtSignal, QThread
-from PyQt5.QtWidgets import QMessageBox, QProgressDialog
+from PySide6.QtCore import QObject, Signal, QThread
+from PySide6.QtWidgets import QMessageBox, QProgressDialog
 
 
 class BugreportWorker(QThread):
     """Bugreport工作线程"""
     
-    finished = pyqtSignal(dict)
-    error = pyqtSignal(str)
+    finished = Signal(dict)
+    error = Signal(str)
     
     def __init__(self, device, folder, lang_manager=None):
         super().__init__()
@@ -43,7 +43,7 @@ class BugreportWorker(QThread):
 class DeleteBugreportWorker(QThread):
     """删除Bugreport工作线程"""
     
-    finished = pyqtSignal(bool, str)
+    finished = Signal(bool, str)
     
     def __init__(self, device, lang_manager=None):
         super().__init__()
@@ -68,9 +68,9 @@ class DeleteBugreportWorker(QThread):
 class GoogleLogWorker(QThread):
     """Google日志工作线程"""
     
-    finished = pyqtSignal(dict)
-    error = pyqtSignal(str)
-    progress = pyqtSignal(str, int)
+    finished = Signal(dict)
+    error = Signal(str)
+    progress = Signal(str, int)
     
     def __init__(self, device, operation, google_log_folder=None, lang_manager=None, storage_path_func=None):
         super().__init__()
@@ -266,12 +266,12 @@ class GoogleLogWorker(QThread):
             return {"success": False, "error": str(e)}
 
 
-class PyQtGoogleLogManager(QObject):
-    """PyQt5 Google日志管理器"""
+class PySide6GoogleLogManager(QObject):
+    """PySide6 Google日志管理器"""
     
-    status_message = pyqtSignal(str)
-    google_log_started = pyqtSignal()
-    google_log_stopped = pyqtSignal()
+    status_message = Signal(str)
+    google_log_started = Signal()
+    google_log_stopped = Signal()
     
     def __init__(self, device_manager, parent=None, adblog_manager=None, video_manager=None):
         super().__init__(parent)
@@ -380,11 +380,11 @@ class PyQtGoogleLogManager(QObject):
             None,
             self.lang_manager.tr("确认删除"),
             self.lang_manager.tr("确定要删除设备上的bugreport吗？此操作不可恢复。"),
-            QMessageBox.Yes | QMessageBox.No,
-            QMessageBox.No
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No
         )
         
-        if reply != QMessageBox.Yes:
+        if reply != QMessageBox.StandardButton.Yes:
             return
         
         # 创建工作线程

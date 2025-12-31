@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
 语言管理器
@@ -9,7 +9,7 @@ import json
 import os
 import sys
 from datetime import datetime
-from PyQt5.QtCore import QObject, pyqtSignal
+from PySide6.QtCore import QObject, Signal
 from core.debug_logger import logger
 
 # 检测是否在PyInstaller打包环境中运行
@@ -33,7 +33,7 @@ class LanguageManager(QObject):
     """语言管理器 - 单例模式"""
     
     # 语言改变信号
-    language_changed = pyqtSignal(str)  # 发送新语言代码
+    language_changed = Signal(str)  # 发送新语言代码
     
     _instance = None
     _initialized = False

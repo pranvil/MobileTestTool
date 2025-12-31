@@ -873,8 +873,8 @@ if ($oldVersion -and $oldVersion -ne $Version) {
 
 # Build package
 if (-not $SkipPackage) {
-    Write-Host "=== step 1: run build_pyqt.bat ==="
-    $buildScript = Join-Path $repoRoot "scripts\build_pyqt.bat"
+    Write-Host "=== step 1: run build.bat ==="
+    $buildScript = Join-Path $repoRoot "scripts\build.bat"
     & $buildScript
 
     Write-Host "=== step 2: compress onedir folder ==="

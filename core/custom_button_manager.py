@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
 自定义按钮配置管理器
@@ -10,7 +10,7 @@ import json
 import datetime
 import subprocess
 import sys
-from PyQt5.QtCore import QObject, pyqtSignal
+from PySide6.QtCore import QObject, Signal
 from core.debug_logger import logger
 
 
@@ -18,10 +18,10 @@ class CustomButtonManager(QObject):
     """自定义按钮配置管理器"""
     
     # 信号定义
-    buttons_updated = pyqtSignal()  # 按钮配置更新
+    buttons_updated = Signal()  # 按钮配置更新
     # 对话框相关信号（用于脚本中的UI调用）
-    dialog_request = pyqtSignal(str, str, str, int, int, object)  # dialog_type, title, message, buttons, default_button, response_handler
-    dialog_response = pyqtSignal(int)  # button_clicked (QMessageBox.Yes/No等)
+    dialog_request = Signal(str, str, str, int, int, object)  # dialog_type, title, message, buttons, default_button, response_handler
+    dialog_response = Signal(int)  # button_clicked (QMessageBox.StandardButton.Yes/No等)
     
     # 按钮类型
     BUTTON_TYPES = {
@@ -688,9 +688,9 @@ class CustomButtonManager(QObject):
         except Exception as e:
             return False, f"{self.lang_manager.tr('执行失败:')} {str(e)}"
     
-    def _create_safe_pyqt5_module(self, dialog_request_handler):
-        """创建安全的PyQt5模块包装，用于脚本中的UI调用"""
-        from PyQt5.QtWidgets import QMessageBox as RealQMessageBox
+    def _create_safe_pyside6_module(self, dialog_request_handler):
+        """创建安全的PySide6模块包装，用于脚本中的UI调用（保持向后兼容）"""
+        from PySide6.QtWidgets import QMessageBox as RealQMessageBox
         
         def show_dialog_in_main_thread(dialog_type, title, message, buttons, default_button):
             """在工作线程中调用，通过信号请求主线程显示对话框"""
@@ -701,46 +701,46 @@ class CustomButtonManager(QObject):
         class SafeQMessageBox:
             """线程安全的QMessageBox包装类"""
             # 定义常量
-            Yes = RealQMessageBox.Yes
-            No = RealQMessageBox.No
-            Ok = RealQMessageBox.Ok
-            Cancel = RealQMessageBox.Cancel
-            Abort = RealQMessageBox.Abort
-            Retry = RealQMessageBox.Retry
-            Ignore = RealQMessageBox.Ignore
-            YesAll = RealQMessageBox.YesAll
-            NoAll = RealQMessageBox.NoAll
-            Save = RealQMessageBox.Save
-            Discard = RealQMessageBox.Discard
-            Apply = RealQMessageBox.Apply
-            Reset = RealQMessageBox.Reset
-            RestoreDefaults = RealQMessageBox.RestoreDefaults
-            Help = RealQMessageBox.Help
-            SaveAll = RealQMessageBox.SaveAll
-            YesToAll = RealQMessageBox.YesToAll
-            NoToAll = RealQMessageBox.NoToAll
-            Open = RealQMessageBox.Open
-            Close = RealQMessageBox.Close
+            Yes = RealQMessageBox.StandardButton.Yes
+            No = RealQMessageBox.StandardButton.No
+            Ok = RealQMessageBox.StandardButton.Ok
+            Cancel = RealQMessageBox.StandardButton.Cancel
+            Abort = RealQMessageBox.StandardButton.Abort
+            Retry = RealQMessageBox.StandardButton.Retry
+            Ignore = RealQMessageBox.StandardButton.Ignore
+            YesAll = RealQMessageBox.StandardButton.YesAll
+            NoAll = RealQMessageBox.StandardButton.NoAll
+            Save = RealQMessageBox.StandardButton.Save
+            Discard = RealQMessageBox.StandardButton.Discard
+            Apply = RealQMessageBox.StandardButton.Apply
+            Reset = RealQMessageBox.StandardButton.Reset
+            RestoreDefaults = RealQMessageBox.StandardButton.RestoreDefaults
+            Help = RealQMessageBox.StandardButton.Help
+            SaveAll = RealQMessageBox.StandardButton.SaveAll
+            YesToAll = RealQMessageBox.StandardButton.YesToAll
+            NoToAll = RealQMessageBox.StandardButton.NoToAll
+            Open = RealQMessageBox.StandardButton.Open
+            Close = RealQMessageBox.StandardButton.Close
             
             @staticmethod
-            def question(parent, title, message, buttons=RealQMessageBox.Yes | RealQMessageBox.No, defaultButton=RealQMessageBox.No):
+            def question(parent, title, message, buttons=RealQMessageBox.StandardButton.Yes | RealQMessageBox.StandardButton.No, defaultButton=RealQMessageBox.StandardButton.No):
                 return show_dialog_in_main_thread("question", title, message, buttons, defaultButton)
             
             @staticmethod
-            def information(parent, title, message, buttons=RealQMessageBox.Ok, defaultButton=RealQMessageBox.Ok):
+            def information(parent, title, message, buttons=RealQMessageBox.StandardButton.Ok, defaultButton=RealQMessageBox.StandardButton.Ok):
                 return show_dialog_in_main_thread("information", title, message, buttons, defaultButton)
             
             @staticmethod
-            def warning(parent, title, message, buttons=RealQMessageBox.Ok, defaultButton=RealQMessageBox.Ok):
+            def warning(parent, title, message, buttons=RealQMessageBox.StandardButton.Ok, defaultButton=RealQMessageBox.StandardButton.Ok):
                 return show_dialog_in_main_thread("warning", title, message, buttons, defaultButton)
             
             @staticmethod
-            def critical(parent, title, message, buttons=RealQMessageBox.Ok, defaultButton=RealQMessageBox.Ok):
+            def critical(parent, title, message, buttons=RealQMessageBox.StandardButton.Ok, defaultButton=RealQMessageBox.StandardButton.Ok):
                 return show_dialog_in_main_thread("critical", title, message, buttons, defaultButton)
             
             @staticmethod
             def about(parent, title, message):
-                return show_dialog_in_main_thread("about", title, message, RealQMessageBox.Ok, RealQMessageBox.Ok)
+                return show_dialog_in_main_thread("about", title, message, RealQMessageBox.StandardButton.Ok, RealQMessageBox.StandardButton.Ok)
         
         # 创建安全的QApplication类
         class SafeQApplication:
@@ -750,7 +750,7 @@ class CustomButtonManager(QObject):
             @staticmethod
             def instance():
                 """返回主线程的QApplication实例"""
-                from PyQt5.QtWidgets import QApplication
+                from PySide6.QtWidgets import QApplication
                 return QApplication.instance()
             
             @staticmethod
@@ -764,11 +764,13 @@ class CustomButtonManager(QObject):
             'QApplication': SafeQApplication,
         })
         
-        PyQt5_module = type('module', (), {
+        PySide6_module = type('module', (), {
             'QtWidgets': QtWidgets_module,
         })
+        # 向后兼容：同时支持 PyQt5 和 PySide6 的导入方式
+        PyQt5_module = PySide6_module  # 向后兼容别名
         
-        return PyQt5_module
+        return PySide6_module
     
     def _execute_python_script(self, script_code, device_id=None, dialog_response_handler=None):
         """执行Python脚本（无限制版本 - 允许执行任意代码）
@@ -925,10 +927,11 @@ class CustomButtonManager(QObject):
             except Exception as e:
                 print(f"[WARNING] 包装 uiautomator2.connect 失败: {e}")
             
-            # 如果提供了对话框响应处理器，添加PyQt5支持
+            # 如果提供了对话框响应处理器，添加PySide6支持
             if dialog_response_handler:
-                safe_pyqt5_module = self._create_safe_pyqt5_module(dialog_response_handler)
-                exec_globals['PyQt5'] = safe_pyqt5_module
+                safe_pyside6_module = self._create_safe_pyside6_module(dialog_response_handler)
+                exec_globals['PySide6'] = safe_pyside6_module
+                exec_globals['PyQt5'] = safe_pyside6_module  # 向后兼容
             
             # 重要：让 locals 和 globals 指向同一个字典
             # 这样脚本中定义的函数和变量都在同一个命名空间中，可以互相访问

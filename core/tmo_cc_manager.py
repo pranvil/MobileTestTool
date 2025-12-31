@@ -1,7 +1,7 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-PyQt5 TMO CC管理器
+PySide6 TMO CC管理器
 适配原Tkinter版本的TMO CC功能
 """
 
@@ -12,8 +12,8 @@ import datetime
 import time
 import re
 import sys
-from PyQt5.QtCore import QObject, pyqtSignal, QThread
-from PyQt5.QtWidgets import QMessageBox, QFileDialog, QDialog, QVBoxLayout, QLabel, QPushButton
+from PySide6.QtCore import QObject, Signal, QThread
+from PySide6.QtWidgets import QMessageBox, QFileDialog, QDialog, QVBoxLayout, QLabel, QPushButton
 
 # 尝试导入uiautomator2
 try:
@@ -29,14 +29,14 @@ def is_pyinstaller():
     return getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS')
 
 
-class PyQtTMOCCManager(QObject):
-    """PyQt5 TMO CC管理器"""
+class PySide6TMOCCManager(QObject):
+    """PySide6 TMO CC管理器"""
     
     # 信号定义
-    cc_pulled = pyqtSignal(str)  # folder
-    cc_pushed = pyqtSignal(int, int)  # success_count, total_count
-    server_started = pyqtSignal(str)  # server_type
-    status_message = pyqtSignal(str)
+    cc_pulled = Signal(str)  # folder
+    cc_pushed = Signal(int, int)  # success_count, total_count
+    server_started = Signal(str)  # server_type
+    status_message = Signal(str)
     
     def __init__(self, device_manager, parent=None):
         super().__init__(parent)
@@ -115,7 +115,7 @@ class PyQtTMOCCManager(QObject):
         layout.addWidget(btn_cancel)
         
         dialog.setLayout(layout)
-        dialog.exec_()
+        dialog.exec()
         
         return result_choice["choice"]
     

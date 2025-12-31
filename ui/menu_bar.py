@@ -1,15 +1,15 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
 菜单栏
 """
 
-from PyQt5.QtWidgets import (QMenuBar, QAction, QDialog, QVBoxLayout, 
+from PySide6.QtWidgets import (QMenuBar, QDialog, QVBoxLayout, 
                              QLabel, QLineEdit, QPushButton, QButtonGroup,
                              QRadioButton, QHBoxLayout, QMessageBox,
                              QWidget, QFrame)
-from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QIcon
+from PySide6.QtCore import Qt
+from PySide6.QtGui import QIcon, QAction
 import os
 from ui.widgets.shadow_utils import add_card_shadow
 

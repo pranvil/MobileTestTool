@@ -1,7 +1,7 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-PyQt5 网络信息管理器
+PySide6 网络信息管理器
 适配原Tkinter版本的网络信息功能
 """
 
@@ -9,8 +9,8 @@ import subprocess
 import threading
 import re
 import json
-from PyQt5.QtCore import QObject, pyqtSignal, QTimer
-from PyQt5.QtWidgets import QMessageBox
+from PySide6.QtCore import QObject, Signal, QTimer
+from PySide6.QtWidgets import QMessageBox
 
 # 导入原始解析模块
 import sys
@@ -474,18 +474,18 @@ class PingWorker(threading.Thread):
                 self.ping_process = None
 
 
-class PyQtNetworkInfoManager(QObject):
-    """PyQt5 网络信息管理器"""
+class PySide6NetworkInfoManager(QObject):
+    """PySide6 网络信息管理器"""
     
     # 信号定义
-    network_info_updated = pyqtSignal(list)  # network_info (列表格式)
-    ping_result = pyqtSignal(str)  # ping_result
-    ping_stopped = pyqtSignal()  # ping 已停止
-    status_message = pyqtSignal(str)
-    network_info_started = pyqtSignal()  # 网络信息获取已启动
-    network_info_start_failed = pyqtSignal()  # 网络信息获取启动失败
-    ping_started = pyqtSignal()  # Ping已启动
-    ping_start_failed = pyqtSignal()  # Ping启动失败
+    network_info_updated = Signal(list)  # network_info (列表格式)
+    ping_result = Signal(str)  # ping_result
+    ping_stopped = Signal()  # ping 已停止
+    status_message = Signal(str)
+    network_info_started = Signal()  # 网络信息获取已启动
+    network_info_start_failed = Signal()  # 网络信息获取启动失败
+    ping_started = Signal()  # Ping已启动
+    ping_start_failed = Signal()  # Ping启动失败
     
     def __init__(self, device_manager, parent=None):
         super().__init__(parent)

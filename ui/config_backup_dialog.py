@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
 配置备份对话框
@@ -8,10 +8,10 @@
 import os
 import json
 import datetime
-from PyQt5.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QPushButton, 
+from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QPushButton, 
                              QMessageBox, QFileDialog, QTextEdit, QLabel, QSplitter, QWidget)
-from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QFont
+from PySide6.QtCore import Qt
+from PySide6.QtGui import QFont
 
 from core.debug_logger import logger
 
@@ -327,11 +327,11 @@ class ConfigBackupDialog(QDialog):
                 self.tr("确认导入配置"),
                 (self.tr("⚠️ 导入配置将完全覆盖当前所有设置！\n\n") +
                  self.tr("确定要继续导入吗？")),
-                QMessageBox.Yes | QMessageBox.No,
-                QMessageBox.No
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No
             )
             
-            if reply != QMessageBox.Yes:
+            if reply != QMessageBox.StandardButton.Yes:
                 return
             
             self.status_text.clear()

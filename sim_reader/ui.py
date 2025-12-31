@@ -1,11 +1,11 @@
-from PyQt5.QtWidgets import (
+﻿from PySide6.QtWidgets import (
     QMainWindow, QTreeWidget, QTabWidget, QWidget, QVBoxLayout, QHBoxLayout,
     QLineEdit, QPushButton, QLabel, QDialog, QTableWidget, QMessageBox,QGridLayout,
     QTableWidgetItem, QSizePolicy, QAbstractItemView, QFormLayout,
     QProgressDialog, QApplication, QFileDialog, QInputDialog, QComboBox,
     QScrollArea, QCheckBox, QHeaderView, QSpinBox
 )   
-from PyQt5.QtCore import QThread, pyqtSignal, Qt, QEvent, QTimer, pyqtSlot, QSettings
+from PySide6.QtCore import QThread, Signal, Qt, QEvent, QTimer, Slot, QSettings
 from threading import Lock
 from concurrent.futures import ThreadPoolExecutor
 from collections import OrderedDict
@@ -31,7 +31,7 @@ class AdminThread(QThread):
     """后台执行ADM PIN验证的线程类
     用于异步处理ADM PIN验证，避免阻塞主UI线程
     """
-    result_ready = pyqtSignal(str)
+    result_ready = Signal(str)
 
     def __init__(self, comm, pin):
         super().__init__()
@@ -123,12 +123,12 @@ class EFManagerDialog(QDialog):
         # === Step 2: 弹出提示框，包含 sec_attr 信息 ===
         msg_box = QMessageBox()
         msg_box.setWindowTitle("确认删除")
-        msg_box.setIcon(QMessageBox.Warning)
+        msg_box.setIcon(QMessageBox.Icon.Warning)
         msg_box.setText(f"准备删除: EF {ef_id}\n务必记住下面安全属性，在下次创建的时候使用:\n\nSecurity Attr: {sec_attr}\n\n是否继续？")
-        msg_box.setStandardButtons(QMessageBox.Yes | QMessageBox.Cancel)
-        user_response = msg_box.exec_()
+        msg_box.setStandardButtons(QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel)
+        user_response = msg_box.exec()
 
-        if user_response != QMessageBox.Yes:
+        if user_response != QMessageBox.StandardButton.Yes:
             logging.info("用户取消删除操作: %s", ef_id)
             return  # 用户点击 Cancel，直接返回
 
@@ -192,12 +192,12 @@ class SimEditorUI(QMainWindow):
     提供SIM卡数据的读取、写入、管理等功能
     实现了多线程操作和完整的错误处理机制
     """
-    data_ready = pyqtSignal(list)  # 数据读取完成信号
-    json_load_done = pyqtSignal(bool, str)  # JSON加载完成信号
-    error_occurred = pyqtSignal(str)  # 错误发生信号
-    show_message = pyqtSignal(str, str)  # 通用消息显示信号
-    progress_update = pyqtSignal(int)  # worker -> 主线程：更新进度条
-    progress_close = pyqtSignal()      # worker -> 主线程：关闭进度对话框
+    data_ready = Signal(list)  # 数据读取完成信号
+    json_load_done = Signal(bool, str)  # JSON加载完成信号
+    error_occurred = Signal(str)  # 错误发生信号
+    show_message = Signal(str, str)  # 通用消息显示信号
+    progress_update = Signal(int)  # worker -> 主线程：更新进度条
+    progress_close = Signal()      # worker -> 主线程：关闭进度对话框
 
     def __init__(self):
         super().__init__()
@@ -242,7 +242,7 @@ class SimEditorUI(QMainWindow):
         #         self,
         #         "No Ports Found",
         #         "未检测到任何可用串口设备，请确在使用前认设备已经连接并且AT端口已经打开。",
-        #         QMessageBox.Ok
+        #         QMessageBox.StandardButton.Ok
         #     )
 
 
@@ -425,7 +425,7 @@ class SimEditorUI(QMainWindow):
         """点击 Manage EF 按钮，弹出对话框"""
         logging.info("[on_manage_ef_clicked] 打开EF管理对话框")
         dlg = EFManagerDialog(self.sim_service, self)
-        dlg.exec_()
+        dlg.exec()
 
     def closeEvent(self, event):
         """关闭窗口时需要做的清理操作"""
@@ -851,7 +851,7 @@ class SimEditorUI(QMainWindow):
             # worker 线程不直接操作 UI
             self.progress_close.emit()
 
-    @pyqtSlot(int)
+    @Slot(int)
     def _on_progress_update(self, value: int):
         """主线程更新进度对话框"""
         if hasattr(self, 'progress_dialog') and self.progress_dialog:
@@ -1017,7 +1017,7 @@ class SimEditorUI(QMainWindow):
         # 后台执行更新
         self.executor.submit(self.update_data_async, adf_type, file_path, input_values, force_raw)
     
-    @pyqtSlot(str)
+    @Slot(str)
     def show_error_dialog(self, message):
         """在主线程中显示错误信息"""
 
@@ -1033,7 +1033,7 @@ class SimEditorUI(QMainWindow):
         layout.addWidget(close_button)
 
         dialog.setModal(True)
-        dialog.exec_()
+        dialog.exec()
 
 
     def update_data_async(self, adf_type, file_path, input_values, force_raw):
@@ -1164,7 +1164,7 @@ class SimEditorUI(QMainWindow):
             dialog.accept()
 
         confirm_button.clicked.connect(on_confirm)
-        dialog.exec_()
+        dialog.exec()
 
     # ========== 刷新 SIM ==========
     def on_refresh_button_clicked(self):
@@ -1265,10 +1265,10 @@ class SimEditorUI(QMainWindow):
                 "但当前未勾选 Raw 模式。\n\n"
                 "继续将按“字段解析”方式写入，raw_data 可能无法按预期生效。\n"
                 "是否继续？",
-                QMessageBox.Yes | QMessageBox.No,
-                QMessageBox.No
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No
             )
-            if ret != QMessageBox.Yes:
+            if ret != QMessageBox.StandardButton.Yes:
                 return
 
         # 2) 勾选 raw，但 JSON 存在非 raw_data 字段：提示用户是否继续
@@ -1279,10 +1279,10 @@ class SimEditorUI(QMainWindow):
                 "当前已勾选 Raw 模式，但检测到 JSON records 中存在非 raw_data 字段。\n\n"
                 "继续将按 Raw 模式写入（只认 raw_data），其他字段将不会按解析字段写入。\n"
                 "是否继续？",
-                QMessageBox.Yes | QMessageBox.No,
-                QMessageBox.No
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No
             )
-            if ret != QMessageBox.Yes:
+            if ret != QMessageBox.StandardButton.Yes:
                 return
 
         # 创建进度对话框，显示具体进度
@@ -1398,7 +1398,7 @@ class SimEditorUI(QMainWindow):
             
     #         # resize_ef(self, ef_id, length, adf, structure, record_num = 1, security_Attributes = "", sfi = "")
 
-    @pyqtSlot(str, str)
+    @Slot(str, str)
     def display_message(self, message_type, message):
         """在主线程中显示信息"""
         if message_type == "info":
@@ -1504,4 +1504,4 @@ if __name__ == "__main__":
     app = QApplication(sys.argv)
     w = SimEditorUI()
     w.show()
-    sys.exit(app.exec_())
+    sys.exit(app.exec())

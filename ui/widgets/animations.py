@@ -1,11 +1,11 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
 动画效果工具类
 """
 
-from PyQt5.QtCore import QPropertyAnimation, QEasingCurve, QAbstractAnimation
-from PyQt5.QtWidgets import QPushButton
+from PySide6.QtCore import QPropertyAnimation, QEasingCurve, QAbstractAnimation
+from PySide6.QtWidgets import QPushButton
 
 
 class ButtonAnimation:
@@ -53,7 +53,7 @@ class ButtonAnimation:
         new_x = int(center_x - new_width / 2)
         new_y = int(center_y - new_height / 2)
         
-        from PyQt5.QtCore import QRect
+        from PySide6.QtCore import QRect
         animation.setEndValue(QRect(new_x, new_y, new_width, new_height))
         animation.start(QAbstractAnimation.DeleteWhenStopped)
         return animation

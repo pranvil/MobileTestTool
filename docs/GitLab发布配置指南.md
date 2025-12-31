@@ -181,7 +181,7 @@ git status
 脚本会执行以下步骤：
 
 1. **更新版本号**：更新 `core/version.py` 中的版本号
-2. **构建打包**：运行 `build_pyqt.bat` 并压缩打包
+2. **构建打包**：运行 `build.bat` 并压缩打包
 3. **计算 SHA256**：计算安装包的校验值
 4. **生成 latest.json**：生成包含多下载源的配置文件
    - GitHub 下载源（US 和 default）

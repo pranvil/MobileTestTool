@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
 PR翻译对话框
@@ -10,11 +10,11 @@ import urllib.request
 import json
 import datetime
 import html
-from PyQt5.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel, 
+from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel, 
                              QLineEdit, QTextEdit, QPushButton, QMessageBox,
                              QScrollArea, QWidget, QFrame, QComboBox, QApplication)
-from PyQt5.QtCore import Qt, QThread, pyqtSignal, QTimer
-from PyQt5.QtGui import QTextCursor
+from PySide6.QtCore import Qt, QThread, Signal, QTimer
+from PySide6.QtGui import QTextCursor
 import subprocess
 from ui.widgets.shadow_utils import add_card_shadow
 from core.debug_logger import logger
@@ -44,9 +44,9 @@ except ImportError:
 
 class TranslationWorker(QThread):
     """翻译工作线程"""
-    finished = pyqtSignal(str)  # 翻译完成，传递文件路径
-    error = pyqtSignal(str)  # 翻译错误
-    progress = pyqtSignal(str)  # 进度更新
+    finished = Signal(str)  # 翻译完成，传递文件路径
+    error = Signal(str)  # 翻译错误
+    progress = Signal(str)  # 进度更新
     
     def __init__(self, data_dict, email=None, translate_direction='zh_en', parent=None):
         super().__init__(parent)
@@ -593,7 +593,7 @@ class PRTranslationDialog(QDialog):
         self.progress_dialog = QMessageBox(self)
         self.progress_dialog.setWindowTitle(self.tr("翻译中"))
         self.progress_dialog.setText(self.tr("正在翻译，请稍候..."))
-        self.progress_dialog.setStandardButtons(QMessageBox.NoButton)
+        self.progress_dialog.setStandardButtons(QMessageBox.StandardButton.NoButton)
         self.progress_dialog.show()
         
         # 创建工作线程

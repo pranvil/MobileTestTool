@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
 主窗口
@@ -11,11 +11,11 @@ import json
 import time
 import threading
 from typing import Optional
-from PyQt5.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, 
+from PySide6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, 
                               QSplitter, QTabWidget, QMessageBox, QProgressDialog,
                               QHBoxLayout, QPushButton, QSizePolicy, QApplication)
-from PyQt5.QtCore import Qt, pyqtSignal, pyqtSlot, QThread, QMimeData, QTimer, QObject
-from PyQt5.QtGui import QDrag
+from PySide6.QtCore import Qt, Signal, Slot, QThread, QMimeData, QTimer, QObject
+from PySide6.QtGui import QDrag
 from ui.menu_bar import DisplayLinesDialog
 from ui.tools_config_dialog import ToolsConfigDialog
 from core.debug_logger import logger
@@ -39,27 +39,27 @@ from ui.tabs.background_data_tab import BackgroundDataTab
 from ui.tabs.app_operations_tab import AppOperationsTab
 from ui.tabs.other_tab import OtherTab
 from ui.tabs.sim_tab import SimTab
-from core.device_manager import PyQtDeviceManager
-from core.mtklog_manager import PyQtMTKLogManager
-from core.adblog_manager import PyQtADBLogManager
-from core.log_processor import PyQtLogProcessor
-from core.network_info_manager import PyQtNetworkInfoManager
-from core.screenshot_manager import PyQtScreenshotManager
+from core.device_manager import PySide6DeviceManager
+from core.mtklog_manager import PySide6MTKLogManager
+from core.adblog_manager import PySide6ADBLogManager
+from core.log_processor import PySide6LogProcessor
+from core.network_info_manager import PySide6NetworkInfoManager
+from core.screenshot_manager import PySide6ScreenshotManager
 from core.video_manager import VideoManager
-from core.tcpdump_manager import PyQtTCPDumpManager
-from core.log_utilities import PyQtBugreportManager
-from core.aee_log_manager import PyQtAEELogManager
-from core.google_log_manager import PyQtGoogleLogManager
+from core.tcpdump_manager import PySide6TCPDumpManager
+from core.log_utilities import PySide6BugreportManager
+from core.aee_log_manager import PySide6AEELogManager
+from core.google_log_manager import PySide6GoogleLogManager
 from core.rrc3gpp_decoder import RRC3GPPDecoder
-from core.enable_telephony_manager import PyQtTelephonyManager
-from core.tmo_cc_manager import PyQtTMOCCManager
-from core.echolocate_manager import PyQtEcholocateManager
+from core.enable_telephony_manager import PySide6TelephonyManager
+from core.tmo_cc_manager import PySide6TMOCCManager
+from core.echolocate_manager import PySide6EcholocateManager
 from core.device_operations import (
-    PyQtBackgroundDataManager,
-    PyQtAppOperationsManager,
-    PyQtDeviceInfoManager,
-    PyQtHeraConfigManager,
-    PyQtOtherOperationsManager
+    PySide6BackgroundDataManager,
+    PySide6AppOperationsManager,
+    PySide6DeviceInfoManager,
+    PySide6HeraConfigManager,
+    PySide6OtherOperationsManager
 )
 from core.theme_manager import ThemeManager
 from core.custom_button_manager import CustomButtonManager
@@ -114,7 +114,7 @@ class DraggableCustomButton(QPushButton):
     def contextMenuEvent(self, event):
         """右键：显示自定义按钮菜单（不显示卡片右键菜单）"""
         try:
-            from PyQt5.QtWidgets import QDialog, QMenu, QMessageBox
+            from PySide6.QtWidgets import QDialog, QMenu, QMessageBox
             from ui.custom_button_dialog import ButtonEditDialog
 
             main_window = getattr(self.container, "main_window", None)
@@ -129,14 +129,14 @@ class DraggableCustomButton(QPushButton):
             menu = QMenu(self)
             edit_action = menu.addAction(main_window.tr("编辑"))
             delete_action = menu.addAction(main_window.tr("删除"))
-            chosen = menu.exec_(event.globalPos())
+            chosen = menu.exec(event.globalPos())
             if chosen == edit_action:
                 dialog = ButtonEditDialog(
                     main_window.custom_button_manager,
                     button_data=current_data,
                     parent=main_window,
                 )
-                if dialog.exec_() == QDialog.Accepted:
+                if dialog.exec() == QDialog.DialogCode.Accepted:
                     new_data = dialog.get_button_data()
                     main_window.custom_button_manager.update_button(button_id, new_data)
             elif chosen == delete_action:
@@ -145,10 +145,10 @@ class DraggableCustomButton(QPushButton):
                     main_window,
                     main_window.tr("确认删除"),
                     f"{main_window.tr('确定要删除按钮')} '{button_name}' {main_window.tr('吗？')}",
-                    QMessageBox.Yes | QMessageBox.No,
-                    QMessageBox.No
+                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                    QMessageBox.StandardButton.No
                 )
-                if reply == QMessageBox.Yes:
+                if reply == QMessageBox.StandardButton.Yes:
                     if main_window.custom_button_manager.delete_button(button_id):
                         QMessageBox.information(main_window, main_window.tr("成功"), main_window.tr("按钮删除成功！"))
                     else:
@@ -185,7 +185,7 @@ class DraggableCustomButton(QPushButton):
         # 设置拖动预览图像，避免 QPixmap 警告
         # 创建一个按钮的快照作为拖动预览
         try:
-            from PyQt5.QtGui import QPixmap, QPainter
+            from PySide6.QtGui import QPixmap, QPainter
             pixmap = QPixmap(self.size())
             pixmap.fill(Qt.transparent)
             self.render(pixmap)
@@ -195,13 +195,13 @@ class DraggableCustomButton(QPushButton):
             # 如果创建预览失败，使用默认行为（不设置预览）
             pass
         
-        drag.exec_(Qt.MoveAction)
+        drag.exec(Qt.DropAction.MoveAction)
 
 
 class CustomButtonContainer(QWidget):
     """承载自定义按钮并处理拖拽排序的容器"""
 
-    order_changed = pyqtSignal(str, str, list)
+    order_changed = Signal(str, str, list)
 
     def __init__(self, main_window, tab_name, card_name, parent=None):
         super().__init__(parent)
@@ -373,10 +373,10 @@ class CustomButtonContainer(QWidget):
 class ButtonCommandWorker(QThread):
     """在后台执行自定义按钮命令"""
     
-    finished = pyqtSignal(bool, str, str)  # success, output, button_name
-    log_message = pyqtSignal(str, str)  # message, color
-    dialog_request = pyqtSignal(str, str, str, int, int)  # dialog_type, title, message, buttons, default_button
-    dialog_response_received = pyqtSignal(int)  # 接收对话框响应
+    finished = Signal(bool, str, str)  # success, output, button_name
+    log_message = Signal(str, str)  # message, color
+    dialog_request = Signal(str, str, str, int, int)  # dialog_type, title, message, buttons, default_button
+    dialog_response_received = Signal(int)  # 接收对话框响应
     
     def __init__(self, button_data, device_id, button_manager, lang_manager, main_window):
         super().__init__()
@@ -406,7 +406,7 @@ class ButtonCommandWorker(QThread):
             self.dialog_request.emit(dialog_type, title, message, buttons, default_button)
             
             # 等待响应（最多30秒）
-            from PyQt5.QtCore import QEventLoop, QTimer
+            from PySide6.QtCore import QEventLoop, QTimer
             loop = QEventLoop()
             timer = QTimer()
             timer.timeout.connect(lambda: None)  # 空回调，保持事件循环活跃
@@ -421,7 +421,7 @@ class ButtonCommandWorker(QThread):
             # 轮询等待响应
             while not self._dialog_response_ready and timeout_timer.isActive():
                 loop.processEvents()
-                from PyQt5.QtCore import QThread
+                from PySide6.QtCore import QThread
                 QThread.msleep(10)
             
             timer.stop()
@@ -434,7 +434,7 @@ class ButtonCommandWorker(QThread):
         
         return dialog_request_handler
     
-    @pyqtSlot(int)
+    @Slot(int)
     def _on_dialog_response_received(self, value):
         """接收对话框响应（由信号触发）"""
         self._current_dialog_response = value
@@ -685,8 +685,8 @@ class ButtonCommandWorker(QThread):
 class RootRemountWorker(QThread):
     """在后台执行 adb root & remount"""
 
-    log_message = pyqtSignal(str, str)
-    finished = pyqtSignal(bool, str, bool, str)  # success, message, reboot_required, device
+    log_message = Signal(str, str)
+    finished = Signal(bool, str, bool, str)  # success, message, reboot_required, device
 
     def __init__(self, device, lang_manager=None):
         super().__init__()
@@ -759,12 +759,12 @@ class RootRemountWorker(QThread):
 class UpdateWorker(QThread):
     """在后台执行更新检查与下载"""
 
-    status_message = pyqtSignal(str)
-    progress_changed = pyqtSignal(int, int)  # downloaded, total (-1 表示未知)
-    update_not_required = pyqtSignal(str)
-    update_available = pyqtSignal(dict)
-    download_finished = pyqtSignal(LatestManifest, DownloadResult)
-    update_failed = pyqtSignal(str)
+    status_message = Signal(str)
+    progress_changed = Signal(int, int)  # downloaded, total (-1 表示未知)
+    update_not_required = Signal(str)
+    update_available = Signal(dict)
+    download_finished = Signal(LatestManifest, DownloadResult)
+    update_failed = Signal(str)
 
     def __init__(self, update_manager: UpdateManager, lang_manager=None):
         super().__init__()
@@ -854,9 +854,9 @@ class MainWindow(QMainWindow):
     """主窗口类"""
     
     # 信号定义
-    device_changed = pyqtSignal(str)
-    append_log = pyqtSignal(str, str)  # text, color
-    update_status = pyqtSignal(str)
+    device_changed = Signal(str)
+    append_log = Signal(str, str)  # text, color
+    update_status = Signal(str)
     
     def __init__(self):
         super().__init__()
@@ -881,7 +881,7 @@ class MainWindow(QMainWindow):
         self.lang_manager = LanguageManager(self)
         
         # 初始化设备管理器
-        self.device_manager = PyQtDeviceManager(self)
+        self.device_manager = PySide6DeviceManager(self)
         
         # 显示友好的加载界面
         self._show_loading_screen()
@@ -928,7 +928,7 @@ class MainWindow(QMainWindow):
     
     def _set_window_icon(self):
         """设置窗口图标"""
-        from PyQt5.QtGui import QIcon
+        from PySide6.QtGui import QIcon
         import sys
         import os
         
@@ -953,9 +953,9 @@ class MainWindow(QMainWindow):
     
     def _show_loading_screen(self):
         """显示友好的加载界面"""
-        from PyQt5.QtWidgets import QLabel, QVBoxLayout, QWidget, QProgressBar
-        from PyQt5.QtCore import Qt, QTimer
-        from PyQt5.QtGui import QFont
+        from PySide6.QtWidgets import QLabel, QVBoxLayout, QWidget, QProgressBar
+        from PySide6.QtCore import Qt, QTimer
+        from PySide6.QtGui import QFont
         
         # 创建加载窗口
         self.loading_window = QWidget()
@@ -964,7 +964,7 @@ class MainWindow(QMainWindow):
         self.loading_window.setWindowFlags(Qt.WindowStaysOnTopHint | Qt.FramelessWindowHint)
         
         # 设置窗口居中
-        from PyQt5.QtWidgets import QApplication
+        from PySide6.QtWidgets import QApplication
         screen = QApplication.primaryScreen().geometry()
         x = (screen.width() - self.loading_window.width()) // 2
         y = (screen.height() - self.loading_window.height()) // 2
@@ -1050,19 +1050,19 @@ class MainWindow(QMainWindow):
         self.device_utilities.reboot_finished.connect(self._on_reboot_finished)
         
         # 初始化MTKLOG管理器
-        self.mtklog_manager = PyQtMTKLogManager(self.device_manager, self)
+        self.mtklog_manager = PySide6MTKLogManager(self.device_manager, self)
         
         # 初始化ADB Log管理器
-        self.adblog_manager = PyQtADBLogManager(self.device_manager, self)
+        self.adblog_manager = PySide6ADBLogManager(self.device_manager, self)
         
         # 初始化Log过滤管理器
-        self.log_processor = PyQtLogProcessor(self.device_manager, self)
+        self.log_processor = PySide6LogProcessor(self.device_manager, self)
         
         # 初始化网络信息管理器
-        self.network_info_manager = PyQtNetworkInfoManager(self.device_manager, self)
+        self.network_info_manager = PySide6NetworkInfoManager(self.device_manager, self)
         
         # 初始化截图管理器
-        self.screenshot_manager = PyQtScreenshotManager(self.device_manager, self)
+        self.screenshot_manager = PySide6ScreenshotManager(self.device_manager, self)
         
         # 初始化录制管理器
         self.video_manager = VideoManager(self.device_manager, self)
@@ -1072,37 +1072,37 @@ class MainWindow(QMainWindow):
         self.rrc3gpp_decoder.status_message.connect(self._on_3gpp_decoder_status)
         
         # 初始化其他管理器
-        self.tcpdump_manager = PyQtTCPDumpManager(self.device_manager, self)
-        self.telephony_manager = PyQtTelephonyManager(self.device_manager, self)
-        self.google_log_manager = PyQtGoogleLogManager(
+        self.tcpdump_manager = PySide6TCPDumpManager(self.device_manager, self)
+        self.telephony_manager = PySide6TelephonyManager(self.device_manager, self)
+        self.google_log_manager = PySide6GoogleLogManager(
             self.device_manager, 
             parent=self,
             adblog_manager=self.adblog_manager, 
             video_manager=self.video_manager
         )
-        self.aee_log_manager = PyQtAEELogManager(self.device_manager, self)
-        self.bugreport_manager = PyQtBugreportManager(self.device_manager, self)
+        self.aee_log_manager = PySide6AEELogManager(self.device_manager, self)
+        self.bugreport_manager = PySide6BugreportManager(self.device_manager, self)
         
         # 初始化TMO CC管理器
-        self.tmo_cc_manager = PyQtTMOCCManager(self.device_manager, self)
+        self.tmo_cc_manager = PySide6TMOCCManager(self.device_manager, self)
         
         # 初始化Echolocate管理器
-        self.echolocate_manager = PyQtEcholocateManager(self.device_manager, self)
+        self.echolocate_manager = PySide6EcholocateManager(self.device_manager, self)
         
         # 初始化背景数据管理器
-        self.background_data_manager = PyQtBackgroundDataManager(self.device_manager, self)
+        self.background_data_manager = PySide6BackgroundDataManager(self.device_manager, self)
         
         # 初始化APP操作管理器
-        self.app_operations_manager = PyQtAppOperationsManager(self.device_manager, self)
+        self.app_operations_manager = PySide6AppOperationsManager(self.device_manager, self)
         
         # 初始化设备信息管理器
-        self.device_info_manager = PyQtDeviceInfoManager(self.device_manager, self)
+        self.device_info_manager = PySide6DeviceInfoManager(self.device_manager, self)
         
         # 初始化赫拉配置管理器
-        self.hera_config_manager = PyQtHeraConfigManager(self.device_manager, self)
+        self.hera_config_manager = PySide6HeraConfigManager(self.device_manager, self)
         
         # 初始化其他操作管理器
-        self.other_operations_manager = PyQtOtherOperationsManager(self.device_manager, self)
+        self.other_operations_manager = PySide6OtherOperationsManager(self.device_manager, self)
         
         # 添加工具配置属性，供其他管理器访问
         self.tool_config = self.other_operations_manager.tool_config
@@ -1610,8 +1610,8 @@ class MainWindow(QMainWindow):
     def _create_custom_tab_instance(self, custom_tab):
         """创建自定义Tab实例"""
         try:
-            from PyQt5.QtWidgets import QWidget, QVBoxLayout, QLabel, QScrollArea
-            from PyQt5.QtCore import Qt
+            from PySide6.QtWidgets import QWidget, QVBoxLayout, QLabel, QScrollArea
+            from PySide6.QtCore import Qt
             
             widget = QWidget()
             widget.tab_id = custom_tab['id']  # 设置tab_id属性
@@ -1656,8 +1656,8 @@ class MainWindow(QMainWindow):
     def _create_custom_card_group(self, card, tab_widget):
         """创建自定义Card组（仅创建结构，按钮由统一方法添加）"""
         try:
-            from PyQt5.QtWidgets import QWidget, QFrame, QVBoxLayout, QHBoxLayout, QLabel, QToolTip, QSizePolicy
-            from PyQt5.QtCore import Qt, QEvent, QObject
+            from PySide6.QtWidgets import QWidget, QFrame, QVBoxLayout, QHBoxLayout, QLabel, QToolTip, QSizePolicy
+            from PySide6.QtCore import Qt, QEvent, QObject
             from ui.widgets.shadow_utils import add_card_shadow
             
             # 使用与预置tab一致的现代结构：QLabel + QFrame
@@ -1766,7 +1766,7 @@ class MainWindow(QMainWindow):
     def _get_card_name_from_frame_simple(self, card_frame, tab_widget):
         """简单方法：从card frame获取card名称（用于初始化时存储）"""
         try:
-            from PyQt5.QtWidgets import QLabel
+            from PySide6.QtWidgets import QLabel
             
             # 获取card frame的父widget（通常是container）
             parent_widget = card_frame.parent()
@@ -1841,7 +1841,7 @@ class MainWindow(QMainWindow):
                 return card_name
             
             # 如果没有存储，使用查找方法
-            from PyQt5.QtWidgets import QLabel
+            from PySide6.QtWidgets import QLabel
             
             # 如果没有传入tab_widget，尝试查找
             if not tab_widget:
@@ -1917,7 +1917,8 @@ class MainWindow(QMainWindow):
     def _show_card_context_menu(self, position, card_frame, tab_widget):
         """显示card的右键菜单"""
         try:
-            from PyQt5.QtWidgets import QMenu, QAction, QPushButton
+            from PySide6.QtWidgets import QMenu, QPushButton
+            from PySide6.QtGui import QAction
 
             # 只在 card 的“空白处”显示卡片菜单：
             # - 右键点在任意 QPushButton（含预置/自定义）上：不弹卡片菜单
@@ -1990,7 +1991,7 @@ class MainWindow(QMainWindow):
                     menu.addAction(delete_card_action)
             
             # 显示菜单
-            menu.exec_(card_frame.mapToGlobal(position))
+            menu.exec(card_frame.mapToGlobal(position))
             
         except Exception as e:
             logger.exception(f"{self.tr('显示Card右键菜单失败:')} {e}")
@@ -1999,7 +2000,7 @@ class MainWindow(QMainWindow):
         """从右键菜单添加button"""
         try:
             from ui.custom_button_dialog import ButtonEditDialog
-            from PyQt5.QtWidgets import QDialog, QMessageBox
+            from PySide6.QtWidgets import QDialog, QMessageBox
             
             # 打开按钮对话框，预设tab和card
             dialog = ButtonEditDialog(
@@ -2008,7 +2009,7 @@ class MainWindow(QMainWindow):
                 preset_card_name=card_name,
                 parent=self
             )
-            if dialog.exec_() == QDialog.Accepted:
+            if dialog.exec() == QDialog.DialogCode.Accepted:
                 # 获取按钮数据并添加到管理器
                 button_data = dialog.get_button_data()
                 if self.custom_button_manager.add_button(button_data):
@@ -2024,7 +2025,7 @@ class MainWindow(QMainWindow):
         """从右键菜单添加card"""
         try:
             from ui.tab_manager_dialog import CustomCardDialog
-            from PyQt5.QtWidgets import QDialog
+            from PySide6.QtWidgets import QDialog
             
             # 打开Card对话框，预设tab
             dialog = CustomCardDialog(
@@ -2032,7 +2033,7 @@ class MainWindow(QMainWindow):
                 preset_tab_id=tab_id,
                 parent=self
             )
-            if dialog.exec_() == QDialog.Accepted:
+            if dialog.exec() == QDialog.DialogCode.Accepted:
                 # 刷新tab显示
                 self.tab_config_manager.tab_config_updated.emit()
         except Exception as e:
@@ -2042,7 +2043,7 @@ class MainWindow(QMainWindow):
         """从右键菜单编辑card"""
         try:
             from ui.tab_manager_dialog import CustomCardDialog
-            from PyQt5.QtWidgets import QDialog, QMessageBox
+            from PySide6.QtWidgets import QDialog, QMessageBox
             
             # 打开Card对话框，编辑现有card
             dialog = CustomCardDialog(
@@ -2050,7 +2051,7 @@ class MainWindow(QMainWindow):
                 card_id=card_id,
                 parent=self
             )
-            if dialog.exec_() == QDialog.Accepted:
+            if dialog.exec() == QDialog.DialogCode.Accepted:
                 # 刷新tab显示
                 self.tab_config_manager.tab_config_updated.emit()
                 QMessageBox.information(self, self.tr("成功"), self.tr("Card已更新"))
@@ -2060,17 +2061,17 @@ class MainWindow(QMainWindow):
     def _delete_card_from_context(self, card_id, card_name):
         """从右键菜单删除card"""
         try:
-            from PyQt5.QtWidgets import QMessageBox
+            from PySide6.QtWidgets import QMessageBox
             
             reply = QMessageBox.question(
                 self,
                 self.tr("确认删除"),
                 f"{self.tr('确定要删除Card')} '{card_name}' {self.tr('吗？')}",
-                QMessageBox.Yes | QMessageBox.No,
-                QMessageBox.No
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No
             )
             
-            if reply == QMessageBox.Yes:
+            if reply == QMessageBox.StandardButton.Yes:
                 if self.tab_config_manager.delete_custom_card(card_id):
                     # 刷新tab显示
                     self.tab_config_manager.tab_config_updated.emit()
@@ -2083,8 +2084,8 @@ class MainWindow(QMainWindow):
     def _setup_preset_tab_card_context_menus(self):
         """为所有预置Tab的card统一添加右键菜单"""
         try:
-            from PyQt5.QtWidgets import QFrame
-            from PyQt5.QtCore import Qt
+            from PySide6.QtWidgets import QFrame
+            from PySide6.QtCore import Qt
             
             # 获取所有tab widget
             for i in range(self.tab_widget.count()):
@@ -2232,11 +2233,11 @@ class MainWindow(QMainWindow):
                 self,
                 self.lang_manager.tr('需要重启设备'),
                 '检测到需要重启设备才能使设置生效。\n\n是否立即重启设备？',
-                QMessageBox.Yes | QMessageBox.No,
-                QMessageBox.Yes
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.Yes
             )
 
-            if reply == QMessageBox.Yes:
+            if reply == QMessageBox.StandardButton.Yes:
                 self.append_log.emit(f"{self.lang_manager.tr('执行 adb reboot...')}\n", None)
                 # 直接异步重启，跳过重复确认
                 self.device_utilities.reboot_device(self, confirm=False)
@@ -2424,10 +2425,10 @@ class MainWindow(QMainWindow):
                 self,
                 self.tr("在线更新"),
                 "\n".join([success_message] + detail_lines + [instruction_text, self.tr("是否打开下载位置？")]),
-                QMessageBox.Yes | QMessageBox.No,
-                QMessageBox.Yes,
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.Yes,
             )
-            if reply == QMessageBox.Yes:
+            if reply == QMessageBox.StandardButton.Yes:
                 self._reveal_in_file_manager(result.file_path)
 
     def _on_update_failed(self, message: str) -> None:
@@ -2917,7 +2918,7 @@ class MainWindow(QMainWindow):
             return
         
         # 获取log名称
-        from PyQt5.QtWidgets import QInputDialog
+        from PySide6.QtWidgets import QInputDialog
         log_name, ok = QInputDialog.getText(
             self,
             self.lang_manager.tr('输入log名称'),
@@ -2946,7 +2947,7 @@ class MainWindow(QMainWindow):
             return
         
         # 获取log名称
-        from PyQt5.QtWidgets import QInputDialog
+        from PySide6.QtWidgets import QInputDialog
         log_name, ok = QInputDialog.getText(
             self,
             self.lang_manager.tr('输入log名称'),
@@ -2987,7 +2988,7 @@ class MainWindow(QMainWindow):
     
     def _on_clear_old_logs_required(self, device, file_count, txt_files):
         """需要清除旧log文件的提示"""
-        from PyQt5.QtWidgets import QMessageBox
+        from PySide6.QtWidgets import QMessageBox
         
         # 显示文件名列表（最多显示5个）
         file_list = [os.path.basename(f.strip()) for f in txt_files if f.strip()][:5]
@@ -3003,12 +3004,12 @@ class MainWindow(QMainWindow):
             '是否清除这些旧log文件？\n\n'
             '选择"是"：清除所有旧文件，然后输入新文件名\n'
             '选择"否"：保留旧文件，然后输入新文件名',
-            QMessageBox.Yes | QMessageBox.No,
-            QMessageBox.Yes
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.Yes
         )
         
         # 通知管理器用户的选择
-        clear_old = (reply == QMessageBox.Yes)
+        clear_old = (reply == QMessageBox.StandardButton.Yes)
         self.adblog_manager.handle_clear_old_logs_decision(clear_old)
     
     def _on_online_mode_started(self):
@@ -3102,7 +3103,7 @@ class MainWindow(QMainWindow):
             from ui.log_keyword_dialog import LogKeywordDialog
             
             dialog = LogKeywordDialog(self.log_keyword_manager, parent=self)
-            dialog.exec_()
+            dialog.exec()
             
             # 如果用户选择了关键字并点击了"加载到过滤"按钮
             selected_keyword = dialog.get_selected_keyword()
@@ -3358,7 +3359,7 @@ class MainWindow(QMainWindow):
         try:
             if not hasattr(self, 'app_operations_manager') or self.app_operations_manager is None:
                 logger.error("app_operations_manager 未初始化或为None")
-                from PyQt5.QtWidgets import QMessageBox
+                from PySide6.QtWidgets import QMessageBox
                 QMessageBox.warning(self, self.tr("错误"), self.tr("APP操作管理器未初始化"))
                 return
             logger.debug("调用 app_operations_manager.query_package()")
@@ -3367,12 +3368,12 @@ class MainWindow(QMainWindow):
         except ImportError as e:
             logger.error(f"模块导入失败:\n  错误类型: ImportError\n  错误信息: {str(e)}")
             logger.exception("模块导入异常详情")
-            from PyQt5.QtWidgets import QMessageBox
+            from PySide6.QtWidgets import QMessageBox
             QMessageBox.critical(self, self.tr("错误"), self.tr(f"模块导入失败: {str(e)}"))
         except Exception as e:
             logger.error(f"查询package失败:\n  错误类型: {type(e).__name__}\n  错误信息: {str(e)}")
             logger.exception("异常详情")
-            from PyQt5.QtWidgets import QMessageBox
+            from PySide6.QtWidgets import QMessageBox
             QMessageBox.critical(self, self.tr("错误"), self.tr(f"查询package失败: {str(e)}"))
         finally:
             logger.debug("=" * 60)
@@ -3386,7 +3387,7 @@ class MainWindow(QMainWindow):
         try:
             if not hasattr(self, 'app_operations_manager') or self.app_operations_manager is None:
                 logger.error("app_operations_manager 未初始化或为None")
-                from PyQt5.QtWidgets import QMessageBox
+                from PySide6.QtWidgets import QMessageBox
                 QMessageBox.warning(self, self.tr("错误"), self.tr("APP操作管理器未初始化"))
                 return
             logger.debug("调用 app_operations_manager.query_package_name()")
@@ -3395,12 +3396,12 @@ class MainWindow(QMainWindow):
         except ImportError as e:
             logger.error(f"模块导入失败:\n  错误类型: ImportError\n  错误信息: {str(e)}")
             logger.exception("模块导入异常详情")
-            from PyQt5.QtWidgets import QMessageBox
+            from PySide6.QtWidgets import QMessageBox
             QMessageBox.critical(self, self.tr("错误"), self.tr(f"模块导入失败: {str(e)}"))
         except Exception as e:
             logger.error(f"查询包名失败:\n  错误类型: {type(e).__name__}\n  错误信息: {str(e)}")
             logger.exception("异常详情")
-            from PyQt5.QtWidgets import QMessageBox
+            from PySide6.QtWidgets import QMessageBox
             QMessageBox.critical(self, self.tr("错误"), self.tr(f"查询包名失败: {str(e)}"))
         finally:
             logger.debug("=" * 60)
@@ -3414,7 +3415,7 @@ class MainWindow(QMainWindow):
         try:
             if not hasattr(self, 'app_operations_manager') or self.app_operations_manager is None:
                 logger.error("app_operations_manager 未初始化或为None")
-                from PyQt5.QtWidgets import QMessageBox
+                from PySide6.QtWidgets import QMessageBox
                 QMessageBox.warning(self, self.tr("错误"), self.tr("APP操作管理器未初始化"))
                 return
             logger.debug("调用 app_operations_manager.query_install_path()")
@@ -3423,12 +3424,12 @@ class MainWindow(QMainWindow):
         except ImportError as e:
             logger.error(f"模块导入失败:\n  错误类型: ImportError\n  错误信息: {str(e)}")
             logger.exception("模块导入异常详情")
-            from PyQt5.QtWidgets import QMessageBox
+            from PySide6.QtWidgets import QMessageBox
             QMessageBox.critical(self, self.tr("错误"), self.tr(f"模块导入失败: {str(e)}"))
         except Exception as e:
             logger.error(f"查询安装路径失败:\n  错误类型: {type(e).__name__}\n  错误信息: {str(e)}")
             logger.exception("异常详情")
-            from PyQt5.QtWidgets import QMessageBox
+            from PySide6.QtWidgets import QMessageBox
             QMessageBox.critical(self, self.tr("错误"), self.tr(f"查询安装路径失败: {str(e)}"))
         finally:
             logger.debug("=" * 60)
@@ -3442,7 +3443,7 @@ class MainWindow(QMainWindow):
         try:
             if not hasattr(self, 'app_operations_manager') or self.app_operations_manager is None:
                 logger.error("app_operations_manager 未初始化或为None")
-                from PyQt5.QtWidgets import QMessageBox
+                from PySide6.QtWidgets import QMessageBox
                 QMessageBox.warning(self, self.tr("错误"), self.tr("APP操作管理器未初始化"))
                 return
             logger.debug("调用 app_operations_manager.query_find_file()")
@@ -3451,12 +3452,12 @@ class MainWindow(QMainWindow):
         except ImportError as e:
             logger.error(f"模块导入失败:\n  错误类型: ImportError\n  错误信息: {str(e)}")
             logger.exception("模块导入异常详情")
-            from PyQt5.QtWidgets import QMessageBox
+            from PySide6.QtWidgets import QMessageBox
             QMessageBox.critical(self, self.tr("错误"), self.tr(f"模块导入失败: {str(e)}"))
         except Exception as e:
             logger.error(f"查找文件失败:\n  错误类型: {type(e).__name__}\n  错误信息: {str(e)}")
             logger.exception("异常详情")
-            from PyQt5.QtWidgets import QMessageBox
+            from PySide6.QtWidgets import QMessageBox
             QMessageBox.critical(self, self.tr("错误"), self.tr(f"查找文件失败: {str(e)}"))
         finally:
             logger.debug("=" * 60)
@@ -3470,7 +3471,7 @@ class MainWindow(QMainWindow):
         try:
             if not hasattr(self, 'app_operations_manager') or self.app_operations_manager is None:
                 logger.error("app_operations_manager 未初始化或为None")
-                from PyQt5.QtWidgets import QMessageBox
+                from PySide6.QtWidgets import QMessageBox
                 QMessageBox.warning(self, self.tr("错误"), self.tr("APP操作管理器未初始化"))
                 return
             logger.debug("调用 app_operations_manager.pull_apk()")
@@ -3479,12 +3480,12 @@ class MainWindow(QMainWindow):
         except ImportError as e:
             logger.error(f"模块导入失败:\n  错误类型: ImportError\n  错误信息: {str(e)}")
             logger.exception("模块导入异常详情")
-            from PyQt5.QtWidgets import QMessageBox
+            from PySide6.QtWidgets import QMessageBox
             QMessageBox.critical(self, self.tr("错误"), self.tr(f"模块导入失败: {str(e)}"))
         except Exception as e:
             logger.error(f"pull apk失败:\n  错误类型: {type(e).__name__}\n  错误信息: {str(e)}")
             logger.exception("异常详情")
-            from PyQt5.QtWidgets import QMessageBox
+            from PySide6.QtWidgets import QMessageBox
             QMessageBox.critical(self, self.tr("错误"), self.tr(f"pull apk失败: {str(e)}"))
         finally:
             logger.debug("=" * 60)
@@ -3498,7 +3499,7 @@ class MainWindow(QMainWindow):
         try:
             if not hasattr(self, 'app_operations_manager') or self.app_operations_manager is None:
                 logger.error("app_operations_manager 未初始化或为None")
-                from PyQt5.QtWidgets import QMessageBox
+                from PySide6.QtWidgets import QMessageBox
                 QMessageBox.warning(self, self.tr("错误"), self.tr("APP操作管理器未初始化"))
                 return
             logger.debug("调用 app_operations_manager.push_apk()")
@@ -3507,12 +3508,12 @@ class MainWindow(QMainWindow):
         except ImportError as e:
             logger.error(f"模块导入失败:\n  错误类型: ImportError\n  错误信息: {str(e)}")
             logger.exception("模块导入异常详情")
-            from PyQt5.QtWidgets import QMessageBox
+            from PySide6.QtWidgets import QMessageBox
             QMessageBox.critical(self, self.tr("错误"), self.tr(f"模块导入失败: {str(e)}"))
         except Exception as e:
             logger.error(f"push apk失败:\n  错误类型: {type(e).__name__}\n  错误信息: {str(e)}")
             logger.exception("异常详情")
-            from PyQt5.QtWidgets import QMessageBox
+            from PySide6.QtWidgets import QMessageBox
             QMessageBox.critical(self, self.tr("错误"), self.tr(f"push apk失败: {str(e)}"))
         finally:
             logger.debug("=" * 60)
@@ -3526,7 +3527,7 @@ class MainWindow(QMainWindow):
         try:
             if not hasattr(self, 'app_operations_manager') or self.app_operations_manager is None:
                 logger.error("app_operations_manager 未初始化或为None")
-                from PyQt5.QtWidgets import QMessageBox
+                from PySide6.QtWidgets import QMessageBox
                 QMessageBox.warning(self, self.tr("错误"), self.tr("APP操作管理器未初始化"))
                 return
             logger.debug("调用 app_operations_manager.install_apk()")
@@ -3535,12 +3536,12 @@ class MainWindow(QMainWindow):
         except ImportError as e:
             logger.error(f"模块导入失败:\n  错误类型: ImportError\n  错误信息: {str(e)}")
             logger.exception("模块导入异常详情")
-            from PyQt5.QtWidgets import QMessageBox
+            from PySide6.QtWidgets import QMessageBox
             QMessageBox.critical(self, self.tr("错误"), self.tr(f"模块导入失败: {str(e)}"))
         except Exception as e:
             logger.error(f"安装APK失败:\n  错误类型: {type(e).__name__}\n  错误信息: {str(e)}")
             logger.exception("异常详情")
-            from PyQt5.QtWidgets import QMessageBox
+            from PySide6.QtWidgets import QMessageBox
             QMessageBox.critical(self, self.tr("错误"), self.tr(f"安装APK失败: {str(e)}"))
         finally:
             logger.debug("=" * 60)
@@ -3554,7 +3555,7 @@ class MainWindow(QMainWindow):
         try:
             if not hasattr(self, 'app_operations_manager') or self.app_operations_manager is None:
                 logger.error("app_operations_manager 未初始化或为None")
-                from PyQt5.QtWidgets import QMessageBox
+                from PySide6.QtWidgets import QMessageBox
                 QMessageBox.warning(self, self.tr("错误"), self.tr("APP操作管理器未初始化"))
                 return
             logger.debug("调用 app_operations_manager.view_processes()")
@@ -3563,12 +3564,12 @@ class MainWindow(QMainWindow):
         except ImportError as e:
             logger.error(f"模块导入失败:\n  错误类型: ImportError\n  错误信息: {str(e)}")
             logger.exception("模块导入异常详情")
-            from PyQt5.QtWidgets import QMessageBox
+            from PySide6.QtWidgets import QMessageBox
             QMessageBox.critical(self, self.tr("错误"), self.tr(f"模块导入失败: {str(e)}"))
         except Exception as e:
             logger.error(f"查看进程失败:\n  错误类型: {type(e).__name__}\n  错误信息: {str(e)}")
             logger.exception("异常详情")
-            from PyQt5.QtWidgets import QMessageBox
+            from PySide6.QtWidgets import QMessageBox
             QMessageBox.critical(self, self.tr("错误"), self.tr(f"查看进程失败: {str(e)}"))
         finally:
             logger.debug("=" * 60)
@@ -3582,7 +3583,7 @@ class MainWindow(QMainWindow):
         try:
             if not hasattr(self, 'app_operations_manager') or self.app_operations_manager is None:
                 logger.error("app_operations_manager 未初始化或为None")
-                from PyQt5.QtWidgets import QMessageBox
+                from PySide6.QtWidgets import QMessageBox
                 QMessageBox.warning(self, self.tr("错误"), self.tr("APP操作管理器未初始化"))
                 return
             logger.debug("调用 app_operations_manager.dump_app()")
@@ -3591,12 +3592,12 @@ class MainWindow(QMainWindow):
         except ImportError as e:
             logger.error(f"模块导入失败:\n  错误类型: ImportError\n  错误信息: {str(e)}")
             logger.exception("模块导入异常详情")
-            from PyQt5.QtWidgets import QMessageBox
+            from PySide6.QtWidgets import QMessageBox
             QMessageBox.critical(self, self.tr("错误"), self.tr(f"模块导入失败: {str(e)}"))
         except Exception as e:
             logger.error(f"dump app失败:\n  错误类型: {type(e).__name__}\n  错误信息: {str(e)}")
             logger.exception("异常详情")
-            from PyQt5.QtWidgets import QMessageBox
+            from PySide6.QtWidgets import QMessageBox
             QMessageBox.critical(self, self.tr("错误"), self.tr(f"dump app失败: {str(e)}"))
         finally:
             logger.debug("=" * 60)
@@ -3610,7 +3611,7 @@ class MainWindow(QMainWindow):
         try:
             if not hasattr(self, 'app_operations_manager') or self.app_operations_manager is None:
                 logger.error("app_operations_manager 未初始化或为None")
-                from PyQt5.QtWidgets import QMessageBox
+                from PySide6.QtWidgets import QMessageBox
                 QMessageBox.warning(self, self.tr("错误"), self.tr("APP操作管理器未初始化"))
                 return
             logger.debug("调用 app_operations_manager.enable_app()")
@@ -3619,12 +3620,12 @@ class MainWindow(QMainWindow):
         except ImportError as e:
             logger.error(f"模块导入失败:\n  错误类型: ImportError\n  错误信息: {str(e)}")
             logger.exception("模块导入异常详情")
-            from PyQt5.QtWidgets import QMessageBox
+            from PySide6.QtWidgets import QMessageBox
             QMessageBox.critical(self, self.tr("错误"), self.tr(f"模块导入失败: {str(e)}"))
         except Exception as e:
             logger.error(f"启用app失败:\n  错误类型: {type(e).__name__}\n  错误信息: {str(e)}")
             logger.exception("异常详情")
-            from PyQt5.QtWidgets import QMessageBox
+            from PySide6.QtWidgets import QMessageBox
             QMessageBox.critical(self, self.tr("错误"), self.tr(f"启用app失败: {str(e)}"))
         finally:
             logger.debug("=" * 60)
@@ -3638,7 +3639,7 @@ class MainWindow(QMainWindow):
         try:
             if not hasattr(self, 'app_operations_manager') or self.app_operations_manager is None:
                 logger.error("app_operations_manager 未初始化或为None")
-                from PyQt5.QtWidgets import QMessageBox
+                from PySide6.QtWidgets import QMessageBox
                 QMessageBox.warning(self, self.tr("错误"), self.tr("APP操作管理器未初始化"))
                 return
             logger.debug("调用 app_operations_manager.disable_app()")
@@ -3647,12 +3648,12 @@ class MainWindow(QMainWindow):
         except ImportError as e:
             logger.error(f"模块导入失败:\n  错误类型: ImportError\n  错误信息: {str(e)}")
             logger.exception("模块导入异常详情")
-            from PyQt5.QtWidgets import QMessageBox
+            from PySide6.QtWidgets import QMessageBox
             QMessageBox.critical(self, self.tr("错误"), self.tr(f"模块导入失败: {str(e)}"))
         except Exception as e:
             logger.error(f"禁用app失败:\n  错误类型: {type(e).__name__}\n  错误信息: {str(e)}")
             logger.exception("异常详情")
-            from PyQt5.QtWidgets import QMessageBox
+            from PySide6.QtWidgets import QMessageBox
             QMessageBox.critical(self, self.tr("错误"), self.tr(f"禁用app失败: {str(e)}"))
         finally:
             logger.debug("=" * 60)
@@ -3667,7 +3668,7 @@ class MainWindow(QMainWindow):
         try:
             if not hasattr(self, 'device_info_manager') or self.device_info_manager is None:
                 logger.error("device_info_manager 未初始化或为None")
-                from PyQt5.QtWidgets import QMessageBox
+                from PySide6.QtWidgets import QMessageBox
                 QMessageBox.warning(self, self.tr("错误"), self.tr("设备信息管理器未初始化"))
                 return
             logger.debug("调用 device_info_manager.show_device_info()")
@@ -3676,12 +3677,12 @@ class MainWindow(QMainWindow):
         except ImportError as e:
             logger.error(f"模块导入失败:\n  错误类型: ImportError\n  错误信息: {str(e)}")
             logger.exception("模块导入异常详情")
-            from PyQt5.QtWidgets import QMessageBox
+            from PySide6.QtWidgets import QMessageBox
             QMessageBox.critical(self, self.tr("错误"), self.tr(f"模块导入失败: {str(e)}"))
         except Exception as e:
             logger.error(f"显示手机信息对话框失败:\n  错误类型: {type(e).__name__}\n  错误信息: {str(e)}")
             logger.exception("异常详情")
-            from PyQt5.QtWidgets import QMessageBox
+            from PySide6.QtWidgets import QMessageBox
             QMessageBox.critical(self, self.tr("错误"), self.tr(f"显示手机信息对话框失败: {str(e)}"))
         finally:
             logger.debug("=" * 60)
@@ -3695,7 +3696,7 @@ class MainWindow(QMainWindow):
         try:
             if not hasattr(self, 'device_info_manager') or self.device_info_manager is None:
                 logger.error("device_info_manager 未初始化或为None")
-                from PyQt5.QtWidgets import QMessageBox
+                from PySide6.QtWidgets import QMessageBox
                 QMessageBox.warning(self, self.tr("错误"), self.tr("设备信息管理器未初始化"))
                 return
             logger.debug("调用 device_info_manager.set_screen_timeout()")
@@ -3704,12 +3705,12 @@ class MainWindow(QMainWindow):
         except ImportError as e:
             logger.error(f"模块导入失败:\n  错误类型: ImportError\n  错误信息: {str(e)}")
             logger.exception("模块导入异常详情")
-            from PyQt5.QtWidgets import QMessageBox
+            from PySide6.QtWidgets import QMessageBox
             QMessageBox.critical(self, self.tr("错误"), self.tr(f"模块导入失败: {str(e)}"))
         except Exception as e:
             logger.error(f"设置灭屏时间失败:\n  错误类型: {type(e).__name__}\n  错误信息: {str(e)}")
             logger.exception("异常详情")
-            from PyQt5.QtWidgets import QMessageBox
+            from PySide6.QtWidgets import QMessageBox
             QMessageBox.critical(self, self.tr("错误"), self.tr(f"设置灭屏时间失败: {str(e)}"))
         finally:
             logger.debug("=" * 60)
@@ -3723,7 +3724,7 @@ class MainWindow(QMainWindow):
         try:
             if not hasattr(self, 'other_operations_manager') or self.other_operations_manager is None:
                 logger.error("other_operations_manager 未初始化或为None")
-                from PyQt5.QtWidgets import QMessageBox
+                from PySide6.QtWidgets import QMessageBox
                 QMessageBox.warning(self, self.tr("错误"), self.tr("其他操作管理器未初始化"))
                 return
             logger.debug("调用 other_operations_manager.merge_mtklog()")
@@ -3732,12 +3733,12 @@ class MainWindow(QMainWindow):
         except ImportError as e:
             logger.error(f"模块导入失败:\n  错误类型: ImportError\n  错误信息: {str(e)}")
             logger.exception("模块导入异常详情")
-            from PyQt5.QtWidgets import QMessageBox
+            from PySide6.QtWidgets import QMessageBox
             QMessageBox.critical(self, self.tr("错误"), self.tr(f"模块导入失败: {str(e)}"))
         except Exception as e:
             logger.error(f"合并MTKlog失败:\n  错误类型: {type(e).__name__}\n  错误信息: {str(e)}")
             logger.exception("异常详情")
-            from PyQt5.QtWidgets import QMessageBox
+            from PySide6.QtWidgets import QMessageBox
             QMessageBox.critical(self, self.tr("错误"), self.tr(f"合并MTKlog失败: {str(e)}"))
         finally:
             logger.debug("=" * 60)
@@ -3751,7 +3752,7 @@ class MainWindow(QMainWindow):
         try:
             if not hasattr(self, 'other_operations_manager') or self.other_operations_manager is None:
                 logger.error("other_operations_manager 未初始化或为None")
-                from PyQt5.QtWidgets import QMessageBox
+                from PySide6.QtWidgets import QMessageBox
                 QMessageBox.warning(self, self.tr("错误"), self.tr("其他操作管理器未初始化"))
                 return
             logger.debug("调用 other_operations_manager.extract_pcap_from_mtklog()")
@@ -3760,12 +3761,12 @@ class MainWindow(QMainWindow):
         except ImportError as e:
             logger.error(f"模块导入失败:\n  错误类型: ImportError\n  错误信息: {str(e)}")
             logger.exception("模块导入异常详情")
-            from PyQt5.QtWidgets import QMessageBox
+            from PySide6.QtWidgets import QMessageBox
             QMessageBox.critical(self, self.tr("错误"), self.tr(f"模块导入失败: {str(e)}"))
         except Exception as e:
             logger.error(f"MTKlog提取pcap失败:\n  错误类型: {type(e).__name__}\n  错误信息: {str(e)}")
             logger.exception("异常详情")
-            from PyQt5.QtWidgets import QMessageBox
+            from PySide6.QtWidgets import QMessageBox
             QMessageBox.critical(self, self.tr("错误"), self.tr(f"MTKlog提取pcap失败: {str(e)}"))
         finally:
             logger.debug("=" * 60)
@@ -3779,7 +3780,7 @@ class MainWindow(QMainWindow):
         try:
             if not hasattr(self, 'other_operations_manager') or self.other_operations_manager is None:
                 logger.error("other_operations_manager 未初始化或为None")
-                from PyQt5.QtWidgets import QMessageBox
+                from PySide6.QtWidgets import QMessageBox
                 QMessageBox.warning(self, self.tr("错误"), self.tr("其他操作管理器未初始化"))
                 return
             logger.debug("调用 other_operations_manager.merge_pcap()")
@@ -3788,12 +3789,12 @@ class MainWindow(QMainWindow):
         except ImportError as e:
             logger.error(f"模块导入失败:\n  错误类型: ImportError\n  错误信息: {str(e)}")
             logger.exception("模块导入异常详情")
-            from PyQt5.QtWidgets import QMessageBox
+            from PySide6.QtWidgets import QMessageBox
             QMessageBox.critical(self, self.tr("错误"), self.tr(f"模块导入失败: {str(e)}"))
         except Exception as e:
             logger.error(f"合并PCAP失败:\n  错误类型: {type(e).__name__}\n  错误信息: {str(e)}")
             logger.exception("异常详情")
-            from PyQt5.QtWidgets import QMessageBox
+            from PySide6.QtWidgets import QMessageBox
             QMessageBox.critical(self, self.tr("错误"), self.tr(f"合并PCAP失败: {str(e)}"))
         finally:
             logger.debug("=" * 60)
@@ -3807,7 +3808,7 @@ class MainWindow(QMainWindow):
         try:
             if not hasattr(self, 'other_operations_manager') or self.other_operations_manager is None:
                 logger.error("other_operations_manager 未初始化或为None")
-                from PyQt5.QtWidgets import QMessageBox
+                from PySide6.QtWidgets import QMessageBox
                 QMessageBox.warning(self, self.tr("错误"), self.tr("其他操作管理器未初始化"))
                 return
             logger.debug("调用 other_operations_manager.extract_pcap_from_qualcomm_log()")
@@ -3816,12 +3817,12 @@ class MainWindow(QMainWindow):
         except ImportError as e:
             logger.error(f"模块导入失败:\n  错误类型: ImportError\n  错误信息: {str(e)}")
             logger.exception("模块导入异常详情")
-            from PyQt5.QtWidgets import QMessageBox
+            from PySide6.QtWidgets import QMessageBox
             QMessageBox.critical(self, self.tr("错误"), self.tr(f"模块导入失败: {str(e)}"))
         except Exception as e:
             logger.error(f"高通log提取pcap失败:\n  错误类型: {type(e).__name__}\n  错误信息: {str(e)}")
             logger.exception("异常详情")
-            from PyQt5.QtWidgets import QMessageBox
+            from PySide6.QtWidgets import QMessageBox
             QMessageBox.critical(self, self.tr("错误"), self.tr(f"高通log提取pcap失败: {str(e)}"))
         finally:
             logger.debug("=" * 60)
@@ -3835,7 +3836,7 @@ class MainWindow(QMainWindow):
         try:
             if not hasattr(self, 'other_operations_manager') or self.other_operations_manager is None:
                 logger.error("other_operations_manager 未初始化或为None")
-                from PyQt5.QtWidgets import QMessageBox
+                from PySide6.QtWidgets import QMessageBox
                 QMessageBox.warning(self, self.tr("错误"), self.tr("其他操作管理器未初始化"))
                 return
             logger.debug("调用 other_operations_manager.mtk_sip_decode()")
@@ -3844,12 +3845,12 @@ class MainWindow(QMainWindow):
         except ImportError as e:
             logger.error(f"模块导入失败:\n  错误类型: ImportError\n  错误信息: {str(e)}")
             logger.exception("模块导入异常详情")
-            from PyQt5.QtWidgets import QMessageBox
+            from PySide6.QtWidgets import QMessageBox
             QMessageBox.critical(self, self.tr("错误"), self.tr(f"模块导入失败: {str(e)}"))
         except Exception as e:
             logger.error(f"MTK SIP DECODE失败:\n  错误类型: {type(e).__name__}\n  错误信息: {str(e)}")
             logger.exception("异常详情")
-            from PyQt5.QtWidgets import QMessageBox
+            from PySide6.QtWidgets import QMessageBox
             QMessageBox.critical(self, self.tr("错误"), self.tr(f"MTK SIP DECODE失败: {str(e)}"))
         finally:
             logger.debug("=" * 60)
@@ -3863,23 +3864,23 @@ class MainWindow(QMainWindow):
             logger.debug("开始导入模块: ui.rrc3gpp_decoder_dialog")
             from ui.rrc3gpp_decoder_dialog import RRC3GPPDecoderDialog
             logger.debug("模块导入成功: RRC3GPPDecoderDialog")
-            from PyQt5.QtWidgets import QDialog, QMessageBox
+            from PySide6.QtWidgets import QDialog, QMessageBox
             logger.debug("模块导入成功: QDialog, QMessageBox")
             
             logger.debug("创建 RRC3GPPDecoderDialog 实例")
             dialog = RRC3GPPDecoderDialog(self, decoder=self.rrc3gpp_decoder)
             logger.debug("显示对话框")
-            dialog.exec_()
+            dialog.exec()
             logger.debug("对话框已关闭")
         except ImportError as e:
             logger.error(f"模块导入失败:\n  错误类型: ImportError\n  错误信息: {str(e)}")
             logger.exception("模块导入异常详情")
-            from PyQt5.QtWidgets import QMessageBox
+            from PySide6.QtWidgets import QMessageBox
             QMessageBox.critical(self, self.tr("错误"), self.tr(f"模块导入失败: {str(e)}"))
         except Exception as e:
             logger.error(f"3GPP消息解码失败:\n  错误类型: {type(e).__name__}\n  错误信息: {str(e)}")
             logger.exception("异常详情")
-            from PyQt5.QtWidgets import QMessageBox
+            from PySide6.QtWidgets import QMessageBox
             QMessageBox.critical(self, self.tr("错误"), self.tr(f"3GPP消息解码失败: {str(e)}"))
         finally:
             logger.debug("=" * 60)
@@ -3897,7 +3898,7 @@ class MainWindow(QMainWindow):
         try:
             if not hasattr(self, 'hera_config_manager') or self.hera_config_manager is None:
                 logger.error("hera_config_manager 未初始化或为None")
-                from PyQt5.QtWidgets import QMessageBox
+                from PySide6.QtWidgets import QMessageBox
                 QMessageBox.warning(self, self.tr("错误"), self.tr("赫拉配置管理器未初始化"))
                 return
             logger.debug("调用 hera_config_manager.configure_hera()")
@@ -3906,12 +3907,12 @@ class MainWindow(QMainWindow):
         except ImportError as e:
             logger.error(f"模块导入失败:\n  错误类型: ImportError\n  错误信息: {str(e)}")
             logger.exception("模块导入异常详情")
-            from PyQt5.QtWidgets import QMessageBox
+            from PySide6.QtWidgets import QMessageBox
             QMessageBox.critical(self, self.tr("错误"), self.tr(f"模块导入失败: {str(e)}"))
         except Exception as e:
             logger.error(f"赫拉配置失败:\n  错误类型: {type(e).__name__}\n  错误信息: {str(e)}")
             logger.exception("异常详情")
-            from PyQt5.QtWidgets import QMessageBox
+            from PySide6.QtWidgets import QMessageBox
             QMessageBox.critical(self, self.tr("错误"), self.tr(f"赫拉配置失败: {str(e)}"))
         finally:
             logger.debug("=" * 60)
@@ -3925,7 +3926,7 @@ class MainWindow(QMainWindow):
         try:
             if not hasattr(self, 'hera_config_manager') or self.hera_config_manager is None:
                 logger.error("hera_config_manager 未初始化或为None")
-                from PyQt5.QtWidgets import QMessageBox
+                from PySide6.QtWidgets import QMessageBox
                 QMessageBox.warning(self, self.tr("错误"), self.tr("赫拉配置管理器未初始化"))
                 return
             logger.debug("调用 hera_config_manager.configure_collect_data()")
@@ -3934,12 +3935,12 @@ class MainWindow(QMainWindow):
         except ImportError as e:
             logger.error(f"模块导入失败:\n  错误类型: ImportError\n  错误信息: {str(e)}")
             logger.exception("模块导入异常详情")
-            from PyQt5.QtWidgets import QMessageBox
+            from PySide6.QtWidgets import QMessageBox
             QMessageBox.critical(self, self.tr("错误"), self.tr(f"模块导入失败: {str(e)}"))
         except Exception as e:
             logger.error(f"赫拉测试数据收集失败:\n  错误类型: {type(e).__name__}\n  错误信息: {str(e)}")
             logger.exception("异常详情")
-            from PyQt5.QtWidgets import QMessageBox
+            from PySide6.QtWidgets import QMessageBox
             QMessageBox.critical(self, self.tr("错误"), self.tr(f"赫拉测试数据收集失败: {str(e)}"))
         finally:
             logger.debug("=" * 60)
@@ -3953,7 +3954,7 @@ class MainWindow(QMainWindow):
         try:
             if not hasattr(self, 'other_operations_manager') or self.other_operations_manager is None:
                 logger.error("other_operations_manager 未初始化或为None")
-                from PyQt5.QtWidgets import QMessageBox
+                from PySide6.QtWidgets import QMessageBox
                 QMessageBox.warning(self, self.tr("错误"), self.tr("其他操作管理器未初始化"))
                 return
             logger.debug("调用 other_operations_manager.show_input_text_dialog()")
@@ -3962,12 +3963,12 @@ class MainWindow(QMainWindow):
         except ImportError as e:
             logger.error(f"模块导入失败:\n  错误类型: ImportError\n  错误信息: {str(e)}")
             logger.exception("模块导入异常详情")
-            from PyQt5.QtWidgets import QMessageBox
+            from PySide6.QtWidgets import QMessageBox
             QMessageBox.critical(self, self.tr("错误"), self.tr(f"模块导入失败: {str(e)}"))
         except Exception as e:
             logger.error(f"显示输入文本对话框失败:\n  错误类型: {type(e).__name__}\n  错误信息: {str(e)}")
             logger.exception("异常详情")
-            from PyQt5.QtWidgets import QMessageBox
+            from PySide6.QtWidgets import QMessageBox
             QMessageBox.critical(self, self.tr("错误"), self.tr(f"显示输入文本对话框失败: {str(e)}"))
         finally:
             logger.debug("=" * 60)
@@ -3985,17 +3986,17 @@ class MainWindow(QMainWindow):
             logger.debug("创建 PRTranslationDialog 实例")
             dialog = PRTranslationDialog(parent=self)
             logger.debug("显示对话框")
-            dialog.exec_()
+            dialog.exec()
             logger.debug("PR翻译对话框已关闭")
         except ImportError as e:
             logger.error(f"模块导入失败:\n  错误类型: ImportError\n  错误信息: {str(e)}")
             logger.exception("模块导入异常详情")
-            from PyQt5.QtWidgets import QMessageBox
+            from PySide6.QtWidgets import QMessageBox
             QMessageBox.critical(self, self.tr("错误"), self.tr(f"显示PR翻译对话框失败: {str(e)}"))
         except Exception as e:
             logger.error(f"显示PR翻译对话框失败:\n  错误类型: {type(e).__name__}\n  错误信息: {str(e)}")
             logger.exception("异常详情")
-            from PyQt5.QtWidgets import QMessageBox
+            from PySide6.QtWidgets import QMessageBox
             QMessageBox.critical(self, self.tr("错误"), self.tr(f"显示PR翻译对话框失败: {str(e)}"))
         finally:
             logger.debug("=" * 60)
@@ -4004,7 +4005,7 @@ class MainWindow(QMainWindow):
     def _on_show_display_lines_dialog(self):
         """显示设置显示行数对话框"""
         dialog = DisplayLinesDialog(current_lines=self.log_processor.adaptive_params['max_display_lines'], parent=self)
-        if dialog.exec_() == DisplayLinesDialog.Accepted:
+        if dialog.exec() == DisplayLinesDialog.DialogCode.Accepted:
             new_lines = dialog.result_lines
             self.log_processor.adaptive_params['max_display_lines'] = new_lines
             self.log_processor.adaptive_params['trim_threshold'] = int(new_lines * 0.05)
@@ -4021,7 +4022,7 @@ class MainWindow(QMainWindow):
             logger.debug("检查 other_operations_manager 对象")
             if not hasattr(self, 'other_operations_manager') or self.other_operations_manager is None:
                 logger.error("other_operations_manager 未初始化或为None")
-                from PyQt5.QtWidgets import QMessageBox
+                from PySide6.QtWidgets import QMessageBox
                 QMessageBox.warning(self, self.lang_manager.tr("错误"), self.lang_manager.tr("其他操作管理器未初始化"))
                 return
             logger.debug(f"other_operations_manager.tool_config: {self.other_operations_manager.tool_config}")
@@ -4031,17 +4032,17 @@ class MainWindow(QMainWindow):
             logger.debug("创建 ToolsConfigDialog 实例")
             dialog = ToolsConfigDialog(self.other_operations_manager.tool_config, parent=self)
             logger.debug("显示对话框")
-            dialog.exec_()
+            dialog.exec()
             logger.debug("工具配置对话框已关闭")
         except ImportError as e:
             logger.error(f"模块导入失败:\n  错误类型: ImportError\n  错误信息: {str(e)}")
             logger.exception("模块导入异常详情")
-            from PyQt5.QtWidgets import QMessageBox
+            from PySide6.QtWidgets import QMessageBox
             QMessageBox.critical(self, self.lang_manager.tr("错误"), f"{self.lang_manager.tr('打开工具配置对话框失败')}：{str(e)}")
         except Exception as e:
             logger.error(f"打开工具配置对话框失败:\n  错误类型: {type(e).__name__}\n  错误信息: {str(e)}")
             logger.exception("异常详情")
-            from PyQt5.QtWidgets import QMessageBox
+            from PySide6.QtWidgets import QMessageBox
             QMessageBox.critical(self, self.lang_manager.tr("错误"), f"{self.lang_manager.tr('打开工具配置对话框失败')}：{str(e)}")
         finally:
             logger.debug("=" * 60)
@@ -4058,17 +4059,17 @@ class MainWindow(QMainWindow):
             logger.debug("创建 ATCommandDialog 实例")
             dialog = ATCommandDialog(parent=self)
             logger.debug("显示对话框")
-            dialog.exec_()
+            dialog.exec()
             logger.debug("AT工具对话框已关闭")
         except ImportError as e:
             logger.error(f"模块导入失败:\n  错误类型: ImportError\n  错误信息: {str(e)}")
             logger.exception("模块导入异常详情")
-            from PyQt5.QtWidgets import QMessageBox
+            from PySide6.QtWidgets import QMessageBox
             QMessageBox.critical(self, self.lang_manager.tr("错误"), f"{self.lang_manager.tr('打开AT工具对话框失败')}：{str(e)}")
         except Exception as e:
             logger.error(f"打开AT工具对话框失败:\n  错误类型: {type(e).__name__}\n  错误信息: {str(e)}")
             logger.exception("异常详情")
-            from PyQt5.QtWidgets import QMessageBox
+            from PySide6.QtWidgets import QMessageBox
             QMessageBox.critical(self, self.lang_manager.tr("错误"), f"{self.lang_manager.tr('打开AT工具对话框失败')}：{str(e)}")
         finally:
             logger.debug("=" * 60)
@@ -4085,25 +4086,24 @@ class MainWindow(QMainWindow):
             logger.debug("创建 EncodingToolDialog 实例")
             dialog = EncodingToolDialog(parent=self)
             logger.debug("显示对话框")
-            dialog.exec_()
+            dialog.exec()
             logger.debug("转码工具对话框已关闭")
         except ImportError as e:
             logger.error(f"模块导入失败:\n  错误类型: ImportError\n  错误信息: {str(e)}")
             logger.exception("模块导入异常详情")
-            from PyQt5.QtWidgets import QMessageBox
+            from PySide6.QtWidgets import QMessageBox
             QMessageBox.critical(self, self.lang_manager.tr("错误"), f"{self.lang_manager.tr('打开转码工具对话框失败')}：{str(e)}")
         except Exception as e:
             logger.error(f"打开转码工具对话框失败:\n  错误类型: {type(e).__name__}\n  错误信息: {str(e)}")
             logger.exception("异常详情")
-            from PyQt5.QtWidgets import QMessageBox
+            from PySide6.QtWidgets import QMessageBox
             QMessageBox.critical(self, self.lang_manager.tr("错误"), f"{self.lang_manager.tr('打开转码工具对话框失败')}：{str(e)}")
         finally:
             logger.debug("=" * 60)
     
     def _setup_shortcuts(self):
         """设置快捷键"""
-        from PyQt5.QtWidgets import QShortcut
-        from PyQt5.QtGui import QKeySequence
+        from PySide6.QtGui import QKeySequence, QShortcut
         
         # Ctrl+F - 搜索
         shortcut_search = QShortcut(QKeySequence("Ctrl+F"), self)
@@ -4338,7 +4338,7 @@ class MainWindow(QMainWindow):
     def _add_buttons_to_custom_card(self, tab_widget, tab_name, card_name, buttons):
         """向自定义Card添加按钮"""
         try:
-            from PyQt5.QtWidgets import QFrame, QHBoxLayout, QLabel
+            from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel
             
             # 现在自定义Card使用QFrame+QLabel结构，与预置tab一致
             # 查找对应的Frame（标记为custom_card）
@@ -4382,7 +4382,7 @@ class MainWindow(QMainWindow):
     def _adjust_custom_card_width(self, card_frame, button_container):
         """根据按钮情况动态调整自定义card的宽度"""
         try:
-            from PyQt5.QtCore import QTimer
+            from PySide6.QtCore import QTimer
             
             # 使用QTimer延迟计算，确保按钮已经完成布局
             def calculate_and_set_width():
@@ -4461,7 +4461,7 @@ class MainWindow(QMainWindow):
                         min_width = max(min_width, 200)
                     
                     # 设置sizePolicy为Preferred，不拉伸
-                    from PyQt5.QtWidgets import QSizePolicy
+                    from PySide6.QtWidgets import QSizePolicy
                     size_policy = QSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
                     size_policy.setHorizontalStretch(0)
                     card_frame.setSizePolicy(size_policy)
@@ -4542,7 +4542,7 @@ class MainWindow(QMainWindow):
     def _reset_custom_card_width(self, tab_widget, card_name):
         """重置自定义card的宽度（当按钮被清除时）"""
         try:
-            from PyQt5.QtWidgets import QFrame, QLabel
+            from PySide6.QtWidgets import QFrame, QLabel
             
             # 查找对应的card frame
             frames = tab_widget.findChildren(QFrame)
@@ -4596,7 +4596,7 @@ class MainWindow(QMainWindow):
     def _inject_custom_buttons_to_card(self, tab_instance, tab_name, card_name, buttons):
         """向指定卡片注入自定义按钮（仅处理预制Card）"""
         try:
-            from PyQt5.QtWidgets import QFrame, QHBoxLayout, QVBoxLayout, QWidget, QLabel
+            from PySide6.QtWidgets import QFrame, QHBoxLayout, QVBoxLayout, QWidget, QLabel
             
             logger.debug(f"{self.lang_manager.tr('尝试向预制卡片')} '{card_name}' {self.lang_manager.tr('注入')} {len(buttons)} {self.lang_manager.tr('个按钮')}")
             
@@ -4657,7 +4657,7 @@ class MainWindow(QMainWindow):
     def _populate_button_layout(self, tab_instance, tab_name, card_name, layout, buttons):
         """在指定布局中填充自定义按钮容器"""
         try:
-            from PyQt5.QtWidgets import QHBoxLayout, QVBoxLayout, QGridLayout, QWidget
+            from PySide6.QtWidgets import QHBoxLayout, QVBoxLayout, QGridLayout, QWidget
             
             button_layout = None
             
@@ -4852,7 +4852,7 @@ class MainWindow(QMainWindow):
     def _handle_script_dialog_request(self, dialog_type, title, message, buttons, default_button, worker):
         """处理脚本中发起的对话框请求（在主线程中执行）"""
         try:
-            from PyQt5.QtWidgets import QMessageBox
+            from PySide6.QtWidgets import QMessageBox
             
             # 将int类型的buttons和default_button转换为QMessageBox.StandardButtons类型
             buttons_enum = QMessageBox.StandardButtons(buttons) if isinstance(buttons, int) else buttons
@@ -4893,7 +4893,7 @@ class MainWindow(QMainWindow):
                 )
             elif dialog_type == "about":
                 QMessageBox.about(self, title, message)
-                reply = QMessageBox.Ok
+                reply = QMessageBox.StandardButton.Ok
             else:
                 # 默认使用question
                 reply = QMessageBox.question(
@@ -5078,7 +5078,7 @@ class MainWindow(QMainWindow):
             from ui.config_backup_dialog import ConfigBackupDialog
             
             dialog = ConfigBackupDialog(parent=self)
-            dialog.exec_()
+            dialog.exec()
             
         except Exception as e:
             logger.exception(f"{self.lang_manager.tr('显示配置备份对话框失败:')} {e}")
@@ -5090,7 +5090,7 @@ class MainWindow(QMainWindow):
             from ui.unified_manager_dialog import UnifiedManagerDialog
             
             dialog = UnifiedManagerDialog(self.tab_config_manager, self.custom_button_manager, parent=self)
-            dialog.exec_()
+            dialog.exec()
             
             # 对话框关闭后，重新加载Tab以应用可能的更改
             self.reload_tabs()
@@ -5105,7 +5105,7 @@ class MainWindow(QMainWindow):
             from ui.secret_code_dialog import SecretCodeDialog
             
             dialog = SecretCodeDialog(parent=self)
-            dialog.exec_()
+            dialog.exec()
             
         except Exception as e:
             logger.exception(f"{self.lang_manager.tr('显示暗码管理对话框失败:')} {e}")
@@ -5117,7 +5117,7 @@ class MainWindow(QMainWindow):
             from ui.cell_lock_dialog import LockCellDialog
             
             dialog = LockCellDialog(parent=self)
-            dialog.exec_()
+            dialog.exec()
             
         except Exception as e:
             logger.exception(f"{self.lang_manager.tr('显示高通lock cell对话框失败:')} {e}")
@@ -5129,7 +5129,7 @@ class MainWindow(QMainWindow):
             from ui.qc_nv_dialog import QCNVDialog
             
             dialog = QCNVDialog(parent=self)
-            dialog.exec_()
+            dialog.exec()
             
         except Exception as e:
             logger.exception(f"{self.lang_manager.tr('显示高通NV对话框失败:')} {e}")
@@ -5142,7 +5142,7 @@ class MainWindow(QMainWindow):
             if hasattr(self, '_tab_move_timer'):
                 self._tab_move_timer.stop()
             else:
-                from PyQt5.QtCore import QTimer
+                from PySide6.QtCore import QTimer
                 self._tab_move_timer = QTimer()
                 self._tab_move_timer.setSingleShot(True)
                 self._tab_move_timer.timeout.connect(self._save_tab_order)
@@ -5628,13 +5628,13 @@ class MainWindow(QMainWindow):
             self,
             self.tr("在线更新"),
             "\n\n".join(details),
-            QMessageBox.Yes | QMessageBox.No,
-            QMessageBox.Yes,
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.Yes,
         )
 
         self._record_update_check_timestamp()
 
-        if reply == QMessageBox.Yes:
+        if reply == QMessageBox.StandardButton.Yes:
             logger.debug("MainWindow: user chose YES")
             self._update_status_text = self.tr("正在下载安装包...")
             self._update_progress_extra = ""

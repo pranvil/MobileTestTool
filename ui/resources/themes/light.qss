@@ -1,4 +1,4 @@
-/* PyQt5 Light Theme */
+/* PySide6 Light Theme */
 
 /* 主窗口 */
 QMainWindow {

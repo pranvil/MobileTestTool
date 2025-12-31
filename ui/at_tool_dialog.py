@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
 AT命令工具对话框
@@ -6,13 +6,13 @@ AT命令工具对话框
 
 import json
 import os
-from PyQt5.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QPushButton, 
+from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QPushButton, 
                              QTextEdit, QTableWidget, QTableWidgetItem, 
                              QLineEdit, QComboBox, QMenu, QMessageBox,
                              QFileDialog, QHeaderView, QLabel, QSplitter, QWidget,
                              QFormLayout, QAbstractItemView)
-from PyQt5.QtCore import Qt, QThread, pyqtSignal, QDateTime, QTimer
-from PyQt5.QtGui import QTextCursor, QTextCharFormat, QColor, QFont
+from PySide6.QtCore import Qt, QThread, Signal, QDateTime, QTimer
+from PySide6.QtGui import QTextCursor, QTextCharFormat, QColor, QFont
 from core.debug_logger import logger
 
 
@@ -28,7 +28,7 @@ class DraggableCommandsTable(QTableWidget):
         self.setDropIndicatorShown(True)
         self.setDragDropMode(QAbstractItemView.InternalMove)
         self.setDragDropOverwriteMode(False)
-        self.setDefaultDropAction(Qt.MoveAction)
+        self.setDefaultDropAction(Qt.DropAction.MoveAction)
         self.setSelectionBehavior(QAbstractItemView.SelectRows)
         self.setSelectionMode(QAbstractItemView.SingleSelection)
         
@@ -469,12 +469,12 @@ class ATCommandDialog(QDialog):
                 move_down_action = menu.addAction(self.lang_manager.tr("下移"))
                 move_down_action.triggered.connect(self.move_command_down)
         
-        menu.exec_(self.commands_table.viewport().mapToGlobal(position))
+        menu.exec(self.commands_table.viewport().mapToGlobal(position))
     
     def add_command(self):
         """添加AT命令"""
         dialog = AddEditCommandDialog(self, is_edit=False)
-        if dialog.exec_() == QDialog.Accepted:
+        if dialog.exec() == QDialog.DialogCode.Accepted:
             name, command = dialog.get_data()
             if name and command:
                 # 检查名称是否已存在
@@ -497,7 +497,7 @@ class ATCommandDialog(QDialog):
         command = cmd["command"]
         
         dialog = AddEditCommandDialog(self, is_edit=True, name=name, command=command)
-        if dialog.exec_() == QDialog.Accepted:
+        if dialog.exec() == QDialog.DialogCode.Accepted:
             new_name, new_command = dialog.get_data()
             if new_name and new_command:
                 # 检查新名称是否与其他命令冲突
@@ -523,10 +523,10 @@ class ATCommandDialog(QDialog):
             self,
             self.lang_manager.tr("确认删除"),
             self.lang_manager.tr(f"确定要删除命令 '{name}' 吗？"),
-            QMessageBox.Yes | QMessageBox.No
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
         )
         
-        if reply == QMessageBox.Yes:
+        if reply == QMessageBox.StandardButton.Yes:
             self.at_commands.pop(selected_row)
             self.save_commands()
             self.refresh_commands_table()
@@ -695,7 +695,7 @@ class ATCommandDialog(QDialog):
     def append_output(self, text):
         """追加输出文本，使用颜色区分输入和输出"""
         cursor = self.output_text.textCursor()
-        cursor.movePosition(QTextCursor.End)
+        cursor.movePosition(QTextCursor.MoveOperation.End)
         self.output_text.setTextCursor(cursor)
         
         # 根据文本前缀设置颜色
@@ -722,7 +722,7 @@ class ATCommandDialog(QDialog):
         cursor.insertText(text + "\n")
         
         # 重置光标位置
-        cursor.movePosition(QTextCursor.End)
+        cursor.movePosition(QTextCursor.MoveOperation.End)
         self.output_text.setTextCursor(cursor)
     
     def clear_output(self):
@@ -777,7 +777,7 @@ class ATCommandDialog(QDialog):
 class ATCommandWorker(QThread):
     """AT命令工作线程"""
     
-    output = pyqtSignal(str)
+    output = Signal(str)
     
     def __init__(self, port, command, parent=None):
         super().__init__(parent)

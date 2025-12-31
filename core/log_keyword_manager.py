@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
 Log关键字管理器
@@ -8,7 +8,7 @@ Log关键字管理器
 import os
 import json
 import datetime
-from PyQt5.QtCore import QObject, pyqtSignal
+from PySide6.QtCore import QObject, Signal
 from core.debug_logger import logger
 
 
@@ -16,7 +16,7 @@ class LogKeywordManager(QObject):
     """Log关键字配置管理器"""
     
     # 信号定义
-    keywords_updated = pyqtSignal()  # 关键字配置更新
+    keywords_updated = Signal()  # 关键字配置更新
     
     def __init__(self, parent=None):
         super().__init__(parent)

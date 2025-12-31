@@ -1,13 +1,13 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
 Log过滤 Tab
 """
 
-from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, 
+from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, 
                              QLineEdit, QCheckBox, QPushButton,
                              QScrollArea, QFrame)
-from PyQt5.QtCore import pyqtSignal, Qt
+from PySide6.QtCore import Signal, Qt
 from ui.widgets.shadow_utils import add_card_shadow
 
 
@@ -16,21 +16,21 @@ class LogFilterTab(QWidget):
     
     # 信号定义
     # 过滤控制
-    start_filtering = pyqtSignal()
-    stop_filtering = pyqtSignal()
+    start_filtering = Signal()
+    stop_filtering = Signal()
     
     # 常用操作
-    manage_log_keywords = pyqtSignal()  # 打开关键字管理对话框
-    clear_logs = pyqtSignal()
-    clear_device_logs = pyqtSignal()
-    show_display_lines_dialog = pyqtSignal()
-    save_logs = pyqtSignal()
+    manage_log_keywords = Signal()  # 打开关键字管理对话框
+    clear_logs = Signal()
+    clear_device_logs = Signal()
+    show_display_lines_dialog = Signal()
+    save_logs = Signal()
     
     # 选项变化
-    keyword_changed = pyqtSignal(str)
-    use_regex_changed = pyqtSignal(bool)
-    case_sensitive_changed = pyqtSignal(bool)
-    color_highlight_changed = pyqtSignal(bool)
+    keyword_changed = Signal(str)
+    use_regex_changed = Signal(bool)
+    case_sensitive_changed = Signal(bool)
+    color_highlight_changed = Signal(bool)
     
     def __init__(self, parent=None):
         super().__init__(parent)

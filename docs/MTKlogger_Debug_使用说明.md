@@ -77,8 +77,8 @@
 
 ### 3. 优化了打包配置
 
-#### 标准版本 (build_pyqt.bat)
-- 使用 `MobileTestTool_pyqt.spec`
+#### 标准版本 (build.bat)
+- 使用 `MobileTestTool.spec`
 - 禁用控制台窗口（`console=False`）
 - 适合日常使用和分发
 
@@ -88,7 +88,7 @@
 
 ```bash
 # 标准版本（推荐）
-build_pyqt.bat
+build.bat
 ```
 
 ### 2. 运行程序
