@@ -3,7 +3,7 @@
     QLineEdit, QPushButton, QLabel, QDialog, QTableWidget, QMessageBox,QGridLayout,
     QTableWidgetItem, QSizePolicy, QAbstractItemView, QFormLayout,
     QProgressDialog, QApplication, QFileDialog, QInputDialog, QComboBox,
-    QScrollArea, QCheckBox, QHeaderView, QSpinBox
+    QScrollArea, QCheckBox, QHeaderView, QSpinBox, QSplitter, QStyledItemDelegate
 )   
 from PySide6.QtCore import QThread, Signal, Qt, QEvent, QTimer, Slot, QSettings
 from threading import Lock
@@ -45,6 +45,38 @@ class AdminThread(QThread):
         except Exception as e:
             logging.error("ADM PIN验证失败: %s", str(e))
             self.result_ready.emit(f"error: {e}")
+
+
+class CenteredComboBoxDelegate(QStyledItemDelegate):
+    """居中对齐的QComboBox委托类"""
+    def paint(self, painter, option, index):
+        """重写绘制方法，使文本居中显示"""
+        option.displayAlignment = Qt.AlignCenter
+        super().paint(painter, option, index)
+
+
+class CenteredComboBox(QComboBox):
+    """文本居中对齐的QComboBox"""
+    def paintEvent(self, event):
+        """重写绘制事件，使显示文本居中"""
+        from PySide6.QtGui import QPainter
+        from PySide6.QtWidgets import QStyle, QStyleOptionComboBox
+        
+        # 创建样式选项
+        opt = QStyleOptionComboBox()
+        self.initStyleOption(opt)
+        
+        # 绘制组合框框架和按钮
+        painter = QPainter(self)
+        self.style().drawComplexControl(QStyle.CC_ComboBox, opt, painter, self)
+        
+        # 计算文本区域（减去下拉按钮的宽度）
+        rect = self.rect()
+        drop_down_width = 20  # 下拉按钮宽度（从样式表得知）
+        text_rect = rect.adjusted(2, 2, -drop_down_width - 2, -2)  # 留一些边距
+        
+        # 绘制居中的文本
+        painter.drawText(text_rect, Qt.AlignCenter, self.currentText())
 
 
 class EFManagerDialog(QDialog):
@@ -251,46 +283,63 @@ class SimEditorUI(QMainWindow):
         """初始化主界面布局"""
         main_widget = QWidget()
         main_layout = QHBoxLayout()
+        main_layout.setContentsMargins(0, 0, 0, 0)  # 移除边距
         main_widget.setLayout(main_layout)
         self.setCentralWidget(main_widget)
 
+        # 使用 QSplitter 让树形结构可以调整宽度
+        splitter = QSplitter(Qt.Horizontal)
+        
         # 左侧：树形视图
         self.tree = QTreeWidget()
         self.tree.setHeaderHidden(True)
-        self.tree.setFixedWidth(250)
+        self.tree.setMinimumWidth(150)  # 设置最小宽度，而不是固定宽度
         self.tree.itemClicked.connect(self.on_tree_item_clicked)
-        main_layout.addWidget(self.tree)
+        splitter.addWidget(self.tree)
 
-        # 右侧布局
-        right_layout = QVBoxLayout()
+        # 右侧布局容器
+        right_widget = QWidget()
+        right_layout = QVBoxLayout(right_widget)
+        right_layout.setContentsMargins(0, 0, 0, 0)
+        right_layout.setSpacing(0)
 
-        # Tab
+        # 使用垂直 QSplitter 让上中下三部分可以手动调整高度
+        right_splitter = QSplitter(Qt.Vertical)
+
+        # 上部分：Tab
         self.tabs = QTabWidget()
         self.add_sim_data_tab()
         self.add_pins_management_tab()  # 你的 PIN 管理 Tab
-        self.tabs.setFixedHeight(120)
-        right_layout.addWidget(self.tabs, 1)
+        self.tabs.setFixedHeight(110)  # 设置最小高度
+        right_splitter.addWidget(self.tabs)
 
-        # 表格显示读取结果
+        # 中部分：表格显示读取结果
         self.read_data_display = QTableWidget()
-        self.read_data_display.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Minimum)
+        self.read_data_display.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.read_data_display.setEditTriggers(QAbstractItemView.NoEditTriggers)
         self.read_data_display.itemClicked.connect(self.on_read_data_item_clicked)
-        right_layout.addWidget(self.read_data_display)
+        self.read_data_display.setMinimumHeight(100)  # 设置最小高度
+        right_splitter.addWidget(self.read_data_display)
 
-        # 动态写入区域
+        # 下部分：动态写入区域
         self.write_data_scroll_area = QScrollArea()
         self.write_data_scroll_area.setWidgetResizable(True)  # 让内部 widget 根据内容大小变化
         self.write_data_widget = QWidget()
         self.write_data_layout = QFormLayout()
         self.write_data_widget.setLayout(self.write_data_layout)
         self.write_data_scroll_area.setWidget(self.write_data_widget)  # 让滚动区域包裹 write_data_widget
+        self.write_data_scroll_area.setMinimumHeight(100)  # 设置最小高度
+        right_splitter.addWidget(self.write_data_scroll_area)
 
-        right_layout.addWidget(self.write_data_scroll_area)  #
-
-
+        # 设置右侧 splitter 的初始高度比例（Tab:表格:写入 = 60:20:20）
+        # 注意：这些是相对比例值，Qt会根据可用空间自动计算实际像素值
+        # 比例为 1:2:3，表示Tab区域占1/6，表格和写入区域各占2/3
+        right_splitter.setSizes([160, 300, 540])
         
-        # 按钮区域
+        # 将 splitter 添加到右侧布局
+        right_layout.addWidget(right_splitter)
+
+        # 按钮区域（固定在底部，不参与分割）
         button_layout = QHBoxLayout()
         refresh_port_button = QPushButton("Refresh Port")
         refresh_port_button.clicked.connect(self.on_refresh_port_button_clicked)
@@ -304,20 +353,21 @@ class SimEditorUI(QMainWindow):
         json_load_button.clicked.connect(self.on_load_json_clicked)
         button_layout.addWidget(json_load_button)
 
-        # gid1_button = QPushButton("GID1")
-        # gid1_button.clicked.connect(lambda: self.on_gid_button_clicked("GID1", "6F3E"))
-        # button_layout.addWidget(gid1_button)
-
-        # gid2_button = QPushButton("GID2")
-        # gid2_button.clicked.connect(lambda: self.on_gid_button_clicked("GID2", "6F3F"))
-        # button_layout.addWidget(gid2_button)
-
         manage_ef_button = QPushButton("Manage EF")
         manage_ef_button.clicked.connect(self.on_manage_ef_clicked)
         button_layout.addWidget(manage_ef_button)
 
         right_layout.addLayout(button_layout)
-        main_layout.addLayout(right_layout)
+        
+        # 将右侧容器添加到 splitter
+        splitter.addWidget(right_widget)
+        
+        # 设置 splitter 的初始大小比例（左侧200，右侧自适应）
+        # 注意：这些是像素值，Qt会根据可用空间自动调整
+        splitter.setSizes([200, 600])
+        
+        # 将 splitter 添加到主布局
+        main_layout.addWidget(splitter)
 
  
 
@@ -459,64 +509,70 @@ class SimEditorUI(QMainWindow):
 
     # ========== 添加的两个 Tabs  ==========
     def add_sim_data_tab(self):
-        """SIM Data 选项卡：两行布局，按钮右对齐"""
+        """SIM Data 选项卡：使用水平布局，避免控件挤压"""
         tab = QWidget()
         outer = QVBoxLayout(tab)
-        grid = QGridLayout()
-        outer.addLayout(grid)
+        outer.setSpacing(6)
 
         # -------- 第 0 行：Filepath / ADF / 三个主按钮 --------
+        row0_layout = QHBoxLayout()
+        row0_layout.setSpacing(10)
+
+        # Filepath 组
         fp_lbl = QLabel("Filepath:")
         self.file_path_input = QLineEdit()
-        # self.file_path_input.setReadOnly(True)
+        self.file_path_input.setFixedWidth(120)  # 固定宽度为120像素
+        self.file_path_input.setFixedHeight(25)  # 固定高度为25像素
+        self.file_path_input.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+        row0_layout.addWidget(fp_lbl)
+        row0_layout.addWidget(self.file_path_input)
 
+        # ADF type 组
         adf_lbl = QLabel("ADF type:")
         self.adf_type_input = QLineEdit()
-        # self.adf_type_input.setReadOnly(True)
+        self.adf_type_input.setFixedWidth(60)  # 固定宽度为60像素
+        self.adf_type_input.setFixedHeight(25)  # 固定高度为25像素
+        self.adf_type_input.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+        row0_layout.addWidget(adf_lbl)
+        row0_layout.addWidget(self.adf_type_input)
 
-        raw_lbl = QLabel("Raw:")
-        self.raw_checkbox = QCheckBox()
+        # 添加弹性空间，将按钮推到右侧
+        row0_layout.addStretch()
 
+        # 三个主按钮
         read_btn = QPushButton("Read")
         read_btn.clicked.connect(self.on_read_button_clicked)
+        read_btn.setFixedWidth(70)  # 固定宽度为70像素
+        read_btn.setFixedHeight(25)  # 固定高度为25像素
+        row0_layout.addWidget(read_btn)
 
         update_btn = QPushButton("Update")
         update_btn.clicked.connect(self.on_update_button_clicked)
+        update_btn.setFixedWidth(70)  # 固定宽度为70像素
+        update_btn.setFixedHeight(25)  # 固定高度为25像素
+        update_btn.setStyleSheet("padding: 2px 12px;") 
+        row0_layout.addWidget(update_btn)
 
         all_btn = QPushButton("Read All EF")
         all_btn.clicked.connect(self.on_batch_read_button_clicked)
+        all_btn.setFixedWidth(100)  # 固定宽度为100像素
+        all_btn.setFixedHeight(25)  # 固定高度为25像素
+        row0_layout.addWidget(all_btn)
 
-        # 放到网格   (row, col, rowSpan, colSpan)
-        grid.addWidget(fp_lbl,          0, 0)
-        grid.addWidget(self.file_path_input, 0, 1, 1, 2)   # 跨 2 列
-        grid.addWidget(adf_lbl,         0, 3)
-        grid.addWidget(self.adf_type_input, 0, 4)
-        grid.addWidget(read_btn,   0, 6)
-        grid.addWidget(update_btn, 0, 7)
-        grid.addWidget(all_btn,    0, 8)
+        outer.addLayout(row0_layout)
 
-        # -------- 第 1 行：pSIM / eSIM / 端口选择 --------
-        psim_btn = QPushButton("pSIM")
-        psim_btn.clicked.connect(self.on_psim_button_clicked)
+        # -------- 第 1 行：AT Gap / Raw / pSIM / eSIM / 端口选择 --------
+        row1_layout = QHBoxLayout()
+        row1_layout.setSpacing(10)
 
-        esim_btn = QPushButton("eSIM")
-        esim_btn.clicked.connect(self.on_esim_button_clicked)
-
-        # 添加端口选择下拉框
-        self.port_combo = QComboBox()
-        self.port_combo.setMinimumWidth(100)
-        # 添加占位提示
-        self.port_combo.addItem("-- 请选择端口 --")
-        self.port_combo.setCurrentIndex(0)  # 默认选中占位项
-        self.update_port_list()  # 初始化端口列表
-        self.port_combo.currentTextChanged.connect(self.on_port_changed)
-
-        # AT 命令最小间隔配置（ms）
+        # AT Gap 组
         gap_lbl = QLabel("AT Gap(ms):")
         self.at_gap_spin = QSpinBox()
         self.at_gap_spin.setRange(0, 2000)
         self.at_gap_spin.setSingleStep(10)
         self.at_gap_spin.setSuffix(" ms")
+        self.at_gap_spin.setFixedWidth(80)
+        self.at_gap_spin.setFixedHeight(25)
         self.at_gap_spin.setToolTip(
             "AT 指令最小间隔（从上一条 RX 完成到下一条 TX 开始）。\n"
             "用于降低部分模组/卡在高频 APDU 下的无响应概率。\n"
@@ -528,23 +584,50 @@ class SimEditorUI(QMainWindow):
         # 立即应用到串口层
         self.comm.set_min_command_gap_ms(self.at_gap_spin.value())
         self.at_gap_spin.valueChanged.connect(self._on_at_gap_changed)
-        # 第 1 行左侧：AT 间隔 + Raw（固定位置，窗口缩放不漂移）
-        grid.addWidget(gap_lbl, 1, 0, alignment=Qt.AlignLeft | Qt.AlignVCenter)
-        grid.addWidget(self.at_gap_spin, 1, 1, alignment=Qt.AlignLeft | Qt.AlignVCenter)
-        grid.addWidget(raw_lbl, 1, 2, alignment=Qt.AlignLeft | Qt.AlignVCenter)
-        grid.addWidget(self.raw_checkbox, 1, 3, alignment=Qt.AlignLeft | Qt.AlignVCenter)
+        row1_layout.addWidget(gap_lbl)
+        row1_layout.addWidget(self.at_gap_spin)
 
-        # 第 1 行右侧：pSIM / eSIM / 端口选择
-        grid.addWidget(psim_btn, 1, 6)
-        grid.addWidget(esim_btn, 1, 7)
-        grid.addWidget(self.port_combo, 1, 8)
+        # Raw 复选框
+        raw_lbl = QLabel("Raw:")
+        self.raw_checkbox = QCheckBox()
+        row1_layout.addWidget(raw_lbl)
+        row1_layout.addWidget(self.raw_checkbox)
 
-        # -------- 网格弹性列：把弹性空间放在 Raw 右侧、右侧按钮左侧 --------
-        grid.setColumnStretch(4, 1)   # 让第 4 列吸收多余空间，避免 Raw/AT Gap 随窗口变化漂移
-        grid.setHorizontalSpacing(10)
-        grid.setVerticalSpacing(6)
+        # 添加弹性空间
+        row1_layout.addStretch()
 
-        outer.addStretch()            # 其余空间给表格 / 滚动区
+        # pSIM / eSIM 按钮
+        psim_btn = QPushButton("pSIM")
+        psim_btn.clicked.connect(self.on_psim_button_clicked)
+        psim_btn.setFixedWidth(70)
+        psim_btn.setFixedHeight(25)
+        psim_btn.setStyleSheet("padding: 2px 12px;") 
+        row1_layout.addWidget(psim_btn)
+
+        esim_btn = QPushButton("eSIM")
+        esim_btn.clicked.connect(self.on_esim_button_clicked)
+        esim_btn.setFixedWidth(70)
+        esim_btn.setFixedHeight(25) 
+        row1_layout.addWidget(esim_btn)
+
+        # 端口选择下拉框（使用自定义的居中ComboBox）
+        self.port_combo = CenteredComboBox()
+        self.port_combo.setFixedWidth(107)  # 设置最小宽度，避免过度压缩
+        self.port_combo.setFixedHeight(25)  # 设置最小高度，避免过度压缩
+        
+        # 创建居中对齐的委托，确保下拉列表中的项也居中
+        delegate = CenteredComboBoxDelegate()
+        self.port_combo.setItemDelegate(delegate)
+        
+        # 添加占位提示
+        self.port_combo.addItem("- 请选择端口")
+        self.port_combo.setCurrentIndex(0)  # 默认选中占位项
+        self.update_port_list()  # 初始化端口列表
+        self.port_combo.currentTextChanged.connect(self.on_port_changed)
+        row1_layout.addWidget(self.port_combo)
+
+        outer.addLayout(row1_layout)
+        outer.addStretch()  # 其余空间给表格 / 滚动区
         self.tabs.addTab(tab, "SIM Data")
 
     def _on_at_gap_changed(self, value: int):
@@ -562,7 +645,7 @@ class SimEditorUI(QMainWindow):
         all_ports = self.comm.get_all_ports()
         old_ports = self._get_combo_items(self.port_combo)
         # 从旧端口列表中排除占位项
-        old_ports = [p for p in old_ports if p != "-- 请选择端口 --"]
+        old_ports = [p for p in old_ports if p != "- 请选择端口"]
 
         # === 端口列表无变化时，直接返回 ===
         if set(all_ports) == set(old_ports):
@@ -573,7 +656,7 @@ class SimEditorUI(QMainWindow):
         current_selection = self.port_combo.currentText()
         self.port_combo.clear()
         # 添加占位项
-        self.port_combo.addItem("-- 请选择端口 --")
+        self.port_combo.addItem("- 请选择端口")
         self.port_combo.addItems(all_ports)
 
         if current_port and current_port in all_ports:
@@ -610,7 +693,7 @@ class SimEditorUI(QMainWindow):
 
     def on_port_changed(self, new_port):
         """端口选择改变时的处理：测试端口并连接"""
-        if not new_port or new_port == "-- 请选择端口 --":
+        if not new_port or new_port == "- 请选择端口":
             return
 
         # 如果是当前已连接的端口，不重复连接
@@ -660,11 +743,11 @@ class SimEditorUI(QMainWindow):
                     response = self.comm.send_command('AT')
                     if 'OK' in response:
                         logging.info("端口 %s 连接成功", new_port)
-                        QMessageBox.information(
-                            self, 
-                            "连接成功", 
-                            f"已成功连接到端口 {new_port}\n端口测试正常，可以使用SIM卡功能。"
-                        )
+                        # QMessageBox.information(
+                        #     self, 
+                        #     "连接成功", 
+                        #     f"已成功连接到端口 {new_port}\n端口测试正常，可以使用SIM卡功能。"
+                        # )
                         self.comm.initialized = True
                         self.update_port_list()
                     else:
@@ -866,23 +949,41 @@ class SimEditorUI(QMainWindow):
     
 
         column_order = list(data[0].keys())  # 直接使用第一条记录的键顺序
+        num_columns = len(column_order)
 
         self.read_data_display.setRowCount(len(data))
-        self.read_data_display.setColumnCount(len(column_order))
+        self.read_data_display.setColumnCount(num_columns)
         self.read_data_display.setHorizontalHeaderLabels(column_order)  # 设置表头
         
-        # 允许手动调整所有列的列宽
         header = self.read_data_display.horizontalHeader()
-        header.setStretchLastSection(False)
-        for i in range(len(column_order)):
-            header.setSectionResizeMode(i, QHeaderView.Interactive)
+        
+        # 根据列数采用不同的列宽策略
+        if num_columns == 1:
+            # 单列情况：让这一列占据大部分可用宽度，使用自动拉伸
+            header.setStretchLastSection(True)
+            header.setSectionResizeMode(0, QHeaderView.Stretch)
+            # 设置最小宽度，确保即使窗口很小时也能显示一部分内容
+            header.setMinimumSectionSize(200)
+        elif num_columns <= 3:
+            # 少量列（2-3列）：使用较大的固定宽度，让内容显示更完整
+            header.setStretchLastSection(False)
+            default_width = 300  # 可以调整这个值
+            for i in range(num_columns):
+                header.setSectionResizeMode(i, QHeaderView.Interactive)
+                self.read_data_display.setColumnWidth(i, default_width)
+        else:
+            # 多列情况（4列及以上）：使用较小的固定宽度，确保所有列都能显示
+            header.setStretchLastSection(False)
+            default_width = 100  # 较小的固定宽度
+            for i in range(num_columns):
+                header.setSectionResizeMode(i, QHeaderView.Interactive)
+                self.read_data_display.setColumnWidth(i, default_width)
 
         # 按照列顺序填充数据
         for row_idx, row_dict in enumerate(data):
             for col_idx, key in enumerate(column_order):
                 item = QTableWidgetItem(str(row_dict.get(key, "")))  # 如果键不存在，则填充空字符串
                 self.read_data_display.setItem(row_idx, col_idx, item)
-
 
         # 默认选中第一行
         self.set_default_values()
