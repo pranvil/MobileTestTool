@@ -904,6 +904,10 @@ $hashStr = $hashObj.Hash
 $sha256 = $hashStr.ToLower()
 Write-Host ("SHA256: {0}" -f $sha256)
 
+# Check package size
+$packageSizeMB = ((Get-Item $packagePath).Length / 1MB)
+Write-Host ("Package size: {0:F2} MB" -f $packageSizeMB) -ForegroundColor $(if ($packageSizeMB -gt 100) { "Yellow" } else { "Green" })
+
 if ($SkipPublish) {
     Write-Host "=== step 4: SKIPPED (SkipPublish enabled) ==="
     Write-Host "Warning: latest.json will not be generated because -SkipPublish is used"
@@ -935,14 +939,49 @@ $downloadUrls += @{
     priority = 10
 }
 
-# Gitee source (CN) - if configured
-if ($config.GiteeOwner -and $config.GiteeRepo) {
-    $giteeDownloadUrl = "https://gitee.com/$($config.GiteeOwner)/$($config.GiteeRepo)/releases/download/v$Version/$packageName"
-    $downloadUrls += @{
-        url = $giteeDownloadUrl
-        region = "cn"
-        platform = "windows"
-        priority = 20
+# Check if alternative download URL is needed for Chinese users
+$alternativeDownloadUrl = $null
+if ($packageSizeMB -gt 100) {
+    Write-Host ""
+    Write-Host "========================================" -ForegroundColor Yellow
+    Write-Host "⚠️  Package size exceeds 100MB!" -ForegroundColor Yellow
+    Write-Host "========================================" -ForegroundColor Yellow
+    Write-Host ""
+    Write-Host "Gitee has a 100MB file size limit." -ForegroundColor Yellow
+    Write-Host "Please provide an alternative download URL for Chinese users (region: cn)." -ForegroundColor Yellow
+    Write-Host ""
+    Write-Host "Options:" -ForegroundColor Cyan
+    Write-Host "  1. Upload to cloud storage (Baidu Netdisk, Lanzouyun, etc.) and provide the download link" -ForegroundColor Cyan
+    Write-Host "  2. Use Gitee Release page URL (users need to manually download from the page)" -ForegroundColor Cyan
+    Write-Host "  3. Press Enter to skip (no alternative URL will be added)" -ForegroundColor Cyan
+    Write-Host ""
+    
+    $alternativeDownloadUrl = Read-Host "Enter alternative download URL for Chinese users (or press Enter to skip)"
+    
+    if ($alternativeDownloadUrl -and $alternativeDownloadUrl.Trim()) {
+        $alternativeDownloadUrl = $alternativeDownloadUrl.Trim()
+        Write-Host ("Alternative URL added: {0}" -f $alternativeDownloadUrl) -ForegroundColor Green
+        
+        # Add alternative download address (Chinese region)
+        $downloadUrls += @{
+            url = $alternativeDownloadUrl
+            region = "cn"
+            platform = "windows"
+            priority = 20
+        }
+    } else {
+        Write-Host "No alternative URL provided. Chinese users will use GitHub as fallback." -ForegroundColor Yellow
+    }
+} else {
+    # File size is less than 100MB, use Gitee auto-download
+    if ($config.GiteeOwner -and $config.GiteeRepo) {
+        $giteeDownloadUrl = "https://gitee.com/$($config.GiteeOwner)/$($config.GiteeRepo)/releases/download/v$Version/$packageName"
+        $downloadUrls += @{
+            url = $giteeDownloadUrl
+            region = "cn"
+            platform = "windows"
+            priority = 20
+        }
     }
 }
 
