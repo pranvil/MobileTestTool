@@ -548,6 +548,17 @@ class UpdateManager:
         self._log(f"未找到匹配的下载源，使用默认URL: {manifest.download_url}")
         return manifest.download_url
 
+    def get_alternative_download_url(self, manifest: LatestManifest, target_region: str) -> Optional[str]:
+        """获取指定区域的备用下载地址"""
+        if not manifest.download_urls:
+            return None
+        
+        for source in manifest.download_urls:
+            if source.region and source.region.lower() == target_region.lower():
+                return source.url
+        
+        return None
+
 
 __all__ = [
     "UpdateManager",

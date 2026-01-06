@@ -765,7 +765,9 @@ class UpdateWorker(QThread):
     update_not_required = Signal(str)
     update_available = Signal(dict)
     download_finished = Signal(LatestManifest, DownloadResult)
-    update_failed = Signal(str)
+    update_failed = Signal(str, dict)  # 修改：添加额外信息字典参数
+    # 新增信号：备用下载地址
+    alternative_url_info = Signal(str, str, str)  # region, url, message
 
     def __init__(self, update_manager: UpdateManager, lang_manager=None):
         super().__init__()
@@ -819,14 +821,65 @@ class UpdateWorker(QThread):
                 self.update_not_required.emit(self._tr("当前已是最新版本"))
                 return
 
+            # 检测地区
+            detected_region = self._manager._detect_region()
+            logger.debug(f"UpdateWorker: detected region = {detected_region}")
+            
+            # 准备 manifest 数据，包含备用地址信息
+            manifest_dict = manifest.to_dict()
+            manifest_dict['_detected_region'] = detected_region
+            
+            # 获取备用下载地址
+            if detected_region == "cn":
+                # 中国区：获取备用地址（通常是网盘链接）
+                alternative_url = self._manager.get_alternative_download_url(manifest, "cn")
+                if alternative_url:
+                    manifest_dict['_alternative_url'] = alternative_url
+                    manifest_dict['_alternative_region'] = "cn"
+            else:
+                # 非中国区：获取 GitHub 和 Gitee 作为备用
+                github_url = self._manager.get_alternative_download_url(manifest, "us") or manifest.download_url
+                gitee_url = self._manager.get_alternative_download_url(manifest, "cn")
+                manifest_dict['_primary_url'] = github_url
+                if gitee_url:
+                    manifest_dict['_alternative_url'] = gitee_url
+                    manifest_dict['_alternative_region'] = "cn"
+
             logger.debug("UpdateWorker: update available, wait for decision")
-            self.update_available.emit(manifest.to_dict())
+            self.update_available.emit(manifest_dict)
             self._decision_event.wait()
             logger.debug(f"UpdateWorker: decision event set, should_download={self._should_download} cancel={self._cancel_requested}")
 
             if self._cancel_requested or not self._should_download:
                 logger.debug("UpdateWorker: decision -> cancel")
-                self.update_failed.emit(self._tr("用户取消更新"))
+                # 用户取消：传递备用地址信息
+                error_info = {
+                    'reason': 'user_cancelled',
+                    'alternative_url': manifest_dict.get('_alternative_url'),
+                    'alternative_region': manifest_dict.get('_alternative_region'),
+                    'detected_region': detected_region
+                }
+                self.update_failed.emit(self._tr("用户取消更新"), error_info)
+                return
+
+            # 中国区特殊处理：不自动下载，提示用户手动下载
+            if detected_region == "cn" and manifest_dict.get('_alternative_url'):
+                error_info = {
+                    'reason': 'manual_download_required',
+                    'alternative_url': manifest_dict['_alternative_url'],
+                    'alternative_region': 'cn',
+                    'detected_region': detected_region
+                }
+                self.update_failed.emit(
+                    self._tr("检测到新版本，请前往备用地址手动下载"),
+                    error_info
+                )
+                # 同时发送备用地址信息
+                self.alternative_url_info.emit(
+                    "cn",
+                    manifest_dict['_alternative_url'],
+                    self._tr("中国区域用户，请使用以下地址手动下载：")
+                )
                 return
 
             self.status_message.emit(self._tr("检测到新版本，开始下载安装包..."))
@@ -838,7 +891,14 @@ class UpdateWorker(QThread):
 
             if self._cancel_requested:
                 logger.debug("UpdateWorker: cancel after download started")
-                self.update_failed.emit(self._tr("下载已取消"))
+                # 下载被取消：传递备用地址信息
+                error_info = {
+                    'reason': 'download_cancelled',
+                    'alternative_url': manifest_dict.get('_alternative_url'),
+                    'alternative_region': manifest_dict.get('_alternative_region'),
+                    'detected_region': detected_region
+                }
+                self.update_failed.emit(self._tr("下载已取消"), error_info)
                 return
 
             logger.debug("UpdateWorker: download finished")
@@ -846,10 +906,22 @@ class UpdateWorker(QThread):
 
         except UpdateError as exc:
             logger.debug(f"UpdateWorker: UpdateError -> {exc}")
-            self.update_failed.emit(str(exc))
+            # 下载失败：传递备用地址信息
+            error_info = {
+                'reason': 'download_failed',
+                'alternative_url': manifest_dict.get('_alternative_url') if 'manifest_dict' in locals() else None,
+                'alternative_region': manifest_dict.get('_alternative_region') if 'manifest_dict' in locals() else None,
+                'detected_region': detected_region if 'detected_region' in locals() else None,
+                'error_message': str(exc)
+            }
+            self.update_failed.emit(str(exc), error_info)
         except Exception as exc:  # pragma: no cover - 防御性捕获
             logger.debug(f"UpdateWorker: Exception -> {exc}")
-            self.update_failed.emit(str(exc))
+            error_info = {
+                'reason': 'unknown_error',
+                'error_message': str(exc)
+            }
+            self.update_failed.emit(str(exc), error_info)
 
 class MainWindow(QMainWindow):
     """主窗口类"""
@@ -2321,6 +2393,7 @@ class MainWindow(QMainWindow):
         self._update_worker.update_available.connect(self._on_update_available)
         self._update_worker.download_finished.connect(self._on_update_download_finished)
         self._update_worker.update_failed.connect(self._on_update_failed)
+        self._update_worker.alternative_url_info.connect(self._on_alternative_url_info)
         self._update_worker.finished.connect(self._cleanup_update_worker)
         self._update_worker.start()
 
@@ -2445,20 +2518,60 @@ class MainWindow(QMainWindow):
             if reply == QMessageBox.StandardButton.Yes:
                 self._reveal_in_file_manager(result.file_path)
 
-    def _on_update_failed(self, message: str) -> None:
+    def _on_update_failed(self, message: str, error_info: dict = None) -> None:
+        """处理更新失败，显示备用下载地址"""
         logger.debug(f"MainWindow: update failed -> {message}")
         self._close_update_progress_dialog()
-        if message == self.tr("用户取消更新"):
+        
+        # 解析错误信息
+        if error_info is None:
+            error_info = {}
+        
+        reason = error_info.get('reason', 'unknown')
+        alternative_url = error_info.get('alternative_url')
+        alternative_region = error_info.get('alternative_region')
+        detected_region = error_info.get('detected_region', '')
+        
+        # 日志消息
+        log_color = "#FFA500" if reason in ['user_cancelled', 'download_cancelled'] else "#FF0000"
+        
+        if reason == "user_cancelled":
             logger.info("用户取消更新流程")
-            self.append_log.emit(f"[更新] {message}\n", "#FFA500")
-            return
-
-        logger.error(f"在线更新失败: {message}")
-        self.append_log.emit(f"[更新] ❌ {message}\n", "#FF0000")
-        if self._update_request_origin == "manual":
-            QMessageBox.critical(self, self.tr("在线更新"), message)
+            self.append_log.emit(f"[更新] {message}\n", log_color)
+            if alternative_url:
+                log_msg = f"[更新] 备用下载地址（{alternative_region or '中国区'}）：{alternative_url}\n"
+                self.append_log.emit(log_msg, "#FFA500")
+        elif alternative_url:
+            # 下载失败或取消，显示备用地址
+            self.append_log.emit(f"[更新] ❌ {message}\n", log_color)
+            log_msg = f"[更新] 备用下载地址（{alternative_region or '中国区'}）：{alternative_url}\n"
+            self.append_log.emit(log_msg, "#FFA500")
+            
+            if self._update_request_origin == "manual":
+                # 手动更新：显示详细消息框
+                details = [message]
+                details.append("")
+                details.append(self.tr("请使用以下备用地址手动下载："))
+                details.append(alternative_url)
+                details.append("")
+                details.append(self.tr("下载完成后，解压并覆盖原文件即可完成更新。"))
+                
+                QMessageBox.warning(
+                    self,
+                    self.tr("在线更新"),
+                    "\n".join(details),
+                )
+            else:
+                # 自动更新：只记录日志
+                logger.error(f"自动检查更新失败: {message}")
         else:
-            logger.error(f"自动检查更新失败: {message}")
+            # 没有备用地址，按原逻辑处理
+            logger.error(f"在线更新失败: {message}")
+            self.append_log.emit(f"[更新] ❌ {message}\n", "#FF0000")
+            if self._update_request_origin == "manual":
+                QMessageBox.critical(self, self.tr("在线更新"), message)
+            else:
+                logger.error(f"自动检查更新失败: {message}")
 
     def _on_update_cancel_requested(self) -> None:
         if self._suppress_progress_cancel:
@@ -5648,6 +5761,8 @@ class MainWindow(QMainWindow):
         version = manifest_data.get("version", "?")
         notes = manifest_data.get("release_notes") or ""
         file_size = manifest_data.get("file_size")
+        detected_region = manifest_data.get("_detected_region", "")
+        alternative_url = manifest_data.get("_alternative_url")
 
         details = [self.tr("检测到新版本: {version}").format(version=version)]
         if file_size:
@@ -5659,7 +5774,38 @@ class MainWindow(QMainWindow):
         if notes:
             details.append(self.tr("更新说明:"))
             details.append(notes)
+        
+        # 中国区：显示备用下载地址，提示手动下载
+        if detected_region == "cn" and alternative_url:
+            details.append("")  # 空行
+            details.append(self.tr("⚠️ 中国区域用户，请使用以下地址手动下载："))
+            details.append(alternative_url)
+            details.append("")
+            details.append(self.tr("下载完成后，解压并覆盖原文件即可完成更新。"))
+            
+            # 在日志区域显示
+            log_msg = f"[更新] 检测到新版本 {version}\n"
+            log_msg += f"[更新] 备用下载地址（中国区）：{alternative_url}\n"
+            self.append_log.emit(log_msg, "#FFA500")
+            
+            QMessageBox.information(
+                self,
+                self.tr("在线更新"),
+                "\n\n".join(details),
+            )
+            self._record_update_check_timestamp()
+            if self._update_worker:
+                self._update_worker.reject_download()
+            return
+        
+        # 非中国区：正常流程
         details.append(self.tr("是否立即下载？"))
+        
+        # 如果有备用地址，在日志区域显示
+        if alternative_url:
+            log_msg = f"[更新] 检测到新版本 {version}\n"
+            log_msg += f"[更新] 备用下载地址（如主地址失败可使用）：{alternative_url}\n"
+            self.append_log.emit(log_msg, None)
 
         reply = QMessageBox.question(
             self,
@@ -5686,5 +5832,11 @@ class MainWindow(QMainWindow):
                 self._update_worker.reject_download()
             else:
                 logger.debug("MainWindow: no worker instance when rejecting download")
+
+    def _on_alternative_url_info(self, region: str, url: str, message: str) -> None:
+        """处理备用下载地址信息"""
+        log_msg = f"[更新] {message}\n"
+        log_msg += f"[更新] 下载地址：{url}\n"
+        self.append_log.emit(log_msg, "#FFA500")
 
 

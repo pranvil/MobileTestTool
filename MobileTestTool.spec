@@ -28,6 +28,8 @@ a = Analysis(
         # SIM Reader 模块文件
         ('sim_reader', 'sim_reader'),
         ('sim_reader/parsers', 'sim_reader/parsers'),
+        # Jira_tool 模块文件
+        ('Jira_tool/templates', 'Jira_tool/templates'),
         # UIAutomator2 资源文件由 hook-uiautomator2.py 自动处理
     ],
     hiddenimports=[
@@ -127,6 +129,41 @@ a = Analysis(
         'ui.custom_button_dialog',
         'ui.tab_manager_dialog',
         'ui.tools_config_dialog',  # 工具配置对话框
+        # Jira_tool 相关模块
+        'Jira_tool',
+        'Jira_tool.jira_client',
+        'Jira_tool.confluence_client',
+        'Jira_tool.core',
+        'Jira_tool.core.paths',
+        'Jira_tool.core.config_manager',
+        'Jira_tool.core.exceptions',
+        'Jira_tool.core.logger',
+        'Jira_tool.ui',
+        'Jira_tool.ui.main_window',
+        'Jira_tool.ui.settings_dialog',
+        'Jira_tool.ui.comment_widget',
+        'Jira_tool.ui.create_widget',
+        'Jira_tool.ui.confluence_create_widget',
+        'Jira_tool.ui.issue_export_widget',
+        'Jira_tool.ui.chapter_editor',
+        'Jira_tool.ui.richtext_editor',
+        'Jira_tool.modules',
+        'Jira_tool.modules.comment_fetcher',
+        'Jira_tool.modules.test_progress_creator',
+        'Jira_tool.modules.jql_records',
+        'Jira_tool.modules.confluence_template',
+        'Jira_tool.modules.confluence_page_tree',
+        'Jira_tool.modules.jira_field_definition',
+        'Jira_tool.modules.local_templates',
+        'Jira_tool.modules.template_parser',
+        'Jira_tool.modules.test_suite_query',
+        # Jira_tool 依赖
+        'requests',
+        'requests.adapters',
+        'urllib3',
+        'urllib3.exceptions',
+        'core.jira_tool_launcher',
+        'core.jira_config_manager',
     ],
     hookspath=['.'],
     hooksconfig={},
@@ -138,6 +175,7 @@ a = Analysis(
         'PySide6.QtQml',
         'PySide6.QtQuick',
         'PySide6.QtQuickWidgets',
+        # QtWebEngine 排除（Jira_tool 有降级方案使用 QTextBrowser，为减少打包体积排除）
         'PySide6.QtWebEngineCore',
         'PySide6.QtWebEngineWidgets',
         'PySide6.QtWebSockets',
@@ -158,14 +196,15 @@ a = Analysis(
         'matplotlib.pyplot',
         'contourpy',
         'kiwisolver',
-        # 排除科学计算库（代码中未直接使用，可能是间接依赖）
-        'numpy',
-        'numpy.core',
-        'numpy.libs',
+        # numpy 需要保留（pandas 的必需依赖，Jira_tool 使用 pandas）
+        # 'numpy',
+        # 'numpy.core',
+        # 'numpy.libs',
         'scipy',
         'scipy.libs',
-        'pandas',
-        'pandas.libs',
+        # pandas 需要保留（Jira_tool 需要用到）
+        # 'pandas',
+        # 'pandas.libs',
         # 如果排除后运行出错，说明某个功能需要这些库，需要找出并处理
         # 排除不需要的 PIL 格式支持（如果不需要 AVIF 等新格式）
         'PIL._avif',  # AVIF 格式支持，约 7.5MB，如果不需要可以排除
