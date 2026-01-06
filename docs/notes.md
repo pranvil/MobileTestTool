@@ -1,6 +1,9 @@
 ## Release Note
-- Restructure by pyside6
-- fix SIM tool UI issue
+- New feature1: read/write NV
+- New feature2:jira/Confluence tool
+- UI Refactoring
+
+
 
 
 

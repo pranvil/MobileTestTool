@@ -12,9 +12,90 @@ from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QPushButton,
                              QTableWidget, QTableWidgetItem, QHeaderView,
                              QLineEdit, QMessageBox, QFileDialog, QLabel,
                              QDialogButtonBox, QTextEdit, QFormLayout,
-                             QSplitter, QWidget)
-from PySide6.QtCore import Qt
+                             QSplitter, QWidget, QRadioButton, QButtonGroup,
+                             QSizePolicy)
+from PySide6.QtCore import Qt, QThread, Signal
+from PySide6.QtGui import QTextCursor
 from core.debug_logger import logger
+from core import pcat_nv
+
+
+class PlainTextEdit(QTextEdit):
+    """只接受纯文本粘贴的文本编辑器"""
+    
+    def insertFromMimeData(self, source):
+        """重写粘贴方法，只粘贴纯文本"""
+        if source.hasText():
+            # 只提取纯文本，忽略所有格式
+            plain_text = source.text()
+            # 插入纯文本
+            text_cursor = self.textCursor()
+            text_cursor.insertText(plain_text)
+            self.setTextCursor(text_cursor)
+
+
+class PcatNvWorker(QThread):
+    finished = Signal(bool, str, str, str)  # success, value, stdout, stderr
+
+    def __init__(self, device_id: str, nv_item: str, sub_id: int, parent=None):
+        super().__init__(parent)
+        self.device_id = device_id
+        self.nv_item = nv_item
+        self.sub_id = sub_id
+
+    def run(self):
+        try:
+            cmd = pcat_nv.build_read_cmd(self.device_id, self.nv_item, self.sub_id)
+            result = pcat_nv.run_pcat(cmd, timeout=90)
+            output = result.output
+            success = pcat_nv.is_success(output) and (pcat_nv.extract_nv_value(output) is not None)
+            value = pcat_nv.extract_nv_value(output) or ""
+            self.finished.emit(success, value, result.stdout, result.stderr)
+        except Exception as e:
+            self.finished.emit(False, "", "", str(e))
+
+
+class PcatNvWriteWorker(QThread):
+    finished = Signal(bool, str, str, str)  # success, message, stdout, stderr
+
+    def __init__(self, device_id: str, nv_item: str, sub_id: int, value: str, use_json: bool, parent=None):
+        super().__init__(parent)
+        self.device_id = device_id
+        self.nv_item = nv_item
+        self.sub_id = sub_id
+        self.value = value
+        self.use_json = use_json
+
+    def run(self):
+        try:
+            cmd = pcat_nv.build_write_cmd(self.device_id, self.nv_item, self.sub_id, self.value, self.use_json)
+            result = pcat_nv.run_pcat(cmd, timeout=120)
+            output = result.output
+            success = pcat_nv.is_success(output)
+            msg = "OK" if success else (result.stderr.strip() or result.stdout.strip() or "WRITE failed")
+            self.finished.emit(success, msg, result.stdout, result.stderr)
+        except Exception as e:
+            self.finished.emit(False, str(e), "", str(e))
+
+
+class PcatResetWorker(QThread):
+    """PCAT 重启设备 Worker"""
+    finished = Signal(bool, str)  # success, message
+
+    def __init__(self, device_id: str, parent=None):
+        super().__init__(parent)
+        self.device_id = device_id
+
+    def run(self):
+        try:
+            cmd = pcat_nv.build_reset_cmd(self.device_id)
+            result = pcat_nv.run_pcat(cmd, timeout=30)
+            output = result.output
+            success = pcat_nv.is_success(output) or result.returncode == 0
+            msg = "设备重启命令已执行" if success else (result.stderr.strip() or result.stdout.strip() or "重启失败")
+            self.finished.emit(success, msg)
+        except Exception as e:
+            self.finished.emit(False, str(e))
 
 
 class QCNVDialog(QDialog):
@@ -32,12 +113,22 @@ class QCNVDialog(QDialog):
         
         self.setWindowTitle(self.tr("高通NV"))
         self.setModal(True)
-        self.resize(400,700)  # 默认大小减少一半，仍可手动调整
+        self.resize(900, 700)
         
         # 数据存储
         self.nv_data = []  # 存储NV信息的列表 [{"nv_value": "...", "description": "..."}]
         self.config_file = self._get_config_file_path()
         self.backup_dir = self._get_backup_dir()
+
+        # UI 状态
+        self._display_indices = []  # table row -> nv_data index
+        self._filter_keyword = ""
+        self._is_refreshing_table = False
+        self._pcat_worker: PcatNvWorker | None = None
+        self._pcat_write_worker: PcatNvWriteWorker | None = None
+        self._pcat_reset_worker: PcatResetWorker | None = None
+        self._pending_write_value: str | None = None
+        self._pending_read_request: tuple[str, int] | None = None  # (nv_item, sub_id)
         
         self.setup_ui()
         self.load_data()
@@ -62,28 +153,29 @@ class QCNVDialog(QDialog):
     
     def setup_ui(self):
         """设置UI"""
-        layout = QVBoxLayout(self)
-        
-        # 创建表格
+        root_layout = QHBoxLayout(self)
+
+        # ========== 左侧：上列表（80%） + 下读写区（20%）==========
+        left_widget = QWidget()
+        left_layout = QVBoxLayout(left_widget)
+        left_layout.setContentsMargins(0, 0, 0, 0)
+
+        left_splitter = QSplitter(Qt.Vertical)
+
+        # 上：表格
         self.table = QTableWidget()
         self.table.setColumnCount(2)
         self.table.setHorizontalHeaderLabels([self.tr("NV值"), self.tr("说明")])
-        
-        # 启用网格线显示，确保列分隔线可见
         self.table.setShowGrid(True)
-        
-        # 设置列宽（允许手动调整）
+
         header = self.table.horizontalHeader()
-        header.setSectionResizeMode(0, QHeaderView.Interactive)  # 允许手动调整
-        header.setSectionResizeMode(1, QHeaderView.Interactive)  # 允许手动调整
-        # 设置初始列宽
-        self.table.setColumnWidth(0, 200)  # NV值列初始宽度
-        self.table.setColumnWidth(1, 350)  # 说明列初始宽度
-        
+        header.setSectionResizeMode(0, QHeaderView.Interactive)
+        header.setSectionResizeMode(1, QHeaderView.Interactive)
+        self.table.setColumnWidth(0, 180)
+        self.table.setColumnWidth(1, 420)
+
         self.table.setSelectionBehavior(QTableWidget.SelectRows)
         self.table.setSelectionMode(QTableWidget.SingleSelection)
-        
-        # 设置表格样式，让列分隔线更明显
         self.table.setStyleSheet("""
             QTableWidget {
                 gridline-color: #666666;
@@ -98,54 +190,289 @@ class QCNVDialog(QDialog):
                 border-bottom: 1px solid #666666;
             }
         """)
-        
-        # 双击事件
-        self.table.itemDoubleClicked.connect(self.on_item_double_clicked)
-        
-        layout.addWidget(self.table)
-        
-        # 底部按钮区域 - 分两行
-        # 第一行：搜索框和搜索按钮
-        search_layout = QHBoxLayout()
-        search_layout.addWidget(QLabel(self.tr("搜索:")))
-        
+
+        # 双击：直接进入编辑
+        self.table.itemDoubleClicked.connect(lambda _item: self.edit_nv())
+        # 按需求：选中NV不自动读取，仅在用户点击“读取”时才读取并显示
+
+        left_splitter.addWidget(self.table)
+
+        # 下：读写区（先搭UI，逻辑后续接入）
+        rw_container = QWidget()
+        rw_layout = QVBoxLayout(rw_container)
+        rw_layout.setContentsMargins(8, 8, 8, 8)
+
+        self.rw_value_edit = PlainTextEdit()
+        self.rw_value_edit.setPlaceholderText(self.tr("在此输入读取结果或待写入的数据（多字段请使用 {key:'value', ...} 格式，字符串值必须加引号）"))
+        self.rw_value_edit.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        rw_layout.addWidget(self.rw_value_edit)
+
+        rw_controls = QHBoxLayout()
+
+        # SUB 单选按钮直接放在控制栏
+        rw_controls.addWidget(QLabel("SUB:"))
+        self.sub0_radio = QRadioButton("sub0")
+        self.sub1_radio = QRadioButton("sub1")
+        self.sub_group = QButtonGroup(self)
+        self.sub_group.setExclusive(True)
+        self.sub_group.addButton(self.sub0_radio, 0)
+        self.sub_group.addButton(self.sub1_radio, 1)
+        self.sub0_radio.setChecked(True)
+        # 按需求：切换sub不自动读取，仅影响后续"读取/写入"的 SUB 参数
+        rw_controls.addWidget(self.sub0_radio)
+        rw_controls.addWidget(self.sub1_radio)
+
+        rw_controls.addSpacing(20)  # 添加间距
+        rw_controls.addStretch()
+
+        self.read_btn = QPushButton(self.tr("读取"))
+        self.write_btn = QPushButton(self.tr("写入"))
+        self.read_btn.clicked.connect(self._on_read_clicked)
+        self.write_btn.clicked.connect(self._on_write_clicked)
+        rw_controls.addWidget(self.read_btn)
+        rw_controls.addWidget(self.write_btn)
+
+        rw_layout.addLayout(rw_controls)
+
+        left_splitter.addWidget(rw_container)
+        left_splitter.setStretchFactor(0, 8)
+        left_splitter.setStretchFactor(1, 2)
+
+        left_layout.addWidget(left_splitter)
+
+        # ========== 右侧：竖排工具区 ==========
+        right_widget = QWidget()
+        right_layout = QVBoxLayout(right_widget)
+        right_layout.setContentsMargins(8, 8, 8, 8)
+
+        right_layout.addWidget(QLabel(self.tr("搜索:")))
         self.search_input = QLineEdit()
         self.search_input.setPlaceholderText(self.tr("输入搜索关键字..."))
         self.search_input.returnPressed.connect(self.search_data)
-        search_layout.addWidget(self.search_input)
-        
-        self.search_btn = QPushButton("🔍 " + self.tr("搜索"))
+        right_layout.addWidget(self.search_input)
+
+        self.search_btn = QPushButton(self.tr("搜索"))
         self.search_btn.clicked.connect(self.search_data)
-        search_layout.addWidget(self.search_btn)
-        
-        layout.addLayout(search_layout)
-        
-        # 第二行：新增、编辑、删除、导入、导出按钮
-        button_layout = QHBoxLayout()
-        
-        self.add_btn = QPushButton("➕ " + self.tr("新增"))
+        right_layout.addWidget(self.search_btn)
+
+        right_layout.addSpacing(10)
+
+        self.add_btn = QPushButton(self.tr("新增"))
         self.add_btn.clicked.connect(self.add_nv)
-        button_layout.addWidget(self.add_btn)
-        
-        self.edit_btn = QPushButton("✏️ " + self.tr("编辑"))
+        right_layout.addWidget(self.add_btn)
+
+        self.edit_btn = QPushButton(self.tr("编辑"))
         self.edit_btn.clicked.connect(self.edit_nv)
-        button_layout.addWidget(self.edit_btn)
-        
-        self.delete_btn = QPushButton("🗑️ " + self.tr("删除"))
+        right_layout.addWidget(self.edit_btn)
+
+        self.delete_btn = QPushButton(self.tr("删除"))
         self.delete_btn.clicked.connect(self.delete_nv)
-        button_layout.addWidget(self.delete_btn)
-        
-        button_layout.addStretch()
-        
-        self.import_btn = QPushButton("📥 " + self.tr("导入"))
+        right_layout.addWidget(self.delete_btn)
+
+        right_layout.addSpacing(10)
+
+        self.import_btn = QPushButton(self.tr("导入"))
         self.import_btn.clicked.connect(self.import_data)
-        button_layout.addWidget(self.import_btn)
-        
-        self.export_btn = QPushButton("📤 " + self.tr("导出"))
+        right_layout.addWidget(self.import_btn)
+
+        self.export_btn = QPushButton(self.tr("导出"))
         self.export_btn.clicked.connect(self.export_data)
-        button_layout.addWidget(self.export_btn)
-        
-        layout.addLayout(button_layout)
+        right_layout.addWidget(self.export_btn)
+
+        right_layout.addStretch()
+
+        right_widget.setFixedWidth(180)
+
+        root_layout.addWidget(left_widget, 1)
+        root_layout.addWidget(right_widget, 0)
+
+    def _get_selected_nv_item(self):
+        nv_index = self._get_selected_nv_index()
+        if nv_index is None:
+            return None
+        return str(self.nv_data[nv_index].get("nv_value", "")).strip() or None
+
+    def _get_sub_id(self) -> int:
+        return int(self.sub_group.checkedId()) if self.sub_group.checkedId() in (0, 1) else 0
+
+    def _get_device_id(self):
+        parent = self.parent()
+        if parent and hasattr(parent, "device_manager"):
+            device = parent.device_manager.validate_device_selection()
+            if device:
+                return device
+        return None
+
+    def _set_busy(self, busy: bool, scope: str = "read"):
+        """
+        scope:
+          - read: 仅影响读写区，避免“选中NV自动读取时整页变灰”
+          - all:  用于写入等关键操作，禁用整页避免状态被打断
+        """
+        self.read_btn.setEnabled(not busy)
+        self.write_btn.setEnabled(not busy)
+
+        if scope == "all":
+            self.table.setEnabled(not busy)
+            self.add_btn.setEnabled(not busy)
+            self.edit_btn.setEnabled(not busy)
+            self.delete_btn.setEnabled(not busy)
+            self.import_btn.setEnabled(not busy)
+            self.export_btn.setEnabled(not busy)
+            self.search_input.setEnabled(not busy)
+            self.search_btn.setEnabled(not busy)
+
+    def _on_read_clicked(self):
+        nv_item = self._get_selected_nv_item()
+        if not nv_item:
+            QMessageBox.warning(self, self.tr("提示"), self.tr("请先选择要读取的NV"))
+            return
+        self._trigger_read(nv_item, allow_queue=True)
+
+    def _trigger_read(self, nv_item: str, allow_queue: bool = False):
+        if self._pcat_worker and self._pcat_worker.isRunning():
+            if allow_queue:
+                self._pending_read_request = (nv_item, self._get_sub_id())
+            return
+
+        device_id = self._get_device_id()
+        if not device_id:
+            QMessageBox.warning(self, self.tr("提示"), self.tr("请先选择一个设备"))
+            return
+
+        sub_id = self._get_sub_id()
+        self._set_busy(True, scope="read")
+        self._pcat_worker = PcatNvWorker(device_id=device_id, nv_item=nv_item, sub_id=sub_id, parent=self)
+        self._pcat_worker.finished.connect(self._on_read_finished)
+        self._pcat_worker.start()
+
+    def _on_read_finished(self, success: bool, value: str, stdout: str, stderr: str):
+        self._set_busy(False, scope="read")
+        if not success:
+            msg = stderr.strip() or stdout.strip() or self.tr("读取失败")
+            QMessageBox.warning(self, self.tr("错误"), f"{self.tr('读取失败')}:\n{msg}")
+            self._pending_write_value = None
+            # 失败也要尝试处理排队的读取请求
+            if self._pending_read_request is not None:
+                nv_item, sub_id = self._pending_read_request
+                self._pending_read_request = None
+                # sub_id 变化已包含在 nv_item/sub_id，直接触发
+                self._trigger_read(nv_item, allow_queue=False)
+            return
+
+        # 如果是“写入前预读”，走写入决策；否则正常填充输入框
+        if self._pending_write_value is not None:
+            self._continue_write_after_preread(read_value=value)
+            return
+
+        self.rw_value_edit.setPlainText(value)
+
+        # 处理排队的读取请求（用户在读取期间切换了NV/sub）
+        if self._pending_read_request is not None:
+            nv_item, sub_id = self._pending_read_request
+            self._pending_read_request = None
+            self._trigger_read(nv_item, allow_queue=False)
+
+    def _on_write_clicked(self):
+        nv_item = self._get_selected_nv_item()
+        if not nv_item:
+            QMessageBox.warning(self, self.tr("提示"), self.tr("请先选择要写入的NV"))
+            return
+
+        device_id = self._get_device_id()
+        if not device_id:
+            QMessageBox.warning(self, self.tr("提示"), self.tr("请先选择一个设备"))
+            return
+
+        new_value = self.rw_value_edit.toPlainText().strip()
+        if not new_value:
+            QMessageBox.warning(self, self.tr("提示"), self.tr("请输入要写入的数据"))
+            return
+
+        # 写入前必须先READ（同 NV + 同 SUB）
+        self._pending_write_value = new_value
+        self._trigger_read(nv_item)
+
+    def _continue_write_after_preread(self, read_value: str):
+        nv_item = self._get_selected_nv_item()
+        device_id = self._get_device_id()
+        if not nv_item or not device_id:
+            self._pending_write_value = None
+            QMessageBox.warning(self, self.tr("错误"), self.tr("写入前校验失败：未选择NV或设备"))
+            return
+
+        sub_id = self._get_sub_id()
+        new_value = self._pending_write_value or ""
+        self._pending_write_value = None
+
+        multi = pcat_nv.is_multi_value(read_value)
+        use_json = False
+        if multi:
+            ok, err = pcat_nv.validate_json_like(new_value)
+            if not ok:
+                QMessageBox.warning(
+                    self,
+                    self.tr("提示"),
+                    f"{self.tr('该NV为多字段结构，不允许直接写入。')}\n{self.tr('请使用GUI写入或检查JSON格式。')}\n\n{self.tr('原因')}: {err}",
+                )
+                return
+            use_json = True
+
+        # 执行WRITE
+        if self._pcat_write_worker and self._pcat_write_worker.isRunning():
+            return
+
+        self._set_busy(True, scope="all")
+        self._pcat_write_worker = PcatNvWriteWorker(
+            device_id=device_id,
+            nv_item=nv_item,
+            sub_id=sub_id,
+            value=new_value,
+            use_json=use_json,
+            parent=self,
+        )
+        self._pcat_write_worker.finished.connect(self._on_write_finished)
+        self._pcat_write_worker.start()
+
+    def _on_write_finished(self, success: bool, message: str, stdout: str, stderr: str):
+        self._set_busy(False, scope="all")
+        if success:
+            # 询问是否立即重启生效
+            reply = QMessageBox.question(
+                self,
+                self.tr("写入成功"),
+                self.tr("NV写入成功！\n\n是否立即重启设备使更改生效？"),
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.Yes
+            )
+            if reply == QMessageBox.StandardButton.Yes:
+                self._trigger_reset()
+            return
+
+        # key 错/格式错/权限等：展示 stdout+stderr 摘要
+        detail = (stderr or "").strip() or (stdout or "").strip() or message
+        QMessageBox.critical(self, self.tr("错误"), f"{self.tr('写入失败')}:\n{detail}")
+
+    def _trigger_reset(self):
+        """触发设备重启"""
+        device_id = self._get_device_id()
+        if not device_id:
+            QMessageBox.warning(self, self.tr("提示"), self.tr("未选择设备"))
+            return
+
+        if self._pcat_reset_worker and self._pcat_reset_worker.isRunning():
+            return
+
+        self._pcat_reset_worker = PcatResetWorker(device_id=device_id, parent=self)
+        self._pcat_reset_worker.finished.connect(self._on_reset_finished)
+        self._pcat_reset_worker.start()
+        QMessageBox.information(self, self.tr("提示"), self.tr("正在重启设备，请稍候..."))
+
+    def _on_reset_finished(self, success: bool, message: str):
+        if success:
+            QMessageBox.information(self, self.tr("成功"), self.tr("设备重启命令已执行，请等待设备重新连接"))
+        else:
+            QMessageBox.warning(self, self.tr("警告"), f"{self.tr('重启失败')}:\n{message}")
     
     def load_data(self):
         """加载数据"""
@@ -195,13 +522,35 @@ class QCNVDialog(QDialog):
     
     def refresh_table(self):
         """刷新表格"""
-        self.table.setRowCount(0)
-        for item in self.nv_data:
-            row = self.table.rowCount()
-            self.table.insertRow(row)
-            
-            self.table.setItem(row, 0, QTableWidgetItem(item.get('nv_value', '')))
-            self.table.setItem(row, 1, QTableWidgetItem(item.get('description', '')))
+        self._is_refreshing_table = True
+        try:
+            keyword = (self._filter_keyword or "").strip().lower()
+            self._display_indices = []
+            self.table.setRowCount(0)
+
+            for idx, item in enumerate(self.nv_data):
+                nv_value = item.get('nv_value', '')
+                description = item.get('description', '')
+                if keyword:
+                    if keyword not in str(nv_value).lower() and keyword not in str(description).lower():
+                        continue
+
+                row = self.table.rowCount()
+                self.table.insertRow(row)
+                self.table.setItem(row, 0, QTableWidgetItem(str(nv_value)))
+                self.table.setItem(row, 1, QTableWidgetItem(str(description)))
+                self._display_indices.append(idx)
+        finally:
+            self._is_refreshing_table = False
+
+    def _get_selected_nv_index(self):
+        """获取当前选中行对应的 nv_data 索引（支持搜索过滤后的映射）"""
+        current_row = self.table.currentRow()
+        if current_row < 0:
+            return None
+        if current_row >= len(self._display_indices):
+            return None
+        return self._display_indices[current_row]
     
     def add_nv(self):
         """新增NV"""
@@ -219,20 +568,20 @@ class QCNVDialog(QDialog):
     
     def edit_nv(self):
         """编辑NV"""
-        current_row = self.table.currentRow()
-        if current_row < 0:
+        nv_index = self._get_selected_nv_index()
+        if nv_index is None:
             QMessageBox.warning(self, self.tr("提示"), self.tr("请先选择要编辑的项目"))
             return
         
-        nv_value = self.table.item(current_row, 0).text()
-        description = self.table.item(current_row, 1).text()
+        nv_value = str(self.nv_data[nv_index].get('nv_value', ''))
+        description = str(self.nv_data[nv_index].get('description', ''))
         
         dialog = NVEditDialog(nv_value=nv_value, description=description, parent=self)
         if dialog.exec() == QDialog.DialogCode.Accepted:
             new_nv_value, new_description = dialog.get_data()
             if new_nv_value:
                 # 更新数据
-                self.nv_data[current_row] = {
+                self.nv_data[nv_index] = {
                     'nv_value': new_nv_value,
                     'description': new_description
                 }
@@ -242,12 +591,12 @@ class QCNVDialog(QDialog):
     
     def delete_nv(self):
         """删除NV"""
-        current_row = self.table.currentRow()
-        if current_row < 0:
+        nv_index = self._get_selected_nv_index()
+        if nv_index is None:
             QMessageBox.warning(self, self.tr("提示"), self.tr("请先选择要删除的项目"))
             return
         
-        nv_value = self.table.item(current_row, 0).text()
+        nv_value = str(self.nv_data[nv_index].get('nv_value', ''))
         
         reply = QMessageBox.question(
             self, self.tr("确认删除"),
@@ -256,7 +605,7 @@ class QCNVDialog(QDialog):
         )
         
         if reply == QMessageBox.StandardButton.Yes:
-            del self.nv_data[current_row]
+            del self.nv_data[nv_index]
             self.save_data()
             self.refresh_table()
     
@@ -328,71 +677,8 @@ class QCNVDialog(QDialog):
     
     def search_data(self):
         """搜索数据"""
-        keyword = self.search_input.text().strip().lower()
-        
-        if not keyword:
-            self.refresh_table()
-            return
-        
-        # 过滤数据
-        filtered_data = []
-        for item in self.nv_data:
-            nv_value = item.get('nv_value', '').lower()
-            description = item.get('description', '').lower()
-            if keyword in nv_value or keyword in description:
-                filtered_data.append(item)
-        
-        # 更新表格
-        self.table.setRowCount(0)
-        for item in filtered_data:
-            row = self.table.rowCount()
-            self.table.insertRow(row)
-            
-            self.table.setItem(row, 0, QTableWidgetItem(item.get('nv_value', '')))
-            self.table.setItem(row, 1, QTableWidgetItem(item.get('description', '')))
-    
-    def on_item_double_clicked(self, item):
-        """双击打开详细信息"""
-        current_row = self.table.currentRow()
-        if current_row < 0:
-            return
-        
-        nv_value = self.table.item(current_row, 0).text()
-        description = self.table.item(current_row, 1).text()
-        
-        # 显示详细信息的对话框
-        detail_dialog = QDialog(self)
-        detail_dialog.setWindowTitle(self.tr("NV详情"))
-        detail_dialog.setModal(True)
-        detail_dialog.resize(600, 400)
-        
-        layout = QVBoxLayout(detail_dialog)
-        
-        # NV值
-        nv_label = QLabel(f"<b>{self.tr('NV值')}:</b>")
-        layout.addWidget(nv_label)
-        
-        nv_text = QTextEdit()
-        nv_text.setPlainText(nv_value)
-        nv_text.setReadOnly(True)
-        nv_text.setMaximumHeight(80)
-        layout.addWidget(nv_text)
-        
-        # 说明
-        desc_label = QLabel(f"<b>{self.tr('说明')}:</b>")
-        layout.addWidget(desc_label)
-        
-        desc_text = QTextEdit()
-        desc_text.setPlainText(description)
-        desc_text.setReadOnly(True)
-        layout.addWidget(desc_text)
-        
-        # 关闭按钮
-        close_btn = QPushButton(self.tr("关闭"))
-        close_btn.clicked.connect(detail_dialog.close)
-        layout.addWidget(close_btn)
-        
-        detail_dialog.exec()
+        self._filter_keyword = self.search_input.text().strip()
+        self.refresh_table()
     
     def closeEvent(self, event):
         """关闭事件"""
