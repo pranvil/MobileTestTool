@@ -39,6 +39,7 @@ from ui.tabs.background_data_tab import BackgroundDataTab
 from ui.tabs.app_operations_tab import AppOperationsTab
 from ui.tabs.other_tab import OtherTab
 from ui.tabs.sim_tab import SimTab
+from ui.tabs.office_tool_tab import OfficeToolTab
 from core.device_manager import PySide6DeviceManager
 from core.mtklog_manager import PySide6MTKLogManager
 from core.adblog_manager import PySide6ADBLogManager
@@ -1386,6 +1387,13 @@ class MainWindow(QMainWindow):
         self.log_control_tab.parse_3gpp_message.connect(self._on_parse_3gpp_message)
         self.log_control_tab.mtk_sip_decode.connect(self._on_mtk_sip_decode)
         
+        # 连接办公工具Tab信号
+        try:
+            if hasattr(self, 'office_tool_tab'):
+                self.office_tool_tab.show_jira_tool.connect(self._on_show_jira_tool)
+        except Exception as e:
+            logger.error(f"连接OfficeToolTab信号槽失败: {e}")
+        
         # 连接 其他 Tab 信号
         try:
             self.other_tab.show_device_info_dialog.connect(self._on_show_device_info_dialog)
@@ -1543,6 +1551,11 @@ class MainWindow(QMainWindow):
             self.app_operations_tab.tab_id = 'app_operations'  # 添加tab_id属性
             tab_instances['app_operations'] = self.app_operations_tab
             
+            self.office_tool_tab = OfficeToolTab()
+            self.office_tool_tab.lang_manager = self.lang_manager
+            self.office_tool_tab.tab_id = 'office_tool'  # 添加tab_id属性
+            tab_instances['office_tool'] = self.office_tool_tab
+            
             self.other_tab = OtherTab()
             self.other_tab.lang_manager = self.lang_manager
             self.other_tab.tab_id = 'other'  # 添加tab_id属性
@@ -1599,6 +1612,7 @@ class MainWindow(QMainWindow):
             'tmo_echolocate': 'TMO Echolocate',
             'background_data': '24小时背景数据',
             'app_operations': 'APP操作',
+            'office_tool': '办公工具',
             'other': '其他',
             'sim': 'SIM'
         }
@@ -4044,6 +4058,22 @@ class MainWindow(QMainWindow):
             logger.exception("异常详情")
             from PySide6.QtWidgets import QMessageBox
             QMessageBox.critical(self, self.lang_manager.tr("错误"), f"{self.lang_manager.tr('打开工具配置对话框失败')}：{str(e)}")
+        finally:
+            logger.debug("=" * 60)
+    
+    def _on_show_jira_tool(self):
+        """显示JIRA工具窗口"""
+        logger.debug("=" * 60)
+        logger.debug("按钮点击: 显示JIRA工具窗口")
+        logger.debug(f"函数: _on_show_jira_tool")
+        try:
+            from core.jira_tool_launcher import launch_jira_tool
+            launch_jira_tool(self)
+            logger.debug("JIRA工具窗口启动成功")
+        except Exception as e:
+            logger.exception(f"启动JIRA工具失败: {e}")
+            from PySide6.QtWidgets import QMessageBox
+            QMessageBox.critical(self, self.lang_manager.tr("错误"), self.lang_manager.tr(f"启动JIRA工具失败: {str(e)}"))
         finally:
             logger.debug("=" * 60)
     

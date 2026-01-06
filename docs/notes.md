@@ -1,5 +1,6 @@
 ## Release Note
-- New feature: search file
+- Restructure by pyside6
+- fix SIM tool UI issue
 
 
 

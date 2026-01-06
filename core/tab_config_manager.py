@@ -42,6 +42,7 @@ class TabConfigManager(QObject):
             {'id': 'background_data', 'name': '24小时背景数据', 'visible': False, 'custom': False},
             {'id': 'app_operations', 'name': 'APP操作', 'visible': True, 'custom': False},
             {'id': 'sim', 'name': 'SIM', 'visible': True, 'custom': False},
+            {'id': 'office_tool', 'name': '办公工具', 'visible': True, 'custom': False},
             {'id': 'other', 'name': '其他', 'visible': True, 'custom': False}
         ]
         

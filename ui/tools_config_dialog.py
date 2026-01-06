@@ -95,6 +95,68 @@ class ToolsConfigDialog(QDialog):
         storage_container_layout.addWidget(storage_card)
         content_layout.addWidget(storage_container)
         
+        # JIRA配置框架（使用与Tab界面一致的样式：QLabel + QFrame）
+        jira_container = QWidget()
+        jira_container_layout = QVBoxLayout(jira_container)
+        jira_container_layout.setContentsMargins(0, 0, 0, 0)
+        jira_container_layout.setSpacing(4)
+        
+        jira_title = QLabel(self.tr("JIRA配置"))
+        jira_title.setProperty("class", "section-title")
+        jira_container_layout.addWidget(jira_title)
+        
+        jira_card = QFrame()
+        jira_card.setObjectName("card")
+        add_card_shadow(jira_card)
+        jira_layout = QVBoxLayout(jira_card)
+        jira_layout.setContentsMargins(10, 1, 10, 1)
+        jira_layout.setSpacing(8)
+        
+        # JIRA URL
+        jira_url_layout = QHBoxLayout()
+        jira_url_layout.addWidget(QLabel(self.tr("JIRA URL:")))
+        self.jira_url_entry = QLineEdit()
+        self.jira_url_entry.setPlaceholderText(self.tr("例如: https://jira.tcl.com"))
+        jira_url_layout.addWidget(self.jira_url_entry)
+        jira_layout.addLayout(jira_url_layout)
+        
+        # JIRA API Token
+        jira_token_layout = QHBoxLayout()
+        jira_token_layout.addWidget(QLabel(self.tr("JIRA API Token:")))
+        self.jira_token_entry = QLineEdit()
+        self.jira_token_entry.setEchoMode(QLineEdit.EchoMode.Password)
+        self.jira_token_entry.setPlaceholderText(self.tr("请输入JIRA API Token"))
+        jira_token_layout.addWidget(self.jira_token_entry)
+        jira_layout.addLayout(jira_token_layout)
+        
+        # Confluence URL
+        confluence_url_layout = QHBoxLayout()
+        confluence_url_layout.addWidget(QLabel(self.tr("Confluence URL:")))
+        self.confluence_url_entry = QLineEdit()
+        self.confluence_url_entry.setPlaceholderText(self.tr("例如: https://confluence.tclking.com/"))
+        confluence_url_layout.addWidget(self.confluence_url_entry)
+        jira_layout.addLayout(confluence_url_layout)
+        
+        # Confluence API Token
+        confluence_token_layout = QHBoxLayout()
+        confluence_token_layout.addWidget(QLabel(self.tr("Confluence API Token:")))
+        self.confluence_token_entry = QLineEdit()
+        self.confluence_token_entry.setEchoMode(QLineEdit.EchoMode.Password)
+        self.confluence_token_entry.setPlaceholderText(self.tr("请输入Confluence API Token"))
+        confluence_token_layout.addWidget(self.confluence_token_entry)
+        jira_layout.addLayout(confluence_token_layout)
+        
+        # Confluence默认空间
+        confluence_space_layout = QHBoxLayout()
+        confluence_space_layout.addWidget(QLabel(self.tr("Confluence默认空间:")))
+        self.confluence_space_entry = QLineEdit()
+        self.confluence_space_entry.setPlaceholderText(self.tr("例如: USVAL"))
+        confluence_space_layout.addWidget(self.confluence_space_entry)
+        jira_layout.addLayout(confluence_space_layout)
+        
+        jira_container_layout.addWidget(jira_card)
+        content_layout.addWidget(jira_container)
+        
         # 更新配置（已隐藏UI，但功能保留）
         # 更新配置的UI部分已隐藏，用户无法通过界面修改更新配置
         # 配置值将从现有配置中保留，不会被UI修改
@@ -270,6 +332,14 @@ class ToolsConfigDialog(QDialog):
         self._refresh_qualcomm_entry()
         self.wireshark_entry.setText(self.temp_config.get("wireshark_path", ""))
         self.storage_entry.setText(self.temp_config.get("storage_path", ""))
+        
+        # 加载JIRA配置
+        self.jira_url_entry.setText(self.temp_config.get("jira_url", "https://jira.tcl.com"))
+        self.jira_token_entry.setText(self.temp_config.get("jira_api_token", ""))
+        self.confluence_url_entry.setText(self.temp_config.get("confluence_url", "https://confluence.tclking.com/"))
+        self.confluence_token_entry.setText(self.temp_config.get("confluence_api_token", ""))
+        self.confluence_space_entry.setText(self.temp_config.get("confluence_default_space", "USVAL"))
+        
         # 更新配置UI已隐藏，不再初始化UI控件
         # self.update_url_entry.setText(self.temp_config.get("update_feed_url", DEFAULT_UPDATE_FEED_URL))
         # self.update_auto_launch_checkbox.setChecked(self.temp_config.get("update_auto_launch_installer", True))
@@ -599,6 +669,13 @@ class ToolsConfigDialog(QDialog):
                 self.temp_config["update_auto_launch_installer"] = True
             if "update_timeout" not in self.temp_config:
                 self.temp_config["update_timeout"] = 15
+            
+            # 保存JIRA配置
+            self.temp_config["jira_url"] = self.jira_url_entry.text().strip()
+            self.temp_config["jira_api_token"] = self.jira_token_entry.text().strip()
+            self.temp_config["confluence_url"] = self.confluence_url_entry.text().strip()
+            self.temp_config["confluence_api_token"] = self.confluence_token_entry.text().strip()
+            self.temp_config["confluence_default_space"] = self.confluence_space_entry.text().strip()
             # self.temp_config["update_auto_launch_installer"] = self.update_auto_launch_checkbox.isChecked()
             # self.temp_config["update_timeout"] = int(self.update_timeout_spin.value())
             

@@ -2109,7 +2109,13 @@ class PySide6OtherOperationsManager(QObject):
             "update_feed_url": DEFAULT_UPDATE_FEED_URL,
             "update_auto_launch_installer": True,
             "update_timeout": 15,
-            "update_last_checked_at": 0
+            "update_last_checked_at": 0,
+            # JIRA配置
+            "jira_url": "https://jira.tcl.com",
+            "jira_api_token": "",
+            "confluence_url": "https://confluence.tclking.com/",
+            "confluence_api_token": "",
+            "confluence_default_space": "USVAL"
         }
 
         try:
