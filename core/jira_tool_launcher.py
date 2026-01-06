@@ -82,7 +82,8 @@ def launch_jira_tool(parent_window):
         # 创建JIRA主窗口（在主线程中创建）
         jira_window = JiraMainWindow(parent_window)
         jira_window.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, True)
-        jira_window.show()
+        # 默认最大化显示（全屏效果）
+        jira_window.showMaximized()
         
         logger.info("JIRA工具窗口已启动")
         return True

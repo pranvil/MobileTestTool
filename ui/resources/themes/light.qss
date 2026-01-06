@@ -486,6 +486,39 @@ QListWidget::item:hover {
     background-color: #f0f0f0;
 }
 
+/* Jira_tool 左侧导航（避免局部硬编码，统一跟随主题） */
+QListWidget#jiraSidebar {
+    border: none;
+    border-right: 1px solid #d0d0d0;
+    background-color: #ffffff;
+    color: #000000;
+    border-radius: 0px;
+}
+
+QListWidget#jiraSidebar::item {
+    padding: 10px;
+    border-bottom: 1px solid #e0e0e0;
+    color: #000000;
+}
+
+QListWidget#jiraSidebar::item:hover {
+    background-color: #f0f0f0;
+}
+
+QListWidget#jiraSidebar::item:selected {
+    background-color: #0078d4;
+    color: #ffffff;
+}
+
+/* Jira_tool 评论预览 */
+QTextBrowser#jiraCommentPreview {
+    background-color: #ffffff;
+    color: #000000;
+    border: 1px solid #d0d0d0;
+    border-radius: 4px;
+    padding: 5px;
+}
+
 /* 树形控件 */
 QTreeWidget {
     background-color: #ffffff;

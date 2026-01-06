@@ -32,7 +32,11 @@ class ThemeManager:
                 style_sheet = f.read()
             
             # 应用样式表
-            QApplication.instance().setStyleSheet(style_sheet)
+            app = QApplication.instance()
+            if app:
+                app.setStyleSheet(style_sheet)
+                # 让各模块（含 Jira_tool）能读取当前主题，避免各处各自维护一份主题状态
+                app.setProperty("currentTheme", theme_name)
             
             self.current_theme = theme_name            
             return True

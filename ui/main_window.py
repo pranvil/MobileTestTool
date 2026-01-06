@@ -5318,6 +5318,13 @@ class MainWindow(QMainWindow):
                 self.network_info_tab.stop_network_info.connect(self._on_stop_network_info)
                 self.network_info_tab.start_ping.connect(self._on_start_ping)
                 self.network_info_tab.stop_ping.connect(self._on_stop_ping)
+
+            # 连接 办公工具 Tab 信号（reload_tabs 后需要重连）
+            if hasattr(self, 'office_tool_tab'):
+                try:
+                    self.office_tool_tab.show_jira_tool.connect(self._on_show_jira_tool)
+                except Exception as e:
+                    logger.error(f"重新连接OfficeToolTab信号槽失败: {e}")
             
             # 连接 TMO CC Tab 信号
             if hasattr(self, 'tmo_cc_tab'):
