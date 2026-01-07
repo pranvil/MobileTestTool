@@ -13,7 +13,7 @@ import re
 import sys
 import shutil
 import shlex
-from PySide6.QtCore import QObject, Signal, QThread, QMutex
+from PySide6.QtCore import QObject, Signal, QThread, QMutex, Qt
 from PySide6.QtWidgets import QMessageBox, QInputDialog, QFileDialog, QDialog, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton, QDialogButtonBox, QFrame
 
 # 导入资源工具
@@ -422,6 +422,8 @@ class MTKLogWorker(QThread):
     
     finished = Signal(bool, str)  # success, message
     progress = Signal(int, str)   # progress, status
+    start_video_recording = Signal()  # 请求开始录制视频
+    stop_video_recording = Signal()   # 请求停止录制视频
     
     def __init__(self, device, operation, device_manager, parent=None, log_name=None, export_media=False, storage_path_func=None, should_record=False):
         super().__init__(parent)
@@ -591,8 +593,16 @@ class MTKLogWorker(QThread):
                 self.progress.emit(0, self.tr("开始录制视频..."))
                 try:
                     video_manager = self.parent().get_video_manager() if self.parent() and hasattr(self.parent(), 'get_video_manager') else None
-                    if video_manager and not video_manager.is_recording:
-                        video_manager.start_recording()
+                    if video_manager:
+                        # 检查是否已经在录制中
+                        if video_manager.is_recording:
+                            print(f"[DEBUG] {self.tr('警告: 检测到录制已在进行中，跳过重复启动')}")
+                        else:
+                            # 发送信号到主线程启动录制
+                            print(f"[DEBUG] {self.tr('发送启动录制信号')}")
+                            self.start_video_recording.emit()
+                            time.sleep(3)  # 等待录制真正开始
+                            print(f"[DEBUG] {self.tr('录制状态:')} {video_manager.is_recording}")
                 except Exception as e:
                     print(f"{self.lang_manager.tr('警告:')} {self.lang_manager.tr('开始录制视频失败:')} {str(e)}")
             
@@ -618,25 +628,34 @@ class MTKLogWorker(QThread):
                     video_manager = mtklog_manager.get_video_manager()
                 
                 if video_manager and video_manager.is_recording:
-                    print(f"[DEBUG] {self.tr('检测到video_manager正在录制，调用stop_recording()停止录制')}")
-                    video_manager.stop_recording(open_folder=False)  # 不弹出视频文件夹
+                    print(f"[DEBUG] {self.tr('检测到video_manager正在录制，发送停止信号')}")
+                    # 发送信号到主线程停止录制
+                    self.stop_video_recording.emit()
                     # 记录video_manager的引用，后续用于移动视频文件
                     self._video_manager = video_manager
+                    
+                    # 等待录制状态变为False
+                    max_wait = 10
+                    waited = 0
+                    while video_manager.is_recording and waited < max_wait:
+                        time.sleep(0.5)
+                        waited += 0.5
+                    print(f"[DEBUG] {self.tr('录制状态已变为:')} {video_manager.is_recording}")
                     
                     # 智能等待视频保存完成
                     print(f"[DEBUG] {self.tr('等待视频保存完成...')}")
                     video_storage_path = video_manager.get_storage_path()
                     default_video_dir = os.path.join(video_storage_path, "video")
                     
-                    # 等待录制状态变为False（最多等待3秒）
+                    # 等待录制状态变为False（最多等待5秒）
                     check_interval = 0.5
                     waited_time = 0
-                    while video_manager.is_recording and waited_time < 3:
+                    while video_manager.is_recording and waited_time < 5:
                         time.sleep(check_interval)
                         waited_time += check_interval
                     
                     # 等待视频文件出现在目录中，并检查文件大小是否稳定
-                    max_wait_seconds = 30
+                    max_wait_seconds = 60  # 增加到60秒以确保大文件传输完成
                     waited_time = 0
                     video_files_found = False
                     
@@ -645,7 +664,7 @@ class MTKLogWorker(QThread):
                             video_files = [f for f in os.listdir(default_video_dir) if f.endswith('.mp4')]
                             if video_files:
                                 # 检查文件大小是否稳定（连续两次检查文件大小不变）
-                                time.sleep(1)
+                                time.sleep(2)
                                 file_stable = True
                                 file_sizes = {}
                                 for filename in video_files:
@@ -653,14 +672,15 @@ class MTKLogWorker(QThread):
                                     if os.path.exists(file_path):
                                         file_sizes[filename] = os.path.getsize(file_path)
                                 
-                                # 再等待1秒，检查文件大小是否变化
-                                time.sleep(1)
+                                # 再等待2秒，检查文件大小是否变化
+                                time.sleep(2)
                                 for filename, size_before in file_sizes.items():
                                     file_path = os.path.join(default_video_dir, filename)
                                     if os.path.exists(file_path):
                                         size_after = os.path.getsize(file_path)
                                         if size_before != size_after:
                                             file_stable = False
+                                            print(f"[DEBUG] {self.tr('文件仍在传输:')} {filename} ({size_before} -> {size_after})")
                                             break
                                     else:
                                         file_stable = False
@@ -677,7 +697,7 @@ class MTKLogWorker(QThread):
                             print(f"[DEBUG] {self.tr('等待视频保存中...')} ({int(waited_time)}s)")
                     
                     if not video_files_found:
-                        print(f"[DEBUG] {self.tr('等待视频保存超时，继续执行后续流程')}")
+                        print(f"[DEBUG] {self.tr('警告: 等待视频保存超时，可能视频文件较大仍在传输中')}")
                 else:
                     # 如果没有通过video_manager管理，检查是否有screenrecord进程，使用kill停止
                     ps_cmd = ["adb", "-s", self.device, "shell", "ps", "-A"]
@@ -1048,6 +1068,17 @@ class PySide6MTKLogManager(QObject):
             self.status_message.emit(self.lang_manager.tr("未检测到MTKLOGGER，请先安装"))
             return
         
+        # 清理旧的worker
+        if self.worker:
+            try:
+                if hasattr(self.worker, 'start_video_recording'):
+                    self.worker.start_video_recording.disconnect()
+                if hasattr(self.worker, 'stop_video_recording'):
+                    self.worker.stop_video_recording.disconnect()
+            except:
+                pass
+            self.worker = None
+        
         # 询问用户是否需要录制视频
         video_manager = self.get_video_manager()
         should_record = False
@@ -1062,10 +1093,35 @@ class PySide6MTKLogManager(QObject):
             )
             should_record = (reply == QMessageBox.StandardButton.Yes)
         
+        # 如果需要录制，确保先完全清理任何现有录制状态
+        if should_record and video_manager:
+            if video_manager.is_recording:
+                print(f"[DEBUG] {self.lang_manager.tr('检测到现有录制，强制清理状态')}")
+                # 强制停止录制进程
+                if video_manager.recording_process:
+                    try:
+                        video_manager.recording_process.terminate()
+                        video_manager.recording_process.wait(timeout=2)
+                    except:
+                        try:
+                            video_manager.recording_process.kill()
+                        except:
+                            pass
+                    video_manager.recording_process = None
+                # 重置状态
+                video_manager.is_recording = False
+                video_manager.recorded_files.clear()
+                print(f"[DEBUG] {self.lang_manager.tr('录制状态已清理')}")
+                time.sleep(1)
+        
         # 创建工作线程
         self.worker = MTKLogWorker(device, 'start', self.device_manager, self, storage_path_func=self.get_storage_path, should_record=should_record)
         self.worker.progress.connect(self.progress_updated.emit)
         self.worker.finished.connect(self._on_mtklog_started)
+        # 连接视频录制信号（确保只连接一次）
+        if should_record and video_manager:
+            self.worker.start_video_recording.connect(video_manager.start_recording, Qt.ConnectionType.UniqueConnection)
+            print(f"[DEBUG] {self.lang_manager.tr('已连接视频录制信号')}")
         self.is_running = True
         self.worker.start()
         
@@ -1099,6 +1155,10 @@ class PySide6MTKLogManager(QObject):
         self.worker = MTKLogWorker(device, 'stop_export', self.device_manager, self, log_name=log_name, export_media=export_media, storage_path_func=self.get_storage_path)
         self.worker.progress.connect(self.progress_updated.emit)
         self.worker.finished.connect(self._on_mtklog_stopped)
+        # 连接视频录制停止信号
+        video_manager = self.get_video_manager()
+        if video_manager:
+            self.worker.stop_video_recording.connect(lambda: video_manager.stop_recording(open_folder=False))
         self.is_running = True
         self.worker.start()
         

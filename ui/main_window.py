@@ -4138,15 +4138,21 @@ class MainWindow(QMainWindow):
     def _on_recording_started(self):
         """录制开始"""
         # 更新按钮状态
-        self.toolbar.record_btn.setText(self.lang_manager.tr("停止录制"))
-        self.toolbar.record_btn.setChecked(True)
+        record_btn = self.toolbar.record_btn
+        record_btn.blockSignals(True)
+        record_btn.setText(self.lang_manager.tr("停止录制"))
+        record_btn.setChecked(True)
+        record_btn.blockSignals(False)
         self.append_log.emit(self.lang_manager.tr("视频录制已开始") + "\n", None)
     
     def _on_recording_stopped(self):
         """录制停止"""
         # 更新按钮状态
-        self.toolbar.record_btn.setText(self.lang_manager.tr("开始录制"))
-        self.toolbar.record_btn.setChecked(False)
+        record_btn = self.toolbar.record_btn
+        record_btn.blockSignals(True)
+        record_btn.setText(self.lang_manager.tr("开始录制"))
+        record_btn.setChecked(False)
+        record_btn.blockSignals(False)
         self.append_log.emit(self.lang_manager.tr("视频录制已停止") + "\n", None)
     
     def _on_video_saved(self, folder, count):
