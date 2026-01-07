@@ -1,34 +1,34 @@
 {
-    "version":  "0.9.6.5.8",
-    "download_url":  "https://github.com/pranvil/MobileTestTool/releases/download/v0.9.6.5.8/MobileTestTool_0.9.6.5.8.zip",
-    "sha256":  "670a33e24ccfb82396245bb476145aa9e4439b6fe63b17545b7aa0bf82841624",
-    "file_name":  "MobileTestTool_0.9.6.5.8.zip",
-    "file_size":  123927581,
-    "release_notes":  "## Release Note\n- New feature1: read/write NV\n- New feature2:jira/Confluence tool\n- UI Refactoring",
-    "published_at":  "2026-01-06T23:39:12Z",
+    "version":  "0.9.6.5.9",
+    "download_url":  "https://github.com/pranvil/MobileTestTool/releases/download/v0.9.6.5.9/MobileTestTool_0.9.6.5.9.zip",
+    "sha256":  "44d2df830cbe4a34bdf583572adeb6de1a7ff68605b51a60e802cc6b1aaa2125",
+    "file_name":  "MobileTestTool_0.9.6.5.9.zip",
+    "file_size":  123927904,
+    "release_notes":  "## Release Note\n- fix video record issue",
+    "published_at":  "2026-01-07T02:19:50Z",
     "mandatory":  false,
     "download_urls":  [
                           {
                               "region":  "us",
-                              "url":  "https://github.com/pranvil/MobileTestTool/releases/download/v0.9.6.5.8/MobileTestTool_0.9.6.5.8.zip",
+                              "url":  "https://github.com/pranvil/MobileTestTool/releases/download/v0.9.6.5.9/MobileTestTool_0.9.6.5.9.zip",
                               "priority":  10,
                               "platform":  "windows"
                           },
                           {
                               "region":  "cn",
-                              "url":  "https://modelscope.cn/models/Pranvil/mobiletestTool/resolve/master/MobileTestTool_0.9.6.5.8.zip",
+                              "url":  "https://modelscope.cn/models/Pranvil/mobiletestTool/resolve/master/MobileTestTool_0.9.6.5.9.zip",
                               "priority":  20,
                               "platform":  "windows"
                           },
                           {
                               "region":  "internal",
-                              "url":  "http://10.129.93.67/hao.lin/MobileTestTool/-/releases/v0.9.6.5.8/downloads/MobileTestTool_0.9.6.5.8.zip",
+                              "url":  "http://10.129.93.67/hao.lin/MobileTestTool/-/releases/v0.9.6.5.9/downloads/MobileTestTool_0.9.6.5.9.zip",
                               "priority":  15,
                               "platform":  "windows"
                           },
                           {
                               "region":  "default",
-                              "url":  "https://github.com/pranvil/MobileTestTool/releases/download/v0.9.6.5.8/MobileTestTool_0.9.6.5.8.zip",
+                              "url":  "https://github.com/pranvil/MobileTestTool/releases/download/v0.9.6.5.9/MobileTestTool_0.9.6.5.9.zip",
                               "priority":  5,
                               "platform":  "all"
                           }

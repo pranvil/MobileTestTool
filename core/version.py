@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """应用版本信息"""
 
-APP_VERSION = "0.9.6.5.8"
+APP_VERSION = "0.9.6.5.9"
 
 __all__ = ["APP_VERSION"]
 
