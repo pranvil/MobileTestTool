@@ -1,7 +1,7 @@
 ## Release Note
-- New feature1: read/write NV
-- New feature2:jira/Confluence tool
-- UI Refactoring
+- Qualcomm set E922 to EMC
+- MACE use for python 3.7-3.11
+- Push Qualcom lock cell file to EFS 
 
 
 

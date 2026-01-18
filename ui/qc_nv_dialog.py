@@ -98,6 +98,43 @@ class PcatResetWorker(QThread):
             self.finished.emit(False, str(e))
 
 
+class PcatE922WriteWorker(QThread):
+    """PCAT E922批量写入Worker"""
+    finished = Signal(bool, str)  # success, message
+    progress = Signal(str)  # 进度消息
+
+    def __init__(self, device_id: str, sub_id: int, parent=None):
+        super().__init__(parent)
+        self.device_id = device_id
+        self.sub_id = sub_id
+
+    def run(self):
+        try:
+            # 写入NV 73755
+            self.progress.emit("正在写入NV 73755...")
+            nv73755_value = "{'[0].num_digits':'3','[0].digits':'922','[0].category_length':'1','[0].emergency_category':'00-PBM_EMERGENCY_SERVICE_CAT_DEFAULT','[0].srv_status_flag':'0','[0].reserve2':'0'}"
+            cmd1 = pcat_nv.build_write_cmd(self.device_id, "73755", self.sub_id, nv73755_value, True)
+            result1 = pcat_nv.run_pcat(cmd1, timeout=120)
+            if not pcat_nv.is_success(result1.output):
+                error_msg = result1.stderr.strip() or result1.stdout.strip() or "写入NV 73755失败"
+                self.finished.emit(False, f"写入NV 73755失败: {error_msg}")
+                return
+
+            # 写入NV 73847
+            self.progress.emit("正在写入NV 73847...")
+            nv73847_value = "{e911TestMode:'01-IMS_E911_TEST_MODE_ON'}"
+            cmd2 = pcat_nv.build_write_cmd(self.device_id, "73847", self.sub_id, nv73847_value, True)
+            result2 = pcat_nv.run_pcat(cmd2, timeout=120)
+            if not pcat_nv.is_success(result2.output):
+                error_msg = result2.stderr.strip() or result2.stdout.strip() or "写入NV 73847失败"
+                self.finished.emit(False, f"写入NV 73847失败: {error_msg}")
+                return
+
+            self.finished.emit(True, "E922配置写入成功！")
+        except Exception as e:
+            self.finished.emit(False, f"写入过程发生异常: {str(e)}")
+
+
 class QCNVDialog(QDialog):
     """高通 NV 管理对话框"""
     
@@ -127,6 +164,7 @@ class QCNVDialog(QDialog):
         self._pcat_worker: PcatNvWorker | None = None
         self._pcat_write_worker: PcatNvWriteWorker | None = None
         self._pcat_reset_worker: PcatResetWorker | None = None
+        self._pcat_e922_worker: PcatE922WriteWorker | None = None
         self._pending_write_value: str | None = None
         self._pending_read_request: tuple[str, int] | None = None  # (nv_item, sub_id)
         
@@ -210,7 +248,7 @@ class QCNVDialog(QDialog):
         rw_controls = QHBoxLayout()
 
         # SUB 单选按钮直接放在控制栏
-        rw_controls.addWidget(QLabel("SUB:"))
+        rw_controls.addWidget(QLabel(self.tr("SUB:")))
         self.sub0_radio = QRadioButton("sub0")
         self.sub1_radio = QRadioButton("sub1")
         self.sub_group = QButtonGroup(self)
@@ -222,15 +260,7 @@ class QCNVDialog(QDialog):
         rw_controls.addWidget(self.sub0_radio)
         rw_controls.addWidget(self.sub1_radio)
 
-        rw_controls.addSpacing(20)  # 添加间距
         rw_controls.addStretch()
-
-        self.read_btn = QPushButton(self.tr("读取"))
-        self.write_btn = QPushButton(self.tr("写入"))
-        self.read_btn.clicked.connect(self._on_read_clicked)
-        self.write_btn.clicked.connect(self._on_write_clicked)
-        rw_controls.addWidget(self.read_btn)
-        rw_controls.addWidget(self.write_btn)
 
         rw_layout.addLayout(rw_controls)
 
@@ -245,6 +275,19 @@ class QCNVDialog(QDialog):
         right_layout = QVBoxLayout(right_widget)
         right_layout.setContentsMargins(8, 8, 8, 8)
 
+        # 读取和写入按钮放在搜索框上方
+        self.read_btn = QPushButton(self.tr("读取"))
+        self.write_btn = QPushButton(self.tr("写入"))
+        self.read_btn.clicked.connect(self._on_read_clicked)
+        self.write_btn.clicked.connect(self._on_write_clicked)
+        # 设置按钮颜色：读取-绿色，写入-橙色背景
+        self.read_btn.setStyleSheet("background-color: #4CAF50; color: white;")
+        self.write_btn.setStyleSheet("background-color: #FF9800; color: white;")
+        right_layout.addWidget(self.read_btn)
+        right_layout.addWidget(self.write_btn)
+        
+        right_layout.addSpacing(10)
+
         right_layout.addWidget(QLabel(self.tr("搜索:")))
         self.search_input = QLineEdit()
         self.search_input.setPlaceholderText(self.tr("输入搜索关键字..."))
@@ -254,6 +297,10 @@ class QCNVDialog(QDialog):
         self.search_btn = QPushButton(self.tr("搜索"))
         self.search_btn.clicked.connect(self.search_data)
         right_layout.addWidget(self.search_btn)
+
+        self.e922_btn = QPushButton("E922")
+        self.e922_btn.clicked.connect(self._on_e922_clicked)
+        right_layout.addWidget(self.e922_btn)
 
         right_layout.addSpacing(10)
 
@@ -321,6 +368,7 @@ class QCNVDialog(QDialog):
             self.export_btn.setEnabled(not busy)
             self.search_input.setEnabled(not busy)
             self.search_btn.setEnabled(not busy)
+            self.e922_btn.setEnabled(not busy)
 
     def _on_read_clicked(self):
         nv_item = self._get_selected_nv_item()
@@ -389,9 +437,45 @@ class QCNVDialog(QDialog):
             QMessageBox.warning(self, self.tr("提示"), self.tr("请输入要写入的数据"))
             return
 
-        # 写入前必须先READ（同 NV + 同 SUB）
-        self._pending_write_value = new_value
-        self._trigger_read(nv_item)
+        # 优化：如果输入是JSON格式，直接写入，跳过预读以提升速度
+        # 判断是否为JSON格式（以{开头，以}结尾）
+        is_json_format = new_value.strip().startswith("{") and new_value.strip().endswith("}")
+        
+        if is_json_format:
+            # JSON格式：验证格式后直接写入
+            ok, err = pcat_nv.validate_json_like(new_value)
+            if not ok:
+                QMessageBox.warning(
+                    self,
+                    self.tr("提示"),
+                    f"{self.tr('JSON格式验证失败')}\n{self.tr('原因')}: {err}",
+                )
+                return
+            
+            # 直接执行写入
+            self._execute_write(nv_item, device_id, new_value, use_json=True)
+        else:
+            # 非JSON格式：需要预读来验证是否为多字段结构
+            self._pending_write_value = new_value
+            self._trigger_read(nv_item)
+
+    def _execute_write(self, nv_item: str, device_id: str, new_value: str, use_json: bool):
+        """执行写入操作的通用方法"""
+        if self._pcat_write_worker and self._pcat_write_worker.isRunning():
+            return
+
+        sub_id = self._get_sub_id()
+        self._set_busy(True, scope="all")
+        self._pcat_write_worker = PcatNvWriteWorker(
+            device_id=device_id,
+            nv_item=nv_item,
+            sub_id=sub_id,
+            value=new_value,
+            use_json=use_json,
+            parent=self,
+        )
+        self._pcat_write_worker.finished.connect(self._on_write_finished)
+        self._pcat_write_worker.start()
 
     def _continue_write_after_preread(self, read_value: str):
         nv_item = self._get_selected_nv_item()
@@ -401,7 +485,6 @@ class QCNVDialog(QDialog):
             QMessageBox.warning(self, self.tr("错误"), self.tr("写入前校验失败：未选择NV或设备"))
             return
 
-        sub_id = self._get_sub_id()
         new_value = self._pending_write_value or ""
         self._pending_write_value = None
 
@@ -418,21 +501,8 @@ class QCNVDialog(QDialog):
                 return
             use_json = True
 
-        # 执行WRITE
-        if self._pcat_write_worker and self._pcat_write_worker.isRunning():
-            return
-
-        self._set_busy(True, scope="all")
-        self._pcat_write_worker = PcatNvWriteWorker(
-            device_id=device_id,
-            nv_item=nv_item,
-            sub_id=sub_id,
-            value=new_value,
-            use_json=use_json,
-            parent=self,
-        )
-        self._pcat_write_worker.finished.connect(self._on_write_finished)
-        self._pcat_write_worker.start()
+        # 执行WRITE（使用通用方法）
+        self._execute_write(nv_item, device_id, new_value, use_json)
 
     def _on_write_finished(self, success: bool, message: str, stdout: str, stderr: str):
         self._set_busy(False, scope="all")
@@ -473,6 +543,57 @@ class QCNVDialog(QDialog):
             QMessageBox.information(self, self.tr("成功"), self.tr("设备重启命令已执行，请等待设备重新连接"))
         else:
             QMessageBox.warning(self, self.tr("警告"), f"{self.tr('重启失败')}:\n{message}")
+    
+    def _on_e922_clicked(self):
+        """E922按钮点击事件：写入NV 73755和73847"""
+        device_id = self._get_device_id()
+        if not device_id:
+            QMessageBox.warning(self, self.tr("提示"), self.tr("请先选择一个设备"))
+            return
+
+        # 确认操作
+        reply = QMessageBox.question(
+            self,
+            self.tr("确认操作"),
+            self.tr("确定要写入E922配置吗？\n这将写入NV 73755和NV 73847。"),
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No
+        )
+        if reply != QMessageBox.StandardButton.Yes:
+            return
+
+        if self._pcat_e922_worker and self._pcat_e922_worker.isRunning():
+            QMessageBox.warning(self, self.tr("提示"), self.tr("E922写入操作正在进行中，请稍候..."))
+            return
+
+        sub_id = self._get_sub_id()
+        self._set_busy(True, scope="all")
+        self._pcat_e922_worker = PcatE922WriteWorker(device_id=device_id, sub_id=sub_id, parent=self)
+        self._pcat_e922_worker.progress.connect(self._on_e922_progress)
+        self._pcat_e922_worker.finished.connect(self._on_e922_finished)
+        self._pcat_e922_worker.start()
+
+    def _on_e922_progress(self, message: str):
+        """E922写入进度更新"""
+        # 可以在这里更新状态栏或显示进度信息
+        pass
+
+    def _on_e922_finished(self, success: bool, message: str):
+        """E922写入完成回调"""
+        self._set_busy(False, scope="all")
+        if success:
+            # 询问是否立即重启生效
+            reply = QMessageBox.question(
+                self,
+                self.tr("写入成功"),
+                f"{message}\n\n{self.tr('是否立即重启设备使更改生效？')}",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.Yes
+            )
+            if reply == QMessageBox.StandardButton.Yes:
+                self._trigger_reset()
+        else:
+            QMessageBox.critical(self, self.tr("错误"), f"{self.tr('E922写入失败')}:\n{message}")
     
     def load_data(self):
         """加载数据"""

@@ -1200,26 +1200,55 @@ class OtherOperationsWorker(QThread):
             # 如果有 venv_python，直接使用虚拟环境，跳过系统 Python 环境的检测
             venv_python = self.kwargs.get('venv_python')
             
-            # 如果没有虚拟环境，才检查系统 Python 环境中的 mace
+            # 如果没有虚拟环境，先检查当前 Python 版本是否支持 MACE
             if not venv_python:
-                # 检查 mace 是否安装
-                self.status_updated.emit(self.tr("检查 mace 模块..."))
-                self.progress_updated.emit(5)
+                # 检查当前 Python 版本是否支持 MACE（3.7-3.11）
+                current_version = sys.version_info[:2]  # (major, minor)
+                if current_version < (3, 7) or current_version > (3, 11):
+                    # 当前 Python 版本不支持 MACE，检查是否已有虚拟环境
+                    venv_path = self._get_program_dir_venv()
+                    if venv_path:
+                        venv_python = self._get_venv_python_path(venv_path)
+                        if os.path.exists(venv_python):
+                            # 虚拟环境已存在，直接使用
+                            self.status_updated.emit(self.tr("检测到虚拟环境，使用虚拟环境执行"))
+                        else:
+                            # 虚拟环境不存在，返回特殊错误码让主线程处理
+                            return {'success': False, 'error': 'NEED_PYTHON37', 'elt_path': elt_path}
+                    else:
+                        # 无法获取虚拟环境路径，返回特殊错误码让主线程处理
+                        return {'success': False, 'error': 'NEED_PYTHON37', 'elt_path': elt_path}
                 
+                # 当前 Python 版本支持 MACE（3.7-3.11），继续使用当前环境
+                # 先尝试直接导入 mace（最可靠的检测方式）
+                mace_installed = False
                 try:
-                    result = subprocess.run(
-                        ["pip", "list"],
-                        capture_output=True,
-                        text=True,
-                        shell=True,
-                        timeout=10,
-                        creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0
-                    )
-                    mace_installed = "mace" in result.stdout.lower()
-                except Exception:
-                    mace_installed = False
+                    # 动态设置 sys.path 以包含 ELT 路径（导入前需要）
+                    if elt_path not in sys.path:
+                        sys.path.insert(0, elt_path)
+                    import mace
+                    mace_installed = True
+                    self.status_updated.emit(self.tr("检测到 mace 模块已安装"))
+                except ImportError:
+                    # 导入失败，继续用 pip list 检查（可能是路径问题）
+                    self.status_updated.emit(self.tr("检查 mace 模块..."))
+                    self.progress_updated.emit(5)
+                    
+                    try:
+                        result = subprocess.run(
+                            ["pip", "list"],
+                            capture_output=True,
+                            text=True,
+                            shell=True,
+                            timeout=10,
+                            creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0
+                        )
+                        if result.returncode == 0:
+                            mace_installed = "mace" in result.stdout.lower()
+                    except Exception:
+                        mace_installed = False
                 
-                # 如果未安装，尝试安装
+                # 如果未安装，尝试安装（只需安装一次）
                 if not mace_installed:
                     self.status_updated.emit(self.tr("mace 未安装，正在安装..."))
                     self.progress_updated.emit(10)
@@ -1256,16 +1285,18 @@ class OtherOperationsWorker(QThread):
                             except Exception:
                                 pass
                         
-                        # 如果安装失败且错误信息包含 python3.7，需要处理虚拟环境
-                        if result.returncode != 0 and ("python3.7" in result.stderr.lower() or "python 3.7" in result.stderr.lower() or "Please install" in result.stderr):
-                            # 需要 Python 3.7，返回特殊错误码让主线程处理
-                            return {'success': False, 'error': 'NEED_PYTHON37', 'elt_path': elt_path}
+                        # 如果安装失败，检查是否是版本不支持的问题
+                        if result.returncode != 0:
+                            error_lower = result.stderr.lower() if result.stderr else ""
+                            # 如果错误信息提示需要特定 Python 版本，可能需要虚拟环境
+                            # 但由于前面已经检查过版本是 3.7-3.11，这里可能是其他问题
+                            # 不再自动触发虚拟环境创建，而是返回具体错误
+                            error_msg = result.stderr if result.stderr else result.stdout
+                            if not error_msg:
+                                error_msg = f"{self.tr('安装失败，返回码:')} {result.returncode}"
+                            return {'success': False, 'error': f"{self.tr('mace 安装失败:')} {error_msg}"}
                     except Exception as e:
-                        # 检查异常信息中是否包含 python3.7
-                        error_str = str(e).lower()
-                        if "python3.7" in error_str or "python 3.7" in error_str or "please install" in error_str:
-                            return {'success': False, 'error': 'NEED_PYTHON37', 'elt_path': elt_path}
-                        # 其他异常直接返回
+                        # 安装过程异常
                         return {'success': False, 'error': f"{self.tr('mace 安装异常:')} {str(e)}"}
             
             # 获取输出文件路径（Wireshark 目录）
@@ -1294,11 +1325,8 @@ class OtherOperationsWorker(QThread):
             try:
                 import mace
             except ImportError as e:
-                error_str = str(e).lower()
-                # 检查错误信息中是否包含 python3.7 相关提示
-                if "python3.7" in error_str or "python 3.7" in error_str or "please install" in error_str:
-                    # 需要 Python 3.7，返回特殊错误码让主线程处理
-                    return {'success': False, 'error': 'NEED_PYTHON37', 'elt_path': elt_path}
+                # 由于前面已经检查过 Python 版本是 3.7-3.11，导入失败可能是其他原因
+                # 不再自动触发虚拟环境创建，而是返回具体错误
                 return {'success': False, 'error': f"{self.tr('无法导入 mace 模块:')} {str(e)}"}
             
             # 处理所有 .elg 和 .muxz 文件
@@ -1394,6 +1422,26 @@ class OtherOperationsWorker(QThread):
                 
         except Exception as e:
             return {'success': False, 'error': f"{self.tr('执行MTK SIP DECODE失败:')} {str(e)}"}
+    
+    def _get_program_dir_venv(self):
+        """获取虚拟环境路径（在程序目录下）"""
+        import sys
+        if getattr(sys, 'frozen', False):
+            # 打包后的 exe
+            program_dir = os.path.dirname(sys.executable)
+        else:
+            # 开发环境：从当前文件位置推算项目根目录
+            current_file = os.path.abspath(__file__)
+            program_dir = os.path.dirname(os.path.dirname(current_file))
+        return os.path.join(program_dir, "python37")
+    
+    def _get_venv_python_path(self, venv_path):
+        """获取虚拟环境中的 Python 路径"""
+        import sys
+        if sys.platform == "win32":
+            return os.path.join(venv_path, "Scripts", "python.exe")
+        else:
+            return os.path.join(venv_path, "bin", "python")
     
     def _execute_parse_with_venv(self, venv_python, elt_path, log_folder, elg_files, output_file, clear_history, muxz_files):
         """使用虚拟环境的 Python 执行解析"""
