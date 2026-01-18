@@ -295,6 +295,15 @@ QTableWidget {
     gridline-color: #e0e0e0;
 }
 
+/* 表格单元格编辑器（编辑态会弹出 QLineEdit，需避免被行高裁切） */
+QTableWidget QLineEdit,
+QTableView QLineEdit,
+QAbstractItemView QLineEdit {
+    /* 关键：减少纵向 padding，避免编辑态文字被上/下边框挡住 */
+    padding: 0px 4px;
+    min-height: 20px;
+}
+
 QTableWidget::item {
     padding: 5px;
 }
