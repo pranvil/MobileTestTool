@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env python3
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
 高通 Lock Cell 管理对话框
@@ -7,6 +7,8 @@
 
 import os
 import sys
+import subprocess
+import re
 from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QPushButton, 
                              QLabel, QRadioButton, QButtonGroup, QLineEdit,
                              QFileDialog, QMessageBox, QFormLayout, QDialogButtonBox)
@@ -28,6 +30,12 @@ class LockCellDialog(QDialog):
         else:
             from core.language_manager import LanguageManager
             self.lang_manager = LanguageManager.get_instance()
+        
+        # 获取设备管理器
+        if parent and hasattr(parent, 'device_manager'):
+            self.device_manager = parent.device_manager
+        else:
+            self.device_manager = None
         
         self.setWindowTitle(self.tr("高通 Lock Cell"))
         self.setModal(True)
@@ -72,11 +80,27 @@ class LockCellDialog(QDialog):
         layout.addLayout(radio_layout)
         layout.addStretch()
         
-        # 按钮
+        # 底部按钮布局
+        bottom_layout = QHBoxLayout()
+        
+        # 左侧解锁按钮
+        unlock_lte_btn = QPushButton(self.tr("Unlock LTE"))
+        unlock_lte_btn.clicked.connect(self.on_unlock_lte)
+        bottom_layout.addWidget(unlock_lte_btn)
+        
+        unlock_5g_btn = QPushButton(self.tr("Unlock 5G"))
+        unlock_5g_btn.clicked.connect(self.on_unlock_5g)
+        bottom_layout.addWidget(unlock_5g_btn)
+        
+        bottom_layout.addStretch()
+        
+        # 右侧OK/Cancel按钮
         button_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         button_box.accepted.connect(self.on_next)
         button_box.rejected.connect(self.reject)
-        layout.addWidget(button_box)
+        bottom_layout.addWidget(button_box)
+        
+        layout.addLayout(bottom_layout)
     
     def on_next(self):
         """下一步：打开相应的输入对话框"""
@@ -135,6 +159,8 @@ class LockCellDialog(QDialog):
                 with open(output_path, "wb") as file:
                     file.write(new_content)
                 QMessageBox.information(self, self.tr("成功"), self.tr(f"文件已保存: {output_path}"))
+                # 检查PCAT环境并执行复制
+                self.check_pcat_and_copy(output_path, "LTE")
                 self.accept()
         
         except Exception as e:
@@ -190,6 +216,8 @@ class LockCellDialog(QDialog):
                 with open(output_path, "wb") as file:
                     file.write(new_content)
                 QMessageBox.information(self, self.tr("成功"), self.tr(f"文件已保存: {output_path}"))
+                # 检查PCAT环境并执行复制
+                self.check_pcat_and_copy(output_path, "5G")
                 self.accept()
         
         except Exception as e:
@@ -211,6 +239,395 @@ class LockCellDialog(QDialog):
         while len(byte_array) < min_bytes:  # 补齐到最小字节数
             byte_array.append("00")
         return bytes.fromhex("".join(byte_array))
+    
+    def check_pcat_environment(self):
+        """检查PCAT环境是否可用"""
+        try:
+            result = subprocess.run(
+                ["PCAT", "-version"],
+                capture_output=True,
+                text=True,
+                timeout=10,
+                creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0
+            )
+            # 检查输出中是否包含版本信息
+            if result.returncode == 0 and "Product Configuration Assistant Tool" in result.stdout:
+                # 提取版本信息
+                version_match = re.search(r'\[Version\s+([\d.]+)\]', result.stdout)
+                if version_match:
+                    version = version_match.group(1)
+                    logger.info(f"检测到PCAT环境，版本: {version}")
+                    return True, version
+                return True, None
+            return False, None
+        except FileNotFoundError:
+            logger.warning("未找到PCAT命令")
+            return False, None
+        except subprocess.TimeoutExpired:
+            logger.warning("PCAT版本检查超时")
+            return False, None
+        except Exception as e:
+            logger.exception(f"检查PCAT环境失败: {e}")
+            return False, None
+    
+    def get_device_id(self):
+        """获取设备ID"""
+        if not self.device_manager:
+            return None
+        device = self.device_manager.validate_device_selection()
+        return device
+    
+    def build_pcat_copy_cmd(self, file_path, cell_type):
+        """构建PCAT复制命令"""
+        device_id = self.get_device_id()
+        if not device_id:
+            return None
+        
+        # 获取文件名
+        filename = os.path.basename(file_path)
+        
+        if cell_type == "LTE":
+            # LTE: 复制到 /nv/item_files/modem/lte/rrc/efs/
+            target_path = f"/nv/item_files/modem/lte/rrc/efs/{filename}"
+        else:  # 5G
+            # 5G: 复制到 /nv/item_files/modem/nr5g/RRC/
+            target_path = f"/nv/item_files/modem/nr5g/RRC/{filename}"
+        
+        # 构建命令
+        cmd = [
+            "PCAT",
+            "-PLUGIN", "EE",
+            "-DEVICE", device_id,
+            "-FS", "PRI",
+            "-MODE", "COPY",
+            "-TYPE", "FILE",
+            "-FROM", file_path,
+            "-TO", target_path,
+            "-OVERRIDE", "TRUE"
+        ]
+        return cmd
+    
+    def run_pcat_copy(self, cmd):
+        """执行PCAT复制命令"""
+        try:
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                timeout=90,
+                encoding="utf-8",
+                errors="replace",
+                creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0
+            )
+            
+            output = (result.stdout or "") + ("\n" if result.stdout and result.stderr else "") + (result.stderr or "")
+            
+            # 检查是否成功（根据示例输出，成功时会有 "Status    - TRUE" 和 "copied successfully"）
+            success = (
+                result.returncode == 0 and
+                ("Status    - TRUE" in output or "copied successfully" in output.lower())
+            )
+            
+            return success, output
+        except subprocess.TimeoutExpired:
+            return False, self.tr("PCAT执行超时（>90秒）")
+        except Exception as e:
+            logger.exception(f"执行PCAT复制命令失败: {e}")
+            return False, str(e)
+    
+    def reset_device(self, device_id):
+        """重启设备"""
+        try:
+            cmd = ["PCAT", "-MODE", "RESET", "-DEVICE", device_id]
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                timeout=30,
+                encoding="utf-8",
+                errors="replace",
+                creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0
+            )
+            return result.returncode == 0, result.stdout + result.stderr
+        except Exception as e:
+            logger.exception(f"重启设备失败: {e}")
+            return False, str(e)
+    
+    def check_pcat_and_copy(self, file_path, cell_type):
+        """检查PCAT环境并执行文件复制"""
+        # 1. 检查PCAT环境
+        pcat_available, version = self.check_pcat_environment()
+        
+        if not pcat_available:
+            QMessageBox.warning(
+                self,
+                self.tr("PCAT未检测到"),
+                self.tr("未检测到高通PCAT工具环境。\n\n请安装高通PCAT工具并确保已添加到系统PATH环境变量中。")
+            )
+            return
+        
+        # 2. 获取设备ID
+        device_id = self.get_device_id()
+        if not device_id:
+            QMessageBox.warning(
+                self,
+                self.tr("设备未选择"),
+                self.tr("请先选择一个设备")
+            )
+            return
+        
+        # 3. 构建并执行复制命令
+        cmd = self.build_pcat_copy_cmd(file_path, cell_type)
+        if not cmd:
+            QMessageBox.warning(
+                self,
+                self.tr("错误"),
+                self.tr("无法构建PCAT命令")
+            )
+            return
+        
+        # 显示进度提示
+        progress_msg = QMessageBox(self)
+        progress_msg.setWindowTitle(self.tr("正在复制文件"))
+        progress_msg.setText(self.tr("正在将文件复制到设备，请稍候..."))
+        progress_msg.setStandardButtons(QMessageBox.NoButton)
+        progress_msg.setAttribute(Qt.WA_DeleteOnClose, True)
+        progress_msg.show()
+        progress_msg.repaint()
+        
+        try:
+            success, output = self.run_pcat_copy(cmd)
+            progress_msg.close()
+            progress_msg.deleteLater()
+            
+            if success:
+                # 复制成功，询问是否重启
+                reply = QMessageBox.question(
+                    self,
+                    self.tr("复制成功"),
+                    self.tr("文件已成功复制到设备。\n\n是否立即重启设备以使配置生效？"),
+                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                    QMessageBox.StandardButton.Yes
+                )
+                
+                if reply == QMessageBox.StandardButton.Yes:
+                    # 执行重启
+                    reset_progress = QMessageBox(self)
+                    reset_progress.setWindowTitle(self.tr("正在重启设备"))
+                    reset_progress.setText(self.tr("正在重启设备，请稍候..."))
+                    reset_progress.setStandardButtons(QMessageBox.NoButton)
+                    reset_progress.setAttribute(Qt.WA_DeleteOnClose, True)
+                    reset_progress.show()
+                    reset_progress.repaint()
+                    
+                    reset_success, reset_output = self.reset_device(device_id)
+                    reset_progress.close()
+                    reset_progress.deleteLater()
+                    
+                    if reset_success:
+                        QMessageBox.information(
+                            self,
+                            self.tr("重启成功"),
+                            self.tr("设备重启命令已发送。")
+                        )
+                    else:
+                        QMessageBox.warning(
+                            self,
+                            self.tr("重启失败"),
+                            self.tr("设备重启失败:\n{}").format(reset_output)
+                        )
+            else:
+                # 复制失败
+                QMessageBox.critical(
+                    self,
+                    self.tr("复制失败"),
+                    self.tr("文件复制到设备失败:\n\n{}").format(output)
+                )
+        except Exception as e:
+            if progress_msg.isVisible():
+                progress_msg.close()
+                progress_msg.deleteLater()
+            logger.exception(f"执行PCAT复制时发生异常: {e}")
+            QMessageBox.critical(
+                self,
+                self.tr("错误"),
+                self.tr("执行复制时发生错误: {}").format(e)
+            )
+    
+    def build_pcat_delete_cmd(self, cell_type):
+        """构建PCAT删除命令"""
+        device_id = self.get_device_id()
+        if not device_id:
+            return None
+        
+        if cell_type == "LTE":
+            # LTE: 删除 /nv/item_files/modem/lte/rrc/efs/cell_lock_list
+            target_path = "/nv/item_files/modem/lte/rrc/efs/cell_lock_list"
+        else:  # 5G
+            # 5G: 删除 /nv/item_files/modem/nr5g/RRC/pci_lock_info
+            target_path = "/nv/item_files/modem/nr5g/RRC/pci_lock_info"
+        
+        # 构建命令
+        cmd = [
+            "PCAT",
+            "-PLUGIN", "EE",
+            "-DEVICE", device_id,
+            "-FS", "PRI",
+            "-MODE", "DELETE",
+            "-TYPE", "FILE",
+            "-VALUE", target_path
+        ]
+        return cmd
+    
+    def run_pcat_delete(self, cmd):
+        """执行PCAT删除命令"""
+        try:
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                timeout=90,
+                encoding="utf-8",
+                errors="replace",
+                creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0
+            )
+            
+            output = (result.stdout or "") + ("\n" if result.stdout and result.stderr else "") + (result.stderr or "")
+            
+            # 检查是否成功
+            success = (
+                result.returncode == 0 and
+                ("Status    - TRUE" in output or "successfully" in output.lower() or "deleted" in output.lower())
+            )
+            
+            return success, output
+        except subprocess.TimeoutExpired:
+            return False, self.tr("PCAT执行超时（>90秒）")
+        except Exception as e:
+            logger.exception(f"执行PCAT删除命令失败: {e}")
+            return False, str(e)
+    
+    def on_unlock_lte(self):
+        """解锁LTE"""
+        self.unlock_cell("LTE")
+    
+    def on_unlock_5g(self):
+        """解锁5G"""
+        self.unlock_cell("5G")
+    
+    def unlock_cell(self, cell_type):
+        """解锁Cell Lock"""
+        # 1. 检查PCAT环境
+        pcat_available, version = self.check_pcat_environment()
+        
+        if not pcat_available:
+            QMessageBox.warning(
+                self,
+                self.tr("PCAT未检测到"),
+                self.tr("未检测到高通PCAT工具环境。\n\n请安装高通PCAT工具并确保已添加到系统PATH环境变量中。")
+            )
+            return
+        
+        # 2. 获取设备ID
+        device_id = self.get_device_id()
+        if not device_id:
+            QMessageBox.warning(
+                self,
+                self.tr("设备未选择"),
+                self.tr("请先选择一个设备")
+            )
+            return
+        
+        # 3. 确认操作
+        cell_type_name = "LTE" if cell_type == "LTE" else "5G"
+        reply = QMessageBox.question(
+            self,
+            self.tr("确认解锁"),
+            self.tr("确定要解锁{} Cell Lock吗？\n\n此操作将删除设备上的锁定配置文件。").format(cell_type_name),
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No
+        )
+        
+        if reply != QMessageBox.StandardButton.Yes:
+            return
+        
+        # 4. 构建并执行删除命令
+        cmd = self.build_pcat_delete_cmd(cell_type)
+        if not cmd:
+            QMessageBox.warning(
+                self,
+                self.tr("错误"),
+                self.tr("无法构建PCAT命令")
+            )
+            return
+        
+        # 显示进度提示
+        progress_msg = QMessageBox(self)
+        progress_msg.setWindowTitle(self.tr("正在解锁"))
+        progress_msg.setText(self.tr("正在删除{} Cell Lock配置，请稍候...").format(cell_type_name))
+        progress_msg.setStandardButtons(QMessageBox.NoButton)
+        progress_msg.setAttribute(Qt.WA_DeleteOnClose, True)
+        progress_msg.show()
+        progress_msg.repaint()
+        
+        try:
+            success, output = self.run_pcat_delete(cmd)
+            progress_msg.close()
+            progress_msg.deleteLater()
+            
+            if success:
+                # 删除成功，询问是否重启
+                reply = QMessageBox.question(
+                    self,
+                    self.tr("解锁成功"),
+                    self.tr("{} Cell Lock已成功解锁。\n\n是否立即重启设备以使配置生效？").format(cell_type_name),
+                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                    QMessageBox.StandardButton.Yes
+                )
+                
+                if reply == QMessageBox.StandardButton.Yes:
+                    # 执行重启
+                    reset_progress = QMessageBox(self)
+                    reset_progress.setWindowTitle(self.tr("正在重启设备"))
+                    reset_progress.setText(self.tr("正在重启设备，请稍候..."))
+                    reset_progress.setStandardButtons(QMessageBox.NoButton)
+                    reset_progress.setAttribute(Qt.WA_DeleteOnClose, True)
+                    reset_progress.show()
+                    reset_progress.repaint()
+                    
+                    reset_success, reset_output = self.reset_device(device_id)
+                    reset_progress.close()
+                    reset_progress.deleteLater()
+                    
+                    if reset_success:
+                        QMessageBox.information(
+                            self,
+                            self.tr("重启成功"),
+                            self.tr("设备重启命令已发送。")
+                        )
+                    else:
+                        QMessageBox.warning(
+                            self,
+                            self.tr("重启失败"),
+                            self.tr("设备重启失败:\n{}").format(reset_output)
+                        )
+            else:
+                # 删除失败
+                QMessageBox.critical(
+                    self,
+                    self.tr("解锁失败"),
+                    self.tr("删除{} Cell Lock配置失败:\n\n{}").format(cell_type_name, output)
+                )
+        except Exception as e:
+            if progress_msg.isVisible():
+                progress_msg.close()
+                progress_msg.deleteLater()
+            logger.exception(f"执行PCAT删除时发生异常: {e}")
+            QMessageBox.critical(
+                self,
+                self.tr("错误"),
+                self.tr("执行解锁时发生错误: {}").format(e)
+            )
 
 
 class LTEInputDialog(QDialog):
