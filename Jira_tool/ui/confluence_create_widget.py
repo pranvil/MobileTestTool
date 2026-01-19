@@ -7,15 +7,17 @@ from PySide6.QtWidgets import (
     QTreeWidget, QTreeWidgetItem, QFormLayout, QDateEdit,
     QProgressBar, QScrollArea, QTableWidget, QTableWidgetItem,
     QHeaderView, QSplitter, QRadioButton, QButtonGroup, QCheckBox,
-    QSizePolicy
+    QSizePolicy, QTabWidget
 )
 from Jira_tool.ui.chapter_editor import ChapterEditor
-from PySide6.QtCore import Qt, QThread, Signal, QDate
+from PySide6.QtCore import Qt, QThread, Signal, QDate, QUrl
 from PySide6.QtGui import QDesktopServices
 from datetime import datetime
+import html as html_utils
+import re
 from typing import Dict, List, Any, Optional
 from Jira_tool.confluence_client import (
-    get_page_content, create_page, ConfluenceAPIError, reset_client
+    get_page_content, get_page_by_id, create_page, ConfluenceAPIError, reset_client
 )
 from Jira_tool.modules.confluence_template import (
     get_template_list, load_template_from_confluence, replace_variables,
@@ -102,6 +104,44 @@ class LoadChildrenThread(QThread):
             self.error.emit(self.page_id, str(e))
 
 
+class LoadPageContentThread(QThread):
+    """按需加载页面内容线程"""
+    finished = Signal(str, str, int)  # page_id, html, version
+    error = Signal(str, str)  # page_id, error_message
+    
+    def __init__(self, page_id: str):
+        super().__init__()
+        self.page_id = page_id
+    
+    def run(self):
+        """执行加载页面内容"""
+        try:
+            page_data = get_page_by_id(self.page_id, expand="body.view,version")
+            body = page_data.get("body", {}) if isinstance(page_data, dict) else {}
+            view = body.get("view", {}) if isinstance(body, dict) else {}
+            html = view.get("value", "") if isinstance(view, dict) else ""
+            
+            if not html:
+                page_data = get_page_by_id(self.page_id, expand="body.storage,version")
+                body = page_data.get("body", {}) if isinstance(page_data, dict) else {}
+                storage = body.get("storage", {}) if isinstance(body, dict) else {}
+                html = storage.get("value", "") if isinstance(storage, dict) else ""
+            
+            version = 0
+            if isinstance(page_data, dict):
+                version_value = (page_data.get("version") or {}).get("number")
+                if isinstance(version_value, int):
+                    version = version_value
+            
+            if not html:
+                html = "<p>该页面无正文或无法加载。</p>"
+            
+            self.finished.emit(self.page_id, html, version)
+        except Exception as e:
+            logger.exception(f"加载页面内容线程异常: {e}")
+            self.error.emit(self.page_id, str(e))
+
+
 class CreatePageThread(QThread):
     """创建页面线程"""
     finished = Signal(bool, dict)  # success, result
@@ -161,7 +201,10 @@ class ConfluenceCreateWidget(QWidget):
         self.load_template_thread = None
         self.load_pages_thread = None
         self.load_children_threads: List[LoadChildrenThread] = []  # 保存所有子页面加载线程
+        self.load_page_content_thread = None
         self.create_page_thread = None
+        self.page_preview_cache: Dict[str, Dict[str, Any]] = {}
+        self._last_preview_page_id = ""
         self.init_ui()
         # 不在这里加载，由主窗口在启动时自动加载
     
@@ -277,7 +320,23 @@ class ConfluenceCreateWidget(QWidget):
         
         form_container_layout.addWidget(self.form_scroll)
         self.form_group.setLayout(form_container_layout)
-        right_layout.addWidget(self.form_group, stretch=1)  # 设置stretch使其占据剩余空间
+        
+        # 页面预览区域（轻量）
+        self.preview_group = QGroupBox("页面预览（轻量）")
+        preview_layout = QVBoxLayout()
+        preview_layout.setContentsMargins(6, 6, 6, 6)
+        self.preview_text = QTextEdit()
+        self.preview_text.setReadOnly(True)
+        self.preview_text.setPlaceholderText("选择左侧页面后自动加载预览内容")
+        self.preview_text.setMinimumHeight(180)
+        preview_layout.addWidget(self.preview_text)
+        self.preview_group.setLayout(preview_layout)
+        
+        # Tab切换（页面信息/页面预览）
+        self.right_tabs = QTabWidget()
+        self.right_tabs.addTab(self.form_group, "页面信息")
+        self.right_tabs.addTab(self.preview_group, "页面预览")
+        right_layout.addWidget(self.right_tabs, stretch=1)
         
         # 操作按钮区域（在页面信息下方）
         button_container = QWidget()
@@ -514,12 +573,127 @@ class ConfluenceCreateWidget(QWidget):
                 page_title = item.text(0)
                 self.selected_location_label.setText(f"创建位置: {page_title}")
                 self.update_create_button_state()
+                self.load_page_preview(page_id, page_title)
             else:
                 self.selected_parent_id = ""
                 self.selected_location_label.setText("未选择位置")
+                self.set_preview_status("请选择页面以预览内容")
         else:
             self.selected_parent_id = ""
             self.selected_location_label.setText("未选择位置")
+            self.set_preview_status("请选择页面以预览内容")
+
+    def set_preview_status(self, message: str):
+        """设置预览区状态文本"""
+        html = f"<p style='color:#666;'>{message}</p>"
+        self.preview_text.setHtml(html)
+    
+    def load_page_preview(self, page_id: str, page_title: str):
+        """按需加载页面预览内容"""
+        self._last_preview_page_id = page_id
+        cached = self.page_preview_cache.get(page_id)
+        if cached and cached.get("html"):
+            self.show_page_preview(cached.get("html", ""), page_title)
+            return
+        
+        self.set_preview_status("正在加载页面内容...")
+        if self.load_page_content_thread and self.load_page_content_thread.isRunning():
+            # 允许多个请求并发，但只展示最后一次选择的页面
+            pass
+        
+        thread = LoadPageContentThread(page_id)
+        self.load_page_content_thread = thread
+        
+        def on_finished(pid: str, html: str, version: int):
+            if pid != self._last_preview_page_id:
+                return
+            self.page_preview_cache[pid] = {"html": html, "version": version}
+            self.show_page_preview(html, page_title)
+        
+        def on_error(pid: str, error_msg: str):
+            if pid != self._last_preview_page_id:
+                return
+            logger.warning(f"页面预览加载失败: {error_msg}")
+            self.set_preview_status("预览失败，可点击创建结果中的链接在浏览器打开。")
+        
+        thread.finished.connect(on_finished)
+        thread.error.connect(on_error)
+        thread.start()
+    
+    def show_page_preview(self, html: str, page_title: str):
+        """展示预览内容（轻量HTML）"""
+        base_url = get_confluence_url().rstrip("/")
+        safe_html = self._sanitize_preview_html(html)
+        if len(safe_html) > 400_000:
+            plain = self._html_to_plain_text(safe_html)
+            self.preview_text.setPlainText(plain)
+            return
+        
+        styled_content = f"""
+        <html>
+        <head>
+        <style>
+        body {{
+            font-family: Arial, sans-serif;
+            padding: 12px;
+            line-height: 1.5;
+        }}
+        h1, h2, h3 {{
+            color: #333;
+            margin-top: 16px;
+            margin-bottom: 8px;
+        }}
+        table {{
+            border-collapse: collapse;
+            width: 100%;
+            margin: 10px 0;
+        }}
+        th, td {{
+            border: 1px solid #ddd;
+            padding: 6px 10px;
+            text-align: left;
+        }}
+        th {{
+            background-color: #f2f2f2;
+            font-weight: bold;
+        }}
+        img {{
+            max-width: 100%;
+            height: auto;
+        }}
+        </style>
+        </head>
+        <body>
+        <h3 style="margin-top:0;">{page_title}</h3>
+        {safe_html}
+        </body>
+        </html>
+        """
+        self.preview_text.document().setBaseUrl(QUrl(base_url))
+        self.preview_text.setHtml(styled_content)
+
+    def _sanitize_preview_html(self, html: str) -> str:
+        """清理可能导致预览崩溃的HTML片段"""
+        if not html:
+            return ""
+        safe = html
+        # 移除可能引发渲染问题的标签
+        safe = re.sub(r'<!DOCTYPE[^>]*>', '', safe, flags=re.IGNORECASE)
+        safe = re.sub(r'<\?xml[^>]*\?>', '', safe, flags=re.IGNORECASE)
+        safe = re.sub(r'</?html[^>]*>', '', safe, flags=re.IGNORECASE)
+        safe = re.sub(r'</?head[^>]*>', '', safe, flags=re.IGNORECASE)
+        safe = re.sub(r'</?body[^>]*>', '', safe, flags=re.IGNORECASE)
+        safe = re.sub(r'<meta[^>]*>', '', safe, flags=re.IGNORECASE)
+        safe = re.sub(r'<style[^>]*>.*?</style>', '', safe, flags=re.IGNORECASE | re.DOTALL)
+        safe = re.sub(r'<script[^>]*>.*?</script>', '', safe, flags=re.IGNORECASE | re.DOTALL)
+        # Confluence 宏整体替换为占位文本
+        safe = re.sub(r'<ac:structured-macro[^>]*>.*?</ac:structured-macro>', '<p>[宏内容已省略]</p>', safe, flags=re.IGNORECASE | re.DOTALL)
+        return safe.strip()
+    
+    def _html_to_plain_text(self, html: str) -> str:
+        """HTML转纯文本（极端情况下的兜底）"""
+        text = re.sub(r'<[^>]+>', '', html or '')
+        return html_utils.unescape(text).strip()
     
     def on_template_changed(self, index: int):
         """模板选择改变"""
@@ -1279,6 +1453,9 @@ class ConfluenceCreateWidget(QWidget):
         
         if self.load_template_thread and self.load_template_thread.isRunning():
             self.load_template_thread.wait(3000)
+        
+        if self.load_page_content_thread and self.load_page_content_thread.isRunning():
+            self.load_page_content_thread.wait(3000)
         
         if self.create_page_thread and self.create_page_thread.isRunning():
             self.create_page_thread.wait(3000)
