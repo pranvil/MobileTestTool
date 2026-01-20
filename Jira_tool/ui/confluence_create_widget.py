@@ -230,6 +230,7 @@ class ConfluenceCreateWidget(QWidget):
         tree_group = QGroupBox("选择创建位置")
         tree_layout = QVBoxLayout()
         self.page_tree = QTreeWidget()
+        self.page_tree.setIndentation(12) 
         self.page_tree.setHeaderLabel("页面目录")
         self.page_tree.itemExpanded.connect(self.on_item_expanded)
         self.page_tree.itemSelectionChanged.connect(self.on_tree_selection_changed)
@@ -686,6 +687,14 @@ class ConfluenceCreateWidget(QWidget):
         safe = re.sub(r'<meta[^>]*>', '', safe, flags=re.IGNORECASE)
         safe = re.sub(r'<style[^>]*>.*?</style>', '', safe, flags=re.IGNORECASE | re.DOTALL)
         safe = re.sub(r'<script[^>]*>.*?</script>', '', safe, flags=re.IGNORECASE | re.DOTALL)
+        # 将内联黑色替换为暗色主题文本色，避免黑底黑字
+        dark_text_color = "#EAEAEA"
+        safe = re.sub(
+            r'color\s*:\s*(?:black|#000000|#000|rgb\(\s*0\s*,\s*0\s*,\s*0\s*\)|rgba\(\s*0\s*,\s*0\s*,\s*0\s*,\s*1\s*\))',
+            f"color: {dark_text_color}",
+            safe,
+            flags=re.IGNORECASE,
+        )
         # Confluence 宏整体替换为占位文本
         safe = re.sub(r'<ac:structured-macro[^>]*>.*?</ac:structured-macro>', '<p>[宏内容已省略]</p>', safe, flags=re.IGNORECASE | re.DOTALL)
         return safe.strip()
