@@ -1,34 +1,34 @@
 {
-    "version":  "0.9.6.6.0",
-    "download_url":  "https://github.com/pranvil/MobileTestTool/releases/download/v0.9.6.6.0/MobileTestTool_0.9.6.6.0.zip",
-    "sha256":  "d00810f920962293d30e355f68475c69bda3b6b21672cd12c30d4a53fad943ff",
-    "file_name":  "MobileTestTool_0.9.6.6.0.zip",
-    "file_size":  124177787,
-    "release_notes":  "## Release Note\n- Qualcomm set E922 to EMC\n- MACE use for python 3.7-3.11\n- Push Qualcom lock cell file to EFS",
-    "published_at":  "2026-01-19T00:05:41Z",
+    "version":  "0.9.6.6.1",
+    "download_url":  "https://github.com/pranvil/MobileTestTool/releases/download/v0.9.6.6.1/MobileTestTool_0.9.6.6.1.zip",
+    "sha256":  "79fefac442d895d80445ff76db5ecf2e656f519509c0b00589558fa6e41fb485",
+    "file_name":  "MobileTestTool_0.9.6.6.1.zip",
+    "file_size":  124179696,
+    "release_notes":  "## Release Note\n- Display confluence page\n- UI layout change",
+    "published_at":  "2026-01-21T21:03:03Z",
     "mandatory":  false,
     "download_urls":  [
                           {
                               "region":  "us",
-                              "url":  "https://github.com/pranvil/MobileTestTool/releases/download/v0.9.6.6.0/MobileTestTool_0.9.6.6.0.zip",
+                              "url":  "https://github.com/pranvil/MobileTestTool/releases/download/v0.9.6.6.1/MobileTestTool_0.9.6.6.1.zip",
                               "priority":  10,
                               "platform":  "windows"
                           },
                           {
                               "region":  "cn",
-                              "url":  "https://modelscope.cn/models/Pranvil/mobiletestTool/resolve/master/MobileTestTool_0.9.6.6.0.zip",
+                              "url":  "https://modelscope.cn/models/Pranvil/mobiletestTool/resolve/master/MobileTestTool_0.9.6.6.1.zip",
                               "priority":  20,
                               "platform":  "windows"
                           },
                           {
                               "region":  "internal",
-                              "url":  "http://10.129.93.67/hao.lin/MobileTestTool/-/releases/v0.9.6.6.0/downloads/MobileTestTool_0.9.6.6.0.zip",
+                              "url":  "http://10.129.93.67/hao.lin/MobileTestTool/-/releases/v0.9.6.6.1/downloads/MobileTestTool_0.9.6.6.1.zip",
                               "priority":  15,
                               "platform":  "windows"
                           },
                           {
                               "region":  "default",
-                              "url":  "https://github.com/pranvil/MobileTestTool/releases/download/v0.9.6.6.0/MobileTestTool_0.9.6.6.0.zip",
+                              "url":  "https://github.com/pranvil/MobileTestTool/releases/download/v0.9.6.6.1/MobileTestTool_0.9.6.6.1.zip",
                               "priority":  5,
                               "platform":  "all"
                           }
