@@ -1,6 +1,6 @@
 ## Release Note
 - Display confluence page
-- UI change
+- UI layout change
 
 
 
