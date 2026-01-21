@@ -1,13 +1,13 @@
-﻿#!/usr/bin/env python3
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
 顶部工具栏
 """
 
 from PySide6.QtWidgets import (QToolBar, QWidget, QHBoxLayout, QLabel, 
-                              QComboBox, QPushButton, QFrame, QLineEdit, QSizePolicy)
+                              QComboBox, QPushButton, QToolButton, QFrame, QLineEdit, QSizePolicy, QMenu)
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QIcon
+from PySide6.QtGui import QIcon, QAction
 from core.resource_utils import get_icon_path
 import os
 import logging
@@ -29,6 +29,10 @@ class DeviceToolBar(QToolBar):
     adb_command_executed = Signal(str)  # 执行adb命令
     language_changed = Signal(str)  # 语言切换信号
     check_update_clicked = Signal()
+    unified_manager_clicked = Signal()  # 自定义界面管理
+    tools_config_clicked = Signal()  # 工具配置
+    config_backup_clicked = Signal()  # 配置备份恢复
+    display_lines_clicked = Signal()  # 日志区域行数
     
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -156,6 +160,63 @@ class DeviceToolBar(QToolBar):
         right_layout.setContentsMargins(0, 0, 0, 0)
         right_layout.setSpacing(5)
 
+        # 自定义界面管理按钮（下拉菜单，只显示齿轮图标）
+        self.unified_manager_btn = QToolButton()
+        self.unified_manager_btn.setText("⚙️")
+        self.unified_manager_btn.setToolTip(self.lang_manager.tr("自定义界面管理"))
+        self.unified_manager_btn.setPopupMode(QToolButton.InstantPopup)
+        self.unified_manager_btn.setStyleSheet("""
+            QToolButton {
+                background-color: #6f42c1;
+                color: white;
+                font-weight: bold;
+                font-size: 16px;
+                padding: 5px 8px;
+                border: none;
+                border-radius: 4px;
+                min-width: 30px;
+                max-width: 30px;
+            }
+            QToolButton:hover {
+                background-color: #5a32a3;
+            }
+            QToolButton::menu-indicator {
+                image: none;
+                width: 0px;
+                height: 0px;
+            }
+        """)
+        
+        # 创建下拉菜单
+        settings_menu = QMenu(self.unified_manager_btn)
+        
+        # 自定义界面管理
+        unified_manager_action = QAction("⚙️ " + self.lang_manager.tr("自定义界面管理"), self)
+        unified_manager_action.triggered.connect(self.unified_manager_clicked.emit)
+        settings_menu.addAction(unified_manager_action)
+        
+        settings_menu.addSeparator()
+        
+        # 工具配置
+        tools_config_action = QAction("🔧 " + self.lang_manager.tr("工具配置"), self)
+        tools_config_action.triggered.connect(self.tools_config_clicked.emit)
+        settings_menu.addAction(tools_config_action)
+        
+        # 配置备份恢复
+        config_backup_action = QAction("💾 " + self.lang_manager.tr("配置备份恢复"), self)
+        config_backup_action.triggered.connect(self.config_backup_clicked.emit)
+        settings_menu.addAction(config_backup_action)
+        
+        # 日志区域行数
+        display_lines_action = QAction("📊 " + self.lang_manager.tr("日志区域行数"), self)
+        display_lines_action.triggered.connect(self.display_lines_clicked.emit)
+        settings_menu.addAction(display_lines_action)
+        
+        self.unified_manager_btn.setMenu(settings_menu)
+        self.settings_menu = settings_menu  # 保存引用以便后续更新文本
+        
+        right_layout.addWidget(self.unified_manager_btn)
+
         self.check_update_btn = QPushButton(self.lang_manager.tr("检查更新"))
         self.check_update_btn.clicked.connect(self.check_update_clicked.emit)
         right_layout.addWidget(self.check_update_btn)
@@ -254,6 +315,21 @@ class DeviceToolBar(QToolBar):
         self.reboot_btn.setText(self.lang_manager.tr("重启手机"))
         self.root_remount_btn.setText(self.lang_manager.tr("Root&&Remount"))
         self.check_update_btn.setText(self.lang_manager.tr("检查更新"))
+        
+        # 更新自定义界面管理按钮的tooltip和菜单文本
+        if hasattr(self, 'unified_manager_btn'):
+            self.unified_manager_btn.setToolTip(self.lang_manager.tr("自定义界面管理"))
+        if hasattr(self, 'settings_menu'):
+            # 更新菜单项文本
+            for action in self.settings_menu.actions():
+                if "自定义界面管理" in action.text() or "Custom Interface Management" in action.text():
+                    action.setText("⚙️ " + self.lang_manager.tr("自定义界面管理"))
+                elif "工具配置" in action.text() or "Tool Configuration" in action.text():
+                    action.setText("🔧 " + self.lang_manager.tr("工具配置"))
+                elif "配置备份恢复" in action.text() or "Config Backup" in action.text():
+                    action.setText("💾 " + self.lang_manager.tr("配置备份恢复"))
+                elif "日志区域行数" in action.text() or "Log area line count" in action.text():
+                    action.setText("📊 " + self.lang_manager.tr("日志区域行数"))
         
         # ADB命令输入框已移到日志显示区域，不再需要刷新工具栏中的
         # # 刷新ADB命令标签

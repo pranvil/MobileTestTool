@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env python3
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
 其他 Tab
@@ -26,35 +26,17 @@ class OtherTab(QWidget):
     # 其他操作
     show_input_text_dialog = Signal()
     
-    # 工具配置
-    show_tools_config_dialog = Signal()
-    
-    # 设置显示行数
-    show_display_lines_dialog = Signal()
-    
     # AT工具
     show_at_tool_dialog = Signal()
-    
-    # 配置备份恢复
-    show_config_backup_dialog = Signal()
-    
-    # 自定义界面管理
-    show_unified_manager = Signal()
     
     # 暗码管理
     show_secret_code_dialog = Signal()
     
-    # 高通lock cell
-    show_lock_cell_dialog = Signal()
-    
-    # 高通NV
-    show_qc_nv_dialog = Signal()
-    
-    # PR翻译
-    show_pr_translation_dialog = Signal()
-    
     # 转码工具
     show_encoding_tool_dialog = Signal()
+    
+    # 3GPP解码器
+    parse_3gpp_message = Signal()
     
     def __init__(self, parent=None):
         try:
@@ -177,15 +159,6 @@ class OtherTab(QWidget):
             self.secret_code_btn = QPushButton("🔑 " + self.lang_manager.tr("暗码"))
             self.secret_code_btn.clicked.connect(lambda: self._on_button_clicked("secret_code_btn", self.show_secret_code_dialog.emit))
             card_layout.addWidget(self.secret_code_btn)
-            
-            self.lock_cell_btn = QPushButton("📱 " + self.lang_manager.tr("高通lock cell"))
-            self.lock_cell_btn.setToolTip(self.lang_manager.tr("高通lock cell - 锁定高通设备到指定的小区"))
-            self.lock_cell_btn.clicked.connect(lambda: self._on_button_clicked("lock_cell_btn", self.show_lock_cell_dialog.emit))
-            card_layout.addWidget(self.lock_cell_btn)
-            
-            self.qc_nv_btn = QPushButton("📊 " + self.lang_manager.tr("高通NV"))
-            self.qc_nv_btn.clicked.connect(lambda: self._on_button_clicked("qc_nv_btn", self.show_qc_nv_dialog.emit))
-            card_layout.addWidget(self.qc_nv_btn)
                      
             card_layout.addStretch()
             
@@ -264,65 +237,16 @@ class OtherTab(QWidget):
         self.show_at_tool_btn.clicked.connect(lambda: self._on_button_clicked("show_at_tool_btn", self.show_at_tool_dialog.emit))
         card_layout.addWidget(self.show_at_tool_btn)
 
-        self.show_pr_translation_btn = QPushButton("🌐 " + self.lang_manager.tr("PR翻译"))
-        self.show_pr_translation_btn.setToolTip(self.lang_manager.tr("PR翻译 - 将中文PR内容翻译成英文并生成Word文档"))
-        self.show_pr_translation_btn.clicked.connect(lambda: self._on_button_clicked("show_pr_translation_btn", self.show_pr_translation_dialog.emit))
-        card_layout.addWidget(self.show_pr_translation_btn)
-
         self.show_encoding_tool_btn = QPushButton("🔤 " + self.lang_manager.tr("转码"))
         self.show_encoding_tool_btn.setToolTip(self.lang_manager.tr("转码工具 - ASCII和GSM 7-bit编码的双向转换"))
         self.show_encoding_tool_btn.clicked.connect(lambda: self._on_button_clicked("show_encoding_tool_btn", self.show_encoding_tool_dialog.emit))
         card_layout.addWidget(self.show_encoding_tool_btn)
 
+        self.parse_3gpp_btn = QPushButton(self.lang_manager.tr("3GPP解码器"))
+        self.parse_3gpp_btn.clicked.connect(lambda: self._on_button_clicked("parse_3gpp_btn", self.parse_3gpp_message.emit))
+        card_layout.addWidget(self.parse_3gpp_btn)
+
         card_layout.addStretch()
-                 
-        self.show_display_lines_btn = QPushButton(self.lang_manager.tr("日志区域行数"))
-        self.show_display_lines_btn.setToolTip(self.lang_manager.tr("设置显示行数 - 配置日志区域显示的最大行数"))
-        self.show_display_lines_btn.clicked.connect(lambda: self._on_button_clicked("show_display_lines_btn", self.show_display_lines_dialog.emit))
-        card_layout.addWidget(self.show_display_lines_btn)
-         
-        self.show_tools_config_btn = QPushButton("🔧 " + self.lang_manager.tr("工具配置"))
-        self.show_tools_config_btn.clicked.connect(lambda: self._on_button_clicked("show_tools_config_btn", self.show_tools_config_dialog.emit))
-        self.show_tools_config_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #6f42c1;
-                color: white;
-                font-weight: bold;
-            }
-            QPushButton:hover {
-                background-color: #5a32a3;
-            }
-        """)
-        card_layout.addWidget(self.show_tools_config_btn)
-      
-        self.config_backup_btn = QPushButton("💾 " + self.lang_manager.tr("配置备份恢复"))
-        self.config_backup_btn.setToolTip(self.lang_manager.tr("配置备份恢复 - 导出或导入工具配置"))
-        self.config_backup_btn.clicked.connect(lambda: self._on_button_clicked("config_backup_btn", self.show_config_backup_dialog.emit))
-        self.config_backup_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #28a745;
-                color: white;
-                font-weight: bold;
-            }
-            QPushButton:hover {
-                background-color: #218838;
-            }
-        """)
-        card_layout.addWidget(self.config_backup_btn)
-        
-        self.unified_manager_btn = QPushButton("⚙️ " + self.lang_manager.tr("自定义界面管理"))
-        self.unified_manager_btn.clicked.connect(lambda: self._on_button_clicked("unified_manager_btn", self.show_unified_manager.emit))
-        self.unified_manager_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #6f42c1;
-                color: white;
-                font-weight: bold;
-            }
-            QPushButton:hover {
-                background-color: #5a32a3;
-            }
-        """)
-        card_layout.addWidget(self.unified_manager_btn)
         
         v.addWidget(card)
         
@@ -403,30 +327,18 @@ class OtherTab(QWidget):
         # 刷新其他操作组按钮
         if hasattr(self, 'show_input_text_btn'):
             self.show_input_text_btn.setText(self.lang_manager.tr("输入文本"))
-        if hasattr(self, 'show_tools_config_btn'):
-            self.show_tools_config_btn.setText("🔧 " + self.lang_manager.tr("工具配置"))
-        if hasattr(self, 'show_display_lines_btn'):
-            self.show_display_lines_btn.setText(self.lang_manager.tr("设置显示行数"))
         if hasattr(self, 'show_at_tool_btn'):
             self.show_at_tool_btn.setText("📡 " + self.lang_manager.tr("AT工具"))
-        if hasattr(self, 'config_backup_btn'):
-            self.config_backup_btn.setText("💾 " + self.lang_manager.tr("配置备份恢复"))
-        if hasattr(self, 'unified_manager_btn'):
-            self.unified_manager_btn.setText("⚙️ " + self.lang_manager.tr("自定义界面管理"))
         if hasattr(self, 'custom_button_manager_btn'):
             self.custom_button_manager_btn.setText("🔧 " + self.lang_manager.tr("管理自定义按钮"))
         if hasattr(self, 'tab_manager_btn'):
             self.tab_manager_btn.setText("📋 " + self.lang_manager.tr("Tab管理"))
         if hasattr(self, 'secret_code_btn'):
             self.secret_code_btn.setText("🔑 " + self.lang_manager.tr("暗码"))
-        if hasattr(self, 'lock_cell_btn'):
-            self.lock_cell_btn.setText("📱 " + self.lang_manager.tr("高通lock cell"))
-        if hasattr(self, 'qc_nv_btn'):
-            self.qc_nv_btn.setText("📊 " + self.lang_manager.tr("高通NV"))
-        if hasattr(self, 'show_pr_translation_btn'):
-            self.show_pr_translation_btn.setText("🌐 " + self.lang_manager.tr("PR翻译"))
         if hasattr(self, 'show_encoding_tool_btn'):
             self.show_encoding_tool_btn.setText("🔤 " + self.lang_manager.tr("转码"))
+        if hasattr(self, 'parse_3gpp_btn'):
+            self.parse_3gpp_btn.setText(self.lang_manager.tr("3GPP解码器"))
     
     def _refresh_section_titles(self):
         """刷新组标题标签"""

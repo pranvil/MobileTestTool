@@ -1,12 +1,13 @@
-﻿#!/usr/bin/env python3
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
 Log控制 Tab
 """
 
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout,
-                              QPushButton, QLabel, QScrollArea, QFrame)
+                              QPushButton, QToolButton, QLabel, QScrollArea, QFrame, QMenu)
 from PySide6.QtCore import Signal, Qt
+from PySide6.QtGui import QAction
 from ui.widgets.shadow_utils import add_card_shadow
 
 
@@ -50,8 +51,11 @@ class LogControlTab(QWidget):
     extract_pcap_from_mtklog = Signal()
     merge_pcap = Signal()
     extract_pcap_from_qualcomm_log = Signal()
-    parse_3gpp_message = Signal()
     mtk_sip_decode = Signal()
+    
+    # Qualcomm工具相关
+    show_lock_cell_dialog = Signal()
+    show_qc_nv_dialog = Signal()
     
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -183,9 +187,11 @@ class LogControlTab(QWidget):
         card_layout.setContentsMargins(10, 1, 10, 1)
         card_layout.setSpacing(8)
         
-        # 第一行：主要操作
+        # 第一行：MTK操作（合并了原来的第一行和第二行）
         row1 = QHBoxLayout()
-        row1.addWidget(QLabel("MTKLOG:"))
+        mtk_label = QLabel("MTK:")
+        mtk_label.setFixedWidth(90)  # 固定宽度，确保与Qualcomm标签对齐
+        row1.addWidget(mtk_label)
         
         self.mtklog_start_btn = QPushButton(self.lang_manager.tr("开启"))
         self.mtklog_start_btn.clicked.connect(self.mtklog_start.emit)
@@ -199,57 +205,81 @@ class LogControlTab(QWidget):
         self.mtklog_delete_btn.clicked.connect(self.mtklog_delete.emit)
         row1.addWidget(self.mtklog_delete_btn)
         
-        self.mtklog_set_log_size_btn = QPushButton(self.lang_manager.tr("设置log size"))
-        self.mtklog_set_log_size_btn.clicked.connect(self.mtklog_set_log_size.emit)
-        row1.addWidget(self.mtklog_set_log_size_btn)
+        # Logger设置按钮（下拉菜单）
+        self.mtklog_mode_btn = QToolButton()
+        self.mtklog_mode_btn.setText(self.lang_manager.tr("Logger设置"))
+        self.mtklog_mode_btn.setPopupMode(QToolButton.InstantPopup)
         
-        # 在第一行添加模式相关的按钮（不要模式标签）
-        self.mtklog_sd_mode_btn = QPushButton(self.lang_manager.tr("SD模式"))
-        self.mtklog_sd_mode_btn.clicked.connect(self.mtklog_sd_mode.emit)
-        row1.addWidget(self.mtklog_sd_mode_btn)
+        # 创建下拉菜单
+        mode_menu = QMenu(self.mtklog_mode_btn)
         
-        self.mtklog_usb_mode_btn = QPushButton(self.lang_manager.tr("USB模式"))
-        self.mtklog_usb_mode_btn.clicked.connect(self.mtklog_usb_mode.emit)
-        row1.addWidget(self.mtklog_usb_mode_btn)
+        # 设置log size
+        set_log_size_action = QAction(self.lang_manager.tr("设置log size"), self)
+        set_log_size_action.triggered.connect(self.mtklog_set_log_size.emit)
+        mode_menu.addAction(set_log_size_action)
         
-        self.mtklog_install_btn = QPushButton(self.lang_manager.tr("安装MTKLOGGER"))
-        self.mtklog_install_btn.clicked.connect(self.mtklog_install.emit)
-        row1.addWidget(self.mtklog_install_btn)
+        mode_menu.addSeparator()
+        
+        # SD模式
+        sd_mode_action = QAction(self.lang_manager.tr("SD模式"), self)
+        sd_mode_action.triggered.connect(self.mtklog_sd_mode.emit)
+        mode_menu.addAction(sd_mode_action)
+        
+        # USB模式
+        usb_mode_action = QAction(self.lang_manager.tr("USB模式"), self)
+        usb_mode_action.triggered.connect(self.mtklog_usb_mode.emit)
+        mode_menu.addAction(usb_mode_action)
+        
+        self.mtklog_mode_btn.setMenu(mode_menu)
+        self.mtklog_mode_menu = mode_menu  # 保存引用以便后续更新文本
+        row1.addWidget(self.mtklog_mode_btn)
+        
+        # self.mtklog_install_btn = QPushButton(self.lang_manager.tr("安装MTKLOGGER"))
+        # self.mtklog_install_btn.clicked.connect(self.mtklog_install.emit)
+        # row1.addWidget(self.mtklog_install_btn)
         
         self.telephony_btn = QPushButton(self.lang_manager.tr("启用Telephony日志"))
         self.telephony_btn.clicked.connect(self.telephony_enable.emit)
         row1.addWidget(self.telephony_btn)
         
-        row1.addStretch()
-        card_layout.addLayout(row1)
-        
-        # 第二行：log操作
-        row2 = QHBoxLayout()
-        row2.addWidget(QLabel(self.lang_manager.tr("log操作:")))
-        
+        # 合并原来的第二行按钮
         self.merge_mtklog_btn = QPushButton(self.lang_manager.tr("合并MTKlog"))
         self.merge_mtklog_btn.clicked.connect(self.merge_mtklog.emit)
-        row2.addWidget(self.merge_mtklog_btn)
+        row1.addWidget(self.merge_mtklog_btn)
         
         self.extract_pcap_from_mtklog_btn = QPushButton(self.lang_manager.tr("MTKlog提取pcap"))
         self.extract_pcap_from_mtklog_btn.clicked.connect(self.extract_pcap_from_mtklog.emit)
-        row2.addWidget(self.extract_pcap_from_mtklog_btn)
+        row1.addWidget(self.extract_pcap_from_mtklog_btn)
         
         self.merge_pcap_btn = QPushButton(self.lang_manager.tr("合并PCAP"))
         self.merge_pcap_btn.clicked.connect(self.merge_pcap.emit)
-        row2.addWidget(self.merge_pcap_btn)
+        row1.addWidget(self.merge_pcap_btn)
+        
+        self.mtk_sip_decode_btn = QPushButton(self.lang_manager.tr("MTK SIP DECODE"))
+        self.mtk_sip_decode_btn.clicked.connect(self.mtk_sip_decode.emit)
+        row1.addWidget(self.mtk_sip_decode_btn)
+        
+        row1.addStretch()
+        card_layout.addLayout(row1)
+        
+        # 第二行：高通工具
+        row2 = QHBoxLayout()
+        qualcomm_label = QLabel(self.lang_manager.tr("Qualcomm:"))
+        qualcomm_label.setFixedWidth(90)  # 固定宽度，与MTK标签对齐
+        row2.addWidget(qualcomm_label)
         
         self.extract_pcap_from_qualcomm_log_btn = QPushButton(self.lang_manager.tr("高通log提取pcap"))
         self.extract_pcap_from_qualcomm_log_btn.clicked.connect(self.extract_pcap_from_qualcomm_log.emit)
         row2.addWidget(self.extract_pcap_from_qualcomm_log_btn)
         
-        self.parse_3gpp_btn = QPushButton(self.lang_manager.tr("3GPP解码器"))
-        self.parse_3gpp_btn.clicked.connect(self.parse_3gpp_message.emit)
-        row2.addWidget(self.parse_3gpp_btn)
+        self.lock_cell_btn = QPushButton("📱 " + self.lang_manager.tr("高通lock cell"))
+        self.lock_cell_btn.setToolTip(self.lang_manager.tr("高通lock cell - 锁定高通设备到指定的小区"))
+        self.lock_cell_btn.clicked.connect(self.show_lock_cell_dialog.emit)
+        row2.addWidget(self.lock_cell_btn)
         
-        self.mtk_sip_decode_btn = QPushButton(self.lang_manager.tr("MTK SIP DECODE"))
-        self.mtk_sip_decode_btn.clicked.connect(self.mtk_sip_decode.emit)
-        row2.addWidget(self.mtk_sip_decode_btn)
+        self.qc_nv_btn = QPushButton("📊 " + self.lang_manager.tr("高通NV"))
+        self.qc_nv_btn.clicked.connect(self.show_qc_nv_dialog.emit)
+        row2.addWidget(self.qc_nv_btn)
         
         row2.addStretch()
         card_layout.addLayout(row2)
@@ -282,7 +312,9 @@ class LogControlTab(QWidget):
         
         # 第一行：ADB Log
         row1 = QHBoxLayout()
-        row1.addWidget(QLabel("ADB Log:"))
+        adb_log_label = QLabel("ADB Log:")
+        adb_log_label.setFixedWidth(90)  # 固定宽度，确保与Google日志标签对齐
+        row1.addWidget(adb_log_label)
         
         self.adblog_online_btn = QPushButton(self.lang_manager.tr("连线log"))
         self.adblog_online_btn.clicked.connect(self.adblog_online_start.emit)
@@ -305,7 +337,9 @@ class LogControlTab(QWidget):
         
         # 第二行：Google 日志
         row2 = QHBoxLayout()
-        row2.addWidget(QLabel(self.lang_manager.tr("Google日志:")))
+        google_log_label = QLabel(self.lang_manager.tr("Google日志:"))
+        google_log_label.setFixedWidth(90)  # 固定宽度，与ADB Log标签对齐
+        row2.addWidget(google_log_label)
         
         self.google_log_btn = QPushButton(self.lang_manager.tr("Google 日志"))
         self.google_log_btn.clicked.connect(self.google_log_toggle.emit)
@@ -373,14 +407,19 @@ class LogControlTab(QWidget):
             self.mtklog_stop_export_btn.setText(self.lang_manager.tr("停止&导出"))
         if hasattr(self, 'mtklog_delete_btn'):
             self.mtklog_delete_btn.setText(self.lang_manager.tr("删除"))
-        if hasattr(self, 'mtklog_set_log_size_btn'):
-            self.mtklog_set_log_size_btn.setText(self.lang_manager.tr("设置log size"))
-        if hasattr(self, 'mtklog_sd_mode_btn'):
-            self.mtklog_sd_mode_btn.setText(self.lang_manager.tr("SD模式"))
-        if hasattr(self, 'mtklog_usb_mode_btn'):
-            self.mtklog_usb_mode_btn.setText(self.lang_manager.tr("USB模式"))
-        if hasattr(self, 'mtklog_install_btn'):
-            self.mtklog_install_btn.setText(self.lang_manager.tr("安装MTKLOGGER"))
+        if hasattr(self, 'mtklog_mode_btn'):
+            self.mtklog_mode_btn.setText(self.lang_manager.tr("Logger设置"))
+        if hasattr(self, 'mtklog_mode_menu'):
+            # 更新菜单项文本
+            for action in self.mtklog_mode_menu.actions():
+                if "设置log size" in action.text() or "Set log size" in action.text():
+                    action.setText(self.lang_manager.tr("设置log size"))
+                elif "SD模式" in action.text() or "SD Mode" in action.text():
+                    action.setText(self.lang_manager.tr("SD模式"))
+                elif "USB模式" in action.text() or "USB Mode" in action.text():
+                    action.setText(self.lang_manager.tr("USB模式"))
+        # if hasattr(self, 'mtklog_install_btn'):
+        #     self.mtklog_install_btn.setText(self.lang_manager.tr("安装MTKLOGGER"))
         
         # 刷新ADB Log控制按钮
         if hasattr(self, 'adblog_online_btn'):
@@ -419,17 +458,16 @@ class LogControlTab(QWidget):
             self.extract_pcap_from_mtklog_btn.setText(self.lang_manager.tr("MTKlog提取pcap"))
         if hasattr(self, 'merge_pcap_btn'):
             self.merge_pcap_btn.setText(self.lang_manager.tr("合并PCAP"))
-        if hasattr(self, 'extract_pcap_from_qualcomm_log_btn'):
-            self.extract_pcap_from_qualcomm_log_btn.setText(self.lang_manager.tr("高通log提取pcap"))
-        if hasattr(self, 'parse_3gpp_btn'):
-            self.parse_3gpp_btn.setText(self.lang_manager.tr("3GPP解码器"))
         if hasattr(self, 'mtk_sip_decode_btn'):
             self.mtk_sip_decode_btn.setText(self.lang_manager.tr("MTK SIP DECODE"))
         
-        # 刷新log操作标签
-        for label in self.findChildren(QLabel):
-            if label.text() in ["log操作:", "Log Operations:"]:
-                label.setText(self.lang_manager.tr("log操作:"))
+        # 刷新Qualcomm组按钮
+        if hasattr(self, 'extract_pcap_from_qualcomm_log_btn'):
+            self.extract_pcap_from_qualcomm_log_btn.setText(self.lang_manager.tr("高通log提取pcap"))
+        if hasattr(self, 'lock_cell_btn'):
+            self.lock_cell_btn.setText("📱 " + self.lang_manager.tr("高通lock cell"))
+        if hasattr(self, 'qc_nv_btn'):
+            self.qc_nv_btn.setText("📊 " + self.lang_manager.tr("高通NV"))
         
         # 刷新组标题标签
         self._refresh_section_titles()
@@ -448,4 +486,6 @@ class LogControlTab(QWidget):
                 label.setText(self.lang_manager.tr("模式:"))
             elif current_text in ["Google日志:", "Google Log:"]:
                 label.setText(self.lang_manager.tr("Google日志:"))
+            elif current_text in ["Qualcomm工具:", "Qualcomm Tools:"]:
+                label.setText(self.lang_manager.tr("Qualcomm工具:"))
 

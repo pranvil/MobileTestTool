@@ -17,6 +17,8 @@ class OfficeToolTab(QWidget):
     # 信号定义
     # JIRA工具
     show_jira_tool = Signal()
+    # PR翻译
+    show_pr_translation_dialog = Signal()
     
     def __init__(self, parent=None):
         try:
@@ -116,6 +118,11 @@ class OfficeToolTab(QWidget):
             self.show_jira_tool_btn.clicked.connect(lambda: self._on_button_clicked("show_jira_tool_btn", self.show_jira_tool.emit))
             card_layout.addWidget(self.show_jira_tool_btn)
             
+            self.show_pr_translation_btn = QPushButton("🌐 " + self.lang_manager.tr("PR翻译"))
+            self.show_pr_translation_btn.setToolTip(self.lang_manager.tr("PR翻译 - 将中文PR内容翻译成英文并生成Word文档"))
+            self.show_pr_translation_btn.clicked.connect(lambda: self._on_button_clicked("show_pr_translation_btn", self.show_pr_translation_dialog.emit))
+            card_layout.addWidget(self.show_pr_translation_btn)
+            
             card_layout.addStretch()
             
             v.addWidget(card)
@@ -179,6 +186,8 @@ class OfficeToolTab(QWidget):
         # 刷新JIRA&Confluence组按钮
         if hasattr(self, 'show_jira_tool_btn'):
             self.show_jira_tool_btn.setText(self.lang_manager.tr("JIRA工具"))
+        if hasattr(self, 'show_pr_translation_btn'):
+            self.show_pr_translation_btn.setText("🌐 " + self.lang_manager.tr("PR翻译"))
     
     def _refresh_section_titles(self):
         """刷新组标题标签"""

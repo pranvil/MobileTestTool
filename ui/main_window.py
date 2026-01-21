@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env python3
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
 主窗口
@@ -1302,6 +1302,10 @@ class MainWindow(QMainWindow):
         self.toolbar.root_remount_clicked.connect(self._on_root_remount)
         self.toolbar.theme_toggled.connect(self._on_theme_toggled)
         self.toolbar.check_update_clicked.connect(self._on_check_update_clicked)
+        self.toolbar.unified_manager_clicked.connect(self.show_unified_manager_dialog)
+        self.toolbar.tools_config_clicked.connect(self._on_show_tools_config_dialog)
+        self.toolbar.config_backup_clicked.connect(self.show_config_backup_dialog)
+        self.toolbar.display_lines_clicked.connect(self._on_show_display_lines_dialog)
         # 工具栏中的ADB命令输入框已移到日志显示区域下方
         # self.toolbar.adb_command_executed.connect(self._on_adb_command_executed)
         
@@ -1456,13 +1460,22 @@ class MainWindow(QMainWindow):
         self.log_control_tab.extract_pcap_from_mtklog.connect(self._on_extract_pcap_from_mtklog)
         self.log_control_tab.merge_pcap.connect(self._on_merge_pcap)
         self.log_control_tab.extract_pcap_from_qualcomm_log.connect(self._on_extract_pcap_from_qualcomm_log)
-        self.log_control_tab.parse_3gpp_message.connect(self._on_parse_3gpp_message)
         self.log_control_tab.mtk_sip_decode.connect(self._on_mtk_sip_decode)
+        self.log_control_tab.show_lock_cell_dialog.connect(self.show_lock_cell_dialog)
+        self.log_control_tab.show_qc_nv_dialog.connect(self.show_qc_nv_dialog)
         
         # 连接办公工具Tab信号
         try:
             if hasattr(self, 'office_tool_tab'):
                 self.office_tool_tab.show_jira_tool.connect(self._on_show_jira_tool)
+                self.office_tool_tab.show_pr_translation_dialog.connect(self._on_show_pr_translation_dialog)
+                # 验证关键信号连接是否成功
+                try:
+                    receivers = QObject.receivers(self.office_tool_tab, self.office_tool_tab.show_pr_translation_dialog)
+                    if receivers == 0:
+                        logger.error("✗ show_pr_translation_dialog 信号连接失败！")
+                except Exception as check_error:
+                    logger.warning(f"无法检查信号 show_pr_translation_dialog 的接收器数量: {check_error}")
         except Exception as e:
             logger.error(f"连接OfficeToolTab信号槽失败: {e}")
         
@@ -1473,23 +1486,11 @@ class MainWindow(QMainWindow):
             self.other_tab.configure_hera.connect(self._on_configure_hera)
             self.other_tab.configure_collect_data.connect(self._on_configure_collect_data)
             self.other_tab.show_input_text_dialog.connect(self._on_show_input_text_dialog)
-            self.other_tab.show_tools_config_dialog.connect(self._on_show_tools_config_dialog)
-            self.other_tab.show_display_lines_dialog.connect(self._on_show_display_lines_dialog)
+            # 工具配置、配置备份恢复和日志区域行数已移到工具栏的下拉菜单中
             self.other_tab.show_at_tool_dialog.connect(self._on_show_at_tool_dialog)
-            self.other_tab.show_config_backup_dialog.connect(self.show_config_backup_dialog)
-            self.other_tab.show_unified_manager.connect(self.show_unified_manager_dialog)
             self.other_tab.show_secret_code_dialog.connect(self.show_secret_code_dialog)
-            self.other_tab.show_lock_cell_dialog.connect(self.show_lock_cell_dialog)
-            self.other_tab.show_qc_nv_dialog.connect(self.show_qc_nv_dialog)
-            self.other_tab.show_pr_translation_dialog.connect(self._on_show_pr_translation_dialog)
-            # 验证关键信号连接是否成功
-            try:
-                receivers = QObject.receivers(self.other_tab, self.other_tab.show_pr_translation_dialog)
-                if receivers == 0:
-                    logger.error("✗ show_pr_translation_dialog 信号连接失败！")
-            except Exception as check_error:
-                logger.warning(f"无法检查信号 show_pr_translation_dialog 的接收器数量: {check_error}")
             self.other_tab.show_encoding_tool_dialog.connect(self._on_show_encoding_tool_dialog)
+            self.other_tab.parse_3gpp_message.connect(self._on_parse_3gpp_message)
             logger.debug("OtherTab 信号槽连接完成")
         except Exception as e:
             logger.error(f"连接 OtherTab 信号槽失败:\n  错误类型: {type(e).__name__}\n  错误信息: {str(e)}")
@@ -5420,6 +5421,14 @@ class MainWindow(QMainWindow):
                 self.log_control_tab.bugreport_delete.connect(self._on_bugreport_delete)
                 self.log_control_tab.aee_log_start.connect(self._on_aee_log_start)
                 self.log_control_tab.tcpdump_show_dialog.connect(self._on_tcpdump_show_dialog)
+                self.log_control_tab.merge_mtklog.connect(self._on_merge_mtklog)
+                self.log_control_tab.extract_pcap_from_mtklog.connect(self._on_extract_pcap_from_mtklog)
+                self.log_control_tab.merge_pcap.connect(self._on_merge_pcap)
+                self.log_control_tab.extract_pcap_from_qualcomm_log.connect(self._on_extract_pcap_from_qualcomm_log)
+                self.log_control_tab.parse_3gpp_message.connect(self._on_parse_3gpp_message)
+                self.log_control_tab.mtk_sip_decode.connect(self._on_mtk_sip_decode)
+                self.log_control_tab.show_lock_cell_dialog.connect(self.show_lock_cell_dialog)
+                self.log_control_tab.show_qc_nv_dialog.connect(self.show_qc_nv_dialog)
             
             # 连接 Log过滤 Tab 信号
             if hasattr(self, 'log_filter_tab'):
@@ -5442,6 +5451,7 @@ class MainWindow(QMainWindow):
             if hasattr(self, 'office_tool_tab'):
                 try:
                     self.office_tool_tab.show_jira_tool.connect(self._on_show_jira_tool)
+                    self.office_tool_tab.show_pr_translation_dialog.connect(self._on_show_pr_translation_dialog)
                 except Exception as e:
                     logger.error(f"重新连接OfficeToolTab信号槽失败: {e}")
             
@@ -5496,7 +5506,6 @@ class MainWindow(QMainWindow):
                 self.log_control_tab.extract_pcap_from_mtklog.connect(self._on_extract_pcap_from_mtklog)
                 self.log_control_tab.merge_pcap.connect(self._on_merge_pcap)
                 self.log_control_tab.extract_pcap_from_qualcomm_log.connect(self._on_extract_pcap_from_qualcomm_log)
-                self.log_control_tab.parse_3gpp_message.connect(self._on_parse_3gpp_message)
                 self.log_control_tab.mtk_sip_decode.connect(self._on_mtk_sip_decode)
             
             if hasattr(self, 'other_tab'):
@@ -5505,15 +5514,11 @@ class MainWindow(QMainWindow):
                 self.other_tab.configure_hera.connect(self._on_configure_hera)
                 self.other_tab.configure_collect_data.connect(self._on_configure_collect_data)
                 self.other_tab.show_input_text_dialog.connect(self._on_show_input_text_dialog)
-                self.other_tab.show_tools_config_dialog.connect(self._on_show_tools_config_dialog)
-                self.other_tab.show_display_lines_dialog.connect(self._on_show_display_lines_dialog)
+                # 工具配置、配置备份恢复和日志区域行数已移到工具栏的下拉菜单中
                 self.other_tab.show_at_tool_dialog.connect(self._on_show_at_tool_dialog)
                 self.other_tab.show_encoding_tool_dialog.connect(self._on_show_encoding_tool_dialog)
-                self.other_tab.show_config_backup_dialog.connect(self.show_config_backup_dialog)
-                self.other_tab.show_unified_manager.connect(self.show_unified_manager_dialog)
+                self.other_tab.parse_3gpp_message.connect(self._on_parse_3gpp_message)
                 self.other_tab.show_secret_code_dialog.connect(self.show_secret_code_dialog)
-                self.other_tab.show_lock_cell_dialog.connect(self.show_lock_cell_dialog)
-                self.other_tab.show_qc_nv_dialog.connect(self.show_qc_nv_dialog)
             
             # 连接 SIM Tab 信号
             if hasattr(self, 'sim_tab'):
