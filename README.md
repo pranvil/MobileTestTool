@@ -4,7 +4,6 @@
 
 ## 说明
 
-- **代码仓库**: [MobileTestTool-Private](https://github.com/pranvil/MobileTestTool-Private) (私有)
 - **发布仓库**: 当前仓库 (公开)
 
 此仓库只包含发布相关的文件，源代码已迁移到私有仓库。
