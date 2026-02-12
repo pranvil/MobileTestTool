@@ -4,8 +4,8 @@
     "sha256":  "e188abdc7602cb3b096e637d3b0d574dd1526674388f2e95d7d0323a23ca375f",
     "file_name":  "MobileTestTool_0.9.6.6.7.zip",
     "file_size":  150439269,
-    "release_notes":  "## Release Note\n- Fix markdown templete issue",
-    "published_at":  "2026-02-12T00:06:54Z",
+    "release_notes":  "- Add release notes here",
+    "published_at":  "2026-02-12T00:11:00Z",
     "mandatory":  false,
     "download_urls":  [
                           {
