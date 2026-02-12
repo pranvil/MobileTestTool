@@ -1,28 +1,34 @@
 {
-    "version":  "0.9.6.6.7",
-    "download_url":  "https://github.com/pranvil/MobileTestTool/releases/download/v0.9.6.6.7/MobileTestTool_0.9.6.6.7.zip",
-    "sha256":  "e188abdc7602cb3b096e637d3b0d574dd1526674388f2e95d7d0323a23ca375f",
-    "file_name":  "MobileTestTool_0.9.6.6.7.zip",
-    "file_size":  150439269,
-    "release_notes":  "- Add release notes here",
-    "published_at":  "2026-02-12T00:11:00Z",
+    "version":  "0.9.6.6.8",
+    "download_url":  "https://github.com/pranvil/MobileTestTool/releases/download/v0.9.6.6.8/MobileTestTool_0.9.6.6.8.zip",
+    "sha256":  "426a18a412cf156eb1996b9e76a5517d73174958df5b7f13ecea1258c63f677f",
+    "file_name":  "MobileTestTool_0.9.6.6.8.zip",
+    "file_size":  150441821,
+    "release_notes":  "## Release Note\n- Fix markdown templete issue",
+    "published_at":  "2026-02-12T03:14:09Z",
     "mandatory":  false,
     "download_urls":  [
                           {
                               "region":  "us",
-                              "url":  "https://github.com/pranvil/MobileTestTool/releases/download/v0.9.6.6.7/MobileTestTool_0.9.6.6.7.zip",
+                              "url":  "https://github.com/pranvil/MobileTestTool/releases/download/v0.9.6.6.8/MobileTestTool_0.9.6.6.8.zip",
                               "priority":  10,
                               "platform":  "windows"
                           },
                           {
+                              "region":  "cn",
+                              "url":  "https://modelscope.cn/models/Pranvil/mobiletestTool/resolve/master/MobileTestTool_0.9.6.6.8.zip",
+                              "priority":  20,
+                              "platform":  "windows"
+                          },
+                          {
                               "region":  "internal",
-                              "url":  "http://10.129.93.67/hao.lin/MobileTestTool/-/releases/v0.9.6.6.7/downloads/MobileTestTool_0.9.6.6.7.zip",
+                              "url":  "http://10.129.93.67/hao.lin/MobileTestTool/-/releases/v0.9.6.6.8/downloads/MobileTestTool_0.9.6.6.8.zip",
                               "priority":  15,
                               "platform":  "windows"
                           },
                           {
                               "region":  "default",
-                              "url":  "https://github.com/pranvil/MobileTestTool/releases/download/v0.9.6.6.7/MobileTestTool_0.9.6.6.7.zip",
+                              "url":  "https://github.com/pranvil/MobileTestTool/releases/download/v0.9.6.6.8/MobileTestTool_0.9.6.6.8.zip",
                               "priority":  5,
                               "platform":  "all"
                           }
