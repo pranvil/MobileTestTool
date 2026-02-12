@@ -1,23 +1,17 @@
 {
     "version":  "0.9.6.6.7",
     "download_url":  "https://github.com/pranvil/MobileTestTool/releases/download/v0.9.6.6.7/MobileTestTool_0.9.6.6.7.zip",
-    "sha256":  "1c539ea620118db6baf66d23c82e0124a6c9391c10e99619abb88e86a91fdea7",
+    "sha256":  "e188abdc7602cb3b096e637d3b0d574dd1526674388f2e95d7d0323a23ca375f",
     "file_name":  "MobileTestTool_0.9.6.6.7.zip",
-    "file_size":  149727645,
+    "file_size":  150439269,
     "release_notes":  "## Release Note\n- Fix markdown templete issue",
-    "published_at":  "2026-02-11T01:30:34Z",
+    "published_at":  "2026-02-12T00:06:54Z",
     "mandatory":  false,
     "download_urls":  [
                           {
                               "region":  "us",
                               "url":  "https://github.com/pranvil/MobileTestTool/releases/download/v0.9.6.6.7/MobileTestTool_0.9.6.6.7.zip",
                               "priority":  10,
-                              "platform":  "windows"
-                          },
-                          {
-                              "region":  "cn",
-                              "url":  "https://modelscope.cn/models/Pranvil/mobiletestTool/resolve/master/MobileTestTool_0.9.6.6.7.zip",
-                              "priority":  20,
                               "platform":  "windows"
                           },
                           {
