@@ -1,34 +1,34 @@
 {
-  "version": "0.9.6.6.9",
-  "download_url": "https://github.com/pranvil/MobileTestTool/releases/download/v0.9.6.6.9/MobileTestTool_0.9.6.6.9.zip",
-  "sha256": "c4abe3e6f286b144072f748fcbc33069fd1d186ba77d85de9903f07217150a8c",
-  "file_name": "MobileTestTool_0.9.6.6.9.zip",
-  "file_size": 121654570,
+  "version": "0.9.6.7.0",
+  "download_url": "https://github.com/pranvil/MobileTestTool/releases/download/v0.9.6.7.0/MobileTestTool_0.9.6.7.0.zip",
+  "sha256": "ea52583a4d3c813f94ad696c325fc67dc5500b9575bc3c3c483369ce75722605",
+  "file_name": "MobileTestTool_0.9.6.7.0.zip",
+  "file_size": 121650839,
   "release_notes": "## Release Note\n- test build",
-  "published_at": "2026-03-05T04:31:58Z",
+  "published_at": "2026-03-05T04:48:09Z",
   "mandatory": false,
   "download_urls": [
     {
       "priority": 10,
-      "url": "https://github.com/pranvil/MobileTestTool/releases/download/v0.9.6.6.9/MobileTestTool_0.9.6.6.9.zip",
+      "url": "https://github.com/pranvil/MobileTestTool/releases/download/v0.9.6.7.0/MobileTestTool_0.9.6.7.0.zip",
       "platform": "windows",
       "region": "us"
     },
     {
       "priority": 20,
-      "url": "https://modelscope.cn/models/Pranvil/mobiletestTool/resolve/master/MobileTestTool_0.9.6.6.9-t.zip",
+      "url": "https://modelscope.cn/models/Pranvil/mobiletestTool/resolve/master/MobileTestTool_0.9.6.7.0-t2.zip",
       "platform": "windows",
       "region": "cn"
     },
     {
       "priority": 15,
-      "url": "http://10.129.93.67/hao.lin/MobileTestTool/-/releases/v0.9.6.6.9/downloads/MobileTestTool_0.9.6.6.9.zip",
+      "url": "http://10.129.93.67/hao.lin/MobileTestTool/-/releases/v0.9.6.7.0/downloads/MobileTestTool_0.9.6.7.0.zip",
       "platform": "windows",
       "region": "internal"
     },
     {
       "priority": 5,
-      "url": "https://github.com/pranvil/MobileTestTool/releases/download/v0.9.6.6.9/MobileTestTool_0.9.6.6.9.zip",
+      "url": "https://github.com/pranvil/MobileTestTool/releases/download/v0.9.6.7.0/MobileTestTool_0.9.6.7.0.zip",
       "platform": "all",
       "region": "default"
     }
