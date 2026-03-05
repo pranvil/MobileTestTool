@@ -1,36 +1,36 @@
 {
-  "version": "0.9.6.7.0",
-  "download_url": "https://github.com/pranvil/MobileTestTool/releases/download/v0.9.6.7.0/MobileTestTool_0.9.6.7.0.zip",
-  "sha256": "ea52583a4d3c813f94ad696c325fc67dc5500b9575bc3c3c483369ce75722605",
-  "file_name": "MobileTestTool_0.9.6.7.0.zip",
-  "file_size": 121650839,
-  "release_notes": "## Release Note\n- test build",
-  "published_at": "2026-03-05T04:48:09Z",
+  "version": "0.9.6.7.1",
+  "download_url": "https://github.com/pranvil/MobileTestTool/releases/download/v0.9.6.7.1/MobileTestTool_0.9.6.7.1.zip",
+  "sha256": "a41daf1c6aaafba1670b4ad3843b605f75faee06f8bc98f33af1a7d8a262adee",
+  "file_name": "MobileTestTool_0.9.6.7.1.zip",
+  "file_size": 121655874,
+  "release_notes": "## Release Note\n- fix crash issue when stop google log",
+  "published_at": "2026-03-05T07:08:39Z",
   "mandatory": false,
   "download_urls": [
     {
+      "platform": "windows",
+      "region": "us",
       "priority": 10,
-      "url": "https://github.com/pranvil/MobileTestTool/releases/download/v0.9.6.7.0/MobileTestTool_0.9.6.7.0.zip",
-      "platform": "windows",
-      "region": "us"
+      "url": "https://github.com/pranvil/MobileTestTool/releases/download/v0.9.6.7.1/MobileTestTool_0.9.6.7.1.zip"
     },
     {
+      "platform": "windows",
+      "region": "cn",
       "priority": 20,
-      "url": "https://modelscope.cn/models/Pranvil/mobiletestTool/resolve/master/MobileTestTool_0.9.6.7.0-t2.zip",
-      "platform": "windows",
-      "region": "cn"
+      "url": "https://modelscope.cn/models/Pranvil/mobiletestTool/resolve/master/MobileTestTool_0.9.6.7.1.zip"
     },
     {
+      "platform": "windows",
+      "region": "internal",
       "priority": 15,
-      "url": "http://10.129.93.67/hao.lin/MobileTestTool/-/releases/v0.9.6.7.0/downloads/MobileTestTool_0.9.6.7.0.zip",
-      "platform": "windows",
-      "region": "internal"
+      "url": "http://10.129.93.67/hao.lin/MobileTestTool/-/releases/v0.9.6.7.1/downloads/MobileTestTool_0.9.6.7.1.zip"
     },
     {
-      "priority": 5,
-      "url": "https://github.com/pranvil/MobileTestTool/releases/download/v0.9.6.7.0/MobileTestTool_0.9.6.7.0.zip",
       "platform": "all",
-      "region": "default"
+      "region": "default",
+      "priority": 5,
+      "url": "https://github.com/pranvil/MobileTestTool/releases/download/v0.9.6.7.1/MobileTestTool_0.9.6.7.1.zip"
     }
   ]
 }
