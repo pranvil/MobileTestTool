@@ -1,11 +1,11 @@
 {
   "version": "0.9.6.6.9",
   "download_url": "https://github.com/pranvil/MobileTestTool/releases/download/v0.9.6.6.9/MobileTestTool_0.9.6.6.9.zip",
-  "sha256": "3aad47ef06e06d082aef28e0bbf9b58a3b8ff0cbea1b5d7f21108b24c8e052e8",
+  "sha256": "cc08484064a09c0037821d6a8dd8cbc9a0f5bd671878d7b533153dab0bc58027",
   "file_name": "MobileTestTool_0.9.6.6.9.zip",
-  "file_size": 121651702,
+  "file_size": 121649510,
   "release_notes": "## Release Note\n- Fix google log issue",
-  "published_at": "2026-03-05T01:50:16Z",
+  "published_at": "2026-03-05T02:15:14Z",
   "mandatory": false,
   "download_urls": [
     {
