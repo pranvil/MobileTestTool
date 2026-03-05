@@ -5,31 +5,31 @@
   "file_name": "MobileTestTool_0.9.6.6.9.zip",
   "file_size": 121651702,
   "release_notes": "## Release Note\n- Fix google log issue",
-  "published_at": "2026-03-05T01:08:28Z",
+  "published_at": "2026-03-05T01:42:02Z",
   "mandatory": false,
   "download_urls": [
     {
-      "platform": "windows",
       "priority": 10,
       "url": "https://github.com/pranvil/MobileTestTool/releases/download/v0.9.6.6.9/MobileTestTool_0.9.6.6.9.zip",
+      "platform": "windows",
       "region": "us"
     },
     {
-      "platform": "windows",
       "priority": 20,
       "url": "https://modelscope.cn/models/Pranvil/mobiletestTool/resolve/master/MobileTestTool_0.9.6.6.9.zip",
+      "platform": "windows",
       "region": "cn"
     },
     {
-      "platform": "windows",
       "priority": 15,
       "url": "http://10.129.93.67/hao.lin/MobileTestTool/-/releases/v0.9.6.6.9/downloads/MobileTestTool_0.9.6.6.9.zip",
+      "platform": "windows",
       "region": "internal"
     },
     {
-      "platform": "all",
       "priority": 5,
       "url": "https://github.com/pranvil/MobileTestTool/releases/download/v0.9.6.6.9/MobileTestTool_0.9.6.6.9.zip",
+      "platform": "all",
       "region": "default"
     }
   ]
