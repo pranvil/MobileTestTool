@@ -1,36 +1,36 @@
 {
-  "version": "0.9.6.7.1",
-  "download_url": "https://github.com/pranvil/MobileTestTool/releases/download/v0.9.6.7.1/MobileTestTool_0.9.6.7.1.zip",
-  "sha256": "a41daf1c6aaafba1670b4ad3843b605f75faee06f8bc98f33af1a7d8a262adee",
-  "file_name": "MobileTestTool_0.9.6.7.1.zip",
-  "file_size": 121655874,
-  "release_notes": "## Release Note\n- fix crash issue when stop google log",
-  "published_at": "2026-03-05T07:08:39Z",
+  "version": "0.9.6.7.2",
+  "download_url": "https://github.com/pranvil/MobileTestTool/releases/download/v0.9.6.7.2/MobileTestTool_0.9.6.7.2.zip",
+  "sha256": "dc76465d2bace9dbdd5f8dcc4d16471763ceceba83548b534f81a7b3d92adc8f",
+  "file_name": "MobileTestTool_0.9.6.7.2.zip",
+  "file_size": 121844195,
+  "release_notes": "## Release Note\n- fix samsung device read ISIM issue",
+  "published_at": "2026-03-16T12:06:48Z",
   "mandatory": false,
   "download_urls": [
     {
-      "platform": "windows",
-      "region": "us",
       "priority": 10,
-      "url": "https://github.com/pranvil/MobileTestTool/releases/download/v0.9.6.7.1/MobileTestTool_0.9.6.7.1.zip"
+      "platform": "windows",
+      "url": "https://github.com/pranvil/MobileTestTool/releases/download/v0.9.6.7.2/MobileTestTool_0.9.6.7.2.zip",
+      "region": "us"
     },
     {
-      "platform": "windows",
-      "region": "cn",
       "priority": 20,
-      "url": "https://modelscope.cn/models/Pranvil/mobiletestTool/resolve/master/MobileTestTool_0.9.6.7.1.zip"
-    },
-    {
       "platform": "windows",
-      "region": "internal",
-      "priority": 15,
-      "url": "http://10.129.93.67/hao.lin/MobileTestTool/-/releases/v0.9.6.7.1/downloads/MobileTestTool_0.9.6.7.1.zip"
+      "url": "https://modelscope.cn/models/Pranvil/mobiletestTool/resolve/master/MobileTestTool_0.9.6.7.2.zip",
+      "region": "cn"
     },
     {
-      "platform": "all",
-      "region": "default",
+      "priority": 15,
+      "platform": "windows",
+      "url": "http://10.129.93.67/hao.lin/MobileTestTool/-/releases/v0.9.6.7.2/downloads/MobileTestTool_0.9.6.7.2.zip",
+      "region": "internal"
+    },
+    {
       "priority": 5,
-      "url": "https://github.com/pranvil/MobileTestTool/releases/download/v0.9.6.7.1/MobileTestTool_0.9.6.7.1.zip"
+      "platform": "all",
+      "url": "https://github.com/pranvil/MobileTestTool/releases/download/v0.9.6.7.2/MobileTestTool_0.9.6.7.2.zip",
+      "region": "default"
     }
   ]
 }
