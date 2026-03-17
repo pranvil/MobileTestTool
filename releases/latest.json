@@ -5,7 +5,7 @@
   "file_name": "MobileTestTool_0.9.6.7.2.zip",
   "file_size": 121844195,
   "release_notes": "## Release Note\n- fix samsung device read ISIM issue",
-  "published_at": "2026-03-16T12:08:36Z",
+  "published_at": "2026-03-17T01:24:59Z",
   "mandatory": false,
   "download_urls": [
     {
@@ -13,12 +13,6 @@
       "platform": "windows",
       "url": "https://github.com/pranvil/MobileTestTool/releases/download/v0.9.6.7.2/MobileTestTool_0.9.6.7.2.zip",
       "region": "us"
-    },
-    {
-      "priority": 20,
-      "platform": "windows",
-      "url": "https://modelscope.cn/models/Pranvil/mobiletestTool/resolve/master/MobileTestTool_0.9.6.7.2.zip",
-      "region": "cn"
     },
     {
       "priority": 15,
