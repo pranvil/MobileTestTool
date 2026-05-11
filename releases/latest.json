@@ -1,36 +1,36 @@
 {
-  "version": "0.9.6.7.3",
-  "download_url": "https://github.com/pranvil/MobileTestTool/releases/download/v0.9.6.7.3/MobileTestTool_0.9.6.7.3.zip",
-  "sha256": "17ed7a8e5f8adb3f0b4eaea16eb983ea961c0d084a8ad334cd094e9404acae28",
-  "file_name": "MobileTestTool_0.9.6.7.3.zip",
-  "file_size": 121784568,
-  "release_notes": "## Release Note\n- fix jira tool unable launch issue\n- fix Custom tab hide/unhide cause button doesn't work issue\n- fix SIM EF file error message issue not showing issue\n- fix adb log cannot stop issue",
-  "published_at": "2026-03-26T06:04:01Z",
+  "version": "0.9.6.7.5",
+  "download_url": "https://github.com/pranvil/MobileTestTool/releases/download/v0.9.6.7.5/MobileTestTool_0.9.6.7.5.zip",
+  "sha256": "7e7a77b8c38c625a90f862723be1e75fbcd1483a5f39b5bd790217ff8ae5da7e",
+  "file_name": "MobileTestTool_0.9.6.7.5.zip",
+  "file_size": 134459717,
+  "release_notes": "## Release Note\n- SIM READER optimization\n- SIM APDU parse more apdu\n- FIX EFuts bug",
+  "published_at": "2026-05-11T10:22:06Z",
   "mandatory": false,
   "download_urls": [
     {
-      "url": "https://github.com/pranvil/MobileTestTool/releases/download/v0.9.6.7.3/MobileTestTool_0.9.6.7.3.zip",
+      "region": "us",
+      "url": "https://github.com/pranvil/MobileTestTool/releases/download/v0.9.6.7.5/MobileTestTool_0.9.6.7.5.zip",
       "priority": 10,
-      "platform": "windows",
-      "region": "us"
+      "platform": "windows"
     },
     {
-      "url": "https://modelscope.cn/models/Pranvil/mobiletestTool/resolve/master/MobileTestTool_0.9.6.7.3.zip",
+      "region": "cn",
+      "url": "https://modelscope.cn/models/Pranvil/mobiletestTool/resolve/master/MobileTestTool_0.9.6.7.5.zip",
       "priority": 20,
-      "platform": "windows",
-      "region": "cn"
+      "platform": "windows"
     },
     {
-      "url": "http://10.129.93.67/hao.lin/MobileTestTool/-/releases/v0.9.6.7.3/downloads/MobileTestTool_0.9.6.7.3.zip",
+      "region": "internal",
+      "url": "http://10.129.93.67/hao.lin/MobileTestTool/-/releases/v0.9.6.7.5/downloads/MobileTestTool_0.9.6.7.5.zip",
       "priority": 15,
-      "platform": "windows",
-      "region": "internal"
+      "platform": "windows"
     },
     {
-      "url": "https://github.com/pranvil/MobileTestTool/releases/download/v0.9.6.7.3/MobileTestTool_0.9.6.7.3.zip",
+      "region": "default",
+      "url": "https://github.com/pranvil/MobileTestTool/releases/download/v0.9.6.7.5/MobileTestTool_0.9.6.7.5.zip",
       "priority": 5,
-      "platform": "all",
-      "region": "default"
+      "platform": "all"
     }
   ]
 }
