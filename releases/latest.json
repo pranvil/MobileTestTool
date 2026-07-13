@@ -1,36 +1,30 @@
 {
-  "version": "1.0",
-  "download_url": "https://github.com/pranvil/MobileTestTool/releases/download/v1.0/MobileTestTool_1.0.zip",
-  "sha256": "124d77f988be25b2c70de17f5e577fec8cc4a6c38f603f7cb87f2f0a5c7ac7ea",
-  "file_name": "MobileTestTool_1.0.zip",
-  "file_size": 205019808,
-  "release_notes": "## Release Note\n- fix 6F06/2F02 parser bug\n- mace2 python optimization",
-  "published_at": "2026-06-07T10:44:03Z",
+  "version": "1.1",
+  "download_url": "https://github.com/pranvil/MobileTestTool/releases/download/v1.1/MobileTestTool_1.1.zip",
+  "sha256": "03cda280336ed455bf2388cddfff7fec05c0e8f10595ba0c1bf2eaf3a2452b82",
+  "file_name": "MobileTestTool_1.1.zip",
+  "file_size": 260346037,
+  "release_notes": "## Release Note\n- improve EF parser compatibility\n- Fix APDU parse bug\n-",
+  "published_at": "2026-07-13T11:18:22Z",
   "mandatory": false,
   "download_urls": [
     {
-      "priority": 10,
       "region": "us",
       "platform": "windows",
-      "url": "https://github.com/pranvil/MobileTestTool/releases/download/v1.0/MobileTestTool_1.0.zip"
+      "url": "https://github.com/pranvil/MobileTestTool/releases/download/v1.1/MobileTestTool_1.1.zip",
+      "priority": 10
     },
     {
-      "priority": 20,
       "region": "cn",
       "platform": "windows",
-      "url": "https://modelscope.cn/models/Pranvil/mobiletestTool/resolve/master/MobileTestTool_1.0.zip"
+      "url": "https://modelscope.cn/models/Pranvil/mobiletestTool/resolve/master/MobileTestTool_1.1.zip",
+      "priority": 20
     },
     {
-      "priority": 15,
-      "region": "internal",
-      "platform": "windows",
-      "url": "http://10.129.93.67/hao.lin/MobileTestTool/-/releases/v1.0/downloads/MobileTestTool_1.0.zip"
-    },
-    {
-      "priority": 5,
       "region": "default",
       "platform": "all",
-      "url": "https://github.com/pranvil/MobileTestTool/releases/download/v1.0/MobileTestTool_1.0.zip"
+      "url": "https://github.com/pranvil/MobileTestTool/releases/download/v1.1/MobileTestTool_1.1.zip",
+      "priority": 5
     }
   ]
 }
