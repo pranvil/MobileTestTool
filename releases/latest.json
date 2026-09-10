@@ -1,29 +1,23 @@
 {
-  "version": "1.1",
-  "download_url": "https://github.com/pranvil/MobileTestTool/releases/download/v1.1/MobileTestTool_1.1.zip",
-  "sha256": "03cda280336ed455bf2388cddfff7fec05c0e8f10595ba0c1bf2eaf3a2452b82",
-  "file_name": "MobileTestTool_1.1.zip",
-  "file_size": 260346037,
-  "release_notes": "## Release Note\n- improve EF parser compatibility\n- Fix APDU parse bug\n-",
-  "published_at": "2026-07-13T11:18:22Z",
+  "version": "1.2",
+  "download_url": "https://github.com/pranvil/MobileTestTool/releases/download/v1.2/MobileTestTool_1.2.zip",
+  "sha256": "186a1f9033cba54c5658699f5f2bfd8fd80c94cadaf05da45c4c3fbd82f1ab51",
+  "file_name": "MobileTestTool_1.2.zip",
+  "file_size": 254742567,
+  "release_notes": "## MobileTestTool v1.2\n\n- SIM TOOL：EF 6FAD 的 UE operation mode 改为六项规范下拉选择，选择后通过原有编码流程写入；其他字段和 Raw 模式保持不变。\n- SIM TOOL：启动时后台发送 AT 检测串口，响应包含 OK 才自动选中并连接；没有合适端口时保持未选择。\n- SIM TOOL：手动选择端口或关闭窗口会取消自动检测并释放未接管的串口，避免覆盖用户选择或残留占用。\n",
+  "published_at": "2026-09-10T08:26:03Z",
   "mandatory": false,
   "download_urls": [
     {
+      "url": "https://github.com/pranvil/MobileTestTool/releases/download/v1.2/MobileTestTool_1.2.zip",
       "region": "us",
       "platform": "windows",
-      "url": "https://github.com/pranvil/MobileTestTool/releases/download/v1.1/MobileTestTool_1.1.zip",
       "priority": 10
     },
     {
-      "region": "cn",
-      "platform": "windows",
-      "url": "https://modelscope.cn/models/Pranvil/mobiletestTool/resolve/master/MobileTestTool_1.1.zip",
-      "priority": 20
-    },
-    {
+      "url": "https://github.com/pranvil/MobileTestTool/releases/download/v1.2/MobileTestTool_1.2.zip",
       "region": "default",
       "platform": "all",
-      "url": "https://github.com/pranvil/MobileTestTool/releases/download/v1.1/MobileTestTool_1.1.zip",
       "priority": 5
     }
   ]
