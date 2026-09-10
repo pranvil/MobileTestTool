@@ -1,27 +1,27 @@
 {
-  "version": "1.2",
-  "download_url": "https://github.com/pranvil/MobileTestTool/releases/download/v1.2/MobileTestTool_1.2.zip",
-  "sha256": "186a1f9033cba54c5658699f5f2bfd8fd80c94cadaf05da45c4c3fbd82f1ab51",
-  "file_name": "MobileTestTool_1.2.zip",
-  "file_size": 254742567,
-  "release_notes": "## MobileTestTool v1.2\n\n- SIM TOOL：EF 6FAD 的 UE operation mode 改为六项规范下拉选择，选择后通过原有编码流程写入；其他字段和 Raw 模式保持不变。\n- SIM TOOL：启动时后台发送 AT 检测串口，响应包含 OK 才自动选中并连接；没有合适端口时保持未选择。\n- SIM TOOL：手动选择端口或关闭窗口会取消自动检测并释放未接管的串口，避免覆盖用户选择或残留占用。\n",
-  "published_at": "2026-09-10T08:26:03Z",
+  "version": "1.3.1",
+  "download_url": "https://github.com/pranvil/MobileTestTool/releases/download/v1.3.1/MobileTestTool_1.3.1.zip",
+  "file_name": "MobileTestTool_1.3.1.zip",
+  "file_size": 252499409,
+  "sha256": "5bbcf3ddd39a52da8e0e94c4ce0f517597fa2a5e25374351d6291acf5c5c0bc6",
+  "release_notes": "## MobileTestTool v1.3.1\n\n- 修复 1.3 误打包 Poppler ICU 动态库导致 QtCore 加载失败、主程序无法启动的问题。\n- 包含独立 updater.exe，修复更新器清理阶段 sys 变量作用域错误。\n- 固定使用 Windows 系统 ICU，兼容从 1.2 升级及覆盖曾安装 1.3 的目录。\n- 发布前强制执行隔离构建、ZIP 完整性校验、干净解压后的真实主窗口和更新器启动测试。\n",
+  "published_at": "2026-09-10T14:10:15.076282Z",
   "mandatory": false,
   "download_urls": [
     {
-      "url": "https://modelscope.cn/models/Pranvil/mobiletestTool/resolve/master/MobileTestTool_1.2.zip",
+      "url": "https://modelscope.cn/models/Pranvil/mobiletestTool/resolve/master/MobileTestTool_1.3.1.zip",
       "region": "cn",
       "platform": "windows",
       "priority": 20
     },
     {
-      "url": "https://github.com/pranvil/MobileTestTool/releases/download/v1.2/MobileTestTool_1.2.zip",
+      "url": "https://github.com/pranvil/MobileTestTool/releases/download/v1.3.1/MobileTestTool_1.3.1.zip",
       "region": "us",
       "platform": "windows",
       "priority": 10
     },
     {
-      "url": "https://github.com/pranvil/MobileTestTool/releases/download/v1.2/MobileTestTool_1.2.zip",
+      "url": "https://github.com/pranvil/MobileTestTool/releases/download/v1.3.1/MobileTestTool_1.3.1.zip",
       "region": "default",
       "platform": "all",
       "priority": 5
