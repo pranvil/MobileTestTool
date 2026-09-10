@@ -9,6 +9,12 @@
   "mandatory": false,
   "download_urls": [
     {
+      "url": "https://modelscope.cn/models/Pranvil/mobiletestTool/resolve/master/MobileTestTool_1.2.zip",
+      "region": "cn",
+      "platform": "windows",
+      "priority": 20
+    },
+    {
       "url": "https://github.com/pranvil/MobileTestTool/releases/download/v1.2/MobileTestTool_1.2.zip",
       "region": "us",
       "platform": "windows",
