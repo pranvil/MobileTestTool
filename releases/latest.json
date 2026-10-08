@@ -1,27 +1,27 @@
 {
-  "version": "1.4",
-  "download_url": "https://github.com/pranvil/MobileTestTool/releases/download/v1.4/MobileTestTool_1.4.zip",
-  "file_name": "MobileTestTool_1.4.zip",
-  "file_size": 252636018,
-  "sha256": "142110a688582b9d7d684e83a5f367d174380eef7b50b1eaa5ffb7eedfa02438",
-  "release_notes": "# MobileTestTool 1.4\n\n发布日期：2026-09-28\n\n## SIM 读取性能与兼容性\n\n- 新增基于实际能力验证的 SIM 访问 profile，不再通过芯片名称硬编码访问路径。\n- 对支持且校验一致的设备启用 `AT+CRSM` 只读快速路径；失败、格式异常或数据不一致时自动回退 `AT+CSIM`。\n- Qualcomm 实机自动回退 CSIM；MediaTek 实机验证 CRSM，DF5GS/OPL5G 60 条记录读取从约 57 秒降低到约 4 秒（后端测量）。\n- 支持 AT 型号提示和可选 ADB SoC enrichment；ADB 不可用、未授权或无法匹配时不阻塞读卡。\n- 修复 MTK `AT+CSIM` 对部分文件返回 256 字节、尾部 FF padding 时触发 `short read at offset 0` 的问题。\n- 恢复幂等 SELECT/READ 命令的一次安全重试；VERIFY、UPDATE、CREATE、DELETE 仍禁止自动重发。\n\n## UICC/APDU 与文件解析\n\n- 新增结构化 AT 响应、APDU 状态机、UICC application session 和事务化文件读写模块。\n- 完善 `61xx` GET RESPONSE、`6Cxx` Le 修正以及 `62xx/63xx/63Cx` 状态处理。\n- USIM/ISIM 同 FID `6F07` 按 application context 分派 IMSI/IST parser。\n- 修复 DF5GS `5FC04F08` OPL5G 完整路径 parser 分派，并通过 60/60 记录 parse/encode 回环。\n- 普通编辑流程不再隐式 DELETE/CREATE 扩容；写入后重新选择并回读校验。\n- USIM 根目录 transparent/linear CREATE/DELETE 使用动态 FCP builder，并通过真实测试卡闭环验证。\n\n## UI、安全与测试\n\n- 修复重复点击记录导致编辑表单字段重复的问题。\n- 修复 ADM 命令在 TX/RX echo 日志中泄漏的问题，并清理历史匹配。\n- 支持端口、SIM reset、pSIM/eSIM 切换后的 UICC session/profile 失效。\n- Qualcomm COM8 与 MediaTek COM37 均完成全部预定义树文件 UI 读取。\n- 两个平台均完成 EF 6F40 的 UI 写入、回读、原值恢复和完整字节哈希核验。\n",
-  "published_at": "2026-09-28T09:45:49.574892Z",
+  "version": "1.4.1",
+  "download_url": "https://github.com/pranvil/MobileTestTool/releases/download/v1.4.1/MobileTestTool_1.4.1.zip",
+  "file_name": "MobileTestTool_1.4.1.zip",
+  "file_size": 252641067,
+  "sha256": "22c03c261e098fe3c50e8693a9f3a6a26add16999d04cee6114f9145cba3c8c7",
+  "release_notes": "# MobileTestTool 1.4.1\n\n发布日期：2026-10-08\n\n## SIM/UICC 诊断日志增强\n\n- 增加 FCP 原始十六进制、TLV 标签长度、文件 ID、文件结构、文件大小、记录长度、记录数量和 SFI 诊断日志。\n- 增加 SELECT、APDU TX/RX、SW1/SW2、GET RESPONSE、6Cxx 修正、CRSM/CSIM fallback 和 retry 日志。\n- 增加 UICC session 建立/关闭/失效、应用上下文、完整路径和 generation 日志。\n- 增加 READ BINARY、READ RECORD 的 offset/record/请求长度/返回长度/FF padding 处理日志。\n- 增加 UPDATE BINARY、UPDATE RECORD 的编码数据、D6/DC 响应、回读数据和逐字节比对日志。\n- 测试卡诊断模式保留完整 APDU/FCP/data 日志，便于定位 6981、6982、6A82 和文件选择问题。\n\n## 发布说明\n\n- 不改变既有 CRSM/CSIM 能力探测和 fallback 规则。\n- 不改变已验证的 Qualcomm COM8、MediaTek COM37 读写流程。\n- 保留 ADM、UPDATE、CREATE、DELETE 等非幂等命令不自动重试的安全策略。\n",
+  "published_at": "2026-10-08T13:20:28.330159Z",
   "mandatory": false,
   "download_urls": [
     {
-      "url": "https://modelscope.cn/models/Pranvil/mobiletestTool/resolve/master/MobileTestTool_1.4.zip",
+      "url": "https://modelscope.cn/models/Pranvil/mobiletestTool/resolve/master/MobileTestTool_1.4.1.zip",
       "region": "cn",
       "platform": "windows",
       "priority": 20
     },
     {
-      "url": "https://github.com/pranvil/MobileTestTool/releases/download/v1.4/MobileTestTool_1.4.zip",
+      "url": "https://github.com/pranvil/MobileTestTool/releases/download/v1.4.1/MobileTestTool_1.4.1.zip",
       "region": "us",
       "platform": "windows",
       "priority": 10
     },
     {
-      "url": "https://github.com/pranvil/MobileTestTool/releases/download/v1.4/MobileTestTool_1.4.zip",
+      "url": "https://github.com/pranvil/MobileTestTool/releases/download/v1.4.1/MobileTestTool_1.4.1.zip",
       "region": "default",
       "platform": "all",
       "priority": 5
