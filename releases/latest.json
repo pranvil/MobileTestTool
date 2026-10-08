@@ -5,7 +5,7 @@
   "file_size": 252641067,
   "sha256": "22c03c261e098fe3c50e8693a9f3a6a26add16999d04cee6114f9145cba3c8c7",
   "release_notes": "# MobileTestTool 1.4.1\n\n发布日期：2026-10-08\n\n## SIM/UICC 诊断日志增强\n\n- 增加 FCP 原始十六进制、TLV 标签长度、文件 ID、文件结构、文件大小、记录长度、记录数量和 SFI 诊断日志。\n- 增加 SELECT、APDU TX/RX、SW1/SW2、GET RESPONSE、6Cxx 修正、CRSM/CSIM fallback 和 retry 日志。\n- 增加 UICC session 建立/关闭/失效、应用上下文、完整路径和 generation 日志。\n- 增加 READ BINARY、READ RECORD 的 offset/record/请求长度/返回长度/FF padding 处理日志。\n- 增加 UPDATE BINARY、UPDATE RECORD 的编码数据、D6/DC 响应、回读数据和逐字节比对日志。\n- 测试卡诊断模式保留完整 APDU/FCP/data 日志，便于定位 6981、6982、6A82 和文件选择问题。\n\n## 发布说明\n\n- 不改变既有 CRSM/CSIM 能力探测和 fallback 规则。\n- 不改变已验证的 Qualcomm COM8、MediaTek COM37 读写流程。\n- 保留 ADM、UPDATE、CREATE、DELETE 等非幂等命令不自动重试的安全策略。\n",
-  "published_at": "2026-10-08T13:37:26.250137Z",
+  "published_at": "2026-10-08T13:46:57.844293Z",
   "mandatory": false,
   "download_urls": [
     {
