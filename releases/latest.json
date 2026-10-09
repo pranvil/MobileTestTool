@@ -1,27 +1,27 @@
 {
-  "version": "1.4.1",
-  "download_url": "https://github.com/pranvil/MobileTestTool/releases/download/v1.4.1/MobileTestTool_1.4.1.zip",
-  "file_name": "MobileTestTool_1.4.1.zip",
-  "file_size": 252641067,
-  "sha256": "22c03c261e098fe3c50e8693a9f3a6a26add16999d04cee6114f9145cba3c8c7",
-  "release_notes": "# MobileTestTool 1.4.1\n\n发布日期：2026-10-08\n\n## SIM/UICC 诊断日志增强\n\n- 增加 FCP 原始十六进制、TLV 标签长度、文件 ID、文件结构、文件大小、记录长度、记录数量和 SFI 诊断日志。\n- 增加 SELECT、APDU TX/RX、SW1/SW2、GET RESPONSE、6Cxx 修正、CRSM/CSIM fallback 和 retry 日志。\n- 增加 UICC session 建立/关闭/失效、应用上下文、完整路径和 generation 日志。\n- 增加 READ BINARY、READ RECORD 的 offset/record/请求长度/返回长度/FF padding 处理日志。\n- 增加 UPDATE BINARY、UPDATE RECORD 的编码数据、D6/DC 响应、回读数据和逐字节比对日志。\n- 测试卡诊断模式保留完整 APDU/FCP/data 日志，便于定位 6981、6982、6A82 和文件选择问题。\n\n## 发布说明\n\n- 不改变既有 CRSM/CSIM 能力探测和 fallback 规则。\n- 不改变已验证的 Qualcomm COM8、MediaTek COM37 读写流程。\n- 保留 ADM、UPDATE、CREATE、DELETE 等非幂等命令不自动重试的安全策略。\n",
-  "published_at": "2026-10-08T13:46:57.844293Z",
+  "version": "1.4.2",
+  "download_url": "https://github.com/pranvil/MobileTestTool/releases/download/v1.4.2/MobileTestTool_1.4.2.zip",
+  "file_name": "MobileTestTool_1.4.2.zip",
+  "file_size": 252576593,
+  "sha256": "9c033c875b8d2e4bc86007732d1a69dc6257875e062eaac6314edfc512173d5c",
+  "release_notes": "# MobileTestTool 1.4.2\n\n发布日期：2026-10-09\n\n## 恢复通用 SIM EF resize\n\n- 修复 1.4 重构后，输入参数编码长度超过 EF 容量时只返回 resize required、无法继续写入的问题。\n- 新增可复用的 EF resize 模块；单条编辑、Raw 写入、JSON 导入和兼容 resize 入口统一使用同一条处理链，长度包含编码后的 TLV。\n- 透明文件及线性文件记录数扩展优先使用 RESIZE FILE APDU；成功后重新 SELECT 校验 FCP，再写入并回读确认。\n- 修复 IMPI（6F02）、GID1（6F3E）、GID2（6F3F）编码器自行发送 APDU 和返回 RESIZED 标记导致的新写入链不兼容；编码器不再执行卡操作。\n- 保留完整 application / DF / EF 路径，避免同 FID 或 DF5GS 文件选择错误。\n\n## 删除重建风险确认与保护\n\n- 安全属性文件 6F06、2F06 及应用目录 2F00 禁止 resize；完整路径不能绕过终端 FID 检查。\n- 原生指令明确不支持，或原生指令不能表达线性记录长度变化 / cyclic 扩容时，提示用户是否采用删除重建；默认 No，仅明确确认才继续。\n- 删除前完整备份原 FCP 和数据，确认后复核卡会话、FCP 与数据未变化。重建保留安全属性、生命周期及 SFI，并恢复旧数据、回读校验后再继续编辑。\n- 权限不足、空间不足、错误参数、超时或未知结果不自动转为删建。所有修改指令不自动重试；内存/技术异常或 native 指令发出后的异常按结果不确定处理，停止整批写入。\n- 风险确认仅在 Qt 主线程显示；关闭窗口、超时、确认异常和晚到的 Yes 均不授权删除重建。\n- 当前透明 EF 短 APDU 偏移读写/恢复支持至 32768 字节；更大目标在修改前拒绝，避免先删除后发现不可恢复。\n\n## 完整 FCP 解析日志\n\n- 保留完整原始 FCP，同时输出各 TLV 的名称、长度和完整值。\n- 恢复文件可访问性、类型、结构、文件容量、记录长度/数量、生命周期、安全属性和 SFI 的解析日志及兼容查询字段。\n- 继续保留完整测试卡 FCP / APDU / data 诊断信息，便于定位状态字与访问规则问题。\n\n## 验证说明\n\n- 源码回归覆盖通用 resize、Raw / JSON、IMPI / GID、保护文件、权限 / 内存 / 超时、恢复失败、主线程风险确认和 FCP 解析。\n- Qualcomm COM8 真实测试卡的 ISIM 6F03：读取安全规则确认未授予原生 RESIZE FILE（D4）权限，D4 返回 6982，因此不误判为“指令不支持”或自动删除重建。\n- 经用户单独授权，在真实 6F03 完成 50 → 108 字节 DELETE / CREATE、临时写入回读、再次 DELETE / CREATE 恢复原容量与原数据；最终原始 / 最终 FCP 完全一致，数据逐字节和 SHA-256 一致。\n- 实测验证的是该测试卡的 ISIM transparent 6F03；其他 EF / 结构的 native resize 与删建分支有模拟卡回归覆盖，不能据此宣称所有设备均通过硬件验收。\n",
+  "published_at": "2026-10-09T08:39:01.439523Z",
   "mandatory": false,
   "download_urls": [
     {
-      "url": "https://modelscope.cn/models/Pranvil/mobiletestTool/resolve/master/MobileTestTool_1.4.1.zip",
+      "url": "https://modelscope.cn/models/Pranvil/mobiletestTool/resolve/master/MobileTestTool_1.4.2.zip",
       "region": "cn",
       "platform": "windows",
       "priority": 20
     },
     {
-      "url": "https://github.com/pranvil/MobileTestTool/releases/download/v1.4.1/MobileTestTool_1.4.1.zip",
+      "url": "https://github.com/pranvil/MobileTestTool/releases/download/v1.4.2/MobileTestTool_1.4.2.zip",
       "region": "us",
       "platform": "windows",
       "priority": 10
     },
     {
-      "url": "https://github.com/pranvil/MobileTestTool/releases/download/v1.4.1/MobileTestTool_1.4.1.zip",
+      "url": "https://github.com/pranvil/MobileTestTool/releases/download/v1.4.2/MobileTestTool_1.4.2.zip",
       "region": "default",
       "platform": "all",
       "priority": 5
