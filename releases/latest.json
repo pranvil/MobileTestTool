@@ -1,27 +1,27 @@
 {
-  "version": "1.4.3",
-  "download_url": "https://github.com/pranvil/MobileTestTool/releases/download/v1.4.3/MobileTestTool_1.4.3.zip",
-  "file_name": "MobileTestTool_1.4.3.zip",
-  "file_size": 252579714,
-  "sha256": "59de6696373b275292aa8fb87cbc3edea320faf5c9698ec3e2f0dda6e899a8b0",
-  "release_notes": "修复 ISIM 通道号解析错误，解决部分设备读取失败及通道关闭异常。\n优化通道打开失败的错误判断。\n",
-  "published_at": "2026-10-12T03:43:27.500362Z",
+  "version": "1.4.4",
+  "download_url": "https://github.com/pranvil/MobileTestTool/releases/download/v1.4.4/MobileTestTool_1.4.4.zip",
+  "file_name": "MobileTestTool_1.4.4.zip",
+  "file_size": 252580445,
+  "sha256": "2276324aca3dc86ed46b7919d0e0445d91d074552501e8791d70709caabfbdc4",
+  "release_notes": "修复高通手机 ISIM 读取兼容问题，保留 MTK 通道号解析修复。\n优化通道能力探测和失败回退判断。\n",
+  "published_at": "2026-10-12T04:59:32.560941Z",
   "mandatory": false,
   "download_urls": [
     {
-      "url": "https://modelscope.cn/models/Pranvil/mobiletestTool/resolve/master/MobileTestTool_1.4.3.zip",
+      "url": "https://modelscope.cn/models/Pranvil/mobiletestTool/resolve/master/MobileTestTool_1.4.4.zip",
       "region": "cn",
       "platform": "windows",
       "priority": 20
     },
     {
-      "url": "https://github.com/pranvil/MobileTestTool/releases/download/v1.4.3/MobileTestTool_1.4.3.zip",
+      "url": "https://github.com/pranvil/MobileTestTool/releases/download/v1.4.4/MobileTestTool_1.4.4.zip",
       "region": "us",
       "platform": "windows",
       "priority": 10
     },
     {
-      "url": "https://github.com/pranvil/MobileTestTool/releases/download/v1.4.3/MobileTestTool_1.4.3.zip",
+      "url": "https://github.com/pranvil/MobileTestTool/releases/download/v1.4.4/MobileTestTool_1.4.4.zip",
       "region": "default",
       "platform": "all",
       "priority": 5
