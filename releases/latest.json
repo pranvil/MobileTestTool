@@ -1,27 +1,27 @@
 {
-  "version": "1.4.2",
-  "download_url": "https://github.com/pranvil/MobileTestTool/releases/download/v1.4.2/MobileTestTool_1.4.2.zip",
-  "file_name": "MobileTestTool_1.4.2.zip",
-  "file_size": 252576593,
-  "sha256": "9c033c875b8d2e4bc86007732d1a69dc6257875e062eaac6314edfc512173d5c",
-  "release_notes": "恢复 SIM 文件超长数据的扩容写入，增加删除重建风险确认。\n完善 FCP 安全属性等解析日志，便于定位读写问题。",
-  "published_at": "2026-10-09T08:39:01.439523Z",
+  "version": "1.4.3",
+  "download_url": "https://github.com/pranvil/MobileTestTool/releases/download/v1.4.3/MobileTestTool_1.4.3.zip",
+  "file_name": "MobileTestTool_1.4.3.zip",
+  "file_size": 252579714,
+  "sha256": "59de6696373b275292aa8fb87cbc3edea320faf5c9698ec3e2f0dda6e899a8b0",
+  "release_notes": "修复 ISIM 通道号解析错误，解决部分设备读取失败及通道关闭异常。\n优化通道打开失败的错误判断。\n",
+  "published_at": "2026-10-12T03:43:27.500362Z",
   "mandatory": false,
   "download_urls": [
     {
-      "url": "https://modelscope.cn/models/Pranvil/mobiletestTool/resolve/master/MobileTestTool_1.4.2.zip",
+      "url": "https://modelscope.cn/models/Pranvil/mobiletestTool/resolve/master/MobileTestTool_1.4.3.zip",
       "region": "cn",
       "platform": "windows",
       "priority": 20
     },
     {
-      "url": "https://github.com/pranvil/MobileTestTool/releases/download/v1.4.2/MobileTestTool_1.4.2.zip",
+      "url": "https://github.com/pranvil/MobileTestTool/releases/download/v1.4.3/MobileTestTool_1.4.3.zip",
       "region": "us",
       "platform": "windows",
       "priority": 10
     },
     {
-      "url": "https://github.com/pranvil/MobileTestTool/releases/download/v1.4.2/MobileTestTool_1.4.2.zip",
+      "url": "https://github.com/pranvil/MobileTestTool/releases/download/v1.4.3/MobileTestTool_1.4.3.zip",
       "region": "default",
       "platform": "all",
       "priority": 5
