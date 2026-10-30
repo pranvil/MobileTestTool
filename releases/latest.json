@@ -1,27 +1,27 @@
 {
-  "version": "1.4.4",
-  "download_url": "https://github.com/pranvil/MobileTestTool/releases/download/v1.4.4/MobileTestTool_1.4.4.zip",
-  "file_name": "MobileTestTool_1.4.4.zip",
-  "file_size": 252580445,
-  "sha256": "2276324aca3dc86ed46b7919d0e0445d91d074552501e8791d70709caabfbdc4",
-  "release_notes": "修复高通手机 ISIM 读取兼容问题，保留 MTK 通道号解析修复。\n优化通道能力探测和失败回退判断。\n",
-  "published_at": "2026-10-12T04:59:32.560941Z",
+  "version": "1.4.5",
+  "download_url": "https://github.com/pranvil/MobileTestTool/releases/download/v1.4.5/MobileTestTool_1.4.5.zip",
+  "file_name": "MobileTestTool_1.4.5.zip",
+  "file_size": 252594462,
+  "sha256": "933c8ac74cf4b9804432394f47c6e083e53ed01779499ec2a846b7889b15e66b",
+  "release_notes": "恢复 GID1/GID2 按输入数据精确调整文件长度，支持缩短与扩容，保留明确输入的尾部 FF。\nJSON 批量导入只使用原生 RESIZE，不删除重建；结果中显示失败原因，超时或部分写入时停止后续操作。\n手动写入优先原生 RESIZE，仅在明确不支持时，经风险提示及用户确认后才允许删除重建；缩短前备份原数据。\n补齐常用 SIM 状态码说明，修复回读校验失败可能误报成功的问题，并加强会话变化和备份有效性检查。\n",
+  "published_at": "2026-10-30T08:22:29.270532Z",
   "mandatory": false,
   "download_urls": [
     {
-      "url": "https://modelscope.cn/models/Pranvil/mobiletestTool/resolve/master/MobileTestTool_1.4.4.zip",
+      "url": "https://modelscope.cn/models/Pranvil/mobiletestTool/resolve/master/MobileTestTool_1.4.5.zip",
       "region": "cn",
       "platform": "windows",
       "priority": 20
     },
     {
-      "url": "https://github.com/pranvil/MobileTestTool/releases/download/v1.4.4/MobileTestTool_1.4.4.zip",
+      "url": "https://github.com/pranvil/MobileTestTool/releases/download/v1.4.5/MobileTestTool_1.4.5.zip",
       "region": "us",
       "platform": "windows",
       "priority": 10
     },
     {
-      "url": "https://github.com/pranvil/MobileTestTool/releases/download/v1.4.4/MobileTestTool_1.4.4.zip",
+      "url": "https://github.com/pranvil/MobileTestTool/releases/download/v1.4.5/MobileTestTool_1.4.5.zip",
       "region": "default",
       "platform": "all",
       "priority": 5
