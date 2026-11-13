@@ -1,27 +1,27 @@
 {
-  "version": "1.4.6",
-  "download_url": "https://github.com/pranvil/MobileTestTool/releases/download/v1.4.6/MobileTestTool_1.4.6.zip",
-  "file_name": "MobileTestTool_1.4.6.zip",
-  "file_size": 252676417,
-  "sha256": "50c3c995d4874b2c70775a0cb8af90d825efc7220d0f02ba86714c9e120b861f",
-  "release_notes": "# v1.4.6\n\n- 优化 SIM Reader 的 ADM 输入体验：ADM 控件固定显示在 SIM Data 区域右上角，无需切换 PIN Management 标签页。\n- ADM 支持下拉快速选择 `UUUUUUUU`、`88888888`、`55555555`、`22222222`、`00000000`、`23761799`。\n- 保留 ADM 手动输入能力，并以明文显示输入内容；底层日志仍不会记录 ADM 原文或编码值。\n",
-  "published_at": "2026-11-12T13:05:45.864489Z",
+  "version": "1.4.5",
+  "download_url": "https://github.com/pranvil/MobileTestTool/releases/download/v1.4.5/MobileTestTool_1.4.5.zip",
+  "file_name": "MobileTestTool_1.4.5.zip",
+  "file_size": 252594462,
+  "sha256": "933c8ac74cf4b9804432394f47c6e083e53ed01779499ec2a846b7889b15e66b",
+  "release_notes": "恢复 GID1/GID2 按输入数据精确调整文件长度，支持缩短与扩容，保留明确输入的尾部 FF。\nJSON 批量导入只使用原生 RESIZE，不删除重建；结果中显示失败原因，超时或部分写入时停止后续操作。\n手动写入优先原生 RESIZE，仅在明确不支持时，经风险提示及用户确认后才允许删除重建；缩短前备份原数据。\n补齐常用 SIM 状态码说明，修复回读校验失败可能误报成功的问题，并加强会话变化和备份有效性检查。\n",
+  "published_at": "2026-10-30T08:22:29.270532Z",
   "mandatory": false,
   "download_urls": [
     {
-      "url": "https://modelscope.cn/models/Pranvil/mobiletestTool/resolve/master/MobileTestTool_1.4.6.zip",
+      "url": "https://modelscope.cn/models/Pranvil/mobiletestTool/resolve/master/MobileTestTool_1.4.5.zip",
       "region": "cn",
       "platform": "windows",
       "priority": 20
     },
     {
-      "url": "https://github.com/pranvil/MobileTestTool/releases/download/v1.4.6/MobileTestTool_1.4.6.zip",
+      "url": "https://github.com/pranvil/MobileTestTool/releases/download/v1.4.5/MobileTestTool_1.4.5.zip",
       "region": "us",
       "platform": "windows",
       "priority": 10
     },
     {
-      "url": "https://github.com/pranvil/MobileTestTool/releases/download/v1.4.6/MobileTestTool_1.4.6.zip",
+      "url": "https://github.com/pranvil/MobileTestTool/releases/download/v1.4.5/MobileTestTool_1.4.5.zip",
       "region": "default",
       "platform": "all",
       "priority": 5
