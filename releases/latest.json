@@ -1,27 +1,27 @@
 {
-  "version": "1.4.5",
-  "download_url": "https://github.com/pranvil/MobileTestTool/releases/download/v1.4.5/MobileTestTool_1.4.5.zip",
-  "file_name": "MobileTestTool_1.4.5.zip",
-  "file_size": 252594462,
-  "sha256": "933c8ac74cf4b9804432394f47c6e083e53ed01779499ec2a846b7889b15e66b",
-  "release_notes": "恢复 GID1/GID2 按输入数据精确调整文件长度，支持缩短与扩容，保留明确输入的尾部 FF。\nJSON 批量导入只使用原生 RESIZE，不删除重建；结果中显示失败原因，超时或部分写入时停止后续操作。\n手动写入优先原生 RESIZE，仅在明确不支持时，经风险提示及用户确认后才允许删除重建；缩短前备份原数据。\n补齐常用 SIM 状态码说明，修复回读校验失败可能误报成功的问题，并加强会话变化和备份有效性检查。\n",
-  "published_at": "2026-10-30T08:22:29.270532Z",
+  "version": "1.4.7",
+  "download_url": "https://github.com/pranvil/MobileTestTool/releases/download/v1.4.7/MobileTestTool_1.4.7.zip",
+  "file_name": "MobileTestTool_1.4.7.zip",
+  "file_size": 252683858,
+  "sha256": "e21fd31ac5ec7653278129b81cfd589d872d5164f51ced3404210808eeaad949",
+  "release_notes": "# v1.4.7\n\n- 修复 SIM Reader ADM 下拉菜单箭头在深色主题下不可见的问题。\n- ADM 下拉菜单显示清晰的可点击箭头，并保留预置 ADM code 快速选择、手动输入和明文显示能力。\n",
+  "published_at": "2026-11-13T01:28:10.803042Z",
   "mandatory": false,
   "download_urls": [
     {
-      "url": "https://modelscope.cn/models/Pranvil/mobiletestTool/resolve/master/MobileTestTool_1.4.5.zip",
+      "url": "https://modelscope.cn/models/Pranvil/mobiletestTool/resolve/master/MobileTestTool_1.4.7.zip",
       "region": "cn",
       "platform": "windows",
       "priority": 20
     },
     {
-      "url": "https://github.com/pranvil/MobileTestTool/releases/download/v1.4.5/MobileTestTool_1.4.5.zip",
+      "url": "https://github.com/pranvil/MobileTestTool/releases/download/v1.4.7/MobileTestTool_1.4.7.zip",
       "region": "us",
       "platform": "windows",
       "priority": 10
     },
     {
-      "url": "https://github.com/pranvil/MobileTestTool/releases/download/v1.4.5/MobileTestTool_1.4.5.zip",
+      "url": "https://github.com/pranvil/MobileTestTool/releases/download/v1.4.7/MobileTestTool_1.4.7.zip",
       "region": "default",
       "platform": "all",
       "priority": 5
